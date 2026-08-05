@@ -48,8 +48,15 @@ class FileSink(Protocol):
     async def save(self, data: bytes, *, filename: str, media_type: str) -> FileRecord: ...
 
 
-# The sink in effect for the current turn (None -> use the in-memory fallback).
+class FileSource(Protocol):
+    """Something that resolves a file id to a record IFF the caller owns it."""
+
+    async def resolve(self, file_id: str) -> FileRecord | None: ...
+
+
+# The sink/source in effect for the current turn (None -> in-memory fallback).
 _current_sink: ContextVar[FileSink | None] = ContextVar("current_file_sink", default=None)
+_current_source: ContextVar[FileSource | None] = ContextVar("current_file_source", default=None)
 
 
 @contextmanager
@@ -65,6 +72,27 @@ def file_sink(sink: FileSink) -> Iterator[None]:
         yield
     finally:
         _current_sink.reset(token)
+
+
+@contextmanager
+def file_source(source: FileSource) -> Iterator[None]:
+    """Install `source` as the active owner-scoped file resolver for the block.
+    Same contextvar/generator rules as `file_sink`."""
+    token = _current_source.set(source)
+    try:
+        yield
+    finally:
+        _current_source.reset(token)
+
+
+async def resolve_file(file_id: str) -> FileRecord | None:
+    """Resolve a file id to its record for a read tool. Delegates to the active
+    owner-scoped source if one is installed; else the in-memory fallback (offline
+    tool tests). A foreign/unknown id -> None (the tool turns that into an ERROR)."""
+    source = _current_source.get()
+    if source is not None:
+        return await source.resolve(file_id)
+    return file_store.get(file_id)
 
 
 class FileStore:

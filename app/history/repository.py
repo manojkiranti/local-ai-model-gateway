@@ -34,13 +34,34 @@ def make_title(first_message: str) -> str:
     return flat[: TITLE_MAX - 1].rstrip() + "…"  # ellipsis
 
 
+def format_attachment_note(attachments: list[dict[str, Any]]) -> str:
+    """A short system note naming files attached to a user message, so the model
+    knows their ids and can call inspect_excel/read_excel. Pure/formatting only."""
+    lines = ["Attached files (read them with inspect_excel / read_excel):"]
+    for a in attachments:
+        fid = a.get("id", "")
+        name = a.get("filename", "")
+        summary = a.get("summary", "")
+        detail = f" ({summary})" if summary else ""
+        lines.append(f'- id={fid} "{name}"{detail}')
+    return "\n".join(lines)
+
+
 def build_context_messages(messages: list[ChatMessage]) -> list[dict[str, str]]:
     """Clean visible turns -> the [{role, content}] the model sees.
 
     Only role/content is replayed; agent turns contribute their final answer
-    (their `trace` is history, not context). Ordering is the caller's (seq).
+    (their `trace` is history, not context). A user message that carried file
+    attachments re-emits its attachment note (a system message) just before it,
+    so 'now total column B' on a later turn still knows the file ids without the
+    frontend resending them. Ordering is the caller's (seq).
     """
-    return [{"role": m.role, "content": m.content} for m in messages]
+    out: list[dict[str, str]] = []
+    for m in messages:
+        if m.role == ROLE_USER and m.attachments:
+            out.append({"role": "system", "content": format_attachment_note(m.attachments)})
+        out.append({"role": m.role, "content": m.content})
+    return out
 
 
 # --------------------------------------------------------------------------- #
@@ -116,6 +137,7 @@ async def add_message(
     content: str,
     trace: Optional[list[Any]] = None,
     model: Optional[str] = None,
+    attachments: Optional[list[Any]] = None,
 ) -> ChatMessage:
     """Append a message with the next per-session seq, and bump the session's
     updated_at. Locks the session row so concurrent turns serialize."""
@@ -138,6 +160,7 @@ async def add_message(
         content=content,
         trace=trace,
         model=model,
+        attachments=attachments,
     )
     session.add(message)
     # Touch the session so threads re-sort by recency (server clock).
@@ -152,9 +175,16 @@ async def add_message(
 
 # Convenience wrappers for readable call sites.
 async def add_user_message(
-    session: AsyncSession, *, session_id: str, content: str
+    session: AsyncSession,
+    *,
+    session_id: str,
+    content: str,
+    attachments: Optional[list[Any]] = None,
 ) -> ChatMessage:
-    return await add_message(session, session_id=session_id, role=ROLE_USER, content=content)
+    return await add_message(
+        session, session_id=session_id, role=ROLE_USER, content=content,
+        attachments=attachments,
+    )
 
 
 async def add_assistant_message(

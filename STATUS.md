@@ -62,8 +62,14 @@ PyJWT (HS256), bcrypt, httpx (no ollama SDK), mcp SDK v2, openpyxl. Python 3.10.
   trace, robust to unknown tool / bad args / repeat / tool errors / max-iterations.
 - **Tools**: local (`get_current_time`, `create_excel` via openpyxl,
   `create_html`, `create_chart`, `create_pdf` via fpdf2, `create_docx` via
-  python-docx, `create_csv`, `calculator`, `date_math`, `fetch_url`) always on;
-  MCP tools filtered by read_only|allowlist|all. `fetch_url` is an
+  python-docx, `create_csv`, `calculator`, `date_math`, `fetch_url`,
+  `inspect_excel`, `read_excel`) always on;
+  MCP tools filtered by read_only|allowlist|all. `inspect_excel`/`read_excel`
+  read an UPLOADED spreadsheet (`POST /v1/files`, .xlsx/.csv, `source=uploaded`)
+  owner-scoped by `file_id`; `readers.py` normalizes both formats to a capped
+  `Table` and **never evaluates formulas** (`data_only=True`). Attach via
+  `file_ids` on `/v1/chat` (ownership-verified, note persisted on the user
+  message so ids survive later turns). `fetch_url` is an
   **SSRF-guarded** outbound HTTP GET (scheme allowlist; every resolved IP must be
   public, so localhost/private/link-local incl. cloud metadata are blocked;
   redirects re-checked per hop; GET-only; 10s timeout, ~2 MB cap, truncated; HTML
@@ -151,13 +157,18 @@ PyJWT (HS256), bcrypt, httpx (no ollama SDK), mcp SDK v2, openpyxl. Python 3.10.
 - **SSO/OIDC** — schema is ready, not implemented.
 - **Rate limiting / observability** — not yet. (Integration tests now exist for
   chat history + MCP; they skip when their backing service is unreachable.)
-- **Prompt-injection surface (fetch_url + write tools)** — `fetch_url` pulls
-  arbitrary external text into the loop, so a fetched page could carry
-  instructions. Fine while all MCP tools are read-only; **before wiring any
-  write-capable MCP tool**, revisit so fetched/tool content can't chain into a
-  state-changing action (e.g. confirmation gates, keep external text as data,
-  don't let it authorize writes). SSRF is handled; this is the content-trust
-  angle.
+- **Prompt-injection surface (fetch_url + uploaded spreadsheets + write tools)** —
+  `fetch_url` pulls arbitrary external text into the loop, and `inspect_excel`/
+  `read_excel` now feed UPLOADED cell contents (untrusted user data) into the
+  loop too — either could carry instructions. Fine while all MCP tools are
+  read-only; **before wiring any write-capable MCP tool**, revisit so
+  fetched/uploaded/tool content can't chain into a state-changing action (e.g.
+  confirmation gates, keep external text as data, don't let it authorize writes).
+  SSRF is handled; this is the content-trust angle.
+- **Uploaded-file data sensitivity** — uploaded spreadsheets will realistically
+  carry client PII/financials. Stays owner-scoped (`generated_files.user_id`,
+  404-for-non-owner) and out of logs; row/cell caps bound how much enters the
+  model context. No formula/macro execution (`data_only=True`, `.xlsm` rejected).
 
 ## Candidate next steps (to plan)
 1. Build the frontend (auth + chat threads + streaming + file download) — now

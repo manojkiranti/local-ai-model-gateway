@@ -7,7 +7,20 @@ in `registry.py` never changes.
 
 from __future__ import annotations
 
-from . import calculator, chart, csv, date_math, docx, excel, fetch_url, html, pdf, time
+from . import (
+    calculator,
+    chart,
+    csv,
+    date_math,
+    docx,
+    excel,
+    fetch_url,
+    html,
+    inspect_excel,
+    pdf,
+    read_excel,
+    time,
+)
 from .base import LocalFn, LocalToolSpec
 
 LOCAL_TOOLS: list[LocalToolSpec] = [
@@ -21,6 +34,8 @@ LOCAL_TOOLS: list[LocalToolSpec] = [
     date_math.SPEC,
     docx.SPEC,
     fetch_url.SPEC,
+    inspect_excel.SPEC,
+    read_excel.SPEC,
 ]
 
 __all__ = ["LOCAL_TOOLS", "LocalToolSpec", "LocalFn"]

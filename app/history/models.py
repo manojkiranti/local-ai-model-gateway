@@ -76,6 +76,10 @@ class ChatMessage(Base):
     content: Mapped[str] = mapped_column(Text, nullable=False)
     # Agent turns: the TraceEntry[] from the loop. Chat turns: NULL.
     trace: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    # Files the user attached to THIS user message (list of {id, filename,
+    # summary}); NULL when nothing was attached. Persisted so the attachment
+    # note is re-injected on later turns without the frontend resending ids.
+    attachments: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     # Model that produced an assistant row (NULL for user rows).
     model: Mapped[str | None] = mapped_column(String(128), nullable=True)
     created_at: Mapped[datetime] = mapped_column(

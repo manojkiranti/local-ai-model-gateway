@@ -25,6 +25,9 @@ class ChatTurnRequest(BaseModel):
     model: Optional[str] = None  # per-request override; else DEFAULT_CHAT_MODEL
     stream: bool = False
     options: Optional[dict] = None  # passthrough Ollama options (temperature, …)
+    # Ids of previously uploaded files (POST /v1/files) to attach to this turn;
+    # the gateway verifies ownership and tells the model it can read them.
+    file_ids: Optional[list[str]] = None
 
     model_config = ConfigDict(
         json_schema_extra={

@@ -25,8 +25,7 @@ from ..agent.loop import run_turn, stream_turn
 from ..auth.dependencies import get_current_user
 from ..config import Settings
 from ..db.session import SessionLocal, get_session
-from ..files.sink import PostgresFileSink
-from ..files.store import file_sink
+from ..files.source import turn_files
 from ..history import repository as repo
 from ..history.service import open_turn
 from ..mcp.client import MCPClient, MCPUnavailableError
@@ -77,9 +76,11 @@ async def chat(
     )
     model = run_settings.agent_model
 
-    # Resolve/create session + persist the user message (committed here).
+    # Resolve/create session + persist the user message (committed here). Any
+    # attached file_ids are verified owned here (404 on a foreign id).
     chat_session, context = await open_turn(
-        session, user_id=user.id, session_id=req.session_id, message=req.message
+        session, user_id=user.id, session_id=req.session_id, message=req.message,
+        file_ids=req.file_ids,
     )
     sid = chat_session.id
 
@@ -95,9 +96,10 @@ async def chat(
             final_answer = error_message = stop_reason = None
             trace = None
             try:
-                # Files any tool creates this turn are owned by this user + session.
-                # Must be set INSIDE the generator Starlette iterates (contextvar).
-                with file_sink(PostgresFileSink(user_id=user.id, session_id=sid)):
+                # Files any tool creates this turn are owned by this user +
+                # session, and the read tools resolve ids owner-scoped. Must be
+                # set INSIDE the generator Starlette iterates (contextvar).
+                with turn_files(user_id=user.id, session_id=sid):
                     async for event in stream_turn(
                         messages=context, ollama=ollama, mcp=mcp,
                         settings=run_settings, user_email=user.email,
@@ -133,8 +135,9 @@ async def chat(
 
     # --- non-streaming: collect the same loop into a result dict ---
     try:
-        # Files any tool creates this turn are owned by this user + session.
-        with file_sink(PostgresFileSink(user_id=user.id, session_id=sid)):
+        # Files created this turn are owned by this user + session; read tools
+        # resolve attached file ids owner-scoped.
+        with turn_files(user_id=user.id, session_id=sid):
             result = await run_turn(
                 messages=context, ollama=ollama, mcp=mcp,
                 settings=run_settings, user_email=user.email,

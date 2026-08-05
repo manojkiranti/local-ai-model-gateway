@@ -58,6 +58,10 @@ class Settings(BaseSettings):
 
     # --- Files (create_excel output; served only via GET /v1/files/{id}) ---
     files_dir: str = "generated_files"
+    # Spreadsheet upload (POST /v1/files): hard byte cap on the upload, and the
+    # zip-bomb guard's ceiling on total UNCOMPRESSED xlsx content.
+    upload_max_bytes: int = 10 * 1024 * 1024        # 10 MB on the wire
+    upload_xlsx_max_uncompressed: int = 200 * 1024 * 1024  # 200 MB expanded
 
     # --- fetch_url tool (SSRF-guarded outbound HTTP GET) ---
     # Enabled by default; internal/private IPs are ALWAYS blocked regardless.

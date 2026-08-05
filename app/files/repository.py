@@ -26,8 +26,10 @@ async def record_file(
     size: int,
     path: str,
     session_id: Optional[str] = None,
+    source: str = "generated",
 ) -> GeneratedFile:
-    """Insert one generated-file row (does not commit)."""
+    """Insert one file row (does not commit). `source` is 'generated' (tool
+    output) or 'uploaded' (user upload)."""
     row = GeneratedFile(
         id=id,
         user_id=user_id,
@@ -36,6 +38,7 @@ async def record_file(
         media_type=media_type,
         size=size,
         path=path,
+        source=source,
     )
     session.add(row)
     await session.flush()
@@ -67,11 +70,14 @@ async def delete_owned_file(
     return path
 
 
-async def list_files(session: AsyncSession, *, user_id: int) -> list[GeneratedFile]:
-    """All of a user's files, newest first (for the 'my files' UI gallery)."""
-    result = await session.execute(
-        select(GeneratedFile)
-        .where(GeneratedFile.user_id == user_id)
-        .order_by(GeneratedFile.created_at.desc(), GeneratedFile.id.desc())
-    )
+async def list_files(
+    session: AsyncSession, *, user_id: int, source: Optional[str] = None
+) -> list[GeneratedFile]:
+    """A user's files, newest first (for the 'my files' UI gallery). `source`
+    optionally filters to 'generated' or 'uploaded'."""
+    stmt = select(GeneratedFile).where(GeneratedFile.user_id == user_id)
+    if source is not None:
+        stmt = stmt.where(GeneratedFile.source == source)
+    stmt = stmt.order_by(GeneratedFile.created_at.desc(), GeneratedFile.id.desc())
+    result = await session.execute(stmt)
     return list(result.scalars().all())

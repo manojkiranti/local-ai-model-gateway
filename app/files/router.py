@@ -1,6 +1,8 @@
-"""Generated-file routes (authed):
-  GET /v1/files        — the caller's files, newest first (the "my files" list)
-  GET /v1/files/{id}   — download one file the caller owns
+"""Generated- and uploaded-file routes (authed):
+  POST /v1/files       — upload a spreadsheet (.xlsx/.csv) the model can read
+  GET  /v1/files       — the caller's files, newest first (the "my files" list)
+  GET  /v1/files/{id}  — download one file the caller owns
+  DELETE /v1/files/{id} — delete one file the caller owns
 
 Ownership is enforced from the Postgres `generated_files` index, not the raw id:
 the id resolves to a row only when it belongs to the caller, so another user's
@@ -13,19 +15,38 @@ URL for download / listing.
 """
 
 import os
+import zipfile
 from datetime import datetime
+from pathlib import Path
+from typing import Optional
+from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Query,
+    Response,
+    UploadFile,
+    status,
+)
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..auth.dependencies import get_current_user
+from ..config import get_settings
 from ..db.session import get_session
 from ..users.models import User
-from . import repository as repo
+from . import readers, repository as repo
+from .store import CSV_MEDIA_TYPE, XLSX_MEDIA_TYPE, file_store
 
 router = APIRouter(prefix="/v1", tags=["files"])
+
+# Upload allowlist: extension -> stored media type. `.xlsm` (macro-enabled) is
+# deliberately absent.
+_UPLOAD_TYPES = {".xlsx": XLSX_MEDIA_TYPE, ".csv": CSV_MEDIA_TYPE}
+_CHUNK = 64 * 1024
 
 
 class FileMeta(BaseModel):
@@ -33,6 +54,7 @@ class FileMeta(BaseModel):
     filename: str
     media_type: str
     size: int
+    source: str
     created_at: datetime
 
 
@@ -40,17 +62,126 @@ class FileListResponse(BaseModel):
     files: list[FileMeta]
 
 
-@router.get(
+class UploadResponse(BaseModel):
+    id: str
+    filename: str
+    media_type: str
+    size: int
+    source: str
+    summary: dict  # {kind, sheets:[{name,rows,cols,headers}], total_rows}
+
+
+def _reject(path: Optional[Path], code: int, detail: str) -> HTTPException:
+    """Unlink a partial upload (best effort) and build the HTTPException."""
+    if path is not None:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+    return HTTPException(status_code=code, detail=detail)
+
+
+@router.post(
     "/files",
-    response_model=FileListResponse,
-    summary="List the caller's generated files (newest first)",
-    responses={401: {"description": "Missing/invalid JWT."}},
+    response_model=UploadResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Upload a spreadsheet (.xlsx/.csv) the model can read",
+    responses={
+        400: {"description": "Bad extension, corrupt file, or zip-bomb."},
+        401: {"description": "Missing/invalid JWT."},
+        413: {"description": "File exceeds the size limit."},
+    },
 )
-async def list_files(
+async def upload_file(
+    file: UploadFile,
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    rows = await repo.list_files(session, user_id=user.id)
+    settings = get_settings()
+    # 1) extension allowlist (cheap, before touching disk)
+    ext = Path(file.filename or "").suffix.lower()
+    if ext not in _UPLOAD_TYPES:
+        raise _reject(None, 400, "only .xlsx and .csv files are accepted")
+
+    # 2) stream to the owner's folder under a UUID name, counting bytes (413 cap)
+    file_id = uuid4().hex
+    user_dir = file_store.base_dir / str(user.id)
+    user_dir.mkdir(parents=True, exist_ok=True)
+    dest = user_dir / f"{file_id}{ext}"
+    size = 0
+    try:
+        with dest.open("wb") as out:
+            while True:
+                chunk = await file.read(_CHUNK)
+                if not chunk:
+                    break
+                size += len(chunk)
+                if size > settings.upload_max_bytes:
+                    raise _reject(
+                        dest, 413,
+                        f"file exceeds the {settings.upload_max_bytes // (1024 * 1024)} MB limit",
+                    )
+                out.write(chunk)
+    finally:
+        await file.close()
+    if size == 0:
+        raise _reject(dest, 400, "uploaded file is empty")
+
+    # 3) xlsx zip-bomb guard: refuse absurd uncompressed expansion
+    if ext == ".xlsx":
+        try:
+            with zipfile.ZipFile(dest) as zf:
+                uncompressed = sum(i.file_size for i in zf.infolist())
+        except zipfile.BadZipFile:
+            raise _reject(dest, 400, "file is not a valid .xlsx workbook")
+        if uncompressed > settings.upload_xlsx_max_uncompressed:
+            raise _reject(dest, 400, "spreadsheet expands too large to process safely")
+
+    # 4) parse check + summary (never evaluates formulas). Bad file -> unlink+400.
+    try:
+        summary = readers.summarize(dest)
+    except readers.ReadError as exc:
+        raise _reject(dest, 400, f"could not read the spreadsheet ({exc})")
+
+    # 5) durable owned row, source='uploaded'
+    await repo.record_file(
+        session,
+        id=file_id,
+        user_id=user.id,
+        filename=file.filename,
+        media_type=_UPLOAD_TYPES[ext],
+        size=size,
+        path=str(dest),
+        source="uploaded",
+    )
+    await session.commit()
+
+    return UploadResponse(
+        id=file_id,
+        filename=file.filename,
+        media_type=_UPLOAD_TYPES[ext],
+        size=size,
+        source="uploaded",
+        summary=summary.as_dict(),
+    )
+
+
+@router.get(
+    "/files",
+    response_model=FileListResponse,
+    summary="List the caller's files (newest first; optional source filter)",
+    responses={401: {"description": "Missing/invalid JWT."}},
+)
+async def list_files(
+    source: Optional[str] = Query(
+        None, description="Filter by origin: 'generated' or 'uploaded'."
+    ),
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    if source is not None and source not in ("generated", "uploaded"):
+        raise HTTPException(status_code=400, detail="source must be 'generated' or 'uploaded'")
+    rows = await repo.list_files(session, user_id=user.id, source=source)
     return FileListResponse(
         files=[
             FileMeta(
@@ -58,6 +189,7 @@ async def list_files(
                 filename=r.filename,
                 media_type=r.media_type,
                 size=r.size,
+                source=r.source,
                 created_at=r.created_at,
             )
             for r in rows

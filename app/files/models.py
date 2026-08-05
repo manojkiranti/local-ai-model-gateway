@@ -39,6 +39,11 @@ class GeneratedFile(Base):
     media_type: Mapped[str] = mapped_column(String(128), nullable=False)
     size: Mapped[int] = mapped_column(Integer, nullable=False)
     path: Mapped[str] = mapped_column(String(1024), nullable=False)  # on-disk location
+    # How the file got here: model output ('generated') or a user upload
+    # ('uploaded'). Lets GET /v1/files filter, and the read tools target uploads.
+    source: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default="generated"
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
