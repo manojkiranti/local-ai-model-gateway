@@ -59,6 +59,13 @@ class Settings(BaseSettings):
     # --- Files (create_excel output; served only via GET /v1/files/{id}) ---
     files_dir: str = "generated_files"
 
+    # --- fetch_url tool (SSRF-guarded outbound HTTP GET) ---
+    # Enabled by default; internal/private IPs are ALWAYS blocked regardless.
+    fetch_url_enabled: bool = True
+    # Optional host allowlist: if non-empty, ONLY these domains (and subdomains)
+    # may be fetched. Blank = any public host (still IP-filtered).
+    fetch_url_allowlist: str = ""
+
     # --- CORS (frontend talks only to this gateway) ---
     cors_origins: str = "*"  # comma-separated, or "*" for all (dev)
 
@@ -88,6 +95,10 @@ class Settings(BaseSettings):
     @property
     def write_keywords(self) -> list[str]:
         return self._csv(self.mcp_write_keywords)
+
+    @property
+    def fetch_url_allowed_hosts(self) -> list[str]:
+        return [h.lower() for h in self._csv(self.fetch_url_allowlist)]
 
 
 @lru_cache

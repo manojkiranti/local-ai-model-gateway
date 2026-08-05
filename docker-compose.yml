@@ -1,0 +1,63 @@
+# docker compose for the Local LLM Gateway.
+#
+#   db      — Postgres 17 (data persisted in a named volume)
+#   migrate — one-off `alembic upgrade head`, runs to completion before the app
+#   gateway — the FastAPI front door on :8000
+#
+# Ollama is NOT in this stack — it runs on the host and is reached via
+# host.docker.internal (see the gateway service's extra_hosts).
+#
+# Usage:
+#   cp .env.docker.example .env.docker   # then set JWT_SECRET (+ change passwords)
+#   docker compose up --build
+#
+# Config comes entirely from .env.docker (never bake secrets into the image).
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: gateway
+      # Must equal the password in DATABASE_URL (.env.docker).
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gateway_dev_pw}
+      POSTGRES_DB: local_ai_gateway
+    volumes:
+      - gateway_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gateway -d local_ai_gateway"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    # Not published to the host by default (internal only). Uncomment to inspect:
+    # ports: ["5433:5432"]
+
+  migrate:
+    build: .
+    command: ["alembic", "upgrade", "head"]
+    env_file: .env.docker
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  gateway:
+    build: .
+    env_file: .env.docker
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    # Lets the container reach the host's Ollama (:11434) as host.docker.internal.
+    # Required on Linux; harmless on Docker Desktop (Mac/Windows).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # Persist generated files (create_excel / create_html) across restarts.
+    volumes:
+      - gateway_files:/app/generated_files
+
+volumes:
+  gateway_pgdata:
+  gateway_files:

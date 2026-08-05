@@ -58,7 +58,7 @@ async def _create_excel(args: dict[str, Any]) -> str:
     except Exception as exc:  # noqa: BLE001 - report back, don't raise into the loop
         return f"ERROR: failed to build spreadsheet: {exc}"
 
-    record = file_store.save(data, filename=filename, media_type=XLSX_MEDIA_TYPE)
+    record = await file_store.save(data, filename=filename, media_type=XLSX_MEDIA_TYPE)
     return (
         f"Created Excel file '{record.filename}' "
         f"({record.size} bytes, {len(rows)} data row(s)). "

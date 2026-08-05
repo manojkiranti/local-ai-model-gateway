@@ -14,6 +14,7 @@ from .files.router import router as files_router
 from .files.store import file_store
 from .history.router import router as sessions_router
 from .mcp.client import MCPClient
+from .mcp.router import router as mcp_router
 from .ollama.client import OllamaClient, OllamaError
 from .tools.router import router as tools_router
 from .users.router import router as users_router
@@ -90,5 +91,6 @@ app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(chat_router)
 app.include_router(tools_router)
+app.include_router(mcp_router)
 app.include_router(files_router)
 app.include_router(sessions_router)

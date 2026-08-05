@@ -17,6 +17,7 @@ from app.db.base import Base
 # Import model modules so their tables register on Base.metadata.
 from app.users import models as _users_models  # noqa: F401
 from app.history import models as _history_models  # noqa: F401
+from app.files import models as _files_models  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:

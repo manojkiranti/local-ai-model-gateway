@@ -40,7 +40,14 @@ PyJWT (HS256), bcrypt, httpx (no ollama SDK), mcp SDK v2, openpyxl. Python 3.10.
     `stream:true` → NDJSON typed events (token/tool_call/tool_result/done) + the
     new id in `X-Session-Id`. **`/v1/agent` was removed** (folded in).
   - Authed: `GET /v1/tools` — merged/filtered tool list
-  - Authed: `GET /v1/files/{id}` — download generated files by UUID
+  - Authed: `GET /v1/mcp/status` — MCP connection status for the UI badge.
+    **Always 200**; body carries `{configured, reachable, server_url, tool_mode,
+    tools[], error}`. Use this (not `/v1/tools`'s 502) to render 🟢/🔴/⚪.
+  - Authed: `GET /v1/files` — the caller's generated files, newest first
+    (`{files:[{id, filename, media_type, size, created_at}]}`) for a "my files" UI
+  - Authed: `GET /v1/files/{id}` — **owner-scoped** download (404 unless yours)
+  - Authed: `DELETE /v1/files/{id}` — **owner-scoped** delete (204; drops the row
+    + unlinks the on-disk file; 404 if not yours; idempotent)
   - Authed: `GET /v1/sessions`, `GET /v1/sessions/{id}`, `DELETE /v1/sessions/{id}`
     — list/read/delete chat threads (all scoped to the caller; not-owned → 404)
 - **Chat history**: `chat_sessions` + `chat_messages` (Postgres). A turn = one
@@ -53,10 +60,31 @@ PyJWT (HS256), bcrypt, httpx (no ollama SDK), mcp SDK v2, openpyxl. Python 3.10.
   (`stream_turn` yields token/tool_call/tool_result/done; `run_turn` collects it
   for non-stream — one engine, both paths). Streams Ollama internally. Glass-box
   trace, robust to unknown tool / bad args / repeat / tool errors / max-iterations.
-- **Tools**: local (`get_current_time`, `create_excel` via openpyxl, `create_html`)
-  always on; MCP tools filtered by read_only|allowlist|all. `create_excel` and
-  `create_html` return a `/v1/files/{id}` download link (same string shape). They
-  run through `POST /v1/chat` (which is now tool-capable). `create_html`
+- **Tools**: local (`get_current_time`, `create_excel` via openpyxl,
+  `create_html`, `create_chart`, `create_pdf` via fpdf2, `create_docx` via
+  python-docx, `create_csv`, `calculator`, `date_math`, `fetch_url`) always on;
+  MCP tools filtered by read_only|allowlist|all. `fetch_url` is an
+  **SSRF-guarded** outbound HTTP GET (scheme allowlist; every resolved IP must be
+  public, so localhost/private/link-local incl. cloud metadata are blocked;
+  redirects re-checked per hop; GET-only; 10s timeout, ~2 MB cap, truncated; HTML
+  reduced to readable text; `FETCH_URL_ENABLED`/`FETCH_URL_ALLOWLIST` config).
+  `create_docx` shares `create_pdf`'s
+  content model (title + sections{heading?/body?/table?}) but emits a real .docx
+  and keeps full Unicode (no latin-1 clamping). `calculator` is a safe math evaluator (stdlib `ast`
+  allowlist, **never `eval`**; arithmetic + common math fns/constants;
+  DoS-guarded). `date_math` does calendar arithmetic (add/subtract with
+  end-of-month clamping, and diff) on supplied dates. Both return a text result,
+  not a file. `create_csv` (stdlib `csv`) writes `text/csv` and returns a
+  download link like the other file tools. `create_excel`, `create_html`,
+  `create_chart`, and `create_pdf` return a `/v1/files/{id}` download link (same
+  string shape). `create_pdf` takes a document model (`title?` + `sections[]` of
+  `{heading?, body?, table?}`) and renders a real PDF with fpdf2 (Helvetica core
+  font, no embedded fonts/system libs; text sanitized to latin-1, so emoji/
+  non-Latin glyphs become `?`). They
+  run through `POST /v1/chat` (which is now tool-capable). `create_chart` takes
+  structured data (chart_type bar|hbar|line|area|pie|donut + labels + series) and
+  the gateway renders a static, script-free SVG (`image/svg+xml`) — no JS, no new
+  deps; palette from the dataviz skill (validated). `create_html`
   writes a model-generated HTML document (no server-side sanitizing); safe
   rendering is the frontend's job — preview only inside a sandboxed `<iframe
   srcdoc>` (no allow-scripts). `/v1/files/{id}` sends HTML as an attachment with
@@ -68,7 +96,14 @@ PyJWT (HS256), bcrypt, httpx (no ollama SDK), mcp SDK v2, openpyxl. Python 3.10.
   still falls back to local-tools-only. A **pre-flight reachability probe** turns
   "server down" into a clean `MCPUnavailableError` (→ 502 / caught mid-run)
   instead of a leaked `CancelledError` from the transport's cancel scope.
-- **Files**: UUID capability downloads, behind JWT (in-memory index, per-process).
+- **Files**: **per-user**, Postgres-backed (`generated_files` table). Every file
+  a tool produces gets a row owned by the caller (+ the originating session),
+  written under `generated_files/{user_id}/{uuid}.ext`. Tools call `await
+  file_store.save(...)`; the caller is threaded in via a `file_sink()` contextvar
+  the chat router installs per turn (`PostgresFileSink`, which commits the row in
+  its own transaction so the file is durable even if the turn later fails). No
+  sink installed (offline tool tests) → in-memory fallback, unchanged. Downloads
+  are owner-scoped (404 for non-owners) and listable via `GET /v1/files`.
 - CORS enabled (dev). Bearer tokens (no cookies).
 
 ## Infra / environment
@@ -89,7 +124,13 @@ PyJWT (HS256), bcrypt, httpx (no ollama SDK), mcp SDK v2, openpyxl. Python 3.10.
     (no `allow-scripts` — disables scripts, isolates model HTML from your app).
     **NEVER** inject into your DOM / `dangerouslySetInnerHTML`. Offer a Download
     button alongside.
-  - xlsx (spreadsheet) → **download only** (blob URL).
+  - `image/svg+xml` (chart) → **render via `<img src={blobURL}>` + download**.
+    An `<img>`-loaded SVG never executes scripts, so it's safe inline. Do NOT
+    inline the SVG markup into the DOM.
+  - `application/pdf` → **download** (blob URL); optionally preview via the
+    browser-native PDF viewer (`<iframe src={blobURL}>` / `<embed>`). Our PDFs
+    carry no JavaScript.
+  - xlsx / docx / csv → **download only** (blob URL). (docx = Word, csv = text.)
 - Never use the ollama SDK (httpx REST). Agent loop stays hand-rolled/readable.
 
 ## NOT done yet (open items for planning)
@@ -100,12 +141,23 @@ PyJWT (HS256), bcrypt, httpx (no ollama SDK), mcp SDK v2, openpyxl. Python 3.10.
   validated with 3 read-only tools; no *business* tools yet, and the write-tool
   filter (read_only/allowlist) is still unexercised against real write tools.
 - **Frontend** — auth UI + chat UI not built yet (contract handed off).
-- **Per-user scoping** — chats now tied to `user_id`; **files** still aren't.
-- **Deployment** — no Docker/prod config; firewalling internal deps to the
-  gateway IP is deferred; secrets/migrations-in-prod TBD.
+- **Per-user scoping** — chats AND files now tied to `user_id` (owner-scoped
+  list/download/delete). File follow-ups: pagination, orphan cleanup of
+  pre-scoping root-level files.
+- **Deployment** — `Dockerfile` + `.dockerignore` exist (image builds & boots,
+  non-root, `/health` check); NOT run for real yet. See `DOCKER.md` for the
+  localhost→`host.docker.internal` env changes and the deferred `docker-compose`.
+  Firewalling internal deps to the gateway IP is deferred; secrets/migrations-in-prod TBD.
 - **SSO/OIDC** — schema is ready, not implemented.
 - **Rate limiting / observability** — not yet. (Integration tests now exist for
   chat history + MCP; they skip when their backing service is unreachable.)
+- **Prompt-injection surface (fetch_url + write tools)** — `fetch_url` pulls
+  arbitrary external text into the loop, so a fetched page could carry
+  instructions. Fine while all MCP tools are read-only; **before wiring any
+  write-capable MCP tool**, revisit so fetched/tool content can't chain into a
+  state-changing action (e.g. confirmation gates, keep external text as data,
+  don't let it authorize writes). SSRF is handled; this is the content-trust
+  angle.
 
 ## Candidate next steps (to plan)
 1. Build the frontend (auth + chat threads + streaming + file download) — now

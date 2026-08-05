@@ -1,0 +1,53 @@
+# Keep the build context small and secrets/cruft out of the image.
+# Only app/, alembic/, alembic.ini, and requirements.txt need to ship.
+
+# Secrets — NEVER bake credentials into an image. Config is injected at runtime.
+.env
+.env.*
+!.env.example
+
+# Virtual environments (deps are reinstalled inside the image)
+.venv/
+venv/
+env/
+
+# Python cache / bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Tests, coverage, and tooling caches
+tests/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Packaging artifacts
+build/
+dist/
+*.egg-info/
+
+# Runtime-generated files (mount a volume instead)
+generated_files/
+
+# Docs and project notes — not needed at runtime
+docs/
+*.md
+
+# Version control
+.git/
+.gitignore
+
+# Editors / OS
+.vscode/
+.idea/
+*.code-workspace
+.DS_Store
+Thumbs.db
+
+# Docker files themselves
+Dockerfile
+.dockerignore

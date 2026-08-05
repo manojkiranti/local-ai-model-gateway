@@ -25,6 +25,8 @@ from ..agent.loop import run_turn, stream_turn
 from ..auth.dependencies import get_current_user
 from ..config import Settings
 from ..db.session import SessionLocal, get_session
+from ..files.sink import PostgresFileSink
+from ..files.store import file_sink
 from ..history import repository as repo
 from ..history.service import open_turn
 from ..mcp.client import MCPClient, MCPUnavailableError
@@ -93,17 +95,20 @@ async def chat(
             final_answer = error_message = stop_reason = None
             trace = None
             try:
-                async for event in stream_turn(
-                    messages=context, ollama=ollama, mcp=mcp,
-                    settings=run_settings, user_email=user.email,
-                ):
-                    if event.get("type") == "done":
-                        stop_reason = event.get("stop_reason")
-                        final_answer = event.get("final_answer")
-                        error_message = event.get("error_message")
-                        trace = event.get("trace")
-                        event = {**event, "session_id": sid}
-                    yield (json.dumps(event) + "\n").encode()
+                # Files any tool creates this turn are owned by this user + session.
+                # Must be set INSIDE the generator Starlette iterates (contextvar).
+                with file_sink(PostgresFileSink(user_id=user.id, session_id=sid)):
+                    async for event in stream_turn(
+                        messages=context, ollama=ollama, mcp=mcp,
+                        settings=run_settings, user_email=user.email,
+                    ):
+                        if event.get("type") == "done":
+                            stop_reason = event.get("stop_reason")
+                            final_answer = event.get("final_answer")
+                            error_message = event.get("error_message")
+                            trace = event.get("trace")
+                            event = {**event, "session_id": sid}
+                        yield (json.dumps(event) + "\n").encode()
             except MCPUnavailableError as exc:  # rare: handshake failed post pre-flight
                 stop_reason, error_message = "error", exc.message
                 done = {"type": "done", "session_id": sid, "stop_reason": "error",
@@ -128,10 +133,12 @@ async def chat(
 
     # --- non-streaming: collect the same loop into a result dict ---
     try:
-        result = await run_turn(
-            messages=context, ollama=ollama, mcp=mcp,
-            settings=run_settings, user_email=user.email,
-        )
+        # Files any tool creates this turn are owned by this user + session.
+        with file_sink(PostgresFileSink(user_id=user.id, session_id=sid)):
+            result = await run_turn(
+                messages=context, ollama=ollama, mcp=mcp,
+                settings=run_settings, user_email=user.email,
+            )
     except MCPUnavailableError as exc:
         raise HTTPException(status_code=502, detail=exc.message) from exc
 

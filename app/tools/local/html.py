@@ -20,7 +20,7 @@ async def _create_html(args: dict[str, Any]) -> str:
     if not filename.lower().endswith(".html"):
         filename += ".html"
 
-    record = file_store.save(
+    record = await file_store.save(
         html_content.encode("utf-8"), filename=filename, media_type=HTML_MEDIA_TYPE
     )
     # Same string shape as create_excel so the frontend parses it identically.
