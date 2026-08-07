@@ -10,21 +10,27 @@ from app.agent.loop import run_turn, stream_turn
 from app.config import Settings
 
 
-def tool_turn(name, arguments):
-    """One model turn that calls a tool (Ollama sends tool_calls whole)."""
+def tool_turn(name, arguments, call_id="call_test"):
+    """One model turn that calls a tool, as normalized client events.
+
+    `arguments` is passed through verbatim so tests can still exercise the
+    unparseable-JSON path.
+    """
     return [
-        {"message": {"content": "", "tool_calls": [{"function": {"name": name, "arguments": arguments}}]}},
-        {"message": {"content": ""}, "done": True},
+        {"type": "tool_calls", "calls": [
+            {"id": call_id, "name": name, "arguments": arguments},
+        ]},
+        {"type": "finish", "reason": "tool_calls"},
     ]
 
 
 def text_turn(text):
-    """One model turn that streams a plain answer in two deltas."""
+    """One model turn that streams a plain answer in two content events."""
     half = len(text) // 2
     return [
-        {"message": {"content": text[:half]}},
-        {"message": {"content": text[half:]}},
-        {"message": {"content": ""}, "done": True},
+        {"type": "content", "text": text[:half]},
+        {"type": "content", "text": text[half:]},
+        {"type": "finish", "reason": "stop"},
     ]
 
 
@@ -114,3 +120,59 @@ async def test_stream_turn_emits_glass_box_event_sequence():
     assert done["stop_reason"] == "completed"
     assert done["final_answer"] == "Now you know."
     assert len(done["trace"]) == 2  # tool iteration + final iteration
+
+
+class RecordingOllama(FakeStreamOllama):
+    """Captures every payload sent, so we can assert the messages we build."""
+
+    def __init__(self, turns):
+        super().__init__(turns)
+        self.payloads = []
+
+    async def stream_chat(self, payload):
+        self.payloads.append(payload)
+        async for event in super().stream_chat(payload):
+            yield event
+
+
+@pytest.mark.anyio
+async def test_tool_results_are_correlated_by_tool_call_id():
+    """The `role:tool` reply must carry the id the assistant's call announced,
+    and the assistant turn must be replayed in OpenAI tool_calls shape."""
+    ollama = RecordingOllama([
+        tool_turn("get_current_time", {}, call_id="call_xyz"),
+        text_turn("Done."),
+    ])
+    result = await run_turn(
+        messages=[{"role": "user", "content": "time?"}],
+        ollama=ollama, mcp=FakeMCP(), settings=_settings(),
+    )
+    assert result["stop_reason"] == "completed"
+
+    # The second request replays iteration 1's assistant turn + tool result.
+    sent = ollama.payloads[1]["messages"]
+    assistant = next(m for m in sent if m.get("tool_calls"))
+    assert assistant["tool_calls"] == [{
+        "id": "call_xyz", "type": "function",
+        "function": {"name": "get_current_time", "arguments": {}},
+    }]
+
+    tool_msg = next(m for m in sent if m["role"] == "tool")
+    assert tool_msg["tool_call_id"] == "call_xyz"
+    assert "tool_name" not in tool_msg  # native-Ollama field, must be gone
+
+
+@pytest.mark.anyio
+async def test_trace_stores_coerced_arguments_not_the_raw_json_string():
+    """Traces are persisted to chat_messages.trace; keeping the shape stable
+    across transports means storing the dict, never the wire string."""
+    ollama = FakeStreamOllama([
+        tool_turn("get_current_time", '{"tz":"UTC"}'),
+        text_turn("Done."),
+    ])
+    result = await run_turn(
+        messages=[{"role": "user", "content": "time?"}],
+        ollama=ollama, mcp=FakeMCP(), settings=_settings(),
+    )
+    recorded = result["trace"][0]["tool_calls"][0]
+    assert recorded["arguments"] == {"tz": "UTC"}

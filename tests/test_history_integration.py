@@ -18,20 +18,22 @@ TEST_PASSWORD = "supersecret123"
 
 
 def _tool_turn(name, arguments):
-    """One model turn that calls a tool (Ollama sends tool_calls whole)."""
+    """One model turn that calls a tool, as normalized client events."""
     return [
-        {"message": {"content": "", "tool_calls": [{"function": {"name": name, "arguments": arguments}}]}},
-        {"message": {"content": ""}, "done": True},
+        {"type": "tool_calls", "calls": [
+            {"id": "call_1", "name": name, "arguments": arguments},
+        ]},
+        {"type": "finish", "reason": "tool_calls"},
     ]
 
 
 def _text_turn(text):
-    """One model turn streaming a plain answer in two deltas."""
+    """One model turn streaming a plain answer in two content events."""
     mid = len(text) // 2
     return [
-        {"message": {"role": "assistant", "content": text[:mid]}},
-        {"message": {"content": text[mid:]}},
-        {"message": {"content": ""}, "done": True},
+        {"type": "content", "text": text[:mid]},
+        {"type": "content", "text": text[mid:]},
+        {"type": "finish", "reason": "stop"},
     ]
 
 

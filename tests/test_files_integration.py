@@ -22,15 +22,18 @@ HTML = "<!doctype html><html><body><h1>owned &amp; served</h1></body></html>"
 
 
 def _tool_then_answer(name, arguments, answer="done"):
-    """Script FakeOllama: turn 1 calls a tool, turn 2 answers in plain text."""
+    """Script FakeOllama: turn 1 calls a tool, turn 2 answers in plain text,
+    as normalized client events."""
     return [
         [
-            {"message": {"content": "", "tool_calls": [{"function": {"name": name, "arguments": arguments}}]}},
-            {"message": {"content": ""}, "done": True},
+            {"type": "tool_calls", "calls": [
+                {"id": "call_1", "name": name, "arguments": arguments},
+            ]},
+            {"type": "finish", "reason": "tool_calls"},
         ],
         [
-            {"message": {"role": "assistant", "content": answer}},
-            {"message": {"content": ""}, "done": True},
+            {"type": "content", "text": answer},
+            {"type": "finish", "reason": "stop"},
         ],
     ]
 

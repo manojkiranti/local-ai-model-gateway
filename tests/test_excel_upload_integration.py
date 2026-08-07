@@ -36,14 +36,18 @@ def _xlsx_bytes(sheets):
 
 
 def _tool_then_answer(name, arguments, answer="done"):
+    """Script FakeOllama: turn 1 calls a tool, turn 2 answers in plain text,
+    as normalized client events."""
     return [
         [
-            {"message": {"content": "", "tool_calls": [{"function": {"name": name, "arguments": arguments}}]}},
-            {"message": {"content": ""}, "done": True},
+            {"type": "tool_calls", "calls": [
+                {"id": "call_1", "name": name, "arguments": arguments},
+            ]},
+            {"type": "finish", "reason": "tool_calls"},
         ],
         [
-            {"message": {"role": "assistant", "content": answer}},
-            {"message": {"content": ""}, "done": True},
+            {"type": "content", "text": answer},
+            {"type": "finish", "reason": "stop"},
         ],
     ]
 
@@ -205,7 +209,7 @@ def test_attachment_survives_to_next_turn():
 
         # turn 1: attach, model answers plainly (no tool)
         app.state.ollama = FakeOllama(
-            [[{"message": {"role": "assistant", "content": "got it"}}, {"message": {"content": ""}, "done": True}]]
+            [[{"type": "content", "text": "got it"}, {"type": "finish", "reason": "stop"}]]
         )
         r1 = client.post(
             "/v1/chat", json={"message": "here is a file", "file_ids": [fid]}, headers=owner

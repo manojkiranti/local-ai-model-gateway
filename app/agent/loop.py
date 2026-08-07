@@ -10,10 +10,12 @@ typed events as it runs, so callers can surface live glass-box activity —
 so both paths share ONE engine.
 
 Flow per iteration:
-    (a) stream messages + tools to Ollama /api/chat; emit token deltas
-    (b) append the assistant message to `messages`
+    (a) stream the model via ollama.stream_chat (normalized content/tool_calls/
+        finish events — the client owns the wire format); emit token deltas
+    (b) append the assistant message to `messages` (OpenAI tool_calls shape)
     (c) no tool_calls  -> that's the final answer, emit done, stop
-    (d) tool_calls     -> emit tool_call/tool_result, append role:"tool" results, loop
+    (d) tool_calls     -> emit tool_call/tool_result, append role:"tool" results
+                          keyed by tool_call_id, loop
 Capped at AGENT_MAX_ITERATIONS.
 """
 
@@ -60,8 +62,15 @@ def _coerce_arguments(raw: Any) -> tuple[dict[str, Any] | None, str | None]:
     return None, f"unexpected arguments type: {type(raw).__name__}"
 
 
-def _tool_message(name: str, content: str) -> dict[str, Any]:
-    return {"role": "tool", "content": content, "tool_name": name}
+def _tool_message(call_id: str, content: str) -> dict[str, Any]:
+    """A tool result, correlated to the assistant's call by id.
+
+    The OpenAI surface correlates on `tool_call_id` (native Ollama used a
+    `tool_name` field). Ids come from the server, with a synthesised fallback in
+    `finalize_tool_calls`, so this is always populated — which is what lets a
+    single turn run several tools without the model confusing their results.
+    """
+    return {"role": "tool", "tool_call_id": call_id, "content": content}
 
 
 def _repeat_key(name: str, args: dict[str, Any]) -> str:
@@ -128,17 +137,18 @@ async def _loop_events(
         content_parts: list[str] = []
         tool_calls: list[dict[str, Any]] = []
         try:
-            async for chunk in ollama.stream_chat(payload):
-                msg = chunk.get("message") or {}
-                delta = msg.get("content")
-                if delta:
-                    content_parts.append(delta)
-                    yield {"type": "token", "content": delta}
-                chunk_calls = msg.get("tool_calls")
-                if chunk_calls:  # Ollama sends tool_calls whole, in one chunk
-                    tool_calls.extend(chunk_calls)
+            async for event in ollama.stream_chat(payload):
+                kind = event.get("type")
+                if kind == "content":
+                    content_parts.append(event["text"])
+                    yield {"type": "token", "content": event["text"]}
+                elif kind == "tool_calls":
+                    # The client buffers until complete, so this arrives once,
+                    # after the stream — fragmenting servers (vLLM) and whole-
+                    # call servers (Ollama) look identical from here.
+                    tool_calls = event["calls"]
         except OllamaError as exc:
-            logger.error("iteration %d: Ollama stream failed: %s", i, exc.message)
+            logger.error("iteration %d: model stream failed: %s", i, exc.message)
             stop_reason, error_message = "error", exc.message
             trace.append({"iteration": i, "assistant_content": None, "tool_calls": []})
             break
@@ -147,7 +157,13 @@ async def _loop_events(
         assistant_content = "".join(content_parts)
         assistant_msg: dict[str, Any] = {"role": "assistant", "content": assistant_content}
         if tool_calls:
-            assistant_msg["tool_calls"] = tool_calls
+            # Replay in OpenAI shape; `arguments` goes back exactly as received
+            # so we never re-serialise the model's own JSON.
+            assistant_msg["tool_calls"] = [
+                {"id": c["id"], "type": "function",
+                 "function": {"name": c["name"], "arguments": c["arguments"]}}
+                for c in tool_calls
+            ]
         messages.append(assistant_msg)
 
         # (c) no tool calls -> final answer, done.
@@ -159,23 +175,33 @@ async def _loop_events(
             break
 
         # (d) run each requested tool, emitting live tool_call/tool_result events.
-        requested = [(c.get("function", {}) or {}).get("name") for c in tool_calls]
+        requested = [c["name"] for c in tool_calls]
         logger.info("iteration %d: model requested %d tool call(s): %s", i, len(tool_calls), requested)
 
         entry_calls: list[dict[str, Any]] = []
         for call in tool_calls:
-            fn = call.get("function", {}) or {}
-            name = fn.get("name", "") or ""
-            raw_args = fn.get("arguments")
+            call_id = call["id"]
+            name = call["name"] or ""
+            raw_args = call["arguments"]
 
-            record: dict[str, Any] = {"name": name, "arguments": raw_args, "result": None, "status": "ok"}
-            yield {"type": "tool_call", "name": name, "arguments": raw_args, "iteration": i}
+            # Coerce up front so the trace stores a dict on every transport —
+            # native Ollama gave us dicts, the /v1 surface gives JSON strings,
+            # and traces are persisted (chat_messages.trace) and read later.
+            args, parse_error = _coerce_arguments(raw_args)
+            record: dict[str, Any] = {
+                "name": name,
+                "arguments": args if parse_error is None else raw_args,
+                "result": None,
+                "status": "ok",
+            }
+            yield {"type": "tool_call", "name": name,
+                   "arguments": record["arguments"], "iteration": i}
 
             # ROBUSTNESS 1: unknown tool -> tell the model, list valid names.
             if not registry.has_tool(name):
                 result = f"ERROR: tool '{name}' does not exist. Valid tools are: {registry.tool_names()}"
                 record["status"], record["result"] = "unknown_tool", result
-                messages.append(_tool_message(name, result))
+                messages.append(_tool_message(call_id, result))
                 logger.info("   ! unknown tool '%s' -> nudged model to retry", name)
                 entry_calls.append(record)
                 yield {"type": "tool_result", "name": name, "status": "unknown_tool",
@@ -183,11 +209,10 @@ async def _loop_events(
                 continue
 
             # ROBUSTNESS 2: malformed args -> feed the parse error back.
-            args, parse_error = _coerce_arguments(raw_args)
             if parse_error is not None:
                 result = f"ERROR: could not parse arguments for '{name}': {parse_error}"
                 record["status"], record["result"] = "bad_arguments", result
-                messages.append(_tool_message(name, result))
+                messages.append(_tool_message(call_id, result))
                 logger.info("   ! bad arguments for '%s': %s", name, parse_error)
                 entry_calls.append(record)
                 yield {"type": "tool_result", "name": name, "status": "bad_arguments",
@@ -202,7 +227,7 @@ async def _loop_events(
                     f"{call_cache[key]}. Use that result, or make a different call."
                 )
                 record["status"], record["result"] = "repeat", result
-                messages.append(_tool_message(name, result))
+                messages.append(_tool_message(call_id, result))
                 logger.info("   ~ repeat call '%s' -> nudged model", name)
                 entry_calls.append(record)
                 yield {"type": "tool_result", "name": name, "status": "repeat",
@@ -215,7 +240,7 @@ async def _loop_events(
             except MCPUnavailableError as exc:
                 result = f"ERROR: MCP server became unreachable: {exc.message}"
                 record["status"], record["result"] = "tool_error", result[:TRACE_RESULT_CHARS]
-                messages.append(_tool_message(name, result))
+                messages.append(_tool_message(call_id, result))
                 entry_calls.append(record)
                 logger.error("   ! MCP unreachable mid-run: %s", exc.message)
                 yield {"type": "tool_result", "name": name, "status": "tool_error",
@@ -233,7 +258,7 @@ async def _loop_events(
             result = result if result is not None else ""
             call_cache[key] = result[:TRACE_RESULT_CHARS]
             record["result"] = result[:TRACE_RESULT_CHARS]
-            messages.append(_tool_message(name, result[:MAX_TOOL_RESULT_CHARS]))
+            messages.append(_tool_message(call_id, result[:MAX_TOOL_RESULT_CHARS]))
             logger.info("   -> '%s' [%s] returned %d chars", name, record["status"], len(result))
             entry_calls.append(record)
             yield {"type": "tool_result", "name": name, "status": record["status"],
