@@ -38,9 +38,8 @@ class Settings(BaseSettings):
     default_embed_model: str = "nomic-embed-text:latest"
 
     # --- Agent (hand-rolled tool-calling loop) ---
-    agent_model: str = "qwen2.5:latest"
+    agent_model: str = "odin-agent"
     agent_temperature: float = 0.1
-    agent_num_ctx: int = 16384
     agent_max_iterations: int = 8
 
     # --- MCP (remote tools; the gateway is the MCP client) ---

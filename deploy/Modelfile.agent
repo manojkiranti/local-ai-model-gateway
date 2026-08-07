@@ -1,0 +1,25 @@
+# Context length for the agent loop. This is a DELIBERATE increase from the old
+# AGENT_NUM_CTX=16384, not an accident of the port: tool results are capped at
+# 8000 chars (MAX_TOOL_RESULT_CHARS ~= 2000 tokens) and one turn can chain up to
+# AGENT_MAX_ITERATIONS=8 of them, so tool output alone can approach 16k tokens
+# before chat history and the tool schemas are counted. Too small a context
+# truncates mid-loop silently — which looks like the model "forgetting", not an
+# error.
+#
+# The name carries no size so this number can change without a rename.
+#
+# The /v1 surface has no num_ctx parameter, so context is a property of the
+# served model. Same as vLLM's --max-model-len launch flag.
+#
+# Build on whichever host serves the agent, with FROM set to that host's model:
+#   local  (localhost:11434):  FROM qwen2.5:latest
+#   server (GPU box):          FROM qwen3.5:35b-a3b
+#
+#   ollama create odin-agent -f deploy/Modelfile.agent
+#   ollama show odin-agent --parameters     # verify num_ctx took
+#
+# Deriving a model reuses the base weights' blobs — no re-download, no second
+# copy on disk. Set OLLAMA_CONTEXT_LENGTH server-wide as a floor so nothing
+# silently falls back to the 4096 default.
+FROM qwen2.5:latest
+PARAMETER num_ctx 32768

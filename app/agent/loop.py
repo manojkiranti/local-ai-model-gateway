@@ -124,15 +124,15 @@ async def _loop_events(
         logger.info("──── iteration %d ──── tools offered: %s", i, offered)
 
         # (a) stream the model, giving it the merged tool list every time.
+        # Context length is NOT sent: it has no OpenAI-surface equivalent and is
+        # baked into the served model instead (deploy/Modelfile.agent), which is
+        # how vLLM works too — one less thing to change at migration.
         payload = {
             "model": settings.agent_model,
             "messages": messages,
             "tools": registry.list_ollama_tools(),
             "stream": True,
-            "options": {
-                "temperature": settings.agent_temperature,
-                "num_ctx": settings.agent_num_ctx,
-            },
+            "temperature": settings.agent_temperature,
         }
         content_parts: list[str] = []
         tool_calls: list[dict[str, Any]] = []

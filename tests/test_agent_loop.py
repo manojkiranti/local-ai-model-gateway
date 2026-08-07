@@ -176,3 +176,19 @@ async def test_trace_stores_coerced_arguments_not_the_raw_json_string():
     )
     recorded = result["trace"][0]["tool_calls"][0]
     assert recorded["arguments"] == {"tz": "UTC"}
+
+
+@pytest.mark.anyio
+async def test_payload_uses_openai_params_and_no_ollama_options():
+    """`options`/`num_ctx` are native-Ollama only. Context is a property of the
+    served model now (see deploy/Modelfile.agent), matching vLLM semantics."""
+    ollama = RecordingOllama([text_turn("Hi.")])
+    await run_turn(
+        messages=[{"role": "user", "content": "hi"}],
+        ollama=ollama, mcp=FakeMCP(), settings=_settings(),
+    )
+    payload = ollama.payloads[0]
+    assert "options" not in payload
+    assert payload["temperature"] == 0.1
+    assert payload["stream"] is True
+    assert set(payload) == {"model", "messages", "tools", "stream", "temperature"}
