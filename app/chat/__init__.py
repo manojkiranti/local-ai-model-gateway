@@ -1,3 +1,3 @@
-"""Chat: authenticated proxy to Ollama /api/chat. (Session/history persistence
-in Postgres is a later slice.)
+"""Chat: authenticated turn endpoint over an OpenAI-compatible model server.
+(Session/history persistence in Postgres is a later slice.)
 """

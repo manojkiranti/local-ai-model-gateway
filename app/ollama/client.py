@@ -17,10 +17,12 @@ import httpx
 
 
 class OllamaError(Exception):
-    """Raised for any failure talking to Ollama.
+    """Raised for any failure talking to the model server.
 
     ``status_code`` is the HTTP status the gateway returns to its own caller
-    (502 when Ollama is unreachable, 404 when a model isn't pulled, etc.).
+    (502 when the model server is unreachable, 404 when a model isn't pulled,
+    etc.). The class name is kept for now — Ollama is the current backend and
+    renaming would ripple through imports across the app.
     """
 
     def __init__(self, status_code: int, message: str) -> None:
@@ -220,8 +222,8 @@ class OllamaClient:
     # ---- internals ----
     def _unreachable_msg(self, exc: Exception) -> str:
         return (
-            f"Cannot reach Ollama at {self.base_url}. "
-            f"Is `ollama serve` running? ({exc})"
+            f"Cannot reach the model server at {self.base_url}. "
+            f"Is it running? ({exc})"
         )
 
     async def _get_json(self, path: str) -> dict[str, Any]:

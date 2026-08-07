@@ -2,7 +2,7 @@
 
 ## System (Local LLM product)
 ```
-Frontend  →  THIS GATEWAY (:8000)  →  Ollama LLM (:11434)
+Frontend  →  THIS GATEWAY (:8000)  →  Ollama LLM (:11434, OpenAI-compatible /v1)
                     |                    (inference only; NOT an MCP client)
                     ├─ Postgres (users, later chat history)
                     └─ remote MCP server (business tools)
@@ -76,7 +76,31 @@ events (`token`/`tool_call`/`tool_result`/`done`) + the new id in the
 - Auth: JWT (PyJWT HS256) + bcrypt. Provider-agnostic User (email, auth_provider,
   nullable password_hash, role admin|member). **First registered user → admin.**
 - Agent loop is **hand-rolled, no framework** — keep it readable/commented.
-- **Never** use the `ollama` SDK — call Ollama's REST API with httpx.
+- **Never** use the `ollama` SDK, and don't add the `openai` SDK either — we call
+  the model server's OpenAI-compatible REST surface (`/v1/chat/completions`,
+  `/v1/models`, `/v1/embeddings`) with httpx. The `openai` SDK would not solve
+  streamed tool-call fragment accumulation for us (only its *beta* stream helper
+  accumulates) while displacing our `OllamaError` → HTTP-status mapping.
+- **The wire format lives in ONE file:** `app/ollama/client.py`. `stream_chat`
+  yields normalized events (`{"type":"content","text"}` /
+  `{"type":"tool_calls","calls"}` / `{"type":"finish","reason"}`); the agent loop
+  never sees SSE or `choices[0].delta`. Pointing `OLLAMA_BASE_URL` at vLLM /
+  llama.cpp / LiteLLM should need no edits outside that file.
+- **Tool-call streaming differs per backend:** Ollama's `/v1` shim sends each
+  tool call whole in one delta; **vLLM fragments `arguments` across deltas**.
+  `merge_tool_call_deltas` handles both. The fragmented path is covered by
+  hand-authored fixtures in `tests/test_openai_stream_parsing.py` because our
+  Ollama can't produce it — re-verify live when vLLM lands.
+- **Tool results correlate on `tool_call_id`**, not Ollama's `tool_name`. Ids
+  come from the server (`finalize_tool_calls` synthesises a fallback). Getting
+  this wrong silently mismatches results in multi-tool turns.
+- **`num_ctx` is baked into the model, not the request** — `deploy/Modelfile.agent`
+  (`ollama create odin-agent -f deploy/Modelfile.agent`). The `/v1` surface has
+  no `num_ctx`; this matches vLLM's `--max-model-len`. Keep `OLLAMA_CONTEXT_LENGTH`
+  set server-wide as a floor so nothing falls back to 4096.
+- Use `resp.aiter_lines()` for SSE — never `aiter_bytes()` with manual `\n\n`
+  splitting, which truncates JSON across HTTP chunk boundaries under load and
+  presents as a flaky model rather than a parser bug.
 - **fetch_url SSRF rule:** the `fetch_url` tool (outbound HTTP GET) must keep its
   guards — http/https only, resolve the host and refuse if ANY IP is
   non-public (blocks localhost/private/link-local incl. 169.254.169.254 metadata),

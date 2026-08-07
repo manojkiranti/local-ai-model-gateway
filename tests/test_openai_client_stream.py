@@ -173,6 +173,45 @@ async def test_timeout_maps_to_504():
 
 
 @pytest.mark.anyio
+async def test_sse_split_mid_json_across_http_chunks_still_reassembles():
+    """Guards against regressing `aiter_lines()` to manual `aiter_bytes()` +
+    `b"\\n\\n"` splitting.
+
+    Every other test in this file hands `httpx.Response(200, content=body)` a
+    single ``bytes`` blob, which httpx delivers as ONE chunk regardless of how
+    `stream_chat` reads it — so those tests would keep passing even if
+    `stream_chat` split raw bytes on `b"\\n\\n"` by hand instead of using
+    `aiter_lines()`. This test delivers the SSE body as several *genuinely
+    separate* HTTP chunks (via an async generator passed as `content=`, which
+    httpx wraps in `AsyncIteratorByteStream`), with the chunk boundaries
+    falling **inside** a `data:` line's JSON rather than between lines. Only
+    `aiter_lines()`'s cross-chunk line reassembly makes this parseable; a
+    manual `aiter_bytes()` + `b"\\n\\n"` split would hand the JSON decoder a
+    truncated fragment and silently drop or corrupt content — the exact
+    failure mode that shows up as intermittent truncated JSON under load and
+    reads as a flaky model rather than a parser bug.
+    """
+    async def body_chunks():
+        for chunk in (
+            b'data: {"choices":[{"delta":{"content":"Hel',
+            b'lo"}}]}\n\ndata: {"choices":[{"delta":{"con',
+            b'tent":" world"},"finish_reason":"stop"}]}\n\n',
+            b'data: [DONE]\n\n',
+        ):
+            yield chunk
+
+    client = _client(lambda req: httpx.Response(200, content=body_chunks()))
+    events = await _drain(client)
+
+    assert events == [
+        {"type": "content", "text": "Hello"},
+        {"type": "content", "text": " world"},
+        {"type": "finish", "reason": "stop"},
+    ]
+    await client.aclose()
+
+
+@pytest.mark.anyio
 async def test_is_healthy_probes_v1_models():
     seen = {}
 
