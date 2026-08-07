@@ -38,6 +38,75 @@ def _error_from_body(body: bytes | str, fallback: str) -> str:
     return fallback
 
 
+# ---- OpenAI-compatible SSE / tool-call plumbing --------------------------
+# This block is the ONLY place that knows the wire format. `stream_chat`
+# converts it into normalized events, so the agent loop stays transport-blind
+# and swapping Ollama for vLLM/LiteLLM means editing this file alone.
+
+SSE_DONE = object()  # sentinel: the server sent `data: [DONE]`
+
+
+def parse_sse_line(line: str) -> Any:
+    """Decode one SSE line.
+
+    Returns a decoded dict, the ``SSE_DONE`` sentinel, or ``None`` for anything
+    that carries no payload (blank separators, ``:`` keepalive comments,
+    non-``data`` fields, or malformed JSON).
+    """
+    line = line.strip()
+    if not line or line.startswith(":"):  # blank separator or keepalive comment
+        return None
+    if not line.startswith("data:"):  # `event:`/`id:`/`retry:` carry no payload
+        return None
+    payload = line[len("data:") :].strip()
+    if payload == "[DONE]":
+        return SSE_DONE
+    try:
+        return json.loads(payload)
+    except ValueError:
+        return None  # a truncated/garbled chunk must not kill the whole turn
+
+
+def merge_tool_call_deltas(
+    acc: dict[int, dict[str, Any]], deltas: list[dict[str, Any]]
+) -> None:
+    """Fold streamed ``tool_calls`` deltas into ``acc`` in place, keyed by index.
+
+    Handles BOTH shapes we may face: Ollama's shim sends a call whole in one
+    delta, while vLLM streams `arguments` in fragments that must be
+    concatenated. Blank fields never overwrite values already established —
+    only the first delta of a fragmented call carries `id`/`name`.
+    """
+    for delta in deltas:
+        index = delta.get("index") or 0
+        slot = acc.setdefault(index, {"id": "", "name": "", "arguments": ""})
+        if delta.get("id"):
+            slot["id"] = delta["id"]
+        function = delta.get("function") or {}
+        if function.get("name"):
+            slot["name"] = function["name"]
+        if function.get("arguments"):
+            slot["arguments"] += function["arguments"]
+
+
+def finalize_tool_calls(acc: dict[int, dict[str, Any]]) -> list[dict[str, Any]]:
+    """Flatten the accumulator into index-ordered complete calls.
+
+    A blank id gets a synthesised ``call_<index>``: ids correlate our
+    ``role:"tool"`` results back to the assistant's calls, so an id-less server
+    would otherwise break multi-tool turns. Ollama 0.32.5 does supply ids; this
+    keeps other backends safe.
+    """
+    calls: list[dict[str, Any]] = []
+    for index, slot in sorted(acc.items()):
+        calls.append({
+            "id": slot["id"] or f"call_{index}",
+            "name": slot["name"],
+            "arguments": slot["arguments"],
+        })
+    return calls
+
+
 class OllamaClient:
     def __init__(self, base_url: str, timeout: float) -> None:
         self.base_url = base_url.rstrip("/")
