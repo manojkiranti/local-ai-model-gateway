@@ -33,6 +33,10 @@ dist/
 # Application-generated files
 generated_files/
 
+# Subagent-driven-development scratch (ledgers, task briefs, review packages).
+# Plans themselves live in docs/superpowers/plans/ and ARE committed.
+.superpowers/
+
 # Editors
 .vscode/
 .idea/
