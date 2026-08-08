@@ -176,12 +176,15 @@ def parse_number(text: str) -> Decimal | None:
         s = s[:-1].strip()
 
     # Sign may sit either side of the currency symbol: "-$5" and "$-5".
-    if s[:1] in "+-":
+    # Every test below guards on `s` first: "" is a substring of any string, so
+    # an unguarded `s[:1] in _CURRENCY` is True once s empties — and the while
+    # loop never terminates on input like "$" or "-".
+    if s and s[0] in "+-":
         negative = negative or s[0] == "-"
         s = s[1:].strip()
-    while s[:1] in _CURRENCY:
+    while s and s[0] in _CURRENCY:
         s = s[1:].strip()
-    if s[:1] in "+-":
+    if s and s[0] in "+-":
         negative = negative or s[0] == "-"
         s = s[1:].strip()
 
