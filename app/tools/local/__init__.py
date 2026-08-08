@@ -8,6 +8,7 @@ in `registry.py` never changes.
 from __future__ import annotations
 
 from . import (
+    aggregate_excel,
     calculator,
     chart,
     csv,
@@ -36,6 +37,7 @@ LOCAL_TOOLS: list[LocalToolSpec] = [
     fetch_url.SPEC,
     inspect_excel.SPEC,
     read_excel.SPEC,
+    aggregate_excel.SPEC,
 ]
 
 __all__ = ["LOCAL_TOOLS", "LocalToolSpec", "LocalFn"]

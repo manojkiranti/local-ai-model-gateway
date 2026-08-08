@@ -138,6 +138,18 @@ events (`token`/`tool_call`/`tool_result`/`done`) + the new id in the
   ownership (404 on foreign id), persists `{id,filename,summary}` on the user
   message (`chat_messages.attachments` JSONB), and `build_context_messages`
   re-emits the attachment note on later turns so ids survive without resending.
+- **`aggregate_excel` is the correct tool for ANY total** — sum/avg/min/max/count
+  with an optional one-level `group_by` and AND-only filters, computed over
+  EVERY row via `readers.open_sheet_rows` (uncapped streaming context manager,
+  distinct from the ~200-row `load_table`). `read_excel`'s cap makes model-side
+  arithmetic silently wrong on a bigger sheet; this removes that. Engine is
+  `app/files/aggregate.py` (pure), numbers come from `app/files/numeric.py`
+  (currency/commas/percent/accounting negatives → **Decimal**, never eval,
+  rejects `"nan"`/`"Infinity"` which `Decimal()` would otherwise accept). Each
+  cell is blank (absent), parsed, or unparseable (excluded but **counted and
+  named** in the footer); a column where nothing parsed returns None, never 0.
+  Caps: `MAX_SCAN_ROWS=200_000` (states a PARTIAL result rather than refusing),
+  `MAX_GROUPS=50` (reports the true group total).
 - **Starlette 1.x gotcha:** `include_router` mounts as a lazy `_IncludedRouter`,
   so `app.routes` won't list child routes as `APIRoute`. Verify routes via
   TestClient or `/openapi.json`, not `isinstance` checks.
