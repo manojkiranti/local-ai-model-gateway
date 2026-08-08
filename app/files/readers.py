@@ -17,9 +17,10 @@ Safety choices:
 from __future__ import annotations
 
 import csv as _csv
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Iterable, Iterator, Optional
 
 # Caps (shared with the read tool). Deliberately small: the agent context is
 # ~16k tokens, so dumping thousands of rows would blow it — better to truncate
@@ -274,6 +275,87 @@ def _apply_char_cap(rows: list[list[str]], already_truncated: bool) -> bool:
             del rows[n:]
             return True
     return already_truncated
+
+
+# --------------------------------------------------------------------------- #
+# Public: stream one sheet's rows UNCAPPED (for aggregation)
+#
+# load_table above materializes the whole grid then windows it — fine for the
+# ~200 rows a model can read, wrong for a 200k-row sum. This path yields row by
+# row so memory stays flat regardless of file size, and applies NO caps: the
+# scan ceiling lives in aggregate.py, where the RESULT is bounded instead.
+# --------------------------------------------------------------------------- #
+@dataclass
+class RowStream:
+    sheet_name: str
+    headers: list[str]
+    rows: Iterator[list[str]]
+    all_sheets: list[str]
+    total_rows_hint: Optional[int] = None  # data rows; None when unknowable (csv)
+
+
+@contextmanager
+def _csv_stream(path: Path) -> Iterator[Iterable[list[str]]]:
+    """Open a CSV and yield a csv.reader, sniffing the delimiter as _csv_grid does."""
+    try:
+        fh = path.open("r", encoding="utf-8-sig", newline="")
+    except OSError as exc:
+        raise ReadError(f"could not read CSV: {exc}") from exc
+    try:
+        sample = fh.read(8192)
+        fh.seek(0)
+        try:
+            dialect = _csv.Sniffer().sniff(sample, delimiters=",;\t|")
+        except _csv.Error:
+            dialect = _csv.excel  # default to comma
+        yield _csv.reader(fh, dialect)
+    finally:
+        fh.close()
+
+
+@contextmanager
+def open_sheet_rows(path: Path, *, sheet: Optional[str] = None) -> Iterator[RowStream]:
+    """Stream ONE sheet: headers plus an iterator over the remaining rows.
+
+    Must be used as a context manager — the workbook/file handle stays open for
+    the life of the iterator and is closed on exit, even when the consumer stops
+    early (which the aggregator's scan ceiling does by design). Trailing
+    all-empty rows are NOT trimmed here, since a stream cannot look ahead; the
+    aggregator skips fully blank rows instead.
+    """
+    path = Path(path)
+
+    if not _is_xlsx(path):
+        name = path.stem
+        with _csv_stream(path) as reader:
+            rows = ([_cell(v) for v in row] for row in reader)
+            headers = next(rows, [])
+            yield RowStream(
+                sheet_name=name,
+                headers=headers,
+                rows=rows,
+                all_sheets=[name],
+                total_rows_hint=None,
+            )
+        return
+
+    wb = _open_xlsx(path)
+    try:
+        all_sheets = list(wb.sheetnames)
+        sheet_name = _resolve_sheet(all_sheets, sheet)
+        ws = wb[sheet_name]
+        hint = max((ws.max_row or 0) - 1, 0)  # minus the header row
+        rows = ([_cell(v) for v in row] for row in ws.iter_rows(values_only=True))
+        headers = next(rows, [])
+        yield RowStream(
+            sheet_name=sheet_name,
+            headers=headers,
+            rows=rows,
+            all_sheets=all_sheets,
+            total_rows_hint=hint,
+        )
+    finally:
+        wb.close()
 
 
 # --------------------------------------------------------------------------- #
