@@ -151,8 +151,15 @@ the expected answer, run as a normal pytest:
 8. group-by producing >50 groups — checks the cap and remainder line
 
 Scored as exact match on the numbers plus presence of the correct provenance
-footer. Baseline to record on first run; target is 8/8 on the engine, since these
-are deterministic — any failure is a bug, not variance.
+footer. Target is 8/8, since these are deterministic — any failure is a bug, not
+variance.
+
+**Baseline 2026-08-08: 8/8 passing** (`tests/test_aggregate_eval.py`), full suite
+315 passed. Case 5 was miswritten on the first run and the eval caught it: in a
+single-column sheet a blank cell makes the whole ROW blank, and blank rows are
+dropped before the cell-level accounting sees them. The case now uses two columns
+so it exercises the blank-CELL path it was meant to. Both behaviours are correct;
+the eval is what made the distinction explicit.
 
 **Feedback capture.** Every call already lands in the turn `trace` JSONB on
 `chat_messages` with its args and result. The skipped-cell counts and any
