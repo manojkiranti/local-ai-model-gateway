@@ -94,10 +94,14 @@ events (`token`/`tool_call`/`tool_result`/`done`) + the new id in the
 - **Tool results correlate on `tool_call_id`**, not Ollama's `tool_name`. Ids
   come from the server (`finalize_tool_calls` synthesises a fallback). Getting
   this wrong silently mismatches results in multi-tool turns.
-- **`num_ctx` is baked into the model, not the request** — `deploy/Modelfile.agent`
-  (`ollama create odin-agent -f deploy/Modelfile.agent`). The `/v1` surface has
-  no `num_ctx`; this matches vLLM's `--max-model-len`. Keep `OLLAMA_CONTEXT_LENGTH`
-  set server-wide as a floor so nothing falls back to 4096.
+- **`num_ctx` is NOT a request field** — the `/v1` surface has no `num_ctx`
+  (Ollama's shim ignores a passthrough `options.num_ctx`; verified 0.32.5 —
+  requested 8192, loaded 4096). Set context server-wide on the Ollama service:
+  `OLLAMA_CONTEXT_LENGTH=32768`. Without it Ollama defaults to **4096**, which is
+  too small — the ~12 local tool schemas alone are ~2800 tokens, so one 8000-char
+  tool result overflows. This matches vLLM's `--max-model-len` (a launch flag),
+  so it stays a config value across backends. See
+  `docs/llm-transport-and-deployment.md`.
 - Use `resp.aiter_lines()` for SSE — never `aiter_bytes()` with manual `\n\n`
   splitting, which truncates JSON across HTTP chunk boundaries under load and
   presents as a flaky model rather than a parser bug.

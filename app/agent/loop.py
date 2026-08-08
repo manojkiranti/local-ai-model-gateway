@@ -124,9 +124,10 @@ async def _loop_events(
         logger.info("──── iteration %d ──── tools offered: %s", i, offered)
 
         # (a) stream the model, giving it the merged tool list every time.
-        # Context length is NOT sent: it has no OpenAI-surface equivalent and is
-        # baked into the served model instead (deploy/Modelfile.agent), which is
-        # how vLLM works too — one less thing to change at migration.
+        # Context length is NOT sent: it has no OpenAI-surface equivalent, so it
+        # is set server-wide instead (OLLAMA_CONTEXT_LENGTH, or vLLM's
+        # --max-model-len) — one less thing to change at migration. See
+        # docs/llm-transport-and-deployment.md.
         payload = {
             "model": settings.agent_model,
             "messages": messages,

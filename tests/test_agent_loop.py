@@ -180,8 +180,8 @@ async def test_trace_stores_coerced_arguments_not_the_raw_json_string():
 
 @pytest.mark.anyio
 async def test_payload_uses_openai_params_and_no_ollama_options():
-    """`options`/`num_ctx` are native-Ollama only. Context is a property of the
-    served model now (see deploy/Modelfile.agent), matching vLLM semantics."""
+    """`options`/`num_ctx` are native-Ollama only. Context is set server-wide
+    now (OLLAMA_CONTEXT_LENGTH / vLLM --max-model-len), not per request."""
     ollama = RecordingOllama([text_turn("Hi.")])
     await run_turn(
         messages=[{"role": "user", "content": "hi"}],
