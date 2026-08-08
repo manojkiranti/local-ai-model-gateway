@@ -198,3 +198,64 @@ def test_scan_ceiling_stops_and_says_so():
 def test_scan_not_truncated_when_under_the_ceiling():
     r = _agg(metrics=[Metric("Amount", "sum")], max_scan_rows=10)
     assert r.scan_truncated is False
+
+
+# --- grouping --------------------------------------------------------------- #
+def test_group_by_splits_and_totals_each_key():
+    r = _agg(group_by="Region", metrics=[Metric("Amount", "sum")])
+    assert {g.key: g.values[0] for g in r.groups} == {
+        "VIC": Decimal("950"),
+        "NSW": Decimal("350.50"),
+    }
+
+
+def test_groups_are_ordered_by_the_first_metric_descending():
+    r = _agg(group_by="Region", metrics=[Metric("Amount", "sum")])
+    assert [g.key for g in r.groups] == ["VIC", "NSW"]
+
+
+def test_groups_order_by_row_count_when_there_are_no_metrics():
+    rows = ROWS + [["NSW", "Fixed", "1"]]
+    r = _agg(rows, group_by="Region")
+    assert [g.key for g in r.groups] == ["NSW", "VIC"]
+
+
+def test_group_keys_are_matched_case_insensitively_but_displayed_as_first_seen():
+    rows = [["NSW", "Fixed", "1"], ["nsw", "Fixed", "2"]]
+    r = _agg(rows, group_by="Region", metrics=[Metric("Amount", "sum")])
+    assert len(r.groups) == 1
+    assert r.groups[0].key == "NSW"          # first spelling seen
+    assert r.groups[0].values[0] == Decimal("3")
+
+
+def test_blank_group_key_renders_as_blank_label():
+    rows = [["", "Fixed", "5"]]
+    r = _agg(rows, group_by="Region", metrics=[Metric("Amount", "sum")])
+    assert r.groups[0].key == "(blank)"
+
+
+def test_group_cap_truncates_but_reports_the_true_total():
+    rows = [[f"R{i}", "Fixed", str(i)] for i in range(1, 61)]
+    r = _agg(rows, group_by="Region", metrics=[Metric("Amount", "sum")], max_groups=50)
+    assert len(r.groups) == 50
+    assert r.total_groups == 60
+    assert r.groups[0].key == "R60"          # largest kept, not an arbitrary 50
+
+
+def test_groups_with_no_parseable_values_sort_last_deterministically():
+    rows = [
+        ["NSW", "Fixed", "N/A"],
+        ["VIC", "Fixed", "10"],
+        ["QLD", "Fixed", "TBC"],
+    ]
+    r = _agg(rows, group_by="Region", metrics=[Metric("Amount", "sum")])
+    assert r.groups[0].key == "VIC"
+    assert [g.key for g in r.groups[1:]] == ["NSW", "QLD"]   # None -> key order
+
+
+def test_a_grouped_call_with_no_matches_returns_no_groups():
+    r = _agg(group_by="Region", filters=[Filter("Region", "eq", "QLD")],
+             metrics=[Metric("Amount", "sum")])
+    assert r.groups == []
+    assert r.total_groups == 0
+    assert r.rows_matched == 0

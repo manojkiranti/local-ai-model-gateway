@@ -290,9 +290,25 @@ def aggregate(
         GroupResult(key=display, row_count=count, values=[a.value() for a in accs])
         for display, accs, count in groups.values()
     ]
+
+    # Deterministic order: biggest first by the first metric (row count when
+    # there are no metrics). Groups whose metric is None — nothing parseable —
+    # sort last, then by key, so the output never depends on dict insertion
+    # order. Tests and users both see a stable list.
+    def _sort_key(g: GroupResult) -> tuple[int, Decimal, str]:
+        primary: MetricValue = g.values[0] if g.values else g.row_count
+        if primary is None:
+            return (1, Decimal(0), g.key)
+        return (0, -Decimal(primary), g.key)
+
+    results.sort(key=_sort_key)
+    total_groups = len(results)
+    if total_groups > max_groups:
+        results = results[:max_groups]
+
     return AggregateResult(
         groups=results,
-        total_groups=len(results),
+        total_groups=total_groups,
         rows_scanned=rows_scanned,
         rows_matched=rows_matched,
         metric_labels=[m.label for m in metrics],
