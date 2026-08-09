@@ -56,7 +56,24 @@ def test_document_embedding_is_exactly_1536_and_unit_length(settings, model_avai
     assert abs(norm - 1.0) < 1e-6
 
 
+def _cosine(u, v):
+    """Both vectors are already unit length, so the dot product IS cosine."""
+    return sum(a * b for a, b in zip(u, v))
+
+
 def test_batch_order_is_preserved_against_the_real_backend(settings, model_available):
+    """Identical inputs must come back at positions 0 and 2, not shuffled.
+
+    Compared by COSINE, not element-wise equality. Measured against
+    qwen3-embedding:4b-q8_0: the model is bit-deterministic for a given input
+    embedded alone (cos = 1.0000000000), but an input's position within a batch
+    perturbs it by ~0.002 per component — padding, attention masking and
+    reduction order all differ. Element-wise `approx(abs=1e-6)` therefore fails
+    on a perfectly correct result.
+
+    Cosine also makes this a STRONGER shuffle detector than exact equality was:
+    a genuine misordering scores ~0.78 here, nowhere near the threshold.
+    """
     async def go():
         client = OllamaClient(settings.ollama_base_url, settings.ollama_timeout)
         try:
@@ -69,9 +86,8 @@ def test_batch_order_is_preserved_against_the_real_backend(settings, model_avail
             await client.aclose()
 
     a, b, a2 = _run(go())
-    # Identical inputs must land in positions 0 and 2, not be shuffled.
-    assert a == pytest.approx(a2, abs=1e-6)
-    assert a != pytest.approx(b, abs=1e-6)
+    assert _cosine(a, a2) > 0.999, "identical inputs did not map to the same position"
+    assert _cosine(a, b) < 0.95, "different inputs were not distinguishable"
 
 
 def test_query_and_document_modes_produce_different_vectors(settings, model_available):

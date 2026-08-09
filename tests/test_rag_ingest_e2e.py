@@ -68,13 +68,26 @@ def test_upload_then_ingest_produces_searchable_chunks(model_available):
         job_id = accepted.json()["job_id"]
 
         async def drain():
+            """Run the worker until OUR job reaches a terminal state.
+
+            NOT a fixed iteration budget: `claim_next` is FIFO over a queue
+            shared with every other test, so older unrelated jobs can consume a
+            fixed budget before this one is ever claimed. Poll our own job
+            instead, and stop early if the queue empties without it running.
+            """
             engine = create_async_engine(settings.database_url, poolclass=NullPool)
             ollama = OllamaClient(settings.ollama_base_url, settings.ollama_timeout)
             try:
                 await worker.preflight(ollama, settings)
-                for _ in range(10):
+                for _ in range(50):
+                    async with engine.begin() as conn:
+                        status = (await conn.execute(text(
+                            "SELECT status FROM ingest_jobs WHERE id = :j"),
+                            {"j": job_id})).scalar_one()
+                    if status in ("succeeded", "failed"):
+                        return
                     if not await worker.run_once(engine, ollama, settings):
-                        break
+                        return  # queue drained; the assertion below reports it
             finally:
                 await ollama.aclose()
                 await engine.dispose()
