@@ -1,5 +1,11 @@
 # RAG Slice 1 — Schema & Access Control Implementation Plan
 
+> **STATUS: COMPLETE AND LOCKED (2026-08-09).** 8 commits on
+> `feat/rag-slice1-schema-access`, 62 RAG tests passing, migration round-trips.
+> The authorization architecture is settled — see "Decided for slice 3" at the
+> foot of this file. Do not reopen it, and do not add JWT department claims,
+> refresh-token infrastructure, or authorization caching.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Land the five RAG tables, the `chat_sessions.department_id` binding, and a server-enforced department access boundary with an admin API to manage it.
@@ -2510,8 +2516,28 @@ this project has no refresh flow (`/auth/register` and `/auth/login` are the onl
 auth routes). Not a trade worth making in a bank. Do not reintroduce these
 without a decision to build refresh-token infrastructure first.
 
-**One open question for slice 3:** slice 1 returns **400** when a
-department-bound session is continued with no `department` in the body. Now that
-retrieval reads the department from the session row, simply using the bound
-department would also be safe and easier on the frontend. Decide then; do not
-silently change slice 1's tested contract before that.
+### The final slice-3 contract (decided — no longer open)
+
+| Session state | Request `department` | Slice 3 behaviour |
+|---|---|---|
+| new (no row) | given | validate grant, **bind** the new session to it |
+| new (no row) | absent | general chat |
+| bound to X | absent | **use X** — not an error |
+| bound to X | `= X` | use X (consistency check passed) |
+| bound to X | `≠ X` | **409** |
+| `department_id IS NULL` | given | **409** — a general chat stays general; start a new session |
+| `department_id IS NULL` | absent | general chat |
+
+- A session is bound to exactly one department **for its lifetime**.
+- `chat_sessions.department_id` is the server-side source of truth for retrieval.
+- `department` in the body is **required only to open a new department chat**. On
+  an existing session it is an optional consistency check, never the source.
+- Revoked access takes effect on the **next turn** — Postgres stays the live
+  authorization source.
+- Admins retain the grant-bypass.
+
+**This changes one slice-1 behaviour, in slice 3 only.** Slice 1 returns **400**
+for "bound session + no `department` in the body"
+(`test_bound_session_cannot_be_continued_without_a_code`). Slice 3 replaces that
+with "use the bound department" and updates that test. **Do not retroactively
+change slice 1** — it is locked and its tests pass as written.
