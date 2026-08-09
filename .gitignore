@@ -30,8 +30,13 @@ build/
 dist/
 *.egg-info/
 
-# Application-generated files
+# Application-generated files (tool output, per-user uploads)
 generated_files/
+
+# RAG corpus documents (admin-uploaded PDFs/DOCX/CSVs + test-run artifacts).
+# RAG_DOCS_DIR default; the DB row's storage_key points here. Never committed —
+# these are ingested content, not source.
+rag_documents/
 
 # Subagent-driven-development scratch (ledgers, task briefs, review packages).
 # Plans themselves live in docs/superpowers/plans/ and ARE committed.
