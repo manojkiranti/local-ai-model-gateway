@@ -192,3 +192,69 @@ def test_streaming_emits_events_and_persists_final_answer():
             assert assistant["content"] == "streamed reply text"
         finally:
             _cleanup(client, headers)
+
+
+def test_expose_trace_false_hides_trace_but_still_persists_it():
+    """EXPOSE_TRACE=false is a client-visibility switch, not a kill switch: the
+    non-streaming body, the streamed `done` event and the session replay all
+    omit the trace, while the row in Postgres still has it for audit."""
+    with TestClient(app) as client:
+        headers = _auth_headers(client)
+        app.state.mcp = FakeMCP()
+        exposed = app.state.settings
+        app.state.settings = exposed.model_copy(update={"expose_trace": False})
+        try:
+            # --- non-streaming tool turn: trace withheld from the client ---
+            app.state.ollama = FakeOllama(
+                turns=[_tool_turn("get_current_time", {}), _text_turn("It is now.")]
+            )
+            r = client.post("/v1/chat", json={"message": "time?"}, headers=headers)
+            assert r.status_code == 200
+            assert r.json()["trace"] is None
+            sid = r.json()["session_id"]
+
+            # ...and withheld on replay too, so reloading can't resurrect it.
+            detail = client.get(f"/v1/sessions/{sid}", headers=headers).json()
+            assistant = [m for m in detail["messages"] if m["role"] == "assistant"][0]
+            assert assistant["trace"] is None
+
+            # --- streaming: the done event carries no trace either ---
+            app.state.ollama = FakeOllama(
+                turns=[_tool_turn("get_current_time", {}), _text_turn("Still now.")]
+            )
+            rs = client.post(
+                "/v1/chat",
+                json={"session_id": sid, "message": "and now?", "stream": True},
+                headers=headers,
+            )
+            done = [json.loads(l) for l in rs.text.splitlines() if l.strip()][-1]
+            assert done["type"] == "done" and done["trace"] is None
+
+            # --- but it was persisted: flip the switch back and it reappears ---
+            app.state.settings = exposed
+            detail = client.get(f"/v1/sessions/{sid}", headers=headers).json()
+            traces = [m["trace"] for m in detail["messages"] if m["role"] == "assistant"]
+            assert all(isinstance(t, list) and t for t in traces)
+        finally:
+            app.state.settings = exposed
+            _cleanup(client, headers)
+
+
+def test_tool_free_streaming_turn_sends_no_trace():
+    """A plain chat turn must not stream a trace: the loop's raw trace has one
+    entry per iteration even with zero tool calls, which is what made the UI
+    render "1 iteration - 0 tool calls" on an ordinary answer. Streaming now
+    matches the non-streaming path, which has always sent null here."""
+    with TestClient(app) as client:
+        headers = _auth_headers(client)
+        app.state.ollama = FakeOllama(content="just an answer")
+        app.state.mcp = FakeMCP()
+        try:
+            r = client.post(
+                "/v1/chat", json={"message": "hi there", "stream": True}, headers=headers
+            )
+            done = [json.loads(l) for l in r.text.splitlines() if l.strip()][-1]
+            assert done["type"] == "done"
+            assert done["trace"] is None
+        finally:
+            _cleanup(client, headers)

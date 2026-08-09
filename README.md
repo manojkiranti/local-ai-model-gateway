@@ -77,7 +77,7 @@ psql -h 127.0.0.1 -U postgres -c "CREATE DATABASE local_ai_gateway OWNER gateway
 ```bash
 .venv/bin/uvicorn app.main:app --reload --port 8000
 ```
-
+  python -m app.rag.worker
 Serves on `http://localhost:8000`; Swagger UI at `/docs`.
 
 ## Ingestion worker (department RAG)

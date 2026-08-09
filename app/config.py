@@ -46,6 +46,15 @@ class Settings(BaseSettings):
     assistant_name: str = "AI Assistant"
     assistant_org: str = ""  # blank = no organisation clause
 
+    # --- Response transparency ("how it worked" in the UI) ---
+    # The per-iteration execution trace is ALWAYS persisted to
+    # chat_messages.trace (audit); this only controls whether it is sent to the
+    # client. false = /v1/chat (both modes) and /v1/sessions/{id} omit it, so a
+    # production UI has nothing to render a "how it worked" panel from. Live
+    # tool_call/tool_result stream events are NOT affected — those are the
+    # in-flight "using tool X" indicator, not the post-hoc trace.
+    expose_trace: bool = True
+
     # --- Agent (hand-rolled tool-calling loop) ---
     agent_model: str = "qwen2.5:latest"
     agent_temperature: float = 0.1

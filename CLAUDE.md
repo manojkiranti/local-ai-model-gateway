@@ -198,6 +198,17 @@ events (`token`/`tool_call`/`tool_result`/`done`) + the new id in the
   …]` note — a bare cut reads to the model as a complete result. Same reason the
   repeat-nudge only quotes a cached result back when the quote IS the whole
   result (`call_cache` holds the full text; the trace keeps the 600-char copy).
+- **The trace is persisted always, exposed conditionally.** `EXPOSE_TRACE`
+  (default true) gates whether the execution trace leaves the gateway:
+  `/v1/chat` (JSON body AND the streamed `done` event) and `/v1/sessions/{id}`
+  all send null when it's off, so a production UI has nothing to draw a "how it
+  worked" panel from. `chat_messages.trace` is written either way — it's the
+  audit record, not a display field. Live `tool_call`/`tool_result` stream
+  events are deliberately NOT gated (that's the in-flight "using tool X"
+  indicator). Both turn paths also run the trace through `_trace_if_tools`, so a
+  tool-free turn sends null: the loop's raw trace has one entry per iteration
+  even with zero tool calls, and streaming used to leak that as
+  "1 iteration · 0 tool calls" on an ordinary answer.
 - **Starlette 1.x gotcha:** `include_router` mounts as a lazy `_IncludedRouter`,
   so `app.routes` won't list child routes as `APIRoute`. Verify routes via
   TestClient or `/openapi.json`, not `isinstance` checks.

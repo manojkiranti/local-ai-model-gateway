@@ -46,6 +46,15 @@ def _trace_if_tools(trace: Optional[list[dict[str, Any]]]) -> Optional[list[dict
     return None
 
 
+def _client_trace(
+    trace: Optional[list[dict[str, Any]]], settings: Settings
+) -> Optional[list[dict[str, Any]]]:
+    """What the CLIENT is allowed to see. The trace is always persisted (audit);
+    EXPOSE_TRACE=false stops it leaving the gateway so a production UI has
+    nothing to draw a "how it worked" panel from."""
+    return trace if settings.expose_trace else None
+
+
 @contextmanager
 def _department_scope(department):
     """Install the department contextvar for the turn, or nothing at all.
@@ -131,7 +140,17 @@ async def chat(
                             final_answer = event.get("final_answer")
                             error_message = event.get("error_message")
                             trace = event.get("trace")
-                            event = {**event, "session_id": sid}
+                            # Send the client the SAME trace the non-streaming
+                            # path returns: null unless tools actually ran, and
+                            # null outright when EXPOSE_TRACE is off. The loop's
+                            # raw trace has one entry per iteration even for a
+                            # tool-free turn, which is what made the UI render
+                            # "1 iteration · 0 tool calls".
+                            event = {
+                                **event,
+                                "session_id": sid,
+                                "trace": _client_trace(_trace_if_tools(trace), run_settings),
+                            }
                         yield (json.dumps(event) + "\n").encode()
             except MCPUnavailableError as exc:  # rare: handshake failed post pre-flight
                 stop_reason, error_message = "error", exc.message
@@ -179,5 +198,5 @@ async def chat(
         message=TurnMessage(role="assistant", content=content),
         model=model,
         stop_reason=result["stop_reason"],
-        trace=trace,
+        trace=_client_trace(trace, run_settings),
     )

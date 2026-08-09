@@ -4,7 +4,7 @@ Ownership is enforced everywhere: a session that isn't yours reads as 404 (we
 never confirm it exists). This is where per-user scoping lands.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..auth.dependencies import get_current_user
@@ -46,6 +46,7 @@ async def list_my_sessions(
 )
 async def get_my_session(
     session_id: str,
+    request: Request,
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> SessionDetail:
@@ -54,12 +55,22 @@ async def get_my_session(
     )
     if chat_session is None:
         raise HTTPException(status_code=404, detail="session not found")
+    # The trace stays in the database for audit either way; EXPOSE_TRACE=false
+    # only stops it being replayed to the client, so reloading an old thread
+    # can't resurrect a "how it worked" panel the live turn didn't show.
+    expose_trace = request.app.state.settings.expose_trace
+    messages = []
+    for m in chat_session.messages:
+        out = MessageOut.model_validate(m)
+        if not expose_trace:
+            out.trace = None
+        messages.append(out)
     return SessionDetail(
         id=chat_session.id,
         title=chat_session.title,
         created_at=chat_session.created_at,
         updated_at=chat_session.updated_at,
-        messages=[MessageOut.model_validate(m) for m in chat_session.messages],
+        messages=messages,
     )
 
 
