@@ -117,3 +117,14 @@ def test_registered_in_local_tools():
 
     names = {s.name for s in LOCAL_TOOLS}
     assert {"inspect_excel", "read_excel"} <= names
+
+
+def test_descriptions_route_totals_to_aggregate_excel():
+    """The description is the routing prompt. inspect_excel is read FIRST, so if
+    it only points at read_excel the model commits to the ~200-row capped path
+    before it ever weighs aggregate_excel — which is how totals came out wrong.
+    Both readers must name aggregate_excel as the answer for totals."""
+    assert "aggregate_excel" in inspect_excel.SPEC.description
+    # read_excel's cap warning has to name the uncapped alternative, not just
+    # say "capped".
+    assert "aggregate_excel" in read_excel.SPEC.description

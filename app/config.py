@@ -37,6 +37,15 @@ class Settings(BaseSettings):
     default_chat_model: str = "qwen2.5:latest"
     default_embed_model: str = "nomic-embed-text:latest"
 
+    # --- Assistant identity (deployment branding) ---
+    # What the assistant calls itself. Defaults stay generic so the same build
+    # serves any deployment; a bank sets ASSISTANT_NAME/ASSISTANT_ORG in .env.
+    # This is product branding, NOT a security boundary — the real model id is
+    # still in the /v1/chat response body, and a determined user can elicit the
+    # base model by prompting.
+    assistant_name: str = "AI Assistant"
+    assistant_org: str = ""  # blank = no organisation clause
+
     # --- Agent (hand-rolled tool-calling loop) ---
     agent_model: str = "qwen2.5:latest"
     agent_temperature: float = 0.1
@@ -68,24 +77,6 @@ class Settings(BaseSettings):
     # Optional host allowlist: if non-empty, ONLY these domains (and subdomains)
     # may be fetched. Blank = any public host (still IP-filtered).
     fetch_url_allowlist: str = ""
-
---- RAG: department corpus ingestion ---
-    # Corpus documents are org knowledge, NOT per-user files — separate tree.
-    rag_docs_dir: str = "rag_documents"
-    # Native output is 2560; we MRL-truncate to 1536 because pgvector's HNSW
-    # index caps at 2000 dimensions. Must match vector(1536) in the schema.
-    rag_embed_model: str = "qwen3-embedding:4b-q8_0"
-    rag_embed_dim: int = 1536
-    rag_embed_batch: int = 32  # texts per /v1/embeddings request
-    rag_chunk_max_chars: int = 2000
-    rag_chunk_overlap_chars: int = 200
-    # Worker loop timing.
-    rag_ingest_poll_seconds: float = 2.0
-    rag_ingest_stale_minutes: int = 10  # running + stale heartbeat -> failed
-    # Must be comfortably below stale_minutes*60 — a big PDF spends far longer
-    # than the stale window in parse+embed, and without beats the sweep would
-    # fail a job that is working fine.
-    rag_ingest_heartbeat_seconds: float = 30.0
 
     # --- RAG: department corpus ingestion ---
     # Corpus documents are org knowledge, NOT per-user files — separate tree.

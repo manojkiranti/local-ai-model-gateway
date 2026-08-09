@@ -96,9 +96,11 @@ SPEC = LocalToolSpec(
         "Read rows from ONE sheet of an uploaded spreadsheet (.xlsx/.csv) by its "
         "file_id. Optionally pick a 'sheet' (name or 1-based index), project "
         "'columns' (list of header names), and page with 'start_row' (1-based) + "
-        "'max_rows'. Output is capped; if truncated it tells you how to page. For "
-        "a multi-sheet file, call once per sheet. Use inspect_excel first to see "
-        "the sheets and headers."
+        "'max_rows'. Output is CAPPED at a few hundred rows; if truncated it tells "
+        "you how to page. Because of that cap, do NOT sum, average or count from "
+        "this output — use aggregate_excel for any total or breakdown, which reads "
+        "every row. For a multi-sheet file, call once per sheet. Use inspect_excel "
+        "first to see the sheets and headers."
     ),
     parameters={
         "type": "object",
