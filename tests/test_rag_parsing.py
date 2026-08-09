@@ -135,9 +135,23 @@ def test_an_empty_sheet_produces_no_chunks_and_raises(tmp_path):
 
 def test_docling_is_not_imported_at_module_scope():
     """The API image must never pull torch. Docling IS installed in this venv,
-    so this proves parsing.py avoids it by design rather than by absence."""
+    so this proves parsing.py avoids it by design rather than by absence.
+
+    Runs in a SUBPROCESS deliberately: `sys.modules` is process-global, and
+    tests/test_rag_parsing_docling.py imports docling in the same pytest run —
+    an in-process check would pass or fail depending on test order rather than
+    on the import graph, which is the thing actually under test.
+    """
+    import subprocess
     import sys
 
-    import app.rag.parsing  # noqa: F401
-
-    assert "docling" not in sys.modules
+    probe = (
+        "import sys; import app.rag.parsing;"
+        "bad = [m for m in ('docling', 'torch') if m in sys.modules];"
+        "print(','.join(bad))"
+    )
+    out = subprocess.run(
+        [sys.executable, "-c", probe],
+        capture_output=True, text=True, check=True,
+    ).stdout.strip()
+    assert out == "", f"importing app.rag.parsing pulled in: {out}"
