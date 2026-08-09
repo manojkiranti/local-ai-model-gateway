@@ -6,7 +6,7 @@ result dict. We assert both the collected result AND the live event sequence.
 
 import pytest
 
-from app.agent.loop import run_turn, stream_turn
+from app.agent.loop import build_system_prompt, run_turn, stream_turn
 from app.config import Settings
 
 
@@ -44,6 +44,20 @@ class FakeStreamOllama:
             yield chunk
 
 
+class RecordingOllama(FakeStreamOllama):
+    """FakeStreamOllama that keeps every payload, so tests can assert on what the
+    model was actually sent."""
+
+    def __init__(self, turns):
+        super().__init__(turns)
+        self.payloads = []
+
+    async def stream_chat(self, payload):
+        self.payloads.append(payload)
+        async for chunk in super().stream_chat(payload):
+            yield chunk
+
+
 class FakeMCP:
     configured = False
 
@@ -76,6 +90,123 @@ async def test_run_turn_handles_failure_modes_then_completes():
     assert result["final_answer"] == "All done."
     statuses = [tc["status"] for e in result["trace"] for tc in e["tool_calls"]]
     assert statuses == ["unknown_tool", "bad_arguments", "ok", "repeat"]
+
+
+@pytest.mark.anyio
+async def test_system_prompt_survives_a_leading_attachment_note():
+    """A turn carrying an upload starts with the attachment note, which is a
+    system message. That must NOT displace the agent's own system prompt — it
+    used to, leaving every file session with no instructions at all."""
+    ollama = RecordingOllama([text_turn("ok")])
+    settings = _settings()
+    await run_turn(
+        messages=[
+            {"role": "system", "content": 'Active files: id=f1 "a.xlsx"'},
+            {"role": "user", "content": "summarize"},
+        ],
+        ollama=ollama,
+        mcp=FakeMCP(),
+        settings=settings,
+    )
+    sent = ollama.payloads[0]["messages"]
+    assert sent[0] == {"role": "system", "content": build_system_prompt(settings)}
+    assert any("id=f1" in m["content"] for m in sent)
+
+
+@pytest.mark.anyio
+async def test_oversized_tool_result_is_marked_truncated(monkeypatch):
+    """An 8000-char cut with no marker reads to the model as a complete result,
+    so it answers confidently on partial data. The cut must announce itself."""
+    from app.agent.loop import MAX_TOOL_RESULT_CHARS
+    from app.tools.registry import ToolRegistry
+
+    async def huge(self, name, args):
+        return "x" * (MAX_TOOL_RESULT_CHARS + 5000)
+
+    monkeypatch.setattr(ToolRegistry, "dispatch", huge)
+    ollama = RecordingOllama([tool_turn("get_current_time", {}), text_turn("done")])
+    await run_turn(
+        messages=[{"role": "user", "content": "hi"}],
+        ollama=ollama,
+        mcp=FakeMCP(),
+        settings=_settings(),
+    )
+    # The tool message the model saw on the follow-up call.
+    tool_msg = [m for m in ollama.payloads[-1]["messages"] if m["role"] == "tool"][-1]
+    assert "TRUNCATED" in tool_msg["content"]
+    assert "incomplete" in tool_msg["content"].lower()
+    # Still bounded: the marker must not push it past the cap by more than itself.
+    assert len(tool_msg["content"]) < MAX_TOOL_RESULT_CHARS + 400
+
+
+@pytest.mark.anyio
+async def test_full_size_tool_result_gets_no_truncation_marker(monkeypatch):
+    from app.tools.registry import ToolRegistry
+
+    async def small(self, name, args):
+        return "2026-08-08T00:00:00Z"
+
+    monkeypatch.setattr(ToolRegistry, "dispatch", small)
+    ollama = RecordingOllama([tool_turn("get_current_time", {}), text_turn("done")])
+    await run_turn(
+        messages=[{"role": "user", "content": "hi"}],
+        ollama=ollama,
+        mcp=FakeMCP(),
+        settings=_settings(),
+    )
+    tool_msg = [m for m in ollama.payloads[-1]["messages"] if m["role"] == "tool"][-1]
+    assert "TRUNCATED" not in tool_msg["content"]
+
+
+@pytest.mark.anyio
+async def test_repeat_nudge_does_not_quote_a_shortened_result(monkeypatch):
+    """The repeat nudge quoted the trace-sized (600 char) cache entry, so a model
+    that repeated a call was handed a SHORTER result than it originally got and
+    could 'correct' its answer downward. Point it at the real one instead."""
+    from app.agent.loop import TRACE_RESULT_CHARS
+    from app.tools.registry import ToolRegistry
+
+    async def longish(self, name, args):
+        return "y" * (TRACE_RESULT_CHARS + 500)
+
+    monkeypatch.setattr(ToolRegistry, "dispatch", longish)
+    turns = [
+        tool_turn("get_current_time", {}),
+        tool_turn("get_current_time", {}),  # identical repeat
+        text_turn("done"),
+    ]
+    result = await run_turn(
+        messages=[{"role": "user", "content": "hi"}],
+        ollama=FakeStreamOllama(turns),
+        mcp=FakeMCP(),
+        settings=_settings(),
+    )
+    nudge = [tc for e in result["trace"] for tc in e["tool_calls"] if tc["status"] == "repeat"][0]
+    assert "y" * 50 not in nudge["result"]  # no partial quote of the result
+    assert "above" in nudge["result"].lower()
+
+
+@pytest.mark.anyio
+async def test_repeat_nudge_still_quotes_a_short_result(monkeypatch):
+    from app.tools.registry import ToolRegistry
+
+    async def short(self, name, args):
+        return "2026-08-08T00:00:00Z"
+
+    monkeypatch.setattr(ToolRegistry, "dispatch", short)
+    turns = [
+        tool_turn("get_current_time", {}),
+        tool_turn("get_current_time", {}),
+        text_turn("done"),
+    ]
+    result = await run_turn(
+        messages=[{"role": "user", "content": "hi"}],
+        ollama=FakeStreamOllama(turns),
+        mcp=FakeMCP(),
+        settings=_settings(),
+    )
+    nudge = [tc for e in result["trace"] for tc in e["tool_calls"] if tc["status"] == "repeat"][0]
+    assert "2026-08-08T00:00:00Z" in nudge["result"]
 
 
 @pytest.mark.anyio

@@ -18,6 +18,7 @@ from app.db.base import Base
 from app.users import models as _users_models  # noqa: F401
 from app.history import models as _history_models  # noqa: F401
 from app.files import models as _files_models  # noqa: F401
+from app.rag import models as _rag_models  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:
@@ -28,6 +29,20 @@ config.set_main_option("sqlalchemy.url", get_settings().database_url)
 
 target_metadata = Base.metadata
 
+# Indexes whose PostgreSQL-specific options Alembic cannot round-trip: it does
+# not reliably reflect an HNSW operator class or its WITH (m, ef_construction)
+# build parameters, so a drift check would propose dropping and recreating them
+# on every run. They ARE declared on the model (so autogenerate knows they
+# exist) and created by hand in the migration; this only excludes them from
+# comparison.
+_AUTOGEN_SKIP_INDEXES = {"ix_chunks_embedding", "ix_chunks_tsv"}
+
+
+def _include_object(obj, name, type_, reflected, compare_to) -> bool:
+    if type_ == "index" and name in _AUTOGEN_SKIP_INDEXES:
+        return False
+    return True
+
 
 def run_migrations_offline() -> None:
     context.configure(
@@ -36,6 +51,7 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
+        include_object=_include_object,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -46,6 +62,7 @@ def _do_run_migrations(connection) -> None:
         connection=connection,
         target_metadata=target_metadata,
         compare_type=True,
+        include_object=_include_object,
     )
     with context.begin_transaction():
         context.run_migrations()

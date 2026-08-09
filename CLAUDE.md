@@ -48,7 +48,17 @@ contextvars + async `save`/`resolve_file` + in-memory fallback, `sink`=
 create_excel/html/chart/pdf/csv/docx and inspect_excel/read_excel),
 `history/` (chat-history: `models` = `chat_sessions`
 + `chat_messages`, `repository` = data access, `service.open_turn` = shared
-turn-open used by chat, `router` = `/v1/sessions`). `alembic/` for migrations.
+turn-open used by chat, `router` = `/v1/sessions`),
+`rag/` (department-scoped RAG: `models` = `departments` + `user_departments` +
+`documents` + `document_chunks` (pgvector `vector(1536)` + generated `tsv`) +
+`ingest_jobs`, `context` = `rag_context`/`current_department` contextvar,
+`access.resolve_department` = the permission boundary, `repository`/`documents` =
+data access, `storage` = `storage_key` minting + traversal-safe resolution,
+`chunking`/`parsing` = content → `Chunk[]` (Docling lazily, worker only),
+`embedding` = query/document-aware embed + 2560→1536 + normalize, `jobs` =
+Postgres queue, `ingest` = atomic replacement, `worker` = the separate ingest
+process, `router`/`jobs_router` = `/v1/departments` + `/v1/ingest-jobs`).
+`alembic/` for migrations.
 - **Adding a local tool:** new `app/tools/local/<name>.py` with `_fn` + `SPEC`,
   then add `<name>.SPEC` to `LOCAL_TOOLS`. The engine (`registry.py`) never changes.
 
@@ -60,7 +70,18 @@ Authed (JWT): `GET /users/me`, `GET /users` (admin), `POST /v1/chat`,
 size cap), `GET /v1/files` (caller's files, newest first; `?source=` filters),
 `GET /v1/files/{id}` (owner-scoped download; 404 if not yours),
 `DELETE /v1/files/{id}` (owner-scoped; 204, removes row + on-disk file),
-`GET /v1/sessions`, `GET /v1/sessions/{id}`, `DELETE /v1/sessions/{id}`.
+`GET /v1/sessions`, `GET /v1/sessions/{id}`, `DELETE /v1/sessions/{id}`,
+`POST /v1/departments` (admin), `GET /v1/departments` (admin → all; member →
+granted+active, i.e. the frontend's tabs), `PATCH /v1/departments/{code}`
+(admin), `GET|POST /v1/departments/{code}/members` (admin),
+`DELETE /v1/departments/{code}/members/{user_id}` (admin),
+`POST /v1/departments/{code}/documents` (admin, multipart → 202
+`{document_id, job_id}`; 400 bad ext/empty, 409 duplicate content, 413 over cap),
+`POST /v1/departments/{code}/documents/text` (admin, typed text → `source=manual`),
+`GET /v1/departments/{code}/documents` (dept members see `ready` only; admins see
+non-archived, `?include_archived=` admin-only),
+`DELETE /v1/departments/{code}/documents/{id}` (admin; archives — chunks removed,
+row retained), `GET /v1/ingest-jobs/{id}` (admin, progress).
 `GET /v1/mcp/status` is the UI's MCP-connection badge — **always 200**, health
 is in the body (`configured/reachable/tools/error`), never a 502.
 `POST /v1/chat` is the **single, unified** turn endpoint — **stateful**
@@ -138,6 +159,15 @@ events (`token`/`tool_call`/`tool_result`/`done`) + the new id in the
   ownership (404 on foreign id), persists `{id,filename,summary}` on the user
   message (`chat_messages.attachments` JSONB), and `build_context_messages`
   re-emits the attachment note on later turns so ids survive without resending.
+- **Exactly ONE attachment set is active** — the newest. `build_context_messages`
+  replays older sets with superseded wording and no summary; a turn that carries
+  its own upload passes `pending_attachments=True` so every replayed set is
+  demoted and only `open_turn`'s appended note is active. Identical notes per
+  upload made a second file get ignored in favour of the first. Related: the
+  agent's `SYSTEM_PROMPT` is now **always** message 0 — the old
+  `base_messages[0].role != "system"` guard silently dropped it for any session
+  that began with a file upload, since the attachment note is itself a system
+  message.
 - **`aggregate_excel` is the correct tool for ANY total** — sum/avg/min/max/count
   with an optional one-level `group_by` and AND-only filters, computed over
   EVERY row via `readers.open_sheet_rows` (uncapped streaming context manager,
@@ -150,9 +180,136 @@ events (`token`/`tool_call`/`tool_result`/`done`) + the new id in the
   named** in the footer); a column where nothing parsed returns None, never 0.
   Caps: `MAX_SCAN_ROWS=200_000` (states a PARTIAL result rather than refusing),
   `MAX_GROUPS=50` (reports the true group total).
+- **Assistant identity is deployment config**, not a constant: `build_system_prompt(
+  settings)` in `agent/loop.py` prepends an identity block driven by
+  `ASSISTANT_NAME`/`ASSISTANT_ORG` (defaults stay generic; NIC Bank sets them in
+  `.env`). It exists because the model otherwise says "I am Qwen" — and because a
+  model merely renamed will invent a training story, so the prompt explicitly
+  forbids claiming the org trained it. **Branding, not a security boundary:** the
+  real model id is still in the `/v1/chat` body and elicitable by prompting.
+- **Tool descriptions are the routing prompt** — `inspect_excel` is read first,
+  so it routes by question type (totals → `aggregate_excel`, rows →
+  `read_excel`); `read_excel` names `aggregate_excel` in its cap warning. Locked
+  by `test_descriptions_route_totals_to_aggregate_excel`. Don't drop those
+  cross-references: without them the model commits to the capped path and totals
+  come out wrong.
+- **Truncation must announce itself.** Tool results over `MAX_TOOL_RESULT_CHARS`
+  (8000) go through `_for_model` in `agent/loop.py`, which appends a `[TRUNCATED
+  …]` note — a bare cut reads to the model as a complete result. Same reason the
+  repeat-nudge only quotes a cached result back when the quote IS the whole
+  result (`call_cache` holds the full text; the trace keeps the 600-char copy).
 - **Starlette 1.x gotcha:** `include_router` mounts as a lazy `_IncludedRouter`,
   so `app.routes` won't list child routes as `APIRoute`. Verify routes via
   TestClient or `/openapi.json`, not `isinstance` checks.
+- **Department access is a database invariant, not a convention.** A chunk's
+  `department_id` is held to its document's by the composite FK
+  `(document_id, department_id) → documents(id, department_id)`, so
+  `WHERE department_id = ?` is enforced by Postgres rather than by application
+  code behaving correctly. `documents` carries the otherwise-redundant
+  `UNIQUE (id, department_id)` purely as that FK's target — don't "clean it up".
+- **The department is NEVER a tool argument.** `resolve_department` validates the
+  request's tab code against `user_departments` and installs it via
+  `rag_context`, exactly like `file_sink`/`file_source`. Same streaming rule: set
+  it INSIDE the async generator Starlette iterates. Retrieval tools take no
+  `department` parameter, so a prompt injection has nothing to target. Contract:
+  404 unknown/inactive, 404 foreign session (ownership is re-checked, not assumed
+  of the caller), 403 ungranted, 409 department mismatch, 409 **existing general
+  session given a department**, 400 bound session with no code. Admins bypass the
+  grant check ONLY.
+- **`chat_session is None` (new) ≠ `chat_session.department_id is None`
+  (existing general chat).** Both look like "no department". Collapsing them lets
+  an existing general conversation be relabelled HR on turn five, misrepresenting
+  every prior turn as departmentally grounded. New sessions may open in a
+  department; existing general ones get a 409.
+- **Department authorization stays in Postgres — no JWT claims, no auth cache.**
+  A session is bound to one department and retrieval uses the server-side
+  `chat_sessions.department_id`, never a value read back from the request body.
+  Slice 3 folds the grant check into `open_turn`'s existing session query, so it
+  costs **zero additional round trips**. Measured, `resolve_department` is
+  0.518 ms against a multi-second turn, and the request is DB-bound anyway
+  (`get_current_user` selects the user row every request). Token claims would buy
+  that back for a revocation delay — up to 24h, since there is no refresh flow —
+  which is the wrong trade in a bank. Don't reintroduce without building refresh
+  first.
+- **Departments are never deleted.** `documents.department_id` and
+  `chat_sessions.department_id` are both `ON DELETE RESTRICT` — deleting a
+  department must not silently rewrite an old HR session into a general one.
+  `departments.is_active = false` is the only retirement path.
+- **Both RAG unique indexes are PARTIAL, deliberately.**
+  `ux_documents_active_content` excludes `archived` rows, or archiving a document
+  (which deletes its chunks but keeps the row for audit) would permanently block
+  re-uploading that file. `ux_ingest_jobs_active_document` covers only
+  `queued|running`, because `FOR UPDATE SKIP LOCKED` guards a single row and does
+  nothing about two active jobs for one document. Both surface as 409, not 500.
+- **The status CHECK constraints are load-bearing, not hygiene.** Both partial
+  indexes key off exact strings, so a typo'd status (`'runnning'`) would match no
+  predicate and silently escape `ux_ingest_jobs_active_document` entirely.
+  `ck_documents_status`, `ck_documents_source` and `ck_ingest_jobs_status` close
+  the vocabularies. Adding a status value means editing the CHECK too.
+- **`documents.storage_key` is a RELATIVE key under `RAG_DOCS_DIR`**, not an
+  absolute path (unlike `generated_files.path`). Rows stay portable across hosts
+  and the same value becomes the object-storage key later.
+- **`metadata` is reserved by SQLAlchemy declarative** — the attribute is `meta`,
+  the column keeps the name (`mapped_column("metadata", JSONB, ...)`).
+- **`tsv` uses `'english'`, not `'simple'`** — measured: English stems
+  (`loans`→`loan`) while Devanagari passes through untouched, so a mixed
+  Nepali/English corpus gains recall and loses nothing. Changing it rewrites the
+  table (it's a STORED generated column).
+- **The HNSW/GIN indexes are declared on the model AND hand-written in the
+  migration**, and excluded from autogenerate comparison via `_include_object` in
+  `alembic/env.py` — Alembic cannot reflect an HNSW opclass or its
+  `WITH (m, ef_construction)` options, so without the exclusion every drift check
+  proposes dropping and recreating them.
+- **RAG integration tests build a throwaway `NullPool` engine per call**, not the
+  app's module-level `engine`: that one pools connections bound to the first
+  event loop, and each `asyncio.run` makes a new one — the second test would die
+  with "Event loop is closed".
+- **Ingestion runs in a SEPARATE process:** `.venv/bin/python -m app.rag.worker`.
+  It shares the repo and database but not the dependency set — Docling pulls ~90
+  packages including torch and the CUDA stack, which must never enter the API
+  image. `requirements-worker.txt` = `-r requirements.txt` + docling. Docling is
+  imported INSIDE `parsing._parse_with_docling`, never at module scope, and
+  `test_docling_is_not_imported_at_module_scope` (a SUBPROCESS check, because
+  `sys.modules` is process-global) locks that.
+- **The API never parses or embeds.** Upload writes a `documents` row + a queued
+  `ingest_jobs` row and returns **202**. All slow work is the worker's.
+- **The worker holds NO transaction while parsing/embedding.** Snapshot the doc
+  (`DocSnapshot`), end the read, parse via `asyncio.to_thread` (Docling is sync
+  and CPU-bound), embed, then ONE short atomic replacement. A background
+  heartbeat task runs throughout so a long job isn't swept as stale, and is
+  cancelled before the terminal status is written.
+- **`worker.preflight` refuses to start on a dimension mismatch.** Finding out
+  after half a corpus is inserted is far worse — `vector(1536)` would start
+  rejecting inserts partway through.
+- **A failed re-ingest of a `ready` document leaves it `ready`.** The
+  replacement rolled back, so its previous chunks are intact and correct; only a
+  document that never had a good version becomes `failed`. `replace_chunks` and
+  `archive_document` both take `SELECT … FOR UPDATE` on the document row and
+  re-check status under the lock, so an archive landing mid-ingest is not
+  resurrected by the commit that follows.
+- **`get_job`/`get_document`/`lock_document` re-read with `populate_existing`.**
+  `claim_next`/`sweep_stale`/`replace_chunks` update via raw SQL the ORM can't
+  synchronise, and sessions run `expire_on_commit=False`; a cached read would
+  report a swept job as still running.
+- **Upload compensates storage on failure.** The file is written before the DB
+  work is known to succeed, so a duplicate-content 409 or a failed commit calls
+  `storage.delete_document` — otherwise a rejected upload orphans a file.
+- **Corpus spreadsheets are searchable but NOT aggregatable in v1.**
+  `aggregate_excel` resolves through `resolve_file` → `generated_files` (per-user
+  uploads); corpus documents live in `documents` under `RAG_DOCS_DIR`, so the
+  resolvers are disjoint and it cannot reach them. Each corpus table chunk
+  repeats its header row so a chunk retrieved alone is self-describing.
+- **Qwen3-Embedding is asymmetric:** queries get an `Instruct:`/`Query:` prefix,
+  documents do not. `embed_texts` requires an explicit `mode`; getting it wrong
+  silently degrades retrieval. `/v1/embeddings` batch results are ordered by
+  `index`, not array position — `embed_texts` re-sorts and validates the index
+  set; don't "simplify" that away.
+- **PDF/DOCX parsing preserves provenance** — `parsing._parse_with_docling`
+  walks `iterate_items()` (real `prov[0].page_no`, heading path, element label)
+  rather than dumping `export_to_markdown()`, and prepends the heading path to
+  chunk *content* because `tsv` indexes content alone. Model prereq for a live
+  run: `ollama pull qwen3-embedding:4b-q8_0` (not pulled by default; the
+  embedding-live and e2e tests skip until it is).
 - Test login: `admin@example.com` / `supersecret123` (persisted in Postgres).
 
 ## Not done yet

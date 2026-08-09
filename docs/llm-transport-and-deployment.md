@@ -41,6 +41,30 @@ and the model appears to "forget" mid-turn.
 the equivalent of vLLM's `--max-model-len` launch flag, so the mental model
 carries across backends.
 
+### Where does `OLLAMA_CONTEXT_LENGTH` actually go? (common confusion)
+
+**NOT in the gateway's `.env`.** Two different processes, two different config
+homes:
+
+| Variable | Read by | Lives in |
+|----------|---------|----------|
+| `AGENT_MODEL`, `AGENT_TEMPERATURE`, `OLLAMA_BASE_URL`, … | the **gateway** app | the gateway's `.env` |
+| `OLLAMA_CONTEXT_LENGTH` | **Ollama** (`ollama serve`) | the Ollama **systemd** unit |
+
+Putting `OLLAMA_CONTEXT_LENGTH` in the gateway `.env` does nothing — the gateway
+never reads it; Ollama does. Set it on the service:
+
+```bash
+sudo systemctl edit ollama
+#   [Service]
+#   Environment="OLLAMA_CONTEXT_LENGTH=32768"
+sudo systemctl restart ollama
+# confirm it took:
+systemctl show ollama -p Environment | tr ' ' '\n' | grep CONTEXT
+```
+
+(The unit already sets `OLLAMA_MODELS` this same way, so it's the right home.)
+
 ## Local dev (this laptop)
 
 - Ollama runs as a systemd service (`User=ollama`), model store at
@@ -75,20 +99,24 @@ Hardware:
 | RAM | 125 GB (≈119 GB available) |
 | Swap | none |
 
-Current LLM: `qwen3.5:35b-a3b` (MoE, ~3B active params) on Ollama. (STATUS.md's
+Current LLM: `qwen3.5:35b-a3b` (MoE, ~3B active params) on **Ollama**. (STATUS.md's
 older `qwen2.5:72b` target is stale — ignore it.)
 
-**Two ways to serve it, both fed by the same gateway code:**
+**The server runs Ollama today** — option 1 below is the live setup. Option 2
+(vLLM) is a future possibility the transport port unlocks, not something running
+now; it's documented so the switch is a config change when/if you want it.
 
-1. **Ollama on the server** (what's running now)
-   - Same as local: set `OLLAMA_CONTEXT_LENGTH=32768` on the service and restart.
+1. **Ollama on the server** — CURRENT SETUP
+   - Same as local: set `OLLAMA_CONTEXT_LENGTH=32768` on the Ollama **service**
+     (systemd, per the table above — NOT the gateway `.env`) and restart.
    - Point the gateway's `OLLAMA_BASE_URL` at the server's `:11434`.
-   - `AGENT_MODEL=qwen3.5:35b-a3b`.
+   - `AGENT_MODEL=qwen3.5:35b-a3b` in the gateway `.env`.
 
-2. **vLLM on the server** (the reason for the transport port)
+2. **vLLM on the server** — FUTURE OPTION, not running yet
    - Launch with the OpenAI server enabled and context as a flag:
      `--max-model-len 32768`. With 2× A40 you can also use `--tensor-parallel-size 2`.
-   - Point `OLLAMA_BASE_URL` at vLLM's `:8000/v1` base. **No gateway code change.**
+   - Point `OLLAMA_BASE_URL` at vLLM's `/v1` base. **No gateway code change** —
+     that's the whole payoff of the transport port.
    - `AGENT_MODEL` = whatever name vLLM serves the model under.
 
 **VRAM note:** a 32k-token KV cache is a real allocation on top of the weights.

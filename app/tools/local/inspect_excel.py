@@ -58,7 +58,10 @@ SPEC = LocalToolSpec(
         "Inspect an uploaded spreadsheet (.xlsx/.csv) by its file_id and return "
         "the structure of EVERY sheet: name, row/column counts, column headers, "
         "and a few sample rows. Call this first to see what a file contains, then "
-        "use read_excel to read a specific sheet."
+        "pick by question: for a total, average, min/max, count or a breakdown by "
+        "category use aggregate_excel (it reads every row); to look at or quote "
+        "actual rows use read_excel (capped, so never add up its output). The "
+        "sample rows here are a preview only — never answer from them."
     ),
     parameters={
         "type": "object",

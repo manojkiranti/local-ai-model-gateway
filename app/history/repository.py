@@ -34,10 +34,25 @@ def make_title(first_message: str) -> str:
     return flat[: TITLE_MAX - 1].rstrip() + "…"  # ellipsis
 
 
-def format_attachment_note(attachments: list[dict[str, Any]]) -> str:
+def format_attachment_note(attachments: list[dict[str, Any]], *, active: bool = True) -> str:
     """A short system note naming files attached to a user message, so the model
-    knows their ids and can call inspect_excel/read_excel. Pure/formatting only."""
-    lines = ["Attached files (read them with inspect_excel / read_excel):"]
+    knows their ids and can call inspect_excel/read_excel. Pure/formatting only.
+
+    `active=False` marks a SUPERSEDED set — files attached earlier in the
+    conversation that a newer upload has replaced. Those are deliberately weaker:
+    different wording, and no summary. An identically-worded note for every
+    upload is what made a second file get ignored in favour of the first, which
+    had a fat summary and a whole assistant answer behind it.
+    """
+    if not active:
+        lines = ["Files attached earlier in this conversation (superseded — use "
+                 "one of these ONLY if the user names that file):"]
+        for a in attachments:
+            lines.append(f'- id={a.get("id", "")} "{a.get("filename", "")}"')
+        return "\n".join(lines)
+
+    lines = ["Active files for the current request (read them with inspect_excel "
+             "/ read_excel, total them with aggregate_excel):"]
     for a in attachments:
         fid = a.get("id", "")
         name = a.get("filename", "")
@@ -47,7 +62,9 @@ def format_attachment_note(attachments: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-def build_context_messages(messages: list[ChatMessage]) -> list[dict[str, str]]:
+def build_context_messages(
+    messages: list[ChatMessage], *, pending_attachments: bool = False
+) -> list[dict[str, str]]:
     """Clean visible turns -> the [{role, content}] the model sees.
 
     Only role/content is replayed; agent turns contribute their final answer
@@ -55,11 +72,26 @@ def build_context_messages(messages: list[ChatMessage]) -> list[dict[str, str]]:
     attachments re-emits its attachment note (a system message) just before it,
     so 'now total column B' on a later turn still knows the file ids without the
     frontend resending them. Ordering is the caller's (seq).
+
+    Exactly ONE attachment set is ever active: the newest. Older sets are
+    replayed as superseded (see `format_attachment_note`) so the model doesn't
+    have to guess which of several ids the user means. `pending_attachments`
+    says the turn being opened carries its own upload — then EVERY replayed set
+    is superseded, because the caller appends the active note itself. With no
+    new upload, the most recent replayed set stays active.
     """
+    attached_at = [
+        i for i, m in enumerate(messages) if m.role == ROLE_USER and m.attachments
+    ]
+    active_idx = None if pending_attachments else (attached_at[-1] if attached_at else None)
+
     out: list[dict[str, str]] = []
-    for m in messages:
+    for i, m in enumerate(messages):
         if m.role == ROLE_USER and m.attachments:
-            out.append({"role": "system", "content": format_attachment_note(m.attachments)})
+            out.append({
+                "role": "system",
+                "content": format_attachment_note(m.attachments, active=(i == active_idx)),
+            })
         out.append({"role": m.role, "content": m.content})
     return out
 
@@ -68,9 +100,16 @@ def build_context_messages(messages: list[ChatMessage]) -> list[dict[str, str]]:
 # Sessions
 # --------------------------------------------------------------------------- #
 async def create_session(
-    session: AsyncSession, *, user_id: int, title: Optional[str]
+    session: AsyncSession,
+    *,
+    user_id: int,
+    title: Optional[str],
+    department_id: Optional[int] = None,
 ) -> ChatSession:
-    chat_session = ChatSession(user_id=user_id, title=title)
+    """`department_id` binds the conversation to a department FOR ITS LIFETIME;
+    None is a general chat. Only a NEW session may be given one — an existing
+    general chat cannot be adopted into a department (see rag.access)."""
+    chat_session = ChatSession(user_id=user_id, title=title, department_id=department_id)
     session.add(chat_session)
     await session.flush()  # populate id/defaults without committing
     return chat_session

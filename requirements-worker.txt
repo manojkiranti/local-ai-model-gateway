@@ -1,0 +1,9 @@
+# Ingest-worker dependencies. NOT installed in the API image.
+#
+# Docling pulls ~90 packages including torch, torchvision, transformers,
+# opencv and the full NVIDIA CUDA stack — several GB. The API process must
+# never carry that, which is why ingestion runs as a separate process with its
+# own dependency set (and its own image, when containerised).
+-r requirements.txt
+
+docling>=2.0

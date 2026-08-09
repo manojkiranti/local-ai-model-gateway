@@ -20,6 +20,7 @@ from . import (
     inspect_excel,
     pdf,
     read_excel,
+    search_department_docs,
     time,
 )
 from .base import LocalFn, LocalToolSpec
@@ -38,6 +39,7 @@ LOCAL_TOOLS: list[LocalToolSpec] = [
     inspect_excel.SPEC,
     read_excel.SPEC,
     aggregate_excel.SPEC,
+    search_department_docs.SPEC,
 ]
 
 __all__ = ["LOCAL_TOOLS", "LocalToolSpec", "LocalFn"]

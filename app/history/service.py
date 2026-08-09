@@ -15,6 +15,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..files import readers
 from ..files import repository as files_repo
+from ..rag.access import resolve_department
+from ..rag.context import DepartmentContext
+from ..users.models import User
 from . import repository as repo
 from .models import ChatSession
 
@@ -44,17 +47,24 @@ async def _resolve_attachments(
 async def open_turn(
     session: AsyncSession,
     *,
-    user_id: int,
+    user: "User",
     session_id: str | None,
     message: str,
     file_ids: list[str] | None = None,
-) -> tuple[ChatSession, list[dict[str, str]]]:
-    """Returns (chat_session, context_messages) with the user row committed.
+    department: str | None = None,
+) -> tuple[ChatSession, list[dict[str, str]], "DepartmentContext | None"]:
+    """Returns (chat_session, context_messages, department_ctx), user row committed.
 
     context_messages = prior clean turns + (optional attachment note) + the new
     user message, ready to hand to the model. Raises 404 if a given session_id
     isn't owned by this user, or if an attached file_id isn't owned by them.
+
+    `department` is the tab code from the request. It is REQUIRED only to open a
+    new department chat; on an existing bound session it is an optional
+    consistency check and the session's own `department_id` is the source of
+    truth. `resolve_department` owns that contract (403/404/409) — see rag.access.
     """
+    user_id = user.id
     # Verify + summarize attachments BEFORE persisting anything (so a bad id is a
     # clean 404 and doesn't leave a half-written turn).
     attachments = await _resolve_attachments(session, user_id=user_id, file_ids=file_ids)
@@ -65,10 +75,24 @@ async def open_turn(
         )
         if chat_session is None:
             raise HTTPException(status_code=404, detail="session not found")
-        context = repo.build_context_messages(chat_session.messages)
+        # Re-checked on EVERY turn, which is what makes a revoked grant take
+        # effect on the next turn rather than at token expiry.
+        dept_ctx = await resolve_department(session, user, department, chat_session)
+        # A new upload supersedes every earlier one, so the replayed notes are
+        # demoted and only the note appended below stays active.
+        context = repo.build_context_messages(
+            chat_session.messages, pending_attachments=bool(attachments)
+        )
     else:
+        # chat_session=None tells resolve_department this is a NEW session, which
+        # MAY open in a department — unlike an existing general chat, which may
+        # not be adopted into one.
+        dept_ctx = await resolve_department(session, user, department, None)
         chat_session = await repo.create_session(
-            session, user_id=user_id, title=repo.make_title(message)
+            session,
+            user_id=user_id,
+            title=repo.make_title(message),
+            department_id=dept_ctx.id if dept_ctx else None,
         )
         context = []
 
@@ -82,4 +106,4 @@ async def open_turn(
             {"role": "system", "content": repo.format_attachment_note(attachments)}
         )
     context.append({"role": "user", "content": message})
-    return chat_session, context
+    return chat_session, context, dept_ctx

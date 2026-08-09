@@ -28,6 +28,11 @@ class ChatTurnRequest(BaseModel):
     # Ids of previously uploaded files (POST /v1/files) to attach to this turn;
     # the gateway verifies ownership and tells the model it can read them.
     file_ids: Optional[list[str]] = None
+    # Department tab code (e.g. "hr"). REQUIRED only to OPEN a new department
+    # chat — it binds the new session. On an existing bound session it is an
+    # optional consistency check (409 on mismatch); the server reads the
+    # department from chat_sessions.department_id, never from this field.
+    department: Optional[str] = None
 
     model_config = ConfigDict(
         json_schema_extra={

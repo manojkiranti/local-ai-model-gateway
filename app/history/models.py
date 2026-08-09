@@ -45,6 +45,13 @@ class ChatSession(Base):
     )
     # Truncated first user message; rename is a later slice.
     title: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # Which department tab this conversation was opened in. NULL = general chat
+    # (no RAG). RESTRICT rather than SET NULL: deleting a department must not
+    # silently rewrite an old HR session into a general one — soft-disable
+    # departments instead (departments.is_active).
+    department_id: Mapped[int | None] = mapped_column(
+        ForeignKey("departments.id", ondelete="RESTRICT"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
