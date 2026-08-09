@@ -38,6 +38,14 @@ from sqlalchemy.types import DateTime
 
 from ..db.base import Base
 
+# Registration import, not a usage one: `user_departments`, `documents.uploaded_by`
+# and `user_departments.granted_by` all reference `users.id` BY NAME, and
+# SQLAlchemy resolves that lazily at mapper-configuration time. Without the
+# `users` table in Base.metadata first, any consumer that imports only this
+# module gets NoReferencedTableError. Importing it here makes this module
+# self-sufficient instead of making every caller remember.
+from ..users import models as _users_models  # noqa: F401
+
 # Must equal the vector(N) width in the migration. Qwen3-Embedding is 2560
 # native, MRL-truncated to 1536 — pgvector's HNSW index caps at 2000 dims.
 EMBED_DIM = 1536
