@@ -1,0 +1,119 @@
+"""PDF/DOCX parsing. Skips entirely unless Docling is installed, so this file is
+green in the API environment and meaningful in the worker environment.
+"""
+
+import pytest
+
+docling = pytest.importorskip(
+    "docling",
+    reason="Docling lives in the worker env: pip install -r requirements-worker.txt",
+)
+
+from app.rag.parsing import ParseError, parse_to_chunks  # noqa: E402
+
+OPTS = {"max_chars": 800, "overlap_chars": 80}
+
+
+@pytest.fixture(scope="module")
+def docx_file(tmp_path_factory):
+    from docx import Document
+
+    doc = Document()
+    doc.add_heading("Leave Policy", level=1)
+    doc.add_paragraph("Annual leave accrues monthly for all permanent staff.")
+    doc.add_heading("Carry Over", level=2)
+    doc.add_paragraph("Up to five days may be carried into the next year.")
+    path = tmp_path_factory.mktemp("docling") / "policy.docx"
+    doc.save(path)
+    return path
+
+
+@pytest.fixture(scope="module")
+def pdf_file(tmp_path_factory):
+    """A real 2-page PDF with a heading per page.
+
+    NOTE the explicit width and `set_xy`: `multi_cell(0, ...)` raises
+    `FPDFException: Not enough horizontal space` once the cursor is sitting at
+    the right margin after a previous cell. This form is verified to work.
+    """
+    from fpdf import FPDF
+
+    def line(pdf, text, size=12, bold=False):
+        pdf.set_font("Helvetica", "B" if bold else "", size)
+        pdf.set_xy(pdf.l_margin, pdf.get_y())
+        pdf.multi_cell(w=pdf.w - pdf.l_margin - pdf.r_margin, h=8, text=text)
+
+    pdf = FPDF()
+    pdf.set_auto_page_break(True, margin=15)
+    pdf.add_page()
+    line(pdf, "Leave Policy", 16, True)
+    line(pdf, "Annual leave accrues monthly for all permanent staff.")
+    pdf.add_page()
+    line(pdf, "Carry Over", 16, True)
+    line(pdf, "Up to five days may be carried into the next year.")
+
+    path = tmp_path_factory.mktemp("docling") / "policy.pdf"
+    pdf.output(str(path))
+    return path
+
+
+def test_docx_text_is_extracted(docx_file):
+    chunks = parse_to_chunks(docx_file, "docx", **OPTS)
+    joined = " ".join(c.content for c in chunks)
+    assert "accrues monthly" in joined
+    assert "carried into the next year" in joined
+
+
+def test_pdf_text_is_extracted_across_pages(pdf_file):
+    chunks = parse_to_chunks(pdf_file, "pdf", **OPTS)
+    joined = " ".join(c.content for c in chunks)
+    assert "accrues monthly" in joined
+    assert "carried into the next year" in joined
+
+
+def test_pdf_chunks_carry_real_page_numbers(pdf_file):
+    """The reason we walk iterate_items() instead of dumping markdown: slice-3
+    citations need the page. Verified against docling 2.118 — prov[0].page_no
+    is 1-based."""
+    chunks = parse_to_chunks(pdf_file, "pdf", **OPTS)
+    pages = {c.page_number for c in chunks if c.page_number is not None}
+    assert pages, "no chunk carried a page number — provenance was lost"
+    assert pages == {1, 2}
+
+    on_page_1 = " ".join(c.content for c in chunks if c.page_number == 1)
+    on_page_2 = " ".join(c.content for c in chunks if c.page_number == 2)
+    assert "accrues monthly" in on_page_1
+    assert "carried into the next year" in on_page_2
+
+
+def test_chunks_carry_the_heading_path_as_section(pdf_file):
+    chunks = parse_to_chunks(pdf_file, "pdf", **OPTS)
+    sections = {c.section for c in chunks if c.section}
+    assert "Leave Policy" in sections
+    assert "Carry Over" in sections
+
+
+def test_heading_text_is_inside_the_content_so_it_is_lexically_searchable(pdf_file):
+    """`tsv` is generated from `content` alone — a heading kept only in the
+    `section` column would be invisible to the lexical channel."""
+    chunks = parse_to_chunks(pdf_file, "pdf", **OPTS)
+    body = next(c for c in chunks if "carried into the next year" in c.content)
+    assert "Carry Over" in body.content
+
+
+def test_element_types_are_populated(docx_file):
+    chunks = parse_to_chunks(docx_file, "docx", **OPTS)
+    assert {c.element_type for c in chunks} <= {"text", "heading", "table", "list"}
+    assert any(c.element_type == "text" for c in chunks)
+
+
+def test_chunk_indices_are_contiguous(docx_file):
+    chunks = parse_to_chunks(docx_file, "docx", max_chars=120, overlap_chars=0)
+    assert [c.chunk_index for c in chunks] == list(range(len(chunks)))
+
+
+def test_a_non_document_file_raises_parse_error(tmp_path):
+    bad = tmp_path / "broken.pdf"
+    bad.write_bytes(b"definitely not a pdf")
+    with pytest.raises(ParseError):
+        parse_to_chunks(bad, "pdf", **OPTS)
