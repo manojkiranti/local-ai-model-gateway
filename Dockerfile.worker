@@ -1,0 +1,55 @@
+# syntax=docker/dockerfile:1
+
+# ============================================================================
+# Ingest worker for department RAG. Separate image because Docling pulls torch
+# + the CUDA stack (several GB) that must never enter the slim API image.
+# CPU-only torch keeps this image as small as that allows.
+# ============================================================================
+
+# ---- Stage 1: build the virtualenv --------------------------------------
+FROM python:3.10-slim AS builder
+
+ENV PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# CPU torch FIRST, from the PyTorch CPU index, so the subsequent Docling install
+# finds torch already satisfied and never resolves the multi-GB CUDA build.
+RUN pip install --upgrade pip \
+    && pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision
+
+COPY requirements-worker.txt requirements.txt ./
+RUN pip install -r requirements-worker.txt
+
+# ---- Stage 2: runtime ----------------------------------------------------
+FROM python:3.10-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PATH="/opt/venv/bin:$PATH"
+
+RUN useradd --create-home --uid 10001 appuser
+
+WORKDIR /app
+
+COPY --from=builder /opt/venv /opt/venv
+
+# App code only — the worker never migrates (the `migrate` service owns schema).
+COPY app ./app
+
+# Mount points must exist and be appuser-owned BEFORE the named volumes mount,
+# or Docker initializes the volumes root-owned and the non-root worker can't
+# write. rag_documents = shared corpus; ~/.cache = Docling model downloads.
+RUN mkdir -p /app/rag_documents /home/appuser/.cache \
+    && chown -R appuser:appuser /app /home/appuser/.cache
+
+USER appuser
+
+# Background poller: no port, no HTTP healthcheck.
+CMD ["python", "-m", "app.rag.worker"]
