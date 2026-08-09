@@ -87,6 +87,13 @@ class ChatMessage(Base):
     # summary}); NULL when nothing was attached. Persisted so the attachment
     # note is re-injected on later turns without the frontend resending ids.
     attachments: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    # Department documents this ASSISTANT answer was grounded in (list of
+    # {document_id, title, department_code, file_name, file_type, pages, cited});
+    # NULL when the turn searched no corpus. `download_url` is deliberately NOT
+    # stored — it is derived on the way out, so these rows survive a route
+    # change. Unlike `trace`, this is a product feature, not an audit record, so
+    # it is never gated by EXPOSE_TRACE.
+    sources: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     # Model that produced an assistant row (NULL for user rows).
     model: Mapped[str | None] = mapped_column(String(128), nullable=True)
     created_at: Mapped[datetime] = mapped_column(

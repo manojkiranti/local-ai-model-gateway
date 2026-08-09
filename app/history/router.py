@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..auth.dependencies import get_current_user
 from ..db.session import get_session
+from ..rag.sources import with_download_urls
 from ..users.models import User
 from . import repository as repo
 from .schemas import MessageOut, SessionDetail, SessionSummary
@@ -64,6 +65,10 @@ async def get_my_session(
         out = MessageOut.model_validate(m)
         if not expose_trace:
             out.trace = None
+        # Sources are replayed regardless of EXPOSE_TRACE — they are part of the
+        # answer, not part of the diagnostics. `download_url` is computed here
+        # because it is never persisted.
+        out.sources = with_download_urls(out.sources)
         messages.append(out)
     return SessionDetail(
         id=chat_session.id,

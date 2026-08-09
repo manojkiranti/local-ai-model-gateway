@@ -9,6 +9,8 @@ use.
 
 from __future__ import annotations
 
+import re
+
 from fastapi import (
     APIRouter,
     Depends,
@@ -20,6 +22,7 @@ from fastapi import (
     UploadFile,
     status,
 )
+from fastapi.responses import FileResponse
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,6 +33,7 @@ from ..users.models import ROLE_ADMIN, User
 from . import documents as docs_repo
 from . import jobs as jobs_repo
 from . import repository as repo
+from .models import STATUS_READY
 from .parsing import ParseError, detect_file_type
 from .schemas import (
     DepartmentCreate,
@@ -42,7 +46,13 @@ from .schemas import (
     MemberOut,
     TextDocumentCreate,
 )
-from .storage import delete_document, mint_storage_key, write_document
+from .storage import (
+    StorageError,
+    delete_document,
+    mint_storage_key,
+    resolve_storage_path,
+    write_document,
+)
 
 router = APIRouter(prefix="/v1/departments", tags=["departments"])
 
@@ -345,6 +355,108 @@ async def list_department_documents(
         session, dept.id, include_archived=include_archived
     )
     return [DocumentAdminOut.model_validate(d) for d in rows]
+
+
+# Content types for the corpus's closed `file_type` vocabulary (see
+# parsing._EXT_MAP). Anything unrecognised downloads as a binary blob rather
+# than being guessed at — a wrong type invites the browser to render it inline.
+_MEDIA_TYPES = {
+    "pdf": "application/pdf",
+    "docx": (
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    ),
+    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "csv": "text/csv",
+    "text": "text/plain; charset=utf-8",
+}
+
+# Control characters have no place in a filename and are the classic vector for
+# splitting a response header. Starlette percent-encodes via `filename*`, so this
+# is defence in depth rather than the only guard.
+_UNSAFE_FILENAME = re.compile(r"[\x00-\x1f\x7f]")
+
+
+def _download_filename(doc) -> str:
+    """What the browser should save the file as.
+
+    Typed-in documents (`source='manual'`) have no `file_name` — their bytes are
+    stored under a minted `.txt` key — so the admin-supplied title becomes the
+    name. The title is arbitrary text up to 512 chars, hence the sanitising and
+    the length cap.
+    """
+    if doc.file_name:
+        return _UNSAFE_FILENAME.sub("", doc.file_name).strip() or "document"
+    base = _UNSAFE_FILENAME.sub("", doc.title or "").strip()
+    base = base[:120].rstrip(" .") or "document"
+    return f"{base}.txt"
+
+
+@router.get(
+    "/{code}/documents/{document_id}/download",
+    response_class=FileResponse,
+    responses={
+        403: {"description": "You have no grant for this department."},
+        404: {"description": "Unknown department/document, or not readable by you."},
+    },
+)
+async def download_department_document(
+    code: str,
+    document_id: str,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Serve a corpus document's original bytes — what a chat citation links to.
+
+    Status codes follow the routes beside this one rather than one blanket rule:
+    an ungranted **department** is 403 (as in `_require_department_access`, and
+    as `GET /{code}/documents` already answers), while anything at **document**
+    granularity is 404 — unknown id, a document belonging to another department,
+    or one a member is not allowed to read. Members are held to `ready`
+    documents, matching the list route: a pending or archived document is not
+    part of the corpus their answers can cite, and distinguishing "exists but
+    you may not have it" from "does not exist" would leak the corpus's shape.
+
+    Behind JWT like every other download here, so the frontend must fetch with
+    the Authorization header and build a blob URL.
+    """
+    dept = await _require_department_access(session, user, code)
+    doc = await docs_repo.get_document(session, document_id)
+    if doc is None or doc.department_id != dept.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Unknown document"
+        )
+    if user.role != ROLE_ADMIN and doc.status != STATUS_READY:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Unknown document"
+        )
+    if not doc.storage_key:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="This document has no downloadable file",
+        )
+
+    settings = get_settings()
+    try:
+        path = resolve_storage_path(doc.storage_key, settings.rag_docs_dir)
+    except StorageError as exc:
+        # The key is ours, but it round-tripped through the database, so it is
+        # treated as untrusted coming back. A traversal attempt is a 404 to the
+        # caller and a 500-worthy event for us — never a served file.
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Unknown document"
+        ) from exc
+    if not path.is_file():
+        # Row without bytes: the file was removed out of band. Not a 500 — there
+        # is genuinely nothing to serve.
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Document file is missing"
+        )
+
+    return FileResponse(
+        path,
+        media_type=_MEDIA_TYPES.get(doc.file_type, "application/octet-stream"),
+        filename=_download_filename(doc),
+    )
 
 
 @router.delete(
