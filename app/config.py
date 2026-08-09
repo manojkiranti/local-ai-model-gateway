@@ -87,6 +87,47 @@ class Settings(BaseSettings):
     # fail a job that is working fine.
     rag_ingest_heartbeat_seconds: float = 30.0
 
+    # --- RAG: department corpus ingestion ---
+    # Corpus documents are org knowledge, NOT per-user files — separate tree.
+    rag_docs_dir: str = "rag_documents"
+    # Native output is 2560; we MRL-truncate to 1536 because pgvector's HNSW
+    # index caps at 2000 dimensions. Must match vector(1536) in the schema.
+    rag_embed_model: str = "qwen3-embedding:4b-q8_0"
+    rag_embed_dim: int = 1536
+    rag_embed_batch: int = 32  # texts per /v1/embeddings request
+    rag_chunk_max_chars: int = 2000
+    rag_chunk_overlap_chars: int = 200
+    # Worker loop timing.
+    rag_ingest_poll_seconds: float = 2.0
+    rag_ingest_stale_minutes: int = 10  # running + stale heartbeat -> failed
+    # Must be comfortably below stale_minutes*60 — a big PDF spends far longer
+    # than the stale window in parse+embed, and without beats the sweep would
+    # fail a job that is working fine.
+    rag_ingest_heartbeat_seconds: float = 30.0
+
+    # --- RAG: retrieval (slice 3) ---
+    rag_top_k: int = 12  # chunks handed to the model; also the tool's clamp ceiling
+    rag_candidate_pool: int = 50  # per channel, before fusion
+    rag_rerank_pool: int = 20  # fused candidates a reranker would score
+    # Cormack et al. 2009's constant, not a universal law — kept configurable so
+    # an eval can sweep it. RRF is used precisely so no weight has to be tuned
+    # between a cosine distance and a ts_rank_cd score, which share no scale.
+    rag_rrf_k: int = 60
+    # Recall knob for the ANN index. Must be >= the per-channel pool or the dense
+    # side can return fewer candidates than asked for.
+    rag_hnsw_ef_search: int = 100
+    rag_max_query_chars: int = 1000
+    # Budget for the serialized tool result. Deliberately under the agent loop's
+    # MAX_TOOL_RESULT_CHARS (8000): a bare cut there would sever citation headers
+    # mid-line, so the tool trims its own bodies instead and says that it did.
+    rag_tool_result_max_chars: int = 7000
+    # Reranking is OFF for this slice: qwen3-reranker is not pulled, and RRF
+    # ordering is the baseline. Without it there is no calibrated relevance
+    # score, so there is no abstention threshold either — see rag/rerank.py.
+    rag_rerank_enabled: bool = False
+    rag_rerank_model: str = "qwen3-reranker:4b"
+    rag_relevance_threshold: float = 0.5  # only consulted when reranking is on
+
     # --- CORS (frontend talks only to this gateway) ---
     cors_origins: str = "*"  # comma-separated, or "*" for all (dev)
 

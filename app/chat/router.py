@@ -15,6 +15,7 @@ answer + trace, even though the live stream also shows tool activity/narration.
 """
 
 import json
+from contextlib import contextmanager
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -29,6 +30,7 @@ from ..files.source import turn_files
 from ..history import repository as repo
 from ..history.service import open_turn
 from ..mcp.client import MCPClient, MCPUnavailableError
+from ..rag.context import rag_context
 from ..ollama.client import OllamaClient
 from ..users.models import User
 from .schemas import ChatTurnRequest, ChatTurnResponse, TurnMessage
@@ -42,6 +44,21 @@ def _trace_if_tools(trace: Optional[list[dict[str, Any]]]) -> Optional[list[dict
     if trace and any(entry.get("tool_calls") for entry in trace):
         return trace
     return None
+
+
+@contextmanager
+def _department_scope(department):
+    """Install the department contextvar for the turn, or nothing at all.
+
+    A general chat has no department; entering `rag_context(None)` would make
+    `current_department()` return a bogus context, so the no-department case is
+    an explicit no-op rather than a null object.
+    """
+    if department is None:
+        yield
+    else:
+        with rag_context(department):
+            yield
 
 
 def _final_content(result: dict[str, Any]) -> str:
@@ -78,9 +95,9 @@ async def chat(
 
     # Resolve/create session + persist the user message (committed here). Any
     # attached file_ids are verified owned here (404 on a foreign id).
-    chat_session, context = await open_turn(
-        session, user_id=user.id, session_id=req.session_id, message=req.message,
-        file_ids=req.file_ids,
+    chat_session, context, department = await open_turn(
+        session, user=user, session_id=req.session_id, message=req.message,
+        file_ids=req.file_ids, department=req.department,
     )
     sid = chat_session.id
 
@@ -99,7 +116,12 @@ async def chat(
                 # Files any tool creates this turn are owned by this user +
                 # session, and the read tools resolve ids owner-scoped. Must be
                 # set INSIDE the generator Starlette iterates (contextvar).
-                with turn_files(user_id=user.id, session_id=sid):
+                # `rag_context` alongside `turn_files`, and for the same reason:
+                # both are contextvars the tools read, and a contextvar set in
+                # the router before returning StreamingResponse is NOT visible
+                # inside the generator Starlette later iterates.
+                with turn_files(user_id=user.id, session_id=sid), \
+                        _department_scope(department):
                     async for event in stream_turn(
                         messages=context, ollama=ollama, mcp=mcp,
                         settings=run_settings, user_email=user.email,
@@ -137,7 +159,8 @@ async def chat(
     try:
         # Files created this turn are owned by this user + session; read tools
         # resolve attached file ids owner-scoped.
-        with turn_files(user_id=user.id, session_id=sid):
+        with turn_files(user_id=user.id, session_id=sid), \
+                _department_scope(department):
             result = await run_turn(
                 messages=context, ollama=ollama, mcp=mcp,
                 settings=run_settings, user_email=user.email,

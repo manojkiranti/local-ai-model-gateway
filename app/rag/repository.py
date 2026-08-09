@@ -33,6 +33,16 @@ async def get_department_by_code(
     ).scalar_one_or_none()
 
 
+async def get_department_by_id(
+    session: AsyncSession, department_id: int
+) -> Department | None:
+    """Used when a bound session supplies no code: the department is read from
+    `chat_sessions.department_id`, the server-side source of truth."""
+    return (
+        await session.execute(select(Department).where(Department.id == department_id))
+    ).scalar_one_or_none()
+
+
 async def list_departments(session: AsyncSession) -> list[Department]:
     """Every department, active or not — the admin view."""
     result = await session.execute(select(Department).order_by(Department.code))

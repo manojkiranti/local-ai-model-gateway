@@ -143,13 +143,33 @@ def test_matching_session_department_resolves(env):
     assert ctx is not None and ctx.id == env["hr"]
 
 
-def test_bound_session_cannot_be_continued_without_a_code(env):
-    """Omitting `department` must not silently downgrade an HR chat to general."""
+def test_a_bound_session_continues_in_its_own_department_without_a_code(env):
+    """Slice-3 contract (replaces slice 1's 400): `department` is required only
+    to OPEN a department chat. On a bound session the server reads
+    chat_sessions.department_id — the source of truth — so omitting the field
+    continues in HR rather than erroring or downgrading to general."""
     bound = ChatSession(id=uuid.uuid4().hex, user_id=env["member"].id,
                         department_id=env["hr"])
+    ctx = _resolve(env["member"], None, bound)
+    assert ctx is not None
+    assert ctx.id == env["hr"] and ctx.code == env["hr_code"]
+
+
+def test_a_bound_session_still_rechecks_the_grant_when_no_code_is_given(env):
+    """The no-code path must not become a way around revocation."""
+    bound = ChatSession(id=uuid.uuid4().hex, user_id=env["member"].id,
+                        department_id=env["fin"])          # member has no Finance grant
     with pytest.raises(HTTPException) as exc:
         _resolve(env["member"], None, bound)
-    assert exc.value.status_code == 400
+    assert exc.value.status_code == 403
+
+
+def test_a_bound_session_on_an_inactive_department_is_404(env):
+    bound = ChatSession(id=uuid.uuid4().hex, user_id=env["admin"].id,
+                        department_id=env["off"])
+    with pytest.raises(HTTPException) as exc:
+        _resolve(env["admin"], None, bound)
+    assert exc.value.status_code == 404
 
 
 def test_general_session_stays_general(env):

@@ -26,21 +26,96 @@ import logging
 from typing import Any, AsyncIterator
 
 from ..config import Settings
+from ..rag.context import current_department
 from ..mcp.client import MCPClient, MCPUnavailableError
 from ..ollama.client import OllamaClient, OllamaError
 from ..tools.registry import ToolRegistry, UnknownToolError
 
 logger = logging.getLogger("app.agent")
 
-SYSTEM_PROMPT = (
-    "You are a helpful assistant with access to tools. Use the provided tools "
-    "when they help answer the user's request. Only call tools that are listed. "
-    "When you have enough information, stop calling tools and reply with a final "
-    "answer in plain text."
+WORKING_PROMPT = (
+    "Use the provided tools when they help answer the user's request. Only call "
+    "tools that are listed. When you have enough information, stop calling tools "
+    "and reply with a final answer in plain text.\n"
+    "Files: a system note lists the file ids attached to this conversation. Work "
+    "on the ACTIVE files unless the user names a different file by name — files "
+    "marked superseded were replaced by a newer upload. Never describe a file's "
+    "contents from earlier in the conversation; call a file tool on the id you "
+    "intend to answer about."
 )
+
+
+GROUNDING_PROMPT = (
+    "This conversation is scoped to the {code} department. For any question "
+    "about company policy, process, entitlements, products or internal rules, "
+    "call search_department_docs FIRST and answer only from the passages it "
+    "returns, citing the document title (and page, when given). If it returns "
+    "no matching passages, say you could not find it in the {code} documents — "
+    "do not answer such questions from general knowledge, and do not guess. "
+    "Keep answers general and educational; never present them as personal "
+    "financial, tax or legal advice."
+)
+
+
+def build_system_prompt(settings: Settings) -> str:
+    """The system prompt for one turn: deployment identity + working instructions.
+
+    Built per turn rather than fixed at import so `ASSISTANT_NAME`/`ASSISTANT_ORG`
+    (and any per-request settings copy) actually reach the model. Left to itself a
+    model answers "I am Qwen", and a model merely *told* to call itself something
+    else will invent a training story to justify it — hence the explicit "never
+    claim X trained you". Branding only; the real model id is still returned in
+    the /v1/chat body.
+    """
+    name = settings.assistant_name.strip() or "AI Assistant"
+    org = settings.assistant_org.strip()
+
+    if org:
+        identity = (
+            f"You are {name}, an AI assistant for {org}. If you are asked who or "
+            f"what you are, say exactly that. Do not discuss the underlying model, "
+            f"its vendor, or how you were trained — that is not something you "
+            f"disclose. Never claim that {org} built, trained, or developed you, "
+            f"and never claim to be human."
+        )
+    else:
+        identity = (
+            f"You are {name}, an AI assistant. If you are asked who or what you "
+            f"are, say exactly that. Do not discuss the underlying model, its "
+            f"vendor, or how you were trained — that is not something you "
+            f"disclose. Never claim to be human."
+        )
+    prompt = f"{identity}\n{WORKING_PROMPT}"
+
+    # Grounding is added ONLY for a department-scoped turn. A general chat has no
+    # corpus, so instructing the model to answer only from retrieved documents
+    # there would make it refuse ordinary questions it can answer perfectly well.
+    # The contextvar is installed by the chat router before the loop runs.
+    department = current_department()
+    if department is not None:
+        prompt = f"{prompt}\n{GROUNDING_PROMPT.format(code=department.code)}"
+    return prompt
 
 MAX_TOOL_RESULT_CHARS = 8000  # fed back to the model (protect num_ctx)
 TRACE_RESULT_CHARS = 600  # kept in the trace / repeat cache
+
+# A bare cut at MAX_TOOL_RESULT_CHARS is invisible to the model — it reads as a
+# complete result, so the model answers confidently on partial data. Every other
+# truncation we do (read_excel's paging note, aggregate's PARTIAL result) says so;
+# this one must too.
+TRUNCATION_NOTE = (
+    "\n\n[TRUNCATED: this tool result was cut off at {cap} characters and is "
+    "INCOMPLETE. Do not treat it as the whole answer. Narrow the call (fewer "
+    "columns, or page with start_row/max_rows), or use aggregate_excel if you "
+    "need a total over all rows.]"
+)
+
+
+def _for_model(result: str) -> str:
+    """The tool result as the model sees it: capped, and told when it was cut."""
+    if len(result) <= MAX_TOOL_RESULT_CHARS:
+        return result
+    return result[:MAX_TOOL_RESULT_CHARS] + TRUNCATION_NOTE.format(cap=MAX_TOOL_RESULT_CHARS)
 
 
 def _coerce_arguments(raw: Any) -> tuple[dict[str, Any] | None, str | None]:
@@ -103,9 +178,13 @@ async def _loop_events(
 ) -> AsyncIterator[dict[str, Any]]:
     """The loop as an event generator. Yields token/tool_call/tool_result events
     live, then exactly one terminal `done` event carrying the collected trace."""
-    messages: list[dict[str, Any]] = []
-    if not base_messages or base_messages[0].get("role") != "system":
-        messages.append({"role": "system", "content": SYSTEM_PROMPT})
+    # Our prompt always leads. This used to be skipped when base_messages already
+    # started with a system message — but that is never a caller-supplied prompt,
+    # it's the attachment note the history layer emits, so ANY session that began
+    # with a file upload ran with no agent instructions at all.
+    messages: list[dict[str, Any]] = [
+        {"role": "system", "content": build_system_prompt(settings)}
+    ]
     messages.extend(base_messages)
 
     trace: list[dict[str, Any]] = []
@@ -223,10 +302,20 @@ async def _loop_events(
             # ROBUSTNESS 3: identical repeat call -> nudge instead of re-running.
             key = _repeat_key(name, args)
             if key in call_cache:
-                result = (
-                    f"NOTE: you already called '{name}' with these arguments and got: "
-                    f"{call_cache[key]}. Use that result, or make a different call."
-                )
+                cached = call_cache[key]
+                # Quote it back only when the quote IS the whole result. Quoting a
+                # shortened copy of a long result would hand the model less than it
+                # already has in context.
+                if len(cached) <= TRACE_RESULT_CHARS:
+                    result = (
+                        f"NOTE: you already called '{name}' with these arguments and got: "
+                        f"{cached}. Use that result, or make a different call."
+                    )
+                else:
+                    result = (
+                        f"NOTE: you already called '{name}' with these arguments. Its full "
+                        f"result is in the messages above — use that, or make a different call."
+                    )
                 record["status"], record["result"] = "repeat", result
                 messages.append(_tool_message(call_id, result))
                 logger.info("   ~ repeat call '%s' -> nudged model", name)
@@ -257,9 +346,12 @@ async def _loop_events(
                 logger.info("   ! tool '%s' raised: %s", name, exc)
 
             result = result if result is not None else ""
-            call_cache[key] = result[:TRACE_RESULT_CHARS]
+            # Cache the FULL result: the repeat nudge needs its true length to
+            # decide whether quoting it back is honest. The trace keeps the short
+            # copy (below) — that one is for humans, not the model.
+            call_cache[key] = result
             record["result"] = result[:TRACE_RESULT_CHARS]
-            messages.append(_tool_message(call_id, result[:MAX_TOOL_RESULT_CHARS]))
+            messages.append(_tool_message(call_id, _for_model(result)))
             logger.info("   -> '%s' [%s] returned %d chars", name, record["status"], len(result))
             entry_calls.append(record)
             yield {"type": "tool_result", "name": name, "status": record["status"],

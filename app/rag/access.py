@@ -21,6 +21,22 @@ from . import repository as repo
 from .context import DepartmentContext
 
 
+async def _require_grant(session: AsyncSession, user: User, dept) -> None:
+    """Admins bypass the grant check ONLY. Re-checked on every turn, which is
+    what makes revocation take effect on the next turn — Postgres stays the live
+    authorization source."""
+    if user.role == ROLE_ADMIN:
+        return
+    allowed = await repo.has_department_access(
+        session, user_id=user.id, department_id=dept.id
+    )
+    if not allowed:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this department",
+        )
+
+
 async def resolve_department(
     session: AsyncSession,
     user: User,
@@ -48,15 +64,18 @@ async def resolve_department(
     bound_id = chat_session.department_id if is_existing else None
 
     if code is None:
-        # A session opened in a department tab cannot be continued without it —
-        # otherwise omitting the field silently downgrades an HR conversation to
-        # general chat, and the transcript stops meaning what it says.
+        # A bound session continues in ITS OWN department. `department` in the
+        # body is required only to OPEN a department chat; on an existing session
+        # it is an optional consistency check, never the source of truth — that
+        # is `chat_sessions.department_id`, read server-side.
         if bound_id is not None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="This conversation belongs to a department; "
-                       "'department' is required to continue it.",
-            )
+            dept = await repo.get_department_by_id(session, bound_id)
+            if dept is None or not dept.is_active:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND, detail="Unknown department"
+                )
+            await _require_grant(session, user, dept)
+            return DepartmentContext(id=dept.id, code=dept.code)
         return None
 
     dept = await repo.get_department_by_code(session, code)
@@ -70,15 +89,7 @@ async def resolve_department(
 
     # Admins bypass the grant check ONLY. They do not bypass 404, the ownership
     # check above, or the session-binding checks below.
-    if user.role != ROLE_ADMIN:
-        allowed = await repo.has_department_access(
-            session, user_id=user.id, department_id=dept.id
-        )
-        if not allowed:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You do not have access to this department",
-            )
+    await _require_grant(session, user, dept)
 
     if is_existing and bound_id is None:
         # An existing GENERAL conversation cannot be adopted into a department:
