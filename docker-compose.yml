@@ -40,6 +40,24 @@ services:
     # Persist generated files (create_excel / create_html / …) across restarts.
     volumes:
       - gateway_files:/app/generated_files
+      - rag_documents:/app/rag_documents          # shared with worker
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    env_file: .env.docker
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    volumes:
+      - rag_documents:/app/rag_documents          # SAME volume the gateway writes
+      - worker_cache:/home/appuser/.cache         # persist Docling models
 
 volumes:
   gateway_files:
+  rag_documents:
+  worker_cache:

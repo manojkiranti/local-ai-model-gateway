@@ -47,7 +47,11 @@ COPY alembic.ini ./alembic.ini
 
 # FILES_DIR default; must be writable by the runtime user. Mount a volume here
 # in prod if generated files need to survive container restarts.
-RUN mkdir -p generated_files && chown -R appuser:appuser /app
+# generated_files (per-user output) and rag_documents (RAG corpus, shared with
+# the worker via a named volume) must exist + be appuser-owned before their
+# volumes mount, or Docker initializes them root-owned and the non-root gateway
+# can't write.
+RUN mkdir -p generated_files rag_documents && chown -R appuser:appuser /app
 
 USER appuser
 
