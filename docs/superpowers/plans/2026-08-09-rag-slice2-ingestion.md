@@ -26,12 +26,20 @@
 Two setup tasks, not architecture decisions. Task 2 and Task 4 skip cleanly without them, but the slice is not verified until both are done:
 
 ```bash
-# 1. The embedding model (native 2560 dims)
+# 1. The embedding model (native 2560 dims) — STILL OUTSTANDING
 ollama pull qwen3-embedding:4b-q8_0
 
-# 2. The worker dependency tree — NOT into the API's requirements
+# 2. The worker dependency tree — ALREADY INSTALLED in the dev venv
 .venv/bin/pip install -r requirements-worker.txt   # created in Task 8
 ```
+
+**Docling 2.118.1 is already installed in the dev venv**, so the Docling parsing
+tests run from Task 4 onward rather than skipping. It stays out of
+`requirements.txt` regardless — the dependency split is about what the API
+*image* carries, and `test_docling_is_not_imported_at_module_scope` plus the
+post-Task-7 import-graph check are what enforce it. Having Docling importable
+makes those checks stronger, not weaker: they now prove the API avoids it by
+design rather than by absence.
 
 ## Measured facts this plan relies on
 
@@ -70,8 +78,8 @@ Verified against the live stack rather than assumed:
 - Test: `tests/test_rag_storage.py`
 
 **Interfaces:**
-- Produces: `Settings.rag_docs_dir`, `.rag_embed_model`, `.rag_embed_dim`, `.rag_embed_batch`, `.rag_chunk_max_chars`, `.rag_chunk_overlap_chars`, `.rag_ingest_poll_seconds`, `.rag_ingest_stale_minutes`, `.rag_ingest_max_attempts`
-- Produces: `mint_storage_key(department_code: str, filename: str) -> str`, `resolve_storage_path(storage_key: str, base_dir: str) -> Path`, `write_document(data: bytes, storage_key: str, base_dir: str) -> None`, `StorageError`
+- Produces: `Settings.rag_docs_dir`, `.rag_embed_model`, `.rag_embed_dim`, `.rag_embed_batch`, `.rag_chunk_max_chars`, `.rag_chunk_overlap_chars`, `.rag_ingest_poll_seconds`, `.rag_ingest_stale_minutes`, `.rag_ingest_heartbeat_seconds`
+- Produces: `mint_storage_key(department_code: str, filename: str) -> str`, `delete_document(storage_key: str, base_dir: str) -> bool`, `resolve_storage_path(storage_key: str, base_dir: str) -> Path`, `write_document(data: bytes, storage_key: str, base_dir: str) -> None`, `StorageError`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -91,6 +99,7 @@ import pytest
 
 from app.rag.storage import (
     StorageError,
+    delete_document,
     mint_storage_key,
     resolve_storage_path,
     write_document,
@@ -151,6 +160,35 @@ def test_write_creates_parent_directories_and_bytes(tmp_path):
 def test_write_refuses_an_escaping_key(tmp_path):
     with pytest.raises(StorageError):
         write_document(b"x", "../evil.pdf", str(tmp_path))
+
+
+def test_delete_removes_the_file(tmp_path):
+    key = mint_storage_key("hr", "a.pdf")
+    write_document(b"hello", key, str(tmp_path))
+    assert delete_document(key, str(tmp_path)) is True
+    assert not resolve_storage_path(key, str(tmp_path)).exists()
+
+
+def test_delete_is_idempotent(tmp_path):
+    """Compensation runs on an error path — it must never raise and mask the
+    original failure."""
+    key = mint_storage_key("hr", "a.pdf")
+    assert delete_document(key, str(tmp_path)) is False
+
+
+def test_delete_refuses_an_escaping_key(tmp_path):
+    outside = tmp_path.parent / "victim.txt"
+    outside.write_text("do not delete me")
+    with pytest.raises(StorageError):
+        delete_document("../victim.txt", str(tmp_path))
+    assert outside.exists()
+
+
+def test_delete_never_raises_on_a_directory(tmp_path):
+    """Defensive: a key that somehow names a directory must not blow up the
+    compensation path."""
+    (tmp_path / "hr").mkdir()
+    assert delete_document("hr", str(tmp_path)) is False
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -176,7 +214,10 @@ In `app/config.py`, add after the `fetch_url_allowlist` block:
     # Worker loop timing.
     rag_ingest_poll_seconds: float = 2.0
     rag_ingest_stale_minutes: int = 10  # running + stale heartbeat -> failed
-    rag_ingest_max_attempts: int = 3
+    # Must be comfortably below stale_minutes*60 — a big PDF spends far longer
+    # than the stale window in parse+embed, and without beats the sweep would
+    # fail a job that is working fine.
+    rag_ingest_heartbeat_seconds: float = 30.0
 ```
 
 And in `.env.example`, after the `FETCH_URL_ALLOWLIST` block:
@@ -194,7 +235,10 @@ RAG_CHUNK_MAX_CHARS=2000
 RAG_CHUNK_OVERLAP_CHARS=200
 RAG_INGEST_POLL_SECONDS=2.0
 RAG_INGEST_STALE_MINUTES=10
-RAG_INGEST_MAX_ATTEMPTS=3
+# Keep well below STALE_MINUTES*60: a large PDF spends longer than the stale
+# window in parse+embed, and the periodic heartbeat is what stops the sweep
+# failing a healthy job.
+RAG_INGEST_HEARTBEAT_SECONDS=30
 ```
 
 - [ ] **Step 4: Write the storage module**
@@ -259,12 +303,30 @@ def write_document(data: bytes, storage_key: str, base_dir: str) -> None:
     path = resolve_storage_path(storage_key, base_dir)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(data)
+
+
+def delete_document(storage_key: str, base_dir: str) -> bool:
+    """Remove a stored file. True if something was deleted.
+
+    This is **compensation**: the upload routes write the file before the
+    database work is known to succeed, so a duplicate-content 409 or a failed
+    commit would otherwise leak an orphan. It therefore must not raise on a
+    missing file or a directory — an exception here would mask the original
+    error it is cleaning up after. A traversal attempt still raises, because
+    deleting outside the base directory is never compensation.
+    """
+    path = resolve_storage_path(storage_key, base_dir)   # raises on traversal
+    try:
+        path.unlink()
+        return True
+    except (FileNotFoundError, IsADirectoryError, PermissionError, OSError):
+        return False
 ```
 
 - [ ] **Step 5: Run test to verify it passes**
 
 Run: `.venv/bin/pytest tests/test_rag_storage.py -v`
-Expected: PASS, 12 collected (9 functions; the traversal test is parametrized ×4)
+Expected: PASS, 16 collected (13 functions; the traversal test is parametrized ×4)
 
 - [ ] **Step 6: Commit**
 
@@ -323,25 +385,48 @@ DIM = 1536
 
 
 class FakeClient:
-    """Returns deterministic vectors and records every payload it saw."""
+    """Returns deterministic, DIRECTIONALLY DISTINCT vectors.
 
-    def __init__(self, native_dim=2560, shuffle=False, dim_override=None):
+    A constant vector like [k, k, k, ...] normalizes to the same unit vector for
+    every k, which would make an ordering test vacuous — the vectors would be
+    identical no matter how they were shuffled. So input i gets a one-hot-ish
+    vector with its marker in slot i, which survives normalization.
+    """
+
+    def __init__(self, native_dim=2560, shuffle=False, dim_override=None,
+                 bad_index=None, duplicate_index=False):
         self.native_dim = native_dim
         self.shuffle = shuffle
         self.dim_override = dim_override
+        self.bad_index = bad_index
+        self.duplicate_index = duplicate_index
         self.payloads = []
+
+    def _vector(self, i, n):
+        vec = [0.0] * n
+        vec[i % n] = 1.0        # direction depends on i, survives normalization
+        vec[(i + 1) % n] = 0.5
+        return vec
 
     async def embeddings(self, payload):
         self.payloads.append(payload)
-        items = payload["input"]
         n = self.dim_override or self.native_dim
         data = [
-            {"index": i, "embedding": [float(i + 1)] * n}
-            for i, _ in enumerate(items)
+            {"index": i, "embedding": self._vector(i, n)}
+            for i, _ in enumerate(payload["input"])
         ]
+        if self.duplicate_index:
+            for item in data:
+                item["index"] = 0
+        if self.bad_index is not None:
+            data[0]["index"] = self.bad_index
         if self.shuffle:
             data = list(reversed(data))  # index is authoritative, order is not
         return {"data": data}
+
+
+def _argmax(vec):
+    return max(range(len(vec)), key=lambda i: vec[i])
 
 
 def _run(coro):
@@ -408,15 +493,64 @@ def test_every_returned_vector_is_exactly_dim_wide():
 
 
 def test_results_are_reordered_by_index_not_array_position():
-    client = FakeClient(shuffle=True)
-    out = _run(embed_texts(client, ["a", "b"], mode="document",
-                           model="m", dim=DIM, batch_size=8))
-    # FakeClient encodes input position in the vector's value.
-    assert out[0][0] > 0 and out[1][0] > 0
-    assert out[0][0] != out[1][0]
-    # input 0 -> value 1, input 1 -> value 2, before normalization
-    assert out[0][0] == pytest.approx(1.0 / math.sqrt(DIM))
-    assert out[1][0] == pytest.approx(1.0 / math.sqrt(DIM))
+    """The backend may return objects in any order; `index` is authoritative.
+
+    FakeClient encodes input position as the vector's DIRECTION (slot i), which
+    survives normalization — a constant-magnitude encoding would not.
+    """
+    ordered = FakeClient(shuffle=False)
+    shuffled = FakeClient(shuffle=True)
+    a = _run(embed_texts(ordered, ["a", "b", "c"], mode="document",
+                         model="m", dim=DIM, batch_size=8))
+    b = _run(embed_texts(shuffled, ["a", "b", "c"], mode="document",
+                         model="m", dim=DIM, batch_size=8))
+    assert a == b                       # reordering undoes the shuffle exactly
+    assert [_argmax(v) for v in a] == [0, 1, 2]
+
+
+def test_out_of_range_index_is_rejected():
+    with pytest.raises(EmbeddingError):
+        _run(embed_texts(FakeClient(bad_index=99), ["a", "b"], mode="document",
+                         model="m", dim=DIM, batch_size=8))
+
+
+def test_negative_index_is_rejected():
+    with pytest.raises(EmbeddingError):
+        _run(embed_texts(FakeClient(bad_index=-1), ["a", "b"], mode="document",
+                         model="m", dim=DIM, batch_size=8))
+
+
+def test_duplicate_indexes_are_rejected():
+    """Two objects claiming index 0 would silently drop an input."""
+    with pytest.raises(EmbeddingError):
+        _run(embed_texts(FakeClient(duplicate_index=True), ["a", "b"],
+                         mode="document", model="m", dim=DIM, batch_size=8))
+
+
+def test_a_missing_index_field_is_rejected_not_defaulted():
+    class NoIndex(FakeClient):
+        async def embeddings(self, payload):
+            full = await super().embeddings(payload)
+            for item in full["data"]:
+                item.pop("index")
+            return full
+
+    with pytest.raises(EmbeddingError):
+        _run(embed_texts(NoIndex(), ["a", "b"], mode="document",
+                         model="m", dim=DIM, batch_size=8))
+
+
+def test_a_non_integer_index_is_rejected():
+    class StringIndex(FakeClient):
+        async def embeddings(self, payload):
+            full = await super().embeddings(payload)
+            for item in full["data"]:
+                item["index"] = str(item["index"])
+            return full
+
+    with pytest.raises(EmbeddingError):
+        _run(embed_texts(StringIndex(), ["a", "b"], mode="document",
+                         model="m", dim=DIM, batch_size=8))
 
 
 def test_batching_splits_requests_and_preserves_overall_order():
@@ -542,22 +676,53 @@ async def embed_texts(
     for start in range(0, len(prepared), max(1, batch_size)):
         batch = prepared[start : start + max(1, batch_size)]
         response = await client.embeddings({"model": model, "input": list(batch)})
-        data = response.get("data") or []
-        if len(data) != len(batch):
-            raise EmbeddingError(
-                f"expected {len(batch)} embeddings, got {len(data)}"
-            )
-        # `index` is authoritative — array order is not contractual.
-        ordered = sorted(data, key=lambda item: item.get("index", 0))
-        out.extend(truncate_normalize(item["embedding"], dim) for item in ordered)
+        out.extend(_ordered_vectors(response, len(batch), dim))
 
     return out
+
+
+def _ordered_vectors(response: dict, expected: int, dim: int) -> list[list[float]]:
+    """Validate a batch response and return its vectors in INPUT order.
+
+    `index` is authoritative — array order is not contractual — but a bad index
+    is far worse than a missing one: silently defaulting it (`.get("index", 0)`)
+    would map several results onto the same input and quietly drop the rest, so
+    every failure mode here is an exception rather than a fallback.
+    """
+    data = response.get("data")
+    if not isinstance(data, list) or len(data) != expected:
+        raise EmbeddingError(
+            f"expected {expected} embeddings, got "
+            f"{len(data) if isinstance(data, list) else type(data).__name__}"
+        )
+
+    by_index: dict[int, Any] = {}
+    for item in data:
+        if not isinstance(item, dict) or "index" not in item:
+            raise EmbeddingError("embedding result is missing its `index`")
+        idx = item["index"]
+        # bool is an int subclass; a True index is a bug, not position 1.
+        if not isinstance(idx, int) or isinstance(idx, bool):
+            raise EmbeddingError(f"embedding `index` is not an integer: {idx!r}")
+        if not 0 <= idx < expected:
+            raise EmbeddingError(
+                f"embedding `index` {idx} out of range for a batch of {expected}"
+            )
+        if idx in by_index:
+            raise EmbeddingError(f"duplicate embedding `index` {idx}")
+        by_index[idx] = item
+
+    if set(by_index) != set(range(expected)):  # pragma: no cover - defensive
+        missing = sorted(set(range(expected)) - set(by_index))
+        raise EmbeddingError(f"missing embeddings for inputs {missing}")
+
+    return [truncate_normalize(by_index[i]["embedding"], dim) for i in range(expected)]
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `.venv/bin/pytest tests/test_rag_embedding.py -v`
-Expected: PASS, 14 tests
+Expected: PASS, 19 tests
 
 - [ ] **Step 5: Write the live-backend test**
 
@@ -1126,9 +1291,11 @@ Create `app/rag/parsing.py`:
 
 Format split, and why:
 
-- **pdf / docx -> Docling.** Layout analysis and table-structure recognition are
-  the difference between a usable and a useless PDF chunk, and Docling is what
-  fills `page_number` / `section` / `element_type` meaningfully.
+- **pdf / docx -> Docling, walking `iterate_items()`.** Layout analysis and
+  table-structure recognition are the difference between a usable and a useless
+  PDF chunk. We iterate items rather than dumping `export_to_markdown()`,
+  because the dump discards exactly what slice-3 citations need: the real
+  `page_no` from `item.prov`, the heading path, and the element label.
 - **xlsx / csv -> `app/files/readers.py`.** One spreadsheet normalizer is shared
   with `read_excel`/`aggregate_excel`; a second would diverge from the tools that
   already read spreadsheets here, and Docling buys nothing on a plain grid. Uses
@@ -1144,6 +1311,8 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Iterable
+
+from dataclasses import replace
 
 from ..files import readers
 from .chunking import Chunk, chunk_table, chunk_text, renumber
@@ -1207,8 +1376,43 @@ def _parse_spreadsheet(path: Path, *, max_chars: int) -> list[Chunk]:
     return renumber(collected)
 
 
+# Docling's label vocabulary -> our four element_type values.
+_ELEMENT_TYPES = {
+    "section_header": "heading",
+    "title": "heading",
+    "page_header": "heading",
+    "table": "table",
+    "list_item": "list",
+}
+
+
+def _heading_path(stack: list[tuple[int, str]]) -> str | None:
+    return " > ".join(text for _level, text in stack) if stack else None
+
+
+def _with_context(chunks: list[Chunk], section: str | None) -> list[Chunk]:
+    """Prepend the heading path to each chunk's CONTENT, not just its metadata.
+
+    `tsv` is generated from `content` alone, so a heading kept only in the
+    `section` column would be invisible to the lexical channel — a query for
+    "carry over" would miss the section actually titled "Carry Over". This is the
+    same reasoning that repeats the header row into every table chunk.
+    """
+    if not section:
+        return chunks
+    return [replace(c, content=f"{section}\n\n{c.content}") for c in chunks]
+
+
 def _parse_with_docling(path: Path, *, max_chars: int, overlap_chars: int) -> list[Chunk]:
-    """PDF/DOCX via Docling. Imported HERE, never at module scope."""
+    """PDF/DOCX via Docling, PRESERVING provenance. Imported HERE, never at
+    module scope.
+
+    Walks `iterate_items()` rather than dumping `export_to_markdown()`, because
+    the markdown dump throws away exactly what slice-3 citations need: the real
+    `page_no` from `item.prov`, the heading path, and the element label.
+    Verified against docling 2.118: `iterate_items()` yields `(item, level)`,
+    `item.prov[0].page_no` is 1-based, and `item.label` is a `DocItemLabel`.
+    """
     try:
         from docling.document_converter import DocumentConverter
     except ImportError as exc:  # pragma: no cover - depends on the environment
@@ -1218,15 +1422,53 @@ def _parse_with_docling(path: Path, *, max_chars: int, overlap_chars: int) -> li
         ) from exc
 
     try:
-        result = DocumentConverter().convert(str(path))
-        markdown = result.document.export_to_markdown()
+        document = DocumentConverter().convert(str(path)).document
     except Exception as exc:  # noqa: BLE001 - Docling raises a wide range
         raise ParseError(f"could not parse document: {exc}") from exc
 
-    chunks = chunk_text(markdown, max_chars=max_chars, overlap_chars=overlap_chars)
-    if not chunks:
-        raise ParseError("document produced no text (a scanned PDF needs OCR)")
-    return chunks
+    collected: list[Chunk] = []
+    headings: list[tuple[int, str]] = []
+
+    for item, _tree_level in document.iterate_items():
+        label = getattr(getattr(item, "label", None), "value", "") or ""
+        prov = getattr(item, "prov", None) or []
+        page = prov[0].page_no if prov else None
+
+        if label in ("section_header", "title"):
+            text = (getattr(item, "text", "") or "").strip()
+            if not text:
+                continue
+            level = getattr(item, "level", 1) or 1
+            while headings and headings[-1][0] >= level:
+                headings.pop()
+            headings.append((level, text))
+            continue  # the heading itself is carried into following chunks
+
+        if label == "table":
+            try:
+                text = item.export_to_markdown(document).strip()
+            except Exception:  # noqa: BLE001 - a malformed table is not fatal
+                text = ""
+        else:
+            text = (getattr(item, "text", "") or "").strip()
+        if not text:
+            continue
+
+        pieces = chunk_text(
+            text,
+            max_chars=max_chars,
+            overlap_chars=overlap_chars,
+            section=_heading_path(headings),
+            page_number=page,
+            element_type=_ELEMENT_TYPES.get(label, "text"),
+        )
+        collected.extend(_with_context(pieces, _heading_path(headings)))
+
+    if not collected:
+        raise ParseError(
+            "document produced no text — a scanned PDF needs OCR, which v1 does not do"
+        )
+    return collected
 
 
 def parse_to_chunks(
@@ -1296,14 +1538,28 @@ def docx_file(tmp_path_factory):
 
 @pytest.fixture(scope="module")
 def pdf_file(tmp_path_factory):
+    """A real 2-page PDF with a heading per page.
+
+    NOTE the explicit width and `set_xy`: `multi_cell(0, ...)` raises
+    `FPDFException: Not enough horizontal space` once the cursor is sitting at
+    the right margin after a previous cell. This form is verified to work.
+    """
     from fpdf import FPDF
 
+    def line(pdf, text, size=12, bold=False):
+        pdf.set_font("Helvetica", "B" if bold else "", size)
+        pdf.set_xy(pdf.l_margin, pdf.get_y())
+        pdf.multi_cell(w=pdf.w - pdf.l_margin - pdf.r_margin, h=8, text=text)
+
     pdf = FPDF()
+    pdf.set_auto_page_break(True, margin=15)
     pdf.add_page()
-    pdf.set_font("Helvetica", size=12)
-    pdf.multi_cell(0, 8, "Annual leave accrues monthly for all permanent staff.")
+    line(pdf, "Leave Policy", 16, True)
+    line(pdf, "Annual leave accrues monthly for all permanent staff.")
     pdf.add_page()
-    pdf.multi_cell(0, 8, "Up to five days may be carried into the next year.")
+    line(pdf, "Carry Over", 16, True)
+    line(pdf, "Up to five days may be carried into the next year.")
+
     path = tmp_path_factory.mktemp("docling") / "policy.pdf"
     pdf.output(str(path))
     return path
@@ -1321,6 +1577,42 @@ def test_pdf_text_is_extracted_across_pages(pdf_file):
     joined = " ".join(c.content for c in chunks)
     assert "accrues monthly" in joined
     assert "carried into the next year" in joined
+
+
+def test_pdf_chunks_carry_real_page_numbers(pdf_file):
+    """The reason we walk iterate_items() instead of dumping markdown: slice-3
+    citations need the page. Verified against docling 2.118 — prov[0].page_no
+    is 1-based."""
+    chunks = parse_to_chunks(pdf_file, "pdf", **OPTS)
+    pages = {c.page_number for c in chunks if c.page_number is not None}
+    assert pages, "no chunk carried a page number — provenance was lost"
+    assert pages == {1, 2}
+
+    on_page_1 = " ".join(c.content for c in chunks if c.page_number == 1)
+    on_page_2 = " ".join(c.content for c in chunks if c.page_number == 2)
+    assert "accrues monthly" in on_page_1
+    assert "carried into the next year" in on_page_2
+
+
+def test_chunks_carry_the_heading_path_as_section(pdf_file):
+    chunks = parse_to_chunks(pdf_file, "pdf", **OPTS)
+    sections = {c.section for c in chunks if c.section}
+    assert "Leave Policy" in sections
+    assert "Carry Over" in sections
+
+
+def test_heading_text_is_inside_the_content_so_it_is_lexically_searchable(pdf_file):
+    """`tsv` is generated from `content` alone — a heading kept only in the
+    `section` column would be invisible to the lexical channel."""
+    chunks = parse_to_chunks(pdf_file, "pdf", **OPTS)
+    body = next(c for c in chunks if "carried into the next year" in c.content)
+    assert "Carry Over" in body.content
+
+
+def test_element_types_are_populated(docx_file):
+    chunks = parse_to_chunks(docx_file, "docx", **OPTS)
+    assert {c.element_type for c in chunks} <= {"text", "heading", "table", "list"}
+    assert any(c.element_type == "text" for c in chunks)
 
 
 def test_chunk_indices_are_contiguous(docx_file):
@@ -1356,7 +1648,7 @@ git commit -m "feat(rag): parsing — Docling (lazy) for pdf/docx, readers.py fo
 - Test: `tests/test_rag_jobs_integration.py`
 
 **Interfaces:**
-- Produces: `JobConflict`, `async enqueue(session, *, document_id) -> IngestJob`, `async claim_next(session) -> IngestJob | None`, `async heartbeat(session, job_id) -> None`, `async finish(session, job_id, *, status, error=None, chunks_total=None, chunks_done=None) -> None`, `async sweep_stale(session, *, stale_minutes, max_attempts) -> int`, `async get_job(session, job_id) -> IngestJob | None`
+- Produces: `JobConflict`, `async enqueue(session, *, document_id) -> IngestJob`, `async claim_next(session) -> IngestJob | None`, `async heartbeat(session, job_id) -> None`, `async finish(session, job_id, *, status, error=None, chunks_total=None, chunks_done=None) -> None`, `async sweep_stale(session, *, stale_minutes) -> int`, `async get_job(session, job_id) -> IngestJob | None`
 
 **Two different guarantees, easily confused:**
 - `FOR UPDATE SKIP LOCKED` stops two workers claiming the same **row**.
@@ -1594,7 +1886,7 @@ def test_sweep_fails_a_stale_running_job(docs):
             "UPDATE ingest_jobs SET heartbeat_at = now() - interval '1 hour'"
             " WHERE id = :i"), {"i": job.id})
         await s.commit()
-        swept = await jobs.sweep_stale(s, stale_minutes=10, max_attempts=3)
+        swept = await jobs.sweep_stale(s, stale_minutes=10)
         await s.commit()
         return swept, (await jobs.get_job(s, job.id)).status
 
@@ -1610,7 +1902,7 @@ def test_sweep_leaves_a_live_job_alone(docs):
         await s.commit()
         await jobs.heartbeat(s, job.id)
         await s.commit()
-        swept = await jobs.sweep_stale(s, stale_minutes=10, max_attempts=3)
+        swept = await jobs.sweep_stale(s, stale_minutes=10)
         await s.commit()
         return swept, (await jobs.get_job(s, job.id)).status
 
@@ -1629,7 +1921,7 @@ def test_a_swept_job_frees_the_document_for_a_retry(docs):
             "UPDATE ingest_jobs SET heartbeat_at = now() - interval '1 hour'"
             " WHERE id = :i"), {"i": job.id})
         await s.commit()
-        await jobs.sweep_stale(s, stale_minutes=10, max_attempts=3)
+        await jobs.sweep_stale(s, stale_minutes=10)
         await s.commit()
         retry = await jobs.enqueue(s, document_id=docs["a"])
         await s.commit()
@@ -1770,9 +2062,7 @@ async def set_chunks_total(session: AsyncSession, job_id: str, total: int) -> No
     )
 
 
-async def sweep_stale(
-    session: AsyncSession, *, stale_minutes: int, max_attempts: int
-) -> int:
+async def sweep_stale(session: AsyncSession, *, stale_minutes: int) -> int:
     """Fail `running` jobs whose worker stopped heartbeating. Returns the count.
 
     This is what makes a killed worker recoverable: failing the job releases
@@ -1817,8 +2107,8 @@ git commit -m "feat(rag): ingest queue on Postgres — SKIP LOCKED claim, heartb
 - Test: `tests/test_rag_ingest_integration.py`
 
 **Interfaces:**
-- `documents.py` produces: `DocumentConflict`, `async create_document(session, *, department_id, title, source, file_type, content_hash, storage_key=None, file_name=None, uploaded_by=None) -> Document`, `async get_document(session, document_id) -> Document | None`, `async list_documents(session, department_id, *, include_archived=False) -> list[Document]`, `async archive_document(session, document_id) -> bool`, `content_hash_of(data: bytes) -> str`
-- `ingest.py` produces: `async replace_chunks(session, *, document_id, department_id, chunks, embeddings, embed_model, embed_dim) -> int`, `async archive_chunks(session, *, document_id) -> None`, `CHUNK_INSERT_BATCH = 500`
+- `documents.py` produces: `DocumentConflict`, `async create_document(session, *, department_id, title, source, file_type, content_hash, storage_key=None, file_name=None, uploaded_by=None) -> Document`, `async get_document(session, document_id) -> Document | None`, `async list_documents(session, department_id, *, include_archived=False, ready_only=False) -> list[Document]`, `async lock_document(session, document_id) -> Document | None`, `async archive_document(session, document_id) -> bool`, `content_hash_of(data: bytes) -> str`
+- `ingest.py` produces: `async replace_chunks(session, *, document_id, department_id, chunks, embeddings, embed_model, embed_dim) -> int`, `async archive_chunks(session, *, document_id) -> None`, `DocumentGone`, `CHUNK_INSERT_BATCH = 500`
 
 **The atomicity contract.** All parsing and embedding happens *before* `BEGIN`. The database work is one short transaction: `DELETE` prior chunks → batched `INSERT`s (~500 rows/statement, same transaction) → `UPDATE documents`. On failure everything rolls back: a new document exposes zero chunks, and a re-ingest keeps serving the previous complete version until the replacement commits.
 
@@ -2137,7 +2427,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .models import STATUS_ARCHIVED, Document
+from .models import STATUS_ARCHIVED, STATUS_READY, Document
 
 
 class DocumentConflict(Exception):
@@ -2191,11 +2481,36 @@ async def get_document(session: AsyncSession, document_id: str) -> Document | No
     ).scalar_one_or_none()
 
 
+async def lock_document(session: AsyncSession, document_id: str) -> Document | None:
+    """Fetch a document with `SELECT ... FOR UPDATE`.
+
+    Archiving and the ingest replacement both mutate the same document and its
+    chunks. Without serializing on this row they interleave and the document is
+    **resurrected**: the worker parses and embeds, an admin archives (chunks
+    deleted, status='archived'), then the worker's replacement commits, putting
+    the chunks back and flipping status to 'ready'. Whoever takes the lock first
+    wins, and the loser sees the committed outcome and acts on it.
+    """
+    return (
+        await session.execute(
+            select(Document).where(Document.id == document_id).with_for_update()
+        )
+    ).scalar_one_or_none()
+
+
 async def list_documents(
-    session: AsyncSession, department_id: int, *, include_archived: bool = False
+    session: AsyncSession,
+    department_id: int,
+    *,
+    include_archived: bool = False,
+    ready_only: bool = False,
 ) -> list[Document]:
+    """`ready_only` is the member view: a pending or failed document is not part
+    of the corpus their answers can cite. Admins get everything non-archived."""
     stmt = select(Document).where(Document.department_id == department_id)
-    if not include_archived:
+    if ready_only:
+        stmt = stmt.where(Document.status == STATUS_READY)
+    elif not include_archived:
         stmt = stmt.where(Document.status != STATUS_ARCHIVED)
     result = await session.execute(stmt.order_by(Document.created_at.desc()))
     return list(result.scalars())
@@ -2208,10 +2523,15 @@ async def archive_document(session: AsyncSession, document_id: str) -> bool:
     an archived document whose chunks survived would keep being retrieved and
     cited. `chunk_count` is deliberately NOT reset — it is the audit record of
     what the document held.
+
+    Takes `FOR UPDATE` on the document row so it cannot interleave with an
+    in-flight ingest replacement (see `lock_document`). If archive commits
+    first, the worker's replacement aborts; if the replacement commits first,
+    archive then removes the new chunks and wins.
     """
     from .ingest import archive_chunks  # local import: ingest imports this module
 
-    doc = await get_document(session, document_id)
+    doc = await lock_document(session, document_id)
     if doc is None:
         return False
     await archive_chunks(session, document_id=document_id)
@@ -2254,11 +2574,20 @@ from sqlalchemy import delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .chunking import Chunk
-from .models import STATUS_READY, Document, DocumentChunk
+from .documents import lock_document
+from .models import STATUS_ARCHIVED, STATUS_READY, Document, DocumentChunk
 
 # Rows per INSERT statement. Bounds statement size; atomicity comes from the
 # surrounding transaction, not from doing it in one statement.
 CHUNK_INSERT_BATCH = 500
+
+
+class DocumentGone(Exception):
+    """The document was archived or deleted while it was being ingested.
+
+    Not a failure of the document — a failure of THIS job. The worker records
+    the job as failed and leaves the document exactly as the archive left it.
+    """
 
 
 async def archive_chunks(session: AsyncSession, *, document_id: str) -> None:
@@ -2289,6 +2618,17 @@ async def replace_chunks(
         )
     if not chunks:
         raise ValueError("refusing to store a document with zero chunks")
+
+    # Serialize against archive_document, and re-read the status UNDER the lock.
+    # The document may have been archived while we were parsing and embedding;
+    # writing chunks now would resurrect it.
+    doc = await lock_document(session, document_id)
+    if doc is None:
+        raise DocumentGone(f"document {document_id} no longer exists")
+    if doc.status == STATUS_ARCHIVED:
+        raise DocumentGone(
+            f"document {document_id} was archived while it was being ingested"
+        )
     # Belt and braces: vector(1536) would reject this too, but failing here
     # gives a clear message instead of a constraint error mid-transaction.
     for i, vec in enumerate(embeddings):
@@ -2555,6 +2895,62 @@ def test_unknown_job_is_404(env):
     client, admin, _member, _code = env
     assert client.get(f"/v1/ingest-jobs/{uuid.uuid4().hex}",
                       headers=admin).status_code == 404
+
+
+def test_members_see_only_ready_documents(env):
+    """A pending or failed document is not part of the corpus a member's answers
+    can cite, so surfacing it only invites 'why can't the assistant see this?'."""
+    client, admin, member, code = env
+    _upload(client, admin, code, "leave.csv", CSV)   # stays 'pending', no worker
+
+    assert client.get(f"/v1/departments/{code}/documents",
+                      headers=admin).json() != []
+    assert client.get(f"/v1/departments/{code}/documents",
+                      headers=member).json() == []
+
+
+def test_member_response_omits_embed_model(env):
+    client, admin, member, code = env
+    _upload(client, admin, code, "leave.csv", CSV)
+
+    admin_row = client.get(f"/v1/departments/{code}/documents",
+                           headers=admin).json()[0]
+    assert "embed_model" in admin_row
+    # Members get the leaner shape; no operational model inventory.
+    body = client.get(f"/v1/departments/{code}/documents", headers=member).json()
+    assert all("embed_model" not in row for row in body)
+
+
+def test_corpus_operations_reject_an_inactive_department(env):
+    """Soft-disabled means gone from the product — 404, for admins too, matching
+    resolve_department in slice 1."""
+    client, admin, _member, code = env
+    assert client.patch(f"/v1/departments/{code}", json={"is_active": False},
+                        headers=admin).status_code == 200
+
+    assert _upload(client, admin, code, "leave.csv", CSV).status_code == 404
+    assert client.post(f"/v1/departments/{code}/documents/text",
+                       json={"title": "T", "content": "body"},
+                       headers=admin).status_code == 404
+    assert client.get(f"/v1/departments/{code}/documents",
+                      headers=admin).status_code == 404
+
+
+def test_a_duplicate_upload_does_not_leak_a_stored_file(env, tmp_path, monkeypatch):
+    """The file is written before the DB work is known to succeed, so a 409 must
+    compensate — otherwise every duplicate upload orphans a file forever."""
+    from app.config import get_settings
+
+    client, admin, _member, code = env
+    monkeypatch.setattr(get_settings(), "rag_docs_dir", str(tmp_path))
+
+    assert _upload(client, admin, code, "leave.csv", CSV).status_code == 202
+    before = sorted(p for p in tmp_path.rglob("*") if p.is_file())
+
+    assert _upload(client, admin, code, "same.csv", CSV).status_code == 409
+    after = sorted(p for p in tmp_path.rglob("*") if p.is_file())
+
+    assert after == before, "the rejected upload left an orphaned file behind"
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -2573,6 +2969,10 @@ class TextDocumentCreate(BaseModel):
 
 
 class DocumentOut(BaseModel):
+    """Member-facing. Deliberately omits `embed_model` — which model produced
+    the vectors is an operations detail with no UI use, and leaking the model
+    inventory to every reader buys nothing."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: str
@@ -2583,8 +2983,15 @@ class DocumentOut(BaseModel):
     file_name: str | None
     status: str
     chunk_count: int
-    embed_model: str | None
     created_at: datetime
+
+
+class DocumentAdminOut(DocumentOut):
+    """Admin-facing: adds the operational fields used to manage the corpus."""
+
+    embed_model: str | None
+    embed_dim: int | None
+    updated_at: datetime
 
 
 class IngestAccepted(BaseModel):
@@ -2619,19 +3026,35 @@ from . import documents as docs_repo
 from . import jobs as jobs_repo
 from .parsing import ParseError, detect_file_type
 from .schemas import (
+    DocumentAdminOut,
     DocumentOut,
     IngestAccepted,
     TextDocumentCreate,
 )
-from .storage import mint_storage_key, write_document
+from .storage import delete_document, mint_storage_key, write_document
 ```
 
 then the routes:
 
 ```python
+async def _require_active_department(session: AsyncSession, code: str):
+    """Corpus operations reject an INACTIVE department, not just an unknown one.
+
+    404 rather than 403, and for admins too — matching `access.resolve_department`
+    in slice 1. A soft-disabled department is gone from the product; ingesting
+    into it or listing it would contradict that.
+    """
+    dept = await _require_department(session, code)
+    if not dept.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Unknown department"
+        )
+    return dept
+
+
 async def _require_department_access(session: AsyncSession, user: User, code: str):
     """Read access to a department's document list: admin, or a grant."""
-    dept = await _require_department(session, code)
+    dept = await _require_active_department(session, code)
     if user.role != ROLE_ADMIN:
         allowed = await repo.has_department_access(
             session, user_id=user.id, department_id=dept.id
@@ -2644,14 +3067,25 @@ async def _require_department_access(session: AsyncSession, user: User, code: st
     return dept
 
 
-async def _accept(session: AsyncSession, doc) -> IngestAccepted:
+async def _accept(
+    session: AsyncSession, doc, *, storage_key: str, docs_dir: str
+) -> IngestAccepted:
     """Queue the ingest and return 202's body. The API never parses or embeds —
-    that is the worker's job, and Docling must never load in this process."""
+    that is the worker's job, and Docling must never load in this process.
+
+    Compensates the stored file if queuing or committing fails: the bytes were
+    written before the transaction was known to succeed, so without this a
+    failed enqueue leaves an orphan on disk that nothing will ever reference.
+    """
     try:
         job = await jobs_repo.enqueue(session, document_id=doc.id)
+        await session.commit()
     except jobs_repo.JobConflict as exc:
+        delete_document(storage_key, docs_dir)
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
-    await session.commit()
+    except Exception:
+        delete_document(storage_key, docs_dir)
+        raise
     return IngestAccepted(document_id=doc.id, job_id=job.id, status=job.status)
 
 
@@ -2668,7 +3102,7 @@ async def upload_document(
     session: AsyncSession = Depends(get_session),
 ) -> IngestAccepted:
     settings = get_settings()
-    dept = await _require_department(session, code)
+    dept = await _require_active_department(session, code)
 
     try:
         file_type = detect_file_type(file.filename or "")
@@ -2696,9 +3130,17 @@ async def upload_document(
             uploaded_by=admin.id,
         )
     except docs_repo.DocumentConflict as exc:
+        # Compensate: the bytes are already on disk and nothing will reference
+        # them now. A duplicate upload must not leak a file.
+        delete_document(storage_key, settings.rag_docs_dir)
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+    except Exception:
+        delete_document(storage_key, settings.rag_docs_dir)
+        raise
 
-    return await _accept(session, doc)
+    return await _accept(
+        session, doc, storage_key=storage_key, docs_dir=settings.rag_docs_dir
+    )
 
 
 @router.post(
@@ -2714,7 +3156,7 @@ async def create_text_document(
 ) -> IngestAccepted:
     """Typed-in knowledge: source='manual', no file_name, no storage_key."""
     settings = get_settings()
-    dept = await _require_department(session, code)
+    dept = await _require_active_department(session, code)
 
     content = body.content.strip()
     if not content:
@@ -2733,28 +3175,49 @@ async def create_text_document(
             storage_key=storage_key, file_name=None, uploaded_by=admin.id,
         )
     except docs_repo.DocumentConflict as exc:
+        delete_document(storage_key, settings.rag_docs_dir)
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+    except Exception:
+        delete_document(storage_key, settings.rag_docs_dir)
+        raise
 
-    return await _accept(session, doc)
+    return await _accept(
+        session, doc, storage_key=storage_key, docs_dir=settings.rag_docs_dir
+    )
 
 
-@router.get("/{code}/documents", response_model=list[DocumentOut])
+@router.get("/{code}/documents", response_model=None)
 async def list_department_documents(
     code: str,
     include_archived: bool = Query(False),
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
-) -> list[DocumentOut]:
+) -> list[DocumentAdminOut] | list[DocumentOut]:
+    """Admins manage; members browse.
+
+    A member sees only `ready` documents — a `pending` or `failed` one is not
+    part of the corpus their answers can cite, and surfacing it just invites
+    "why can't the assistant see this?". Admins see every non-archived document
+    because managing failures is exactly their job, plus `?include_archived=`.
+
+    `response_model=None` because the two roles genuinely return different
+    shapes; FastAPI serializes whichever model is returned.
+    """
     dept = await _require_department_access(session, user, code)
-    if include_archived and user.role != ROLE_ADMIN:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only admins can list archived documents",
-        )
+
+    if user.role != ROLE_ADMIN:
+        if include_archived:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only admins can list archived documents",
+            )
+        rows = await docs_repo.list_documents(session, dept.id, ready_only=True)
+        return [DocumentOut.model_validate(d) for d in rows]
+
     rows = await docs_repo.list_documents(
         session, dept.id, include_archived=include_archived
     )
-    return [DocumentOut.model_validate(d) for d in rows]
+    return [DocumentAdminOut.model_validate(d) for d in rows]
 
 
 @router.delete(
@@ -2768,7 +3231,7 @@ async def archive_department_document(
 ) -> Response:
     """Archive: chunks removed so it stops being retrievable, row retained for
     audit. Not a delete — `documents.chunk_count` stays as the record."""
-    dept = await _require_department(session, code)
+    dept = await _require_active_department(session, code)
     doc = await docs_repo.get_document(session, document_id)
     if doc is None or doc.department_id != dept.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
@@ -2828,7 +3291,7 @@ app.include_router(ingest_jobs_router)
 - [ ] **Step 6: Run test to verify it passes**
 
 Run: `.venv/bin/pytest tests/test_rag_documents_api.py -v`
-Expected: PASS, 15 tests
+Expected: PASS, 19 tests
 
 - [ ] **Step 7: Confirm the API process still has no Docling**
 
@@ -2862,7 +3325,7 @@ git commit -m "feat(rag): admin document upload/list/archive + ingest job status
 - Test: `tests/test_rag_worker_integration.py`
 
 **Interfaces:**
-- Produces: `async preflight(client, settings) -> None`, `async process_job(session, client, settings, job) -> None`, `async run_once(engine, client, settings) -> bool`, `async main() -> None`, `WorkerPreflightError`
+- Produces: `async preflight(client, settings) -> None`, `DocSnapshot`, `async process_job(Session, client, settings, job) -> None`, `async run_once(engine, client, settings) -> bool`, `async main() -> None`, `WorkerPreflightError`
 
 **Preflight is the point of this task.** The worker refuses to start unless the embedding backend answers and returns a vector that truncates to exactly `rag_embed_dim`. Discovering a dimension mismatch after inserting half a corpus is far worse than refusing to boot.
 
@@ -2901,7 +3364,12 @@ from sqlalchemy.pool import NullPool
 
 from app.config import get_settings
 from app.rag import jobs, worker
-from app.rag.models import JOB_FAILED, JOB_SUCCEEDED, STATUS_FAILED, STATUS_READY
+from app.rag.models import (
+    JOB_FAILED,
+    JOB_SUCCEEDED,
+    STATUS_FAILED,
+    STATUS_READY,
+)
 
 DIM = 1536
 
@@ -3091,6 +3559,116 @@ def test_a_failed_job_frees_the_document_to_be_requeued(queued_csv):
     assert _read(requeue) == "queued"
 
 
+def test_a_failed_re_ingest_leaves_a_ready_document_untouched(queued_csv):
+    """A document already serving good chunks must not be libelled `failed` by
+    a later ingest that blew up — the replacement rolled back, so its previous
+    chunks are still there and still correct."""
+    assert _run_once(queued_csv, FakeEmbedClient()) is True   # first ingest: ready
+
+    async def before(s):
+        return (await s.execute(text(
+            "SELECT count(*) FROM document_chunks WHERE document_id = :i"),
+            {"i": queued_csv["doc"]})).scalar_one()
+
+    first_count = _read(before)
+    assert first_count > 0
+
+    async def requeue(s):
+        await jobs.enqueue(s, document_id=queued_csv["doc"])
+        await s.commit()
+
+    _read(requeue)
+    _run_once(queued_csv, FakeEmbedClient(fail=True))         # re-ingest fails
+
+    async def after(s):
+        doc = (await s.execute(text(
+            "SELECT status, chunk_count FROM documents WHERE id = :i"),
+            {"i": queued_csv["doc"]})).one()
+        chunks = (await s.execute(text(
+            "SELECT count(*) FROM document_chunks WHERE document_id = :i"),
+            {"i": queued_csv["doc"]})).scalar_one()
+        return doc.status, doc.chunk_count, chunks
+
+    status, chunk_count, chunks = _read(after)
+    assert status == STATUS_READY          # NOT failed
+    assert chunks == first_count           # previous version intact
+    assert chunk_count == first_count
+
+
+def test_an_archived_document_is_not_resurrected_by_an_in_flight_ingest(queued_csv):
+    """The race: worker parses+embeds, admin archives, worker commits. Without
+    the FOR UPDATE check the chunks come back and status flips to ready."""
+    async def archive(s):
+        from app.rag import documents as docs_repo
+        await docs_repo.archive_document(s, queued_csv["doc"])
+        await s.commit()
+
+    _read(archive)                                  # archived BEFORE the worker runs
+    assert _run_once(queued_csv, FakeEmbedClient()) is True
+
+    async def after(s):
+        doc = (await s.execute(text(
+            "SELECT status FROM documents WHERE id = :i"),
+            {"i": queued_csv["doc"]})).scalar_one()
+        chunks = (await s.execute(text(
+            "SELECT count(*) FROM document_chunks WHERE document_id = :i"),
+            {"i": queued_csv["doc"]})).scalar_one()
+        job = await jobs.get_job(s, queued_csv["job"])
+        return doc, chunks, job.status, job.error
+
+    status, chunks, job_status, error = _read(after)
+    assert status == "archived"      # stayed archived
+    assert chunks == 0               # NOT resurrected
+    assert job_status == JOB_FAILED
+    assert "archived" in (error or "").lower()
+
+
+def test_the_heartbeat_advances_during_a_slow_job(queued_csv):
+    """A job longer than the stale window must not be swept. The periodic
+    heartbeat is what prevents that; one beat after embedding would not."""
+    class SlowClient(FakeEmbedClient):
+        async def embeddings(self, payload):
+            await asyncio.sleep(0.35)
+            return await super().embeddings(payload)
+
+    settings = _settings_with(queued_csv["docs_dir"]).model_copy(
+        update={"rag_ingest_heartbeat_seconds": 0.05}
+    )
+
+    async def main():
+        engine = create_async_engine(get_settings().database_url, poolclass=NullPool)
+        try:
+            return await worker.run_once(engine, SlowClient(), settings)
+        finally:
+            await engine.dispose()
+
+    assert asyncio.run(main()) is True
+
+    async def beats(s):
+        job = await jobs.get_job(s, queued_csv["job"])
+        return job.status, job.heartbeat_at, job.started_at
+
+    status, heartbeat_at, started_at = _read(beats)
+    assert status == JOB_SUCCEEDED
+    assert heartbeat_at is not None and started_at is not None
+    assert heartbeat_at > started_at   # at least one beat landed mid-flight
+
+
+def test_parsing_runs_off_the_event_loop(queued_csv, monkeypatch):
+    """Docling is synchronous and CPU-bound; running it inline would block the
+    heartbeat. Assert it goes through asyncio.to_thread."""
+    seen = {}
+    real = asyncio.to_thread
+
+    async def spy(fn, *args, **kwargs):
+        seen["fn"] = getattr(fn, "__name__", str(fn))
+        return await real(fn, *args, **kwargs)
+
+    monkeypatch.setattr(worker.asyncio, "to_thread", spy)
+    assert _run_once(queued_csv, FakeEmbedClient()) is True
+    assert seen.get("fn") == "_load_chunks_sync"
+
+
 def test_preflight_rejects_a_backend_returning_too_few_dimensions(tmp_path):
     async def go():
         await worker.preflight(
@@ -3152,6 +3730,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import signal
+from contextlib import suppress
+from dataclasses import dataclass
 from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
@@ -3162,9 +3742,9 @@ from . import documents as docs_repo
 from . import ingest
 from . import jobs as jobs_repo
 from .embedding import EmbeddingError, embed_texts, truncate_normalize
-from .models import JOB_FAILED, JOB_SUCCEEDED, STATUS_FAILED
+from .models import JOB_FAILED, JOB_SUCCEEDED, STATUS_FAILED, STATUS_READY, STATUS_ARCHIVED
 from .parsing import ParseError, parse_to_chunks
-from .storage import StorageError, resolve_storage_path
+from .storage import resolve_storage_path
 
 log = logging.getLogger("rag.worker")
 
@@ -3210,36 +3790,125 @@ async def preflight(client, settings: Settings) -> None:
     )
 
 
-async def _load_chunks(doc, settings: Settings):
-    """Parse the document's stored bytes into chunks. Slow; no transaction open."""
-    if not doc.storage_key:
-        raise ParseError(f"document {doc.id} has no storage_key")
-    path: Path = resolve_storage_path(doc.storage_key, settings.rag_docs_dir)
+@dataclass(frozen=True)
+class DocSnapshot:
+    """The fields the pipeline needs, read once so no transaction stays open.
+
+    `get_document` runs inside a session, and an SQLAlchemy session holds a
+    transaction (and a pooled connection) open from its first query until commit
+    or rollback. Parsing a 200-page PDF with that transaction open would pin a
+    connection for minutes and hold row locks for no reason. So we snapshot,
+    close, and only then do the slow work.
+    """
+
+    id: str
+    department_id: int
+    file_type: str
+    storage_key: str | None
+    status: str
+
+
+async def _snapshot_document(Session, document_id: str) -> DocSnapshot | None:
+    async with Session() as session:
+        doc = await docs_repo.get_document(session, document_id)
+        snap = (
+            None
+            if doc is None
+            else DocSnapshot(
+                id=doc.id,
+                department_id=doc.department_id,
+                file_type=doc.file_type,
+                storage_key=doc.storage_key,
+                status=doc.status,
+            )
+        )
+        await session.rollback()  # read-only: end the transaction immediately
+        return snap
+
+
+def _load_chunks_sync(snap: DocSnapshot, settings: Settings):
+    """Parse the stored bytes. SYNCHRONOUS and CPU-bound — Docling is not async.
+
+    Called via `asyncio.to_thread` so it cannot block the event loop, which
+    would starve the heartbeat and let the stale sweep kill a healthy job.
+    """
+    if not snap.storage_key:
+        raise ParseError(f"document {snap.id} has no storage_key")
+    path: Path = resolve_storage_path(snap.storage_key, settings.rag_docs_dir)
     if not path.exists():
-        raise ParseError(f"stored file is missing: {doc.storage_key}")
+        raise ParseError(f"stored file is missing: {snap.storage_key}")
     return parse_to_chunks(
         path,
-        doc.file_type,
+        snap.file_type,
         max_chars=settings.rag_chunk_max_chars,
         overlap_chars=settings.rag_chunk_overlap_chars,
     )
 
 
-async def process_job(session, client, settings: Settings, job) -> None:
-    """Run one job to completion, recording success or failure on both rows."""
-    doc = await docs_repo.get_document(session, job.document_id)
-    if doc is None:
+async def _heartbeat_loop(Session, job_id: str, interval: float) -> None:
+    """Keep saying the job is alive until cancelled.
+
+    A single heartbeat after embedding is not enough: a large PDF can spend far
+    longer than `rag_ingest_stale_minutes` in parse+embed, and the sweep would
+    fail a job that is working perfectly well. Uses its own short-lived session
+    per beat so it never contends with the pipeline's transactions.
+    """
+    while True:
+        await asyncio.sleep(interval)
+        try:
+            async with Session() as session:
+                await jobs_repo.heartbeat(session, job_id)
+                await session.commit()
+        except Exception:  # noqa: BLE001 - a missed beat must not kill the job
+            log.warning("heartbeat failed for job %s", job_id, exc_info=True)
+
+
+async def _record_failure(Session, job, exc: Exception) -> None:
+    """Fail the JOB; demote the DOCUMENT only if it was not already serving.
+
+    A re-ingest that fails must leave a `ready` document exactly as it was —
+    its previous chunks are still there and still correct (the replacement
+    transaction rolled back), so marking it `failed` would libel a healthy
+    document. Only a document that never had a good version becomes `failed`.
+    An `archived` document is left alone entirely.
+    """
+    async with Session() as session:
+        doc = await docs_repo.lock_document(session, job.document_id)
+        if doc is not None and doc.status not in (STATUS_READY, STATUS_ARCHIVED):
+            doc.status = STATUS_FAILED
         await jobs_repo.finish(
-            session, job.id, status=JOB_FAILED, error="document no longer exists"
+            session, job.id, status=JOB_FAILED, error=str(exc)[:2000]
         )
         await session.commit()
+    log.warning("ingest failed for %s: %s", job.document_id, exc)
+
+
+async def process_job(Session, client, settings: Settings, job) -> None:
+    """Run one job to completion, recording the outcome on both rows.
+
+    Shape of this function is the point: **no transaction is open while parsing
+    or embedding.** Each DB touch is its own short session, and a background
+    heartbeat runs for the whole duration.
+    """
+    snap = await _snapshot_document(Session, job.document_id)
+    if snap is None:
+        await _record_failure(Session, job, RuntimeError("document no longer exists"))
         return
 
+    heart = asyncio.create_task(
+        _heartbeat_loop(Session, job.id, settings.rag_ingest_heartbeat_seconds)
+    )
+    failure: Exception | None = None
+    written = total = 0
+
     try:
-        # --- slow work, deliberately outside any replacement transaction ---
-        chunks = await _load_chunks(doc, settings)
-        await jobs_repo.set_chunks_total(session, job.id, len(chunks))
-        await session.commit()
+        # --- slow work: NO transaction open, off the event loop ---
+        chunks = await asyncio.to_thread(_load_chunks_sync, snap, settings)
+        total = len(chunks)
+
+        async with Session() as session:
+            await jobs_repo.set_chunks_total(session, job.id, total)
+            await session.commit()
 
         vectors = await embed_texts(
             client,
@@ -3249,58 +3918,61 @@ async def process_job(session, client, settings: Settings, job) -> None:
             dim=settings.rag_embed_dim,
             batch_size=settings.rag_embed_batch,
         )
-        await jobs_repo.heartbeat(session, job.id)
-        await session.commit()
 
-        # --- short atomic replacement ---
-        written = await ingest.replace_chunks(
-            session,
-            document_id=doc.id,
-            department_id=doc.department_id,
-            chunks=chunks,
-            embeddings=vectors,
-            embed_model=settings.rag_embed_model,
-            embed_dim=settings.rag_embed_dim,
-        )
-        await jobs_repo.finish(
-            session, job.id, status=JOB_SUCCEEDED,
-            chunks_total=len(chunks), chunks_done=written,
-        )
-        await session.commit()
-        log.info("ingested %s (%d chunks)", doc.id, written)
+        # --- short atomic replacement, its own transaction ---
+        async with Session() as session:
+            written = await ingest.replace_chunks(
+                session,
+                document_id=snap.id,
+                department_id=snap.department_id,
+                chunks=chunks,
+                embeddings=vectors,
+                embed_model=settings.rag_embed_model,
+                embed_dim=settings.rag_embed_dim,
+            )
+            await session.commit()
 
     except Exception as exc:  # noqa: BLE001 - one job must never kill the loop
-        # ParseError / StorageError / EmbeddingError / ValueError all land here,
-        # as does anything Docling raises. The job records why; the loop lives on.
-        await session.rollback()
-        doc = await docs_repo.get_document(session, job.document_id)
-        if doc is not None:
-            doc.status = STATUS_FAILED
+        # ParseError / StorageError / EmbeddingError / DocumentGone / ValueError
+        # all land here, as does anything Docling raises.
+        failure = exc
+    finally:
+        # Stop the heartbeat BEFORE writing the terminal state, so a beat cannot
+        # land after the job is finished.
+        heart.cancel()
+        with suppress(asyncio.CancelledError):
+            await heart
+
+    if failure is not None:
+        await _record_failure(Session, job, failure)
+        return
+
+    async with Session() as session:
         await jobs_repo.finish(
-            session, job.id, status=JOB_FAILED, error=str(exc)[:2000]
+            session, job.id, status=JOB_SUCCEEDED,
+            chunks_total=total, chunks_done=written,
         )
         await session.commit()
-        log.warning("ingest failed for %s: %s", job.document_id, exc)
+    log.info("ingested %s (%d chunks)", snap.id, written)
 
 
 async def run_once(engine: AsyncEngine, client, settings: Settings) -> bool:
     """Sweep, claim one job, process it. True if a job was handled."""
     Session = async_sessionmaker(engine, expire_on_commit=False)
+
     async with Session() as session:
         await jobs_repo.sweep_stale(
-            session,
-            stale_minutes=settings.rag_ingest_stale_minutes,
-            max_attempts=settings.rag_ingest_max_attempts,
+            session, stale_minutes=settings.rag_ingest_stale_minutes
         )
         await session.commit()
-
         job = await jobs_repo.claim_next(session)
         await session.commit()
-        if job is None:
-            return False
 
-        await process_job(session, client, settings, job)
-        return True
+    if job is None:
+        return False
+
+    await process_job(Session, client, settings, job)
+    return True
 
 
 async def main() -> None:  # pragma: no cover - process entrypoint
@@ -3349,9 +4021,16 @@ if __name__ == "__main__":  # pragma: no cover
 .venv/bin/pytest tests/test_rag_worker_integration.py -v
 ```
 
-Expected: PASS, 8 tests. (`jobs.set_chunks_total`, which `process_job` calls, was
+Expected: PASS, 12 tests. (`jobs.set_chunks_total`, which `process_job` calls, was
 added and tested back in Task 5 — re-run `tests/test_rag_jobs_integration.py` too
 if you skipped ahead.)
+
+Four of these are the invariants that make the worker safe, and they are the ones
+to re-read if any fail:
+`test_a_failed_re_ingest_leaves_a_ready_document_untouched`,
+`test_an_archived_document_is_not_resurrected_by_an_in_flight_ingest`,
+`test_the_heartbeat_advances_during_a_slow_job`,
+`test_parsing_runs_off_the_event_loop`.
 
 - [ ] **Step 6: Install the worker dependencies and re-run the Docling tests**
 
@@ -3360,7 +4039,7 @@ if you skipped ahead.)
 .venv/bin/pytest tests/test_rag_parsing_docling.py -v
 ```
 
-Expected: the 4 Docling tests now PASS instead of skipping. This is slow the first time — Docling downloads layout models on first conversion.
+Expected: the 8 Docling tests now PASS instead of skipping — including the four that assert real page numbers, heading paths and element types. This is slow the first time — Docling downloads layout models on first conversion.
 
 - [ ] **Step 7: Verify the API is still Docling-free**
 
@@ -3592,9 +4271,9 @@ Add to Conventions / gotchas:
                  tests/test_rag_worker_integration.py -v
 ```
 
-Expected: no regressions, and **106 slice-2 tests** pass — 12 storage + 14 embedding + 14 chunking + 17 parsing + 13 jobs + 13 ingest + 15 documents-api + 8 worker. (Collected counts: `test_rag_storage` has 9 functions with one parametrized ×4, `test_rag_parsing` has 11 with one parametrized ×7.)
+Expected: no regressions, and **123 slice-2 tests** pass — 16 storage + 19 embedding + 14 chunking + 17 parsing + 13 jobs + 13 ingest + 19 documents-api + 12 worker. (Collected counts: `test_rag_storage` has 13 functions with one parametrized ×4, `test_rag_parsing` has 11 with one parametrized ×7.)
 
-A further **8 are environment-gated** and skip until the prerequisites are met: 4 Docling parsing, 3 live-embedding, 1 end-to-end. **The slice is not verified until those 8 pass** — a green run made entirely of skips proves nothing about ingestion.
+A further **12 are environment-gated** and skip until the prerequisites are met: 8 Docling parsing, 3 live-embedding, 1 end-to-end. **The slice is not verified until those 8 pass** — a green run made entirely of skips proves nothing about ingestion.
 
 Confirm the routes are mounted (Starlette lazy-mount caveat — check `/openapi.json`, never `isinstance` on `app.routes`):
 
