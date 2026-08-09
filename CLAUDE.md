@@ -209,6 +209,16 @@ events (`token`/`tool_call`/`tool_result`/`done`) + the new id in the
   an existing general conversation be relabelled HR on turn five, misrepresenting
   every prior turn as departmentally grounded. New sessions may open in a
   department; existing general ones get a 409.
+- **Department authorization stays in Postgres — no JWT claims, no auth cache.**
+  A session is bound to one department and retrieval uses the server-side
+  `chat_sessions.department_id`, never a value read back from the request body.
+  Slice 3 folds the grant check into `open_turn`'s existing session query, so it
+  costs **zero additional round trips**. Measured, `resolve_department` is
+  0.518 ms against a multi-second turn, and the request is DB-bound anyway
+  (`get_current_user` selects the user row every request). Token claims would buy
+  that back for a revocation delay — up to 24h, since there is no refresh flow —
+  which is the wrong trade in a bank. Don't reintroduce without building refresh
+  first.
 - **Departments are never deleted.** `documents.department_id` and
   `chat_sessions.department_id` are both `ON DELETE RESTRICT` — deleting a
   department must not silently rewrite an old HR session into a general one.

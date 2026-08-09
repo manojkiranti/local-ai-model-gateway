@@ -2487,3 +2487,31 @@ them. That wiring belongs to slice 3, alongside `search_department_docs`. The
 functions are fully built and tested here because slice 2 (ingestion) needs the
 schema and slice 3 needs the boundary, and building a security boundary under
 time pressure next to the feature that uses it is how boundaries get holes.
+
+## Decided for slice 3: how the department reaches a turn
+
+**A chat session is bound to exactly one department, and retrieval always uses
+the server-side `chat_sessions.department_id`.** The request's `department` opens
+a session in a tab and is cross-checked against the bound one; it is never the
+source of truth for a turn that already has a session.
+
+**Fold the grant check into `open_turn`'s existing session query** — one query
+returning session + department + grant, so department authorization costs **zero
+additional round trips**. Postgres stays the live source of truth and revocation
+takes effect on the next turn.
+
+**Explicitly out of scope, now and for the demo: JWT department claims, refresh
+tokens, and authorization caching.** Measured, `resolve_department` costs
+0.518 ms against a turn dominated by seconds of inference, and the request stays
+DB-bound regardless because `get_current_user` selects the user row on every
+authenticated request (0.244 ms). Claims would buy that half millisecond with a
+revocation propagation window — up to 24h under the current token lifetime, since
+this project has no refresh flow (`/auth/register` and `/auth/login` are the only
+auth routes). Not a trade worth making in a bank. Do not reintroduce these
+without a decision to build refresh-token infrastructure first.
+
+**One open question for slice 3:** slice 1 returns **400** when a
+department-bound session is continued with no `department` in the body. Now that
+retrieval reads the department from the session row, simply using the bound
+department would also be safe and easier on the frontend. Decide then; do not
+silently change slice 1's tested contract before that.

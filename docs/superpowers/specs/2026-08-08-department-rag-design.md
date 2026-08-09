@@ -356,6 +356,40 @@ One case is easy to miss and is its own 409: **an existing session whose
 only the first may open in a department tab — relabelling an in-progress general
 thread as HR would misrepresent every prior turn as departmentally grounded.
 
+### Where the department comes from, and what it costs
+
+**A chat session is bound to exactly one department, and retrieval always uses
+the server-side `chat_sessions.department_id`** — never a value read back out of
+the request body. The request's `department` exists to *open* a session in a tab
+and to be cross-checked against the bound one; it is never the source of truth
+for a turn that already has a session.
+
+**The authorization check costs no additional round trip.** `open_turn` already
+loads the `ChatSession`; slice 3 extends that one query to return the session,
+its department, and the caller's grant together. Postgres stays the live source
+of truth and revocation takes effect on the very next turn.
+
+Measured, to size the decision honestly:
+
+```
+get_department_by_code                 0.250 ms
+has_department_access                  0.268 ms
+  -> resolve_department total          0.518 ms
+get_current_user's user lookup         0.244 ms   (every authed request, unavoidable)
+```
+
+**Rejected: department claims in the JWT.** It would remove 0.518 ms from a turn
+whose dominant cost is seconds of model inference, while leaving the request
+DB-bound anyway (`get_current_user` selects the user row on every authenticated
+request). More importantly it trades immediate revocation for a propagation
+window — and this project has no refresh-token flow (`/auth/register` and
+`/auth/login` are the only auth routes; tokens last 24h), so "short-lived tokens"
+would mean building refresh, rotation, and logout revocation first. In a bank, a
+revoked HR grant that keeps working for up to a day is a worse outcome than half
+a millisecond. Also rejected for the same reason: in-process authorization
+caching, which adds invalidation state and a multi-worker correctness problem to
+buy the same half millisecond.
+
 The tool therefore has **no department parameter** — the model has nowhere to put
 one, so a prompt injection has no surface:
 
