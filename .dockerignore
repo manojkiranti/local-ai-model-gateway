@@ -32,6 +32,8 @@ dist/
 
 # Runtime-generated files (mount a volume instead)
 generated_files/
+# RAG corpus uploads (mount a volume instead)
+rag_documents/
 
 # Docs and project notes — not needed at runtime
 docs/
