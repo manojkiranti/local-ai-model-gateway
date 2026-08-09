@@ -52,8 +52,13 @@ turn-open used by chat, `router` = `/v1/sessions`),
 `rag/` (department-scoped RAG: `models` = `departments` + `user_departments` +
 `documents` + `document_chunks` (pgvector `vector(1536)` + generated `tsv`) +
 `ingest_jobs`, `context` = `rag_context`/`current_department` contextvar,
-`access.resolve_department` = the permission boundary, `repository` = data
-access, `router` = `/v1/departments`). `alembic/` for migrations.
+`access.resolve_department` = the permission boundary, `repository`/`documents` =
+data access, `storage` = `storage_key` minting + traversal-safe resolution,
+`chunking`/`parsing` = content → `Chunk[]` (Docling lazily, worker only),
+`embedding` = query/document-aware embed + 2560→1536 + normalize, `jobs` =
+Postgres queue, `ingest` = atomic replacement, `worker` = the separate ingest
+process, `router`/`jobs_router` = `/v1/departments` + `/v1/ingest-jobs`).
+`alembic/` for migrations.
 - **Adding a local tool:** new `app/tools/local/<name>.py` with `_fn` + `SPEC`,
   then add `<name>.SPEC` to `LOCAL_TOOLS`. The engine (`registry.py`) never changes.
 
@@ -69,7 +74,14 @@ size cap), `GET /v1/files` (caller's files, newest first; `?source=` filters),
 `POST /v1/departments` (admin), `GET /v1/departments` (admin → all; member →
 granted+active, i.e. the frontend's tabs), `PATCH /v1/departments/{code}`
 (admin), `GET|POST /v1/departments/{code}/members` (admin),
-`DELETE /v1/departments/{code}/members/{user_id}` (admin).
+`DELETE /v1/departments/{code}/members/{user_id}` (admin),
+`POST /v1/departments/{code}/documents` (admin, multipart → 202
+`{document_id, job_id}`; 400 bad ext/empty, 409 duplicate content, 413 over cap),
+`POST /v1/departments/{code}/documents/text` (admin, typed text → `source=manual`),
+`GET /v1/departments/{code}/documents` (dept members see `ready` only; admins see
+non-archived, `?include_archived=` admin-only),
+`DELETE /v1/departments/{code}/documents/{id}` (admin; archives — chunks removed,
+row retained), `GET /v1/ingest-jobs/{id}` (admin, progress).
 `GET /v1/mcp/status` is the UI's MCP-connection badge — **always 200**, health
 is in the body (`configured/reachable/tools/error`), never a 502.
 `POST /v1/chat` is the **single, unified** turn endpoint — **stateful**
@@ -252,6 +264,52 @@ events (`token`/`tool_call`/`tool_result`/`done`) + the new id in the
   app's module-level `engine`: that one pools connections bound to the first
   event loop, and each `asyncio.run` makes a new one — the second test would die
   with "Event loop is closed".
+- **Ingestion runs in a SEPARATE process:** `.venv/bin/python -m app.rag.worker`.
+  It shares the repo and database but not the dependency set — Docling pulls ~90
+  packages including torch and the CUDA stack, which must never enter the API
+  image. `requirements-worker.txt` = `-r requirements.txt` + docling. Docling is
+  imported INSIDE `parsing._parse_with_docling`, never at module scope, and
+  `test_docling_is_not_imported_at_module_scope` (a SUBPROCESS check, because
+  `sys.modules` is process-global) locks that.
+- **The API never parses or embeds.** Upload writes a `documents` row + a queued
+  `ingest_jobs` row and returns **202**. All slow work is the worker's.
+- **The worker holds NO transaction while parsing/embedding.** Snapshot the doc
+  (`DocSnapshot`), end the read, parse via `asyncio.to_thread` (Docling is sync
+  and CPU-bound), embed, then ONE short atomic replacement. A background
+  heartbeat task runs throughout so a long job isn't swept as stale, and is
+  cancelled before the terminal status is written.
+- **`worker.preflight` refuses to start on a dimension mismatch.** Finding out
+  after half a corpus is inserted is far worse — `vector(1536)` would start
+  rejecting inserts partway through.
+- **A failed re-ingest of a `ready` document leaves it `ready`.** The
+  replacement rolled back, so its previous chunks are intact and correct; only a
+  document that never had a good version becomes `failed`. `replace_chunks` and
+  `archive_document` both take `SELECT … FOR UPDATE` on the document row and
+  re-check status under the lock, so an archive landing mid-ingest is not
+  resurrected by the commit that follows.
+- **`get_job`/`get_document`/`lock_document` re-read with `populate_existing`.**
+  `claim_next`/`sweep_stale`/`replace_chunks` update via raw SQL the ORM can't
+  synchronise, and sessions run `expire_on_commit=False`; a cached read would
+  report a swept job as still running.
+- **Upload compensates storage on failure.** The file is written before the DB
+  work is known to succeed, so a duplicate-content 409 or a failed commit calls
+  `storage.delete_document` — otherwise a rejected upload orphans a file.
+- **Corpus spreadsheets are searchable but NOT aggregatable in v1.**
+  `aggregate_excel` resolves through `resolve_file` → `generated_files` (per-user
+  uploads); corpus documents live in `documents` under `RAG_DOCS_DIR`, so the
+  resolvers are disjoint and it cannot reach them. Each corpus table chunk
+  repeats its header row so a chunk retrieved alone is self-describing.
+- **Qwen3-Embedding is asymmetric:** queries get an `Instruct:`/`Query:` prefix,
+  documents do not. `embed_texts` requires an explicit `mode`; getting it wrong
+  silently degrades retrieval. `/v1/embeddings` batch results are ordered by
+  `index`, not array position — `embed_texts` re-sorts and validates the index
+  set; don't "simplify" that away.
+- **PDF/DOCX parsing preserves provenance** — `parsing._parse_with_docling`
+  walks `iterate_items()` (real `prov[0].page_no`, heading path, element label)
+  rather than dumping `export_to_markdown()`, and prepends the heading path to
+  chunk *content* because `tsv` indexes content alone. Model prereq for a live
+  run: `ollama pull qwen3-embedding:4b-q8_0` (not pulled by default; the
+  embedding-live and e2e tests skip until it is).
 - Test login: `admin@example.com` / `supersecret123` (persisted in Postgres).
 
 ## Not done yet
