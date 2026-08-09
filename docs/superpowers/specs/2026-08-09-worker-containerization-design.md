@@ -31,8 +31,10 @@ cannot run RAG end-to-end even if the worker existed, because:
 - GPU-accelerated Docling. We ship CPU-only. (A GPU worker is a later option:
   `deploy.resources` devices + CUDA torch + nvidia-container-toolkit.)
 - Baking Docling models into the image. We persist them via a cache volume.
-- Any change to the API `Dockerfile`, the app code, or the RAG schema. This is
-  packaging only.
+- No *dependency* change to the API image, and no app-code or RAG-schema change.
+  This is packaging only. (One unavoidable exception: the API `Dockerfile` gets
+  a one-line `mkdir -p rag_documents` so the non-root gateway can write to the
+  shared corpus volume — a directory creation, not a dependency change.)
 
 ## Design
 
