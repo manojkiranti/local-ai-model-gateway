@@ -48,12 +48,46 @@ docker run -d -p 8000:8000 --env-file .env \
 Health check: `curl http://localhost:8000/health` → 200 (503 = DB unreachable).
 
 ## compose recipe
-`docker-compose.yml` runs **only** `migrate` (one-off `alembic upgrade head`) and
-`gateway`. Postgres, Ollama and the MCP server are all external host services —
-nothing is containerized for them by design.
+`docker-compose.yml` runs `migrate` (one-off `alembic upgrade head`) first,
+then `gateway` and `worker` together. Postgres, Ollama and the MCP server are
+all external host services — nothing is containerized for them by design.
 ```bash
 cp .env.docker.example .env.docker   # set JWT_SECRET + real DB password
 docker compose up --build
+```
+
+## Ingestion worker (department RAG)
+`docker-compose.yml` also runs a `worker` service — the department-RAG ingest
+poller (`python -m app.rag.worker`) — built from its own `Dockerfile.worker`
+rather than the API's `Dockerfile`. That's a separate image because Docling
+(PDF/DOCX parsing) pulls in torch + the CPU-only PyTorch wheel, several GB of
+deps that must never enter the slim API image. `docker compose up --build`
+starts `migrate` → then `gateway` and `worker` together.
+
+**Shared volume, not a direct link.** The gateway and worker never call each
+other directly. An upload writes the file bytes to disk and a `queued` row to
+Postgres on the gateway side; the worker polls that row and then needs the
+same bytes to parse. Both services mount the same named volume at the same
+path to make that possible:
+```yaml
+volumes:
+  - rag_documents:/app/rag_documents   # gateway writes, worker reads
+```
+Postgres carries the job; the shared volume carries the file. Without it, the
+worker can see the queued job but not the file, and ingestion fails with a
+"file not found" error.
+
+**`worker_cache`** is a second named volume, mounted at
+`/home/appuser/.cache` in the worker only. Docling downloads its
+layout/table-detection models on first parse; without a persistent cache,
+every worker restart (or redeploy) re-downloads them from scratch.
+
+**Model prerequisite the stack can't provision for you:** the worker's
+startup preflight checks Ollama for the embedding model
+(`qwen3-embedding:4b-q8_0`) and exits immediately if it's missing or returns
+the wrong dimension. Pull it on the Ollama host before bringing the stack up:
+```bash
+ollama pull qwen3-embedding:4b-q8_0
 ```
 
 ## Still TODO (deferred)

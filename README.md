@@ -91,6 +91,12 @@ slow work. Run it alongside the API:
 .venv/bin/python -m app.rag.worker
 ```
 
+**In Docker**, the worker runs as its own `worker` compose service (its own
+`Dockerfile.worker`, so Docling + torch never enter the API image), sharing
+the `rag_documents` volume with the `gateway` service so both see the same
+uploaded files — see `DOCKER.md`. The `python -m app.rag.worker` command above
+is the non-Docker way to run it.
+
 Two things make this a separate process rather than a background task in the API:
 
 1. **Dependencies.** Parsing PDFs/DOCX uses Docling, which pulls torch + the CUDA
