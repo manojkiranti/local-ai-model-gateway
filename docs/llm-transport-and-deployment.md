@@ -49,7 +49,7 @@ homes:
 | Variable | Read by | Lives in |
 |----------|---------|----------|
 | `AGENT_MODEL`, `AGENT_TEMPERATURE`, `OLLAMA_BASE_URL`, … | the **gateway** app | the gateway's `.env` |
-| `OLLAMA_CONTEXT_LENGTH` | **Ollama** (`ollama serve`) | the Ollama **systemd** unit |
+| `OLLAMA_CONTEXT_LENGTH` | **Ollama** (`ollama serve`) | wherever Ollama's own env is set — the **systemd unit** on this laptop, the **container's `environment:`** on the GPU server |
 
 Putting `OLLAMA_CONTEXT_LENGTH` in the gateway `.env` does nothing — the gateway
 never reads it; Ollama does. Set it on the service:
@@ -107,8 +107,32 @@ older `qwen2.5:72b` target is stale — ignore it.)
 now; it's documented so the switch is a config change when/if you want it.
 
 1. **Ollama on the server** — CURRENT SETUP
-   - Same as local: set `OLLAMA_CONTEXT_LENGTH=32768` on the Ollama **service**
-     (systemd, per the table above — NOT the gateway `.env`) and restart.
+   - **Ollama is a CONTAINER here, not systemd.** It lives in an unrelated
+     compose stack at `/home/localllm/backend-local/docker-compose.yml` as service
+     `ollama` / `container_name: nic_ollama` (`ollama/ollama:latest`,
+     `runtime: nvidia`, models in the named volume `ollama_data:/root/.ollama`,
+     publishing `11434:11434`). That stack also provides the `nic_postgres` and
+     `nic_qdrant` containers for a different app; our gateway only piggybacks on
+     its published `11434` (and `5432`) via `host.docker.internal`.
+   - Context goes in that service's `environment:` block, NOT in the gateway `.env`:
+     ```yaml
+     environment:
+       OLLAMA_CONTEXT_LENGTH: 32768
+     ```
+     then **recreate** it — `cd /home/localllm/backend-local && docker compose up -d ollama`.
+   - **Editing compose is not enough.** A running container's environment is fixed
+     at launch, so a declared-but-not-recreated container keeps the old value and
+     silently runs at Ollama's 4096 default (this exact trap bit us on
+     2026-08-10: the var was in the compose file, absent from
+     `docker exec nic_ollama printenv`). `export` inside the container does
+     nothing either — `ollama serve` is already running. Always verify with
+     `docker exec nic_ollama printenv | grep CONTEXT`.
+   - Then confirm the bigger KV cache didn't push the model off the GPU:
+     `docker exec nic_ollama ollama ps` must show `PROCESSOR` = **100% GPU**.
+     If it spills to CPU, step down to 16384.
+   - Recreating ollama alone does not restart `nic_backend` or our gateway —
+     `depends_on: service_healthy` only gates startup. Both just error for the
+     ~10–20s until it's healthy again.
    - Point the gateway's `OLLAMA_BASE_URL` at the server's `:11434`.
    - `AGENT_MODEL=qwen3.5:35b-a3b` in the gateway `.env`.
 
