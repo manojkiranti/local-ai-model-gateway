@@ -135,6 +135,18 @@ def _pdf_pipeline_options():
         AcceleratorOptions,
     )
     from docling.datamodel.pipeline_options import PdfPipelineOptions
+    from docling.datamodel.settings import settings as docling_settings
+
+    # No torch.compile. Docling compiles the layout model by default, and
+    # TorchInductor shells out to a C++ compiler at RUNTIME to build the
+    # generated kernels — `python:*-slim` has no g++ (build-essential lives only
+    # in the builder stage, by design), so the layout stage died with
+    # `InvalidCxxCompiler: No working C++ compiler found`. Eager mode needs no
+    # toolchain, and for a background CPU ingest the compile is not worth
+    # shipping a compiler into the runtime image for. MUST be set before the
+    # options are built: `compile_model` resolves from this via a
+    # default_factory when PdfPipelineOptions() is constructed.
+    docling_settings.inference.compile_torch_models = False
 
     options = PdfPipelineOptions()
     options.do_ocr = False

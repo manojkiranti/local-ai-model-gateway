@@ -74,6 +74,14 @@ def test_pdf_pipeline_is_pinned_to_cpu_with_ocr_off():
     assert opts.accelerator_options.device == AcceleratorDevice.CPU
 
 
+def test_layout_model_is_not_torch_compiled():
+    """torch.compile makes TorchInductor invoke a C++ compiler at runtime, and
+    the slim runtime image has no g++ — the layout stage failed with
+    `InvalidCxxCompiler`. Eager mode needs no toolchain."""
+    opts = _pdf_pipeline_options()
+    assert opts.layout_options.engine_options.compile_model is False
+
+
 def test_docx_text_is_extracted(docx_file):
     chunks = parse_to_chunks(docx_file, "docx", **OPTS)
     joined = " ".join(c.content for c in chunks)
