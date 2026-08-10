@@ -10,6 +10,7 @@ docling = pytest.importorskip(
 )
 
 from app.rag.parsing import ParseError, parse_to_chunks  # noqa: E402
+from app.rag.parsing import _pdf_pipeline_options  # noqa: E402
 
 OPTS = {"max_chars": 800, "overlap_chars": 80}
 
@@ -55,6 +56,22 @@ def pdf_file(tmp_path_factory):
     path = tmp_path_factory.mktemp("docling") / "policy.pdf"
     pdf.output(str(path))
     return path
+
+
+def test_pdf_pipeline_is_pinned_to_cpu_with_ocr_off():
+    """Ingestion must never touch the GPU and must not run OCR.
+
+    device=CPU: the GPU belongs to the LLM (Ollama). Docling's default AUTO
+    grabs CUDA and collides with a resident model on a shared card — the CUDA
+    OOM that killed local ingestion. do_ocr=False: v1 does not OCR (see the
+    "produced no text" ParseError), and OCR is the heavy stage that was
+    allocating on the GPU. Digital PDFs extract fine without it.
+    """
+    from docling.datamodel.accelerator_options import AcceleratorDevice
+
+    opts = _pdf_pipeline_options()
+    assert opts.do_ocr is False
+    assert opts.accelerator_options.device == AcceleratorDevice.CPU
 
 
 def test_docx_text_is_extracted(docx_file):
