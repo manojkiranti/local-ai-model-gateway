@@ -34,6 +34,25 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PATH="/opt/venv/bin:$PATH"
 
+# Native libraries OpenCV links against. Docling depends on `opencv-python`
+# (the FULL build, not headless), whose `cv2.abi3.so` is dynamically linked to
+# the X11/XCB/GL stack — verified with ldd: libxcb.so.1, libGL.so.1,
+# libglib-2.0.so.0, libX11.so.6. python:*-slim ships none of them, so the first
+# PDF parse dies with `libxcb.so.1: cannot open shared object file`. A desktop
+# host has these already, which is why this only ever fails in the container.
+# No X server is involved or needed — the libraries just have to be present to
+# load. libglib2.0-0 also covers gthread.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        libxcb1 \
+        libgl1 \
+        libglib2.0-0 \
+        libx11-6 \
+        libxext6 \
+        libxrender1 \
+        libsm6 \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN useradd --create-home --uid 10001 appuser
 
 WORKDIR /app

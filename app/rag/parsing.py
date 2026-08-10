@@ -115,6 +115,46 @@ def _with_context(chunks: list[Chunk], section: str | None) -> list[Chunk]:
     return [replace(c, content=f"{section}\n\n{c.content}") for c in chunks]
 
 
+def _pdf_pipeline_options():
+    """PDF pipeline pinned to CPU with OCR off. Imports live HERE, never at
+    module scope — torch must not load in the API process.
+
+    device=CPU: ingestion must never touch the GPU. The GPU belongs to the LLM
+    (Ollama); Docling's default AUTO grabs CUDA and, on a shared card, collides
+    with the resident model — the CUDA OOM that failed every parse. The worker
+    image already ships CPU-only torch for this reason; pinning the device makes
+    it true regardless of which torch build a given venv happens to have.
+
+    do_ocr=False: v1 does not OCR (see the "produced no text" ParseError below),
+    and OCR is by far the heaviest, slowest stage. Digital PDFs extract from
+    their embedded text layer without it; a scanned/image-only PDF still lands
+    on the graceful no-text path rather than burning minutes on CPU OCR.
+    """
+    from docling.datamodel.accelerator_options import (
+        AcceleratorDevice,
+        AcceleratorOptions,
+    )
+    from docling.datamodel.pipeline_options import PdfPipelineOptions
+
+    options = PdfPipelineOptions()
+    options.do_ocr = False
+    options.accelerator_options = AcceleratorOptions(device=AcceleratorDevice.CPU)
+    return options
+
+
+def _docling_converter():
+    """A DocumentConverter with the CPU/no-OCR PDF pipeline. Only the PDF format
+    is overridden; DOCX uses Docling's default pipeline (no OCR, no GPU)."""
+    from docling.datamodel.base_models import InputFormat
+    from docling.document_converter import DocumentConverter, PdfFormatOption
+
+    return DocumentConverter(
+        format_options={
+            InputFormat.PDF: PdfFormatOption(pipeline_options=_pdf_pipeline_options())
+        }
+    )
+
+
 def _parse_with_docling(
     path: Path, *, max_chars: int, overlap_chars: int
 ) -> list[Chunk]:
@@ -128,7 +168,7 @@ def _parse_with_docling(
     `item.prov[0].page_no` is 1-based, and `item.label` is a `DocItemLabel`.
     """
     try:
-        from docling.document_converter import DocumentConverter
+        converter = _docling_converter()
     except ImportError as exc:  # pragma: no cover - depends on the environment
         raise ParseError(
             "Docling is not installed. PDF/DOCX ingestion runs in the WORKER "
@@ -136,7 +176,7 @@ def _parse_with_docling(
         ) from exc
 
     try:
-        document = DocumentConverter().convert(str(path)).document
+        document = converter.convert(str(path)).document
     except Exception as exc:  # noqa: BLE001 - Docling raises a wide range
         raise ParseError(f"could not parse document: {exc}") from exc
 
