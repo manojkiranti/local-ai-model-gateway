@@ -132,6 +132,15 @@ events (`token`/`tool_call`/`tool_result`/`done`) + the new id in the
   re-check every redirect hop, GET-only, timeout + byte cap. Never relax these to
   "make it work"; internal services (Ollama/PG/MCP on localhost) are reachable
   otherwise. Config: `FETCH_URL_ENABLED`, `FETCH_URL_ALLOWLIST`.
+- **Dates come from the server clock, never from the model.** `app/localtime.py`
+  is the one source of "today" (Nepal time as a literal **UTC+05:45** offset —
+  `ZoneInfo` needs system tzdata the slim images don't install, and Nepal has no
+  DST). `build_system_prompt`'s `DATE_PROMPT` states today's date and forbids
+  answering time-varying figures from memory. It exists because of one live
+  failure: with no date in context the model answered "USD to NPR" with 2023's
+  132.57/133.17 as current, and a figure recited from training data looks exactly
+  like a current one. Don't derive today from UTC — after 18:15 UTC that is
+  already yesterday in Kathmandu.
 - MCP: gateway is the MCP client (streamable HTTP). Set `MCP_SERVER_URL` to enable;
   blank = agent runs with local tools only. `mcp` SDK v2: fn is `streamable_http_client`,
   tool field is `input_schema`.

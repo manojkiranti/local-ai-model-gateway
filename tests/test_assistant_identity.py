@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import pytest
 
+from app import localtime
 from app.agent.loop import build_system_prompt, run_turn
 from app.config import Settings
 from tests.test_agent_loop import FakeMCP, RecordingOllama, text_turn
@@ -68,3 +69,20 @@ async def test_loop_sends_the_settings_derived_prompt():
     assert sent[0]["role"] == "system"
     assert "NIC AI" in sent[0]["content"]
     assert "NIC Bank" in sent[0]["content"]
+
+
+# --------------------------------------------------------------------------- #
+# Today's date
+# --------------------------------------------------------------------------- #
+# A model with no date in context answers "what is the USD rate" from training
+# data (observed: 2023's NPR 132.57/133.17, stated as current).
+def test_prompt_states_todays_date_in_nepal_time():
+    p = build_system_prompt(_settings(assistant_name="NIC AI"))
+    assert localtime.today_iso() in p
+
+
+def test_prompt_forbids_answering_changing_figures_from_memory():
+    low = build_system_prompt(_settings(assistant_name="NIC AI")).lower()
+    assert "exchange rates" in low
+    assert "memory" in low
+    assert "training data" in low

@@ -25,6 +25,7 @@ import json
 import logging
 from typing import Any, AsyncIterator
 
+from .. import localtime
 from ..config import Settings
 from ..rag.context import current_department
 from ..mcp.client import MCPClient, MCPUnavailableError
@@ -42,6 +43,21 @@ WORKING_PROMPT = (
     "marked superseded were replaced by a newer upload. Never describe a file's "
     "contents from earlier in the conversation; call a file tool on the id you "
     "intend to answer about."
+)
+
+
+# Without this the model has no idea what day it is, and the cheapest path for a
+# question like "what is the USD rate" becomes reciting a rate it memorised during
+# training (observed: NPR 132.57/133.17, which were the rates in 2023). A model
+# that knows the date can neither pass a stale one to a dated tool nor present old
+# figures as current.
+DATE_PROMPT = (
+    "Today's date is {today} (Nepal time, UTC+05:45). Use it whenever a request "
+    "depends on the current date, and pass it to tools that take a date.\n"
+    "Anything that changes over time — exchange rates, prices, balances, "
+    "published figures — must come from a tool call, never from memory. Your "
+    "training data is old; stating a remembered figure as current is a factual "
+    "error. If no tool can supply it, say so instead of guessing."
 )
 
 
@@ -85,7 +101,7 @@ def build_system_prompt(settings: Settings) -> str:
             f"vendor, or how you were trained — that is not something you "
             f"disclose. Never claim to be human."
         )
-    prompt = f"{identity}\n{WORKING_PROMPT}"
+    prompt = f"{identity}\n{DATE_PROMPT.format(today=localtime.today_iso())}\n{WORKING_PROMPT}"
 
     # Grounding is added ONLY for a department-scoped turn. A general chat has no
     # corpus, so instructing the model to answer only from retrieved documents
