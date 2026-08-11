@@ -139,7 +139,18 @@ inconsistency to be tidied away.
 
 `READ_MAX_CHARS = 40_000` is retained as the reader's documented ceiling. But the
 tool emits at most `MAX_TOOL_RESULT_CHARS` minus header room, so **our own cap
-always bites before the loop's**. This is a correctness requirement, not tidiness:
+always bites before the loop's**.
+
+**Truncation happens on whole logical lines.** A line that would cross the
+budget is dropped entirely, never emitted partially, so the last line in the
+output is complete and the header's `start_line=N+1` resumes at exactly the
+first line the model did *not* receive. Cutting mid-line would leave the model a
+fragment it cannot tell is a fragment, and make the next-page number off by a
+partial line. (Edge case: a single line longer than the whole budget is emitted
+alone and hard-cut, with the header saying so — otherwise the reader would
+deadlock, unable to make progress.)
+
+This is a correctness requirement, not tidiness:
 if the tool announced "showing lines 1–400, continue at 401" and the loop then
 silently cut the body at 8000 chars, the model would resume at 401 and skip
 everything between — a silent data loss that looks like a complete read. Because
@@ -294,7 +305,8 @@ self-truncating. Fixing `read_excel` is a separate change.
 
 ## Not in scope
 
-OCR and scanned documents; Docling, worker, queue or schema changes; `.doc`
+OCR / extracting text from scanned pages — scanned PDFs themselves are accepted,
+detected and reported in this slice; Docling, worker, queue or schema changes; `.doc`
 (legacy binary), `.rtf`, `.odt`; structured extraction (tables or JSON as data
 rather than text); search within a document; cross-document questions;
 `inspect_document`. Each is additive later; none blocks the core capability.
