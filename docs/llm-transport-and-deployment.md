@@ -32,10 +32,11 @@ has no such field**, and Ollama's shim *ignores* a passthrough `options.num_ctx`
 (verified on 0.32.5: asked for 8192, model loaded at 4096).
 
 So context must be set **on the server**, not in the request. If you don't,
-Ollama falls back to **4096 tokens**, which is too small for this agent: the ~12
-local tool schemas are ~2,800 tokens on their own, and a single tool result is
-capped at 8,000 chars (~2,000 tokens) — so one tool call overflows a 4096 window
-and the model appears to "forget" mid-turn.
+Ollama falls back to **4096 tokens**, which is too small for this agent: the 15
+local tool schemas are **3,475 tokens** on their own (measured 2026-08-11 via
+`usage.prompt_tokens`, qwen2.5 — a bare turn's prompt floor is 3,778, leaving
+~300), and a single tool result is capped at 8,000 chars (~2,000 tokens) — so one
+tool call overflows a 4096 window and the model appears to "forget" mid-turn.
 
 **Fix (both hosts): set `OLLAMA_CONTEXT_LENGTH` as a service env var.** This is
 the equivalent of vLLM's `--max-model-len` launch flag, so the mental model

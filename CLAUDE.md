@@ -15,6 +15,11 @@ to this gateway, with a JWT bearer token.
 Sibling project `../local-ai-model` is the original where this code was first
 built/proven; code is being ported here. Don't edit it as part of gateway work.
 
+**Server / models / DB facts live in `docs/server-and-models.md`** — GPU box
+hardware, which model runs where (`qwen3.5:35b-a3b` chat, `qwen3-embedding:4b-q8_0`),
+Postgres + pgvector layout, ports, RAG settings, what is not yet live. Read it
+instead of guessing the environment; update it when any of it changes.
+
 ## Environment / commands
 - **Use THIS project's `.venv`** (`.venv/bin/python`, `.venv/bin/pip`, `.venv/bin/uvicorn`,
   `.venv/bin/alembic`, `.venv/bin/pytest`). Never install into a sibling's venv. Python 3.10.
@@ -33,7 +38,8 @@ in `.env` only, never in code). Create with:
 
 ## Layout
 `app/{config,main}`, `db/`, `auth/`, `users/`, `ollama/` (client), `chat/`,
-`mcp/` (client), `tools/` (`registry.py` = engine; `local/` package = one module
+`mcp/` (client), `nrb/` (client — Nepal Rastra Bank official APIs; Forex only so
+far), `tools/` (`registry.py` = engine; `local/` package = one module
 per in-process tool, each exporting a `SPEC`, aggregated in `local/__init__.py`'s
 `LOCAL_TOOLS`), `agent/` (hand-rolled loop; `loop.stream_turn` = async event
 generator, `loop.run_turn` = collect for non-stream, `schemas` = trace types —
@@ -119,7 +125,9 @@ events (`token`/`tool_call`/`tool_result`/`done`) + the new id in the
   (Ollama's shim ignores a passthrough `options.num_ctx`; verified 0.32.5 —
   requested 8192, loaded 4096). Set context server-wide on the Ollama service:
   `OLLAMA_CONTEXT_LENGTH=32768`. Without it Ollama defaults to **4096**, which is
-  too small — the ~12 local tool schemas alone are ~2800 tokens, so one 8000-char
+  too small — the 15 local tool schemas alone are **3475 tokens** (measured
+  2026-08-11 via `usage.prompt_tokens`, qwen2.5; a bare turn's prompt floor is
+  3778, leaving ~300 of a 4096 window), so one 8000-char
   tool result overflows. This matches vLLM's `--max-model-len` (a launch flag),
   so it stays a config value across backends. See
   `docs/llm-transport-and-deployment.md`.
@@ -132,15 +140,36 @@ events (`token`/`tool_call`/`tool_result`/`done`) + the new id in the
   re-check every redirect hop, GET-only, timeout + byte cap. Never relax these to
   "make it work"; internal services (Ollama/PG/MCP on localhost) are reachable
   otherwise. Config: `FETCH_URL_ENABLED`, `FETCH_URL_ALLOWLIST`.
+- **`get_nrb_forex` is NOT fetch_url with a nicer name.** The NRB host is
+  `NRB_API_BASE_URL` and `/rates` is hardcoded in `app/nrb/client.py`; the tool's
+  schema is `{from?, to?, currency?}` with **no `url`/`page`** — there is nothing
+  for an injection to point at. Four things the live API does that defensive
+  parsing must handle (probed 2026-08-10): (1) **`page`+`per_page` are mandatory**
+  (omit → validation errors, `payload: null`); (2) **HTTP is always 200** — the
+  real status is `status.code`; (3) **`status.code` is 400 for an empty-but-valid
+  query too** (future date, reversed range) with `payload: []`, so success is
+  decided on `data.payload` being a *list*, never on the status; (4) a
+  **non-trading day** publishes every currency with `buy`/`sell` **null** — the
+  client classifies that `UNQUOTED` (info log) vs `UNREADABLE` (warning) so a
+  public holiday doesn't emit 22 warnings, and the tool says "quoted no rates"
+  instead of rendering an empty table. Buy/sell stay NRB's **strings** (no float
+  round-trip, no arithmetic — official figures), and the **unit is always
+  printed** (INR is per 100, JPY per 10; dropping it is a 100x error). Range caps:
+  31 days, or 3 without a `currency` (a full day is ~22 rows). Future NRB document
+  search (`search_nrb_documents`, Postgres/pgvector) is a separate tool — the
+  descriptions cross-reference each other, so keep the "not for policies/
+  circulars/directives" clause here.
 - **Dates come from the server clock, never from the model.** `app/localtime.py`
   is the one source of "today" (Nepal time as a literal **UTC+05:45** offset —
   `ZoneInfo` needs system tzdata the slim images don't install, and Nepal has no
-  DST). `build_system_prompt`'s `DATE_PROMPT` states today's date and forbids
-  answering time-varying figures from memory. It exists because of one live
-  failure: with no date in context the model answered "USD to NPR" with 2023's
-  132.57/133.17 as current, and a figure recited from training data looks exactly
-  like a current one. Don't derive today from UTC — after 18:15 UTC that is
-  already yesterday in Kathmandu.
+  DST). Two consumers: `build_system_prompt`'s `DATE_PROMPT` states today's date
+  and forbids answering time-varying figures from memory, and `get_nrb_forex`
+  defaults an absent/blank `from` to today (**nothing is `required`** in its
+  schema). Both exist because of one live failure: with no date in context the
+  model answered "USD to NPR" with 2023's 132.57/133.17 as current. Requiring a
+  date made it *supply* a stale one, and NRB answers for 2023 quite happily, so
+  the result looked right. Don't reintroduce `required: ["from"]`, and don't
+  derive today from UTC — after 18:15 UTC that's yesterday in Kathmandu.
 - MCP: gateway is the MCP client (streamable HTTP). Set `MCP_SERVER_URL` to enable;
   blank = agent runs with local tools only. `mcp` SDK v2: fn is `streamable_http_client`,
   tool field is `input_schema`.

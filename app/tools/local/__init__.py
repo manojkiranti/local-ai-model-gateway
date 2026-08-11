@@ -16,6 +16,7 @@ from . import (
     docx,
     excel,
     fetch_url,
+    get_nrb_forex,
     html,
     inspect_excel,
     pdf,
@@ -40,6 +41,7 @@ LOCAL_TOOLS: list[LocalToolSpec] = [
     read_excel.SPEC,
     aggregate_excel.SPEC,
     search_department_docs.SPEC,
+    get_nrb_forex.SPEC,
 ]
 
 __all__ = ["LOCAL_TOOLS", "LocalToolSpec", "LocalFn"]

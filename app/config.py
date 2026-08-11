@@ -87,6 +87,12 @@ class Settings(BaseSettings):
     # may be fetched. Blank = any public host (still IP-filtered).
     fetch_url_allowlist: str = ""
 
+    # --- Nepal Rastra Bank (get_nrb_forex tool) ---
+    # The official Forex API base. Config, not a tool argument: the model can
+    # never point this tool at a host of its choosing (that is fetch_url's job,
+    # with fetch_url's SSRF guards). The `/rates` path is hardcoded in the client.
+    nrb_api_base_url: str = "https://www.nrb.org.np/api/forex/v1"
+
     # --- RAG: department corpus ingestion ---
     # Corpus documents are org knowledge, NOT per-user files — separate tree.
     rag_docs_dir: str = "rag_documents"
