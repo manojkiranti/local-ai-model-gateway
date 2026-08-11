@@ -64,6 +64,49 @@ def _read_json(path: Path) -> DocumentText:
     return DocumentText(kind="JSON", lines=pretty.splitlines())
 
 
+def _iter_docx_blocks(doc):
+    """Yield Paragraph and Table objects in DOCUMENT ORDER.
+
+    python-docx exposes doc.paragraphs and doc.tables as separate flat lists,
+    which loses their relative position — a table would drift to the end of the
+    output. Walking the body XML is the only way to keep the reading order the
+    author intended.
+    """
+    from docx.oxml.table import CT_Tbl
+    from docx.oxml.text.paragraph import CT_P
+    from docx.table import Table
+    from docx.text.paragraph import Paragraph
+
+    for child in doc.element.body.iterchildren():
+        if isinstance(child, CT_P):
+            yield Paragraph(child, doc)
+        elif isinstance(child, CT_Tbl):
+            yield Table(child, doc)
+
+
+def _read_docx(path: Path) -> DocumentText:
+    from docx import Document
+    from docx.table import Table
+
+    try:
+        doc = Document(str(path))
+    except Exception as exc:  # noqa: BLE001 - any docx/zip failure is a ReadError
+        raise ReadError(f"could not read the Word document: {exc}") from exc
+
+    lines: list[str] = []
+    for block in _iter_docx_blocks(doc):
+        if isinstance(block, Table):
+            lines.append("")
+            for row in block.rows:
+                lines.append(" | ".join(cell.text.strip() for cell in row.cells))
+            lines.append("")
+            continue
+        text = block.text.strip()
+        style = getattr(getattr(block, "style", None), "name", "") or ""
+        lines.append(f"# {text}" if style.startswith("Heading") and text else text)
+    return DocumentText(kind="Word document", lines=lines)
+
+
 def read_lines(path: Path) -> DocumentText:
     """Any supported document -> its text as lines. Raises ReadError for an
     unsupported extension or an unparseable file."""
@@ -73,4 +116,6 @@ def read_lines(path: Path) -> DocumentText:
         return _read_json(path)
     if ext in (".txt", ".md"):
         return _read_text(path, ext)
+    if ext == ".docx":
+        return _read_docx(path)
     raise ReadError(f"unsupported document type '{ext}'")

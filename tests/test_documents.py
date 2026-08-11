@@ -59,3 +59,46 @@ def test_unsupported_extension_raises(tmp_path):
     p = _write(tmp_path, "a.rtf", "hi")
     with pytest.raises(ReadError):
         documents.read_lines(p)
+
+
+def _make_docx(tmp_path, name="a.docx"):
+    from docx import Document
+
+    doc = Document()
+    doc.add_heading("Eligibility", level=1)
+    doc.add_paragraph("Applicants must be resident.")
+    table = doc.add_table(rows=2, cols=3)
+    table.cell(0, 0).text = "name"
+    table.cell(0, 1).text = "min"
+    table.cell(0, 2).text = "max"
+    table.cell(1, 0).text = "term"
+    table.cell(1, 1).text = "1"
+    table.cell(1, 2).text = "30"
+    doc.add_paragraph("End matter.")
+    p = tmp_path / name
+    doc.save(str(p))
+    return p
+
+
+def test_docx_heading_body_and_table(tmp_path):
+    doc = documents.read_lines(_make_docx(tmp_path))
+    assert doc.kind == "Word document"
+    assert "# Eligibility" in doc.lines
+    assert "Applicants must be resident." in doc.lines
+    assert "name | min | max" in doc.lines
+    assert "term | 1 | 30" in doc.lines
+
+
+def test_docx_preserves_document_order(tmp_path):
+    doc = documents.read_lines(_make_docx(tmp_path))
+    heading = doc.lines.index("# Eligibility")
+    table_row = doc.lines.index("name | min | max")
+    tail = doc.lines.index("End matter.")
+    assert heading < table_row < tail
+
+
+def test_corrupt_docx_raises_read_error(tmp_path):
+    p = tmp_path / "broken.docx"
+    p.write_bytes(b"not a zip at all")
+    with pytest.raises(ReadError):
+        documents.read_lines(p)
