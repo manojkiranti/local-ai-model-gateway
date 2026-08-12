@@ -107,6 +107,58 @@ def _read_docx(path: Path) -> DocumentText:
     return DocumentText(kind="Word document", lines=lines)
 
 
+def _read_pdf(path: Path) -> DocumentText:
+    """PDF -> lines, one '[page N]' marker per page.
+
+    An empty page is NOT skipped: it emits an explicit marker, because a silent
+    gap reads to the model as "there was nothing there" rather than "this page
+    could not be extracted".
+    """
+    from pypdf import PdfReader
+
+    try:
+        reader = PdfReader(str(path))
+        if reader.is_encrypted:
+            # Many real-world PDFs are encrypted with an EMPTY owner password
+            # and open fine; only a genuine user password is a hard failure.
+            try:
+                opened = reader.decrypt("")
+            except Exception:  # noqa: BLE001 - a failed decrypt is just "locked"
+                opened = 0
+            if not opened:
+                raise EncryptedDocument("this PDF is password-protected")
+        total = len(reader.pages)
+    except EncryptedDocument:
+        raise
+    except Exception as exc:  # noqa: BLE001 - no pypdf exception escapes this module
+        raise ReadError(f"could not read the PDF: {exc}") from exc
+
+    limit = min(total, MAX_PDF_PAGES)
+    lines: list[str] = []
+    text_pages = 0
+    for index in range(limit):
+        try:
+            raw = reader.pages[index].extract_text() or ""
+        except Exception:  # noqa: BLE001 - one bad page must not kill the document
+            raw = ""
+        page_lines = [ln.rstrip() for ln in raw.splitlines() if ln.strip()]
+        if page_lines:
+            text_pages += 1
+            lines.append(f"[page {index + 1}]")
+            lines.extend(page_lines)
+        else:
+            lines.append(
+                f"[page {index + 1}] (no extractable text — likely a scanned image)"
+            )
+    return DocumentText(
+        kind="PDF",
+        lines=lines,
+        pages=total,
+        text_pages=text_pages,
+        pages_skipped=total - limit,
+    )
+
+
 def read_lines(path: Path) -> DocumentText:
     """Any supported document -> its text as lines. Raises ReadError for an
     unsupported extension or an unparseable file."""
@@ -118,4 +170,6 @@ def read_lines(path: Path) -> DocumentText:
         return _read_text(path, ext)
     if ext == ".docx":
         return _read_docx(path)
+    if ext == ".pdf":
+        return _read_pdf(path)
     raise ReadError(f"unsupported document type '{ext}'")

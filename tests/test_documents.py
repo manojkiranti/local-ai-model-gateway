@@ -102,3 +102,110 @@ def test_corrupt_docx_raises_read_error(tmp_path):
     p.write_bytes(b"not a zip at all")
     with pytest.raises(ReadError):
         documents.read_lines(p)
+
+
+from io import BytesIO
+
+
+def _text_pdf_bytes(pages: list[str]) -> bytes:
+    """A real PDF with a text layer, one page per string."""
+    from fpdf import FPDF
+
+    pdf = FPDF()
+    for body in pages:
+        pdf.add_page()
+        pdf.set_font("Helvetica", size=12)
+        pdf.multi_cell(0, 10, body)
+    return bytes(pdf.output())
+
+
+def _image_only_pdf_bytes(tmp_path, n_pages: int) -> bytes:
+    """A PDF whose pages contain ONLY an image — i.e. what a scan looks like."""
+    from fpdf import FPDF
+    from PIL import Image
+
+    img = tmp_path / "block.png"
+    Image.new("RGB", (64, 64), (180, 180, 180)).save(img)
+    pdf = FPDF()
+    for _ in range(n_pages):
+        pdf.add_page()
+        pdf.image(str(img), x=10, y=10, w=50)
+    return bytes(pdf.output())
+
+
+def _write_bytes(tmp_path, name: str, raw: bytes):
+    p = tmp_path / name
+    p.write_bytes(raw)
+    return p
+
+
+def test_pdf_marks_each_page_in_order(tmp_path):
+    p = _write_bytes(tmp_path, "a.pdf", _text_pdf_bytes(["Alpha page", "Beta page", "Gamma page"]))
+    doc = documents.read_lines(p)
+    assert doc.kind == "PDF"
+    assert doc.pages == 3
+    assert doc.text_pages == 3
+    assert doc.pages_skipped == 0
+    assert doc.lines.index("[page 1]") < doc.lines.index("[page 2]") < doc.lines.index("[page 3]")
+    assert any("Alpha page" in line for line in doc.lines)
+
+
+def test_pdf_blank_page_gets_a_marker_not_silence(tmp_path):
+    from fpdf import FPDF
+    from PIL import Image
+
+    img = tmp_path / "b.png"
+    Image.new("RGB", (64, 64), (180, 180, 180)).save(img)
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Helvetica", size=12)
+    pdf.multi_cell(0, 10, "Readable first page")
+    pdf.add_page()                      # page 2: image only
+    pdf.image(str(img), x=10, y=10, w=50)
+    p = _write_bytes(tmp_path, "mixed.pdf", bytes(pdf.output()))
+
+    doc = documents.read_lines(p)
+    assert doc.pages == 2
+    assert doc.text_pages == 1
+    assert "[page 2] (no extractable text — likely a scanned image)" in doc.lines
+
+
+def test_fully_scanned_pdf_returns_normally_with_zero_text_pages(tmp_path):
+    """Policy (the OCR error) belongs to the tool, not the reader."""
+    p = _write_bytes(tmp_path, "scan.pdf", _image_only_pdf_bytes(tmp_path, 3))
+    doc = documents.read_lines(p)
+    assert doc.pages == 3
+    assert doc.text_pages == 0
+    assert len(doc.lines) == 3  # one marker per page, nothing else
+
+
+def test_pdf_page_cap_reports_what_it_skipped(tmp_path, monkeypatch):
+    monkeypatch.setattr(documents, "MAX_PDF_PAGES", 2)
+    p = _write_bytes(tmp_path, "long.pdf", _text_pdf_bytes(["one", "two", "three", "four"]))
+    doc = documents.read_lines(p)
+    assert doc.pages == 4
+    assert doc.pages_skipped == 2
+    assert "[page 2]" in doc.lines
+    assert "[page 3]" not in doc.lines
+
+
+def test_password_protected_pdf_raises_encrypted(tmp_path):
+    from pypdf import PdfReader, PdfWriter
+
+    reader = PdfReader(BytesIO(_text_pdf_bytes(["secret"])))
+    writer = PdfWriter()
+    for page in reader.pages:
+        writer.add_page(page)
+    writer.encrypt("hunter2")
+    buf = BytesIO()
+    writer.write(buf)
+    p = _write_bytes(tmp_path, "locked.pdf", buf.getvalue())
+
+    with pytest.raises(documents.EncryptedDocument):
+        documents.read_lines(p)
+
+
+def test_corrupt_pdf_raises_read_error(tmp_path):
+    p = _write_bytes(tmp_path, "broken.pdf", b"%PDF-1.4\nthis is not a pdf body")
+    with pytest.raises(ReadError):
+        documents.read_lines(p)
