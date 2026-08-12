@@ -25,7 +25,15 @@ from dataclasses import replace
 from pathlib import Path
 
 from ..files import readers
-from .chunking import Chunk, chunk_table, chunk_text, renumber
+from .chunking import (
+    Block,
+    Chunk,
+    chunk_table,
+    chunk_text,
+    drop_small_blocks,
+    merge_blocks,
+    renumber,
+)
 
 
 class ParseError(Exception):
@@ -194,7 +202,12 @@ def _docling_converter():
 
 
 def _parse_with_docling(
-    path: Path, *, max_chars: int, overlap_chars: int
+    path: Path,
+    *,
+    max_chars: int,
+    overlap_chars: int,
+    min_body_chars: int = 0,
+    skip_sections: set[str] | None = None,
 ) -> list[Chunk]:
     """PDF/DOCX via Docling, PRESERVING provenance. Imported HERE, never at
     module scope.
@@ -218,8 +231,8 @@ def _parse_with_docling(
     except Exception as exc:  # noqa: BLE001 - Docling raises a wide range
         raise ParseError(f"could not parse document: {exc}") from exc
 
-    collected: list[Chunk] = []
     headings: list[tuple[int, str]] = []
+    blocks: list[Block] = []
 
     for item, _tree_level in document.iterate_items():
         label = getattr(getattr(item, "label", None), "value", "") or ""
@@ -236,6 +249,14 @@ def _parse_with_docling(
             headings.append((level, text))
             continue  # the heading itself is carried into following chunks
 
+        section = _heading_path(headings)
+        # Front matter never reaches the index: a Table of Contents lists every
+        # heading in the document, so it matches almost any structural query,
+        # and ts_rank_cd favours short text — it outranked real prose 7 slots
+        # out of 12. Measured 2026-08-12; see the design spec.
+        if _is_skipped_section(section, skip_sections or set()):
+            continue
+
         if label == "table":
             try:
                 text = item.export_to_markdown(document).strip()
@@ -246,32 +267,70 @@ def _parse_with_docling(
         if not text:
             continue
 
+        blocks.append(
+            Block(
+                text=text,
+                section=section,
+                page_number=page,
+                element_type=_ELEMENT_TYPES.get(label, "text"),
+            )
+        )
+
+    if not blocks:
+        raise ParseError(
+            "document produced no text — a scanned PDF needs OCR, which v1 does not do"
+        )
+
+    # Merge BEFORE filtering: a short block is often real content orphaned from
+    # its neighbours by Docling's element split, and only merging can tell the
+    # difference. See drop_small_blocks.
+    blocks = drop_small_blocks(
+        merge_blocks(blocks, max_chars=max_chars), min_body_chars=min_body_chars
+    )
+
+    collected: list[Chunk] = []
+    for block in blocks:
         pieces = chunk_text(
-            text,
+            block.text,
             max_chars=max_chars,
             overlap_chars=overlap_chars,
-            section=_heading_path(headings),
-            page_number=page,
-            element_type=_ELEMENT_TYPES.get(label, "text"),
+            section=block.section,
+            page_number=block.page_number,
+            element_type=block.element_type,
         )
-        collected.extend(_with_context(pieces, _heading_path(headings)))
+        collected.extend(_with_context(pieces, block.section))
 
     if not collected:
         raise ParseError(
-            "document produced no text — a scanned PDF needs OCR, which v1 does not do"
+            "document contained only front matter or fragments — nothing to index"
         )
     return collected
 
 
 def parse_to_chunks(
-    path: Path, file_type: str, *, max_chars: int, overlap_chars: int
+    path: Path,
+    file_type: str,
+    *,
+    max_chars: int,
+    overlap_chars: int,
+    min_body_chars: int = 0,
+    skip_sections: set[str] | None = None,
 ) -> list[Chunk]:
-    """Dispatch on `file_type`, returning contiguously indexed chunks."""
+    """Dispatch on `file_type`, returning contiguously indexed chunks.
+
+    `min_body_chars`/`skip_sections` apply to the Docling path ONLY — the text
+    and spreadsheet branches already produce whole-body or row-buffered chunks,
+    and a global filter would reduce a legitimately short .txt to zero chunks.
+    """
     if file_type in ("xlsx", "csv"):
         chunks = _parse_spreadsheet(path, max_chars=max_chars)
     elif file_type in ("pdf", "docx"):
         chunks = _parse_with_docling(
-            path, max_chars=max_chars, overlap_chars=overlap_chars
+            path,
+            max_chars=max_chars,
+            overlap_chars=overlap_chars,
+            min_body_chars=min_body_chars,
+            skip_sections=skip_sections,
         )
     elif file_type == "text":
         try:

@@ -136,6 +136,8 @@ def _load_chunks_sync(snap: DocSnapshot, settings: Settings):
         snap.file_type,
         max_chars=settings.rag_chunk_max_chars,
         overlap_chars=settings.rag_chunk_overlap_chars,
+        min_body_chars=settings.rag_chunk_min_body_chars,
+        skip_sections=settings.rag_skipped_sections,
     )
 
 

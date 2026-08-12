@@ -22,6 +22,15 @@ def docx_file(tmp_path_factory):
     doc = Document()
     doc.add_heading("Leave Policy", level=1)
     doc.add_paragraph("Annual leave accrues monthly for all permanent staff.")
+    # A second paragraph in the SAME section: without it, every heading in this
+    # fixture guards exactly one body block, so there is never a second block
+    # for merge_blocks to join and test_docling_output_is_merged_not_fragmented
+    # could not distinguish "merges correctly" from "never merges".
+    doc.add_paragraph(
+        "Requests must be submitted at least two weeks in advance through the "
+        "HR portal, and managers should confirm coverage before approving any "
+        "leave that would leave a team short-staffed during a critical period."
+    )
     doc.add_heading("Carry Over", level=2)
     doc.add_paragraph("Up to five days may be carried into the next year.")
     path = tmp_path_factory.mktemp("docling") / "policy.docx"
@@ -142,3 +151,47 @@ def test_a_non_document_file_raises_parse_error(tmp_path):
     bad.write_bytes(b"definitely not a pdf")
     with pytest.raises(ParseError):
         parse_to_chunks(bad, "pdf", **OPTS)
+
+
+@pytest.fixture(scope="module")
+def docx_toc_file(tmp_path_factory):
+    """A document whose front matter looks exactly like the real failure: a
+    Table of Contents listing headings, then the real chapter."""
+    from docx import Document
+
+    doc = Document()
+    doc.add_heading("Table of Contents", level=1)
+    for line in (
+        "4.1 Investment in Government Securities    12",
+        "4.7 Other Investments    20",
+        "5.2.5 Assurance of Investment Limits    24",
+    ):
+        doc.add_paragraph(line)
+    doc.add_heading("Chapter 4: Investment Products", level=1)
+    doc.add_paragraph(
+        "The Bank may invest in permitted shares, debentures and bonds of "
+        "institutions approved by the Board, subject to the single-obligor "
+        "limits set out in Chapter 5. Each proposal is assessed for credit "
+        "quality, tenor and liquidity before any commitment is made."
+    )
+    path = tmp_path_factory.mktemp("docling_toc") / "policy_toc.docx"
+    doc.save(path)
+    return path
+
+
+def test_docling_output_is_merged_not_fragmented(docx_file):
+    """The regression this whole change exists for: one chunk per layout
+    element gave 181-char average chunks."""
+    chunks = parse_to_chunks(docx_file, "docx", **OPTS)
+    bodies = [len(c.content) - len(c.section or "") for c in chunks]
+    assert max(bodies) > 200, f"still fragmented: {bodies}"
+
+
+def test_front_matter_is_not_indexed(docx_toc_file):
+    chunks = parse_to_chunks(
+        docx_toc_file, "docx",
+        max_chars=2000, overlap_chars=200,
+        skip_sections={"table of contents"},
+    )
+    assert all("Table of Contents" not in (c.section or "") for c in chunks)
+    assert chunks, "the real content should survive"
