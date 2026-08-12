@@ -145,3 +145,22 @@ def test_descriptions_route_attached_documents_to_read_document():
 
     # and the corpus tool keeps pointing spreadsheet totals elsewhere
     assert "aggregate_excel" in search_department_docs.SPEC.description
+
+
+def test_attachment_note_routes_documents_to_read_document_not_read_excel():
+    """The regression this locks: the attachment note that precedes the user's
+    message is the STRONGEST routing signal in context (it names the file ids
+    right before the request), so if it only ever says "read them with
+    inspect_excel / read_excel" a model will reach for read_excel on an
+    attached .pdf/.txt/.md — for .txt/.md that SILENTLY produces corrupted
+    content (first line eaten as a CSV header, mid-sentence commas split into
+    columns) rather than erroring. Asserting on SPEC.description alone (as the
+    test above does) missed this for eight per-task reviews because the note
+    text lives in a different module."""
+    from app.history.repository import format_attachment_note
+
+    note = format_attachment_note([
+        {"id": "f1", "filename": "policy.pdf", "summary": "PDF, 3 pages, 40 lines"},
+        {"id": "f2", "filename": "book.xlsx", "summary": "Excel, 1 sheet, 10 rows"},
+    ])
+    assert "read_document" in note

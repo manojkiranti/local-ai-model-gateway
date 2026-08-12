@@ -51,8 +51,9 @@ def format_attachment_note(attachments: list[dict[str, Any]], *, active: bool = 
             lines.append(f'- id={a.get("id", "")} "{a.get("filename", "")}"')
         return "\n".join(lines)
 
-    lines = ["Active files for the current request (read them with inspect_excel "
-             "/ read_excel, total them with aggregate_excel):"]
+    lines = ["Active files for the current request (read documents with "
+             "read_document; for spreadsheets use inspect_excel / read_excel, "
+             "and total them with aggregate_excel):"]
     for a in attachments:
         fid = a.get("id", "")
         name = a.get("filename", "")
