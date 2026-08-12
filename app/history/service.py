@@ -102,8 +102,16 @@ async def open_turn(
     await session.commit()  # user message persisted immediately
 
     if attachments:
+        # ROLE MATTERS, and it is not cosmetic: measured against qwen3.5:35b-a3b
+        # with the 16 tool schemas loaded, a `system` note produced a tool call
+        # 3/12 times versus 12/12 as `user`. The model READS a system note fine
+        # (asked directly, it returns the id every time) but treats it as
+        # background rather than something to act on, and asks the user for an id
+        # it already has. Stronger imperative wording barely moved it (2/6) —
+        # only the role did. See build_context_messages, which replays notes for
+        # the same reason.
         context.append(
-            {"role": "system", "content": repo.format_attachment_note(attachments)}
+            {"role": "user", "content": repo.format_attachment_note(attachments)}
         )
     context.append({"role": "user", "content": message})
     return chat_session, context, dept_ctx

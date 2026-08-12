@@ -35,8 +35,10 @@ def make_title(first_message: str) -> str:
 
 
 def format_attachment_note(attachments: list[dict[str, Any]], *, active: bool = True) -> str:
-    """A short system note naming files attached to a user message, so the model
-    knows their ids and can call inspect_excel/read_excel. Pure/formatting only.
+    """A short note naming files attached to a user message, so the model knows
+    their ids and can call read_document / inspect_excel / read_excel on them.
+    Pure/formatting only — the caller decides the role it is emitted under (see
+    `build_context_messages` and `service.open_turn`; both use `user`).
 
     `active=False` marks a SUPERSEDED set — files attached earlier in the
     conversation that a newer upload has replaced. Those are deliberately weaker:
@@ -89,8 +91,11 @@ def build_context_messages(
     out: list[dict[str, str]] = []
     for i, m in enumerate(messages):
         if m.role == ROLE_USER and m.attachments:
+            # `user`, not `system` — see the measurement in service.open_turn. A
+            # system-role note is read but not acted on once tool schemas are in
+            # play, so the model asks for a file id it was already given.
             out.append({
-                "role": "system",
+                "role": "user",
                 "content": format_attachment_note(m.attachments, active=(i == active_idx)),
             })
         out.append({"role": m.role, "content": m.content})

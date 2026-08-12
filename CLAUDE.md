@@ -231,11 +231,20 @@ events (`token`/`tool_call`/`tool_result`/`done`) + the new id in the
   replays older sets with superseded wording and no summary; a turn that carries
   its own upload passes `pending_attachments=True` so every replayed set is
   demoted and only `open_turn`'s appended note is active. Identical notes per
-  upload made a second file get ignored in favour of the first. Related: the
-  agent's `SYSTEM_PROMPT` is now **always** message 0 — the old
+  upload made a second file get ignored in favour of the first.
+- **The attachment note is a `user` message, and that is load-bearing.**
+  Measured against `qwen3.5:35b-a3b` with the 16 tool schemas loaded, the same
+  note produced a tool call **3/12** times as `system` vs **12/12** as `user`.
+  The model *reads* a system note fine (asked directly, it returns the id every
+  time) but won't ACT on it once tools are in play — it asks the user for a
+  file id it was already handed, which reads as "the assistant ignored my PDF".
+  Stronger imperative wording barely helped (2/6); only the role did. Both
+  emitters (`service.open_turn`, `repository.build_context_messages`) use
+  `user`; `test_attachment_note_is_a_user_message_not_a_system_one` locks it.
+  Related, and the reason this was easy to get wrong: the agent's
+  `SYSTEM_PROMPT` is now **always** message 0 — the old
   `base_messages[0].role != "system"` guard silently dropped it for any session
-  that began with a file upload, since the attachment note is itself a system
-  message.
+  that began with a file upload, back when the note was a system message.
 - **`aggregate_excel` is the correct tool for ANY total** — sum/avg/min/max/count
   with an optional one-level `group_by` and AND-only filters, computed over
   EVERY row via `readers.open_sheet_rows` (uncapped streaming context manager,
