@@ -151,7 +151,9 @@ def test_upload_csv_ok():
 def test_upload_bad_extension_rejected():
     with TestClient(app) as client:
         owner = _auth(client, OWNER)
-        up = _upload(client, owner, "notes.txt", b"hello", "text/plain")
+        # .rtf, not .txt: .txt became a supported document format when
+        # read_document landed. .rtf is still outside the allowlist.
+        up = _upload(client, owner, "notes.rtf", b"{\\rtf1}", "application/rtf")
         assert up.status_code == 400
 
 

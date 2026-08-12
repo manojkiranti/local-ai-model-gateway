@@ -13,7 +13,7 @@ import asyncio
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..files import readers
+from ..files import ingest, readers
 from ..files import repository as files_repo
 from ..rag.access import resolve_department
 from ..rag.context import DepartmentContext
@@ -36,7 +36,7 @@ async def _resolve_attachments(
         if row is None:
             raise HTTPException(status_code=404, detail=f"attached file not found: {fid}")
         try:
-            summary = await asyncio.to_thread(readers.summarize, row.path)
+            summary = await asyncio.to_thread(ingest.summarize, row.path)
             summary_text = summary.text()
         except readers.ReadError:
             summary_text = ""  # still attach it; the read tool will report the error

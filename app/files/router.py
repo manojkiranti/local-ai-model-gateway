@@ -1,5 +1,5 @@
 """Generated- and uploaded-file routes (authed):
-  POST /v1/files       — upload a spreadsheet (.xlsx/.csv) the model can read
+  POST /v1/files       — upload a file the model can read (spreadsheet or document)
   GET  /v1/files       — the caller's files, newest first (the "my files" list)
   GET  /v1/files/{id}  — download one file the caller owns
   DELETE /v1/files/{id} — delete one file the caller owns
@@ -14,6 +14,7 @@ frontend fetches these with the bearer token and turns the response into a blob
 URL for download / listing.
 """
 
+import asyncio
 import os
 import zipfile
 from datetime import datetime
@@ -38,14 +39,11 @@ from ..auth.dependencies import get_current_user
 from ..config import get_settings
 from ..db.session import get_session
 from ..users.models import User
-from . import readers, repository as repo
-from .store import CSV_MEDIA_TYPE, XLSX_MEDIA_TYPE, file_store
+from . import ingest, readers, repository as repo
+from .store import file_store
 
 router = APIRouter(prefix="/v1", tags=["files"])
 
-# Upload allowlist: extension -> stored media type. `.xlsm` (macro-enabled) is
-# deliberately absent.
-_UPLOAD_TYPES = {".xlsx": XLSX_MEDIA_TYPE, ".csv": CSV_MEDIA_TYPE}
 _CHUNK = 64 * 1024
 
 
@@ -68,7 +66,7 @@ class UploadResponse(BaseModel):
     media_type: str
     size: int
     source: str
-    summary: dict  # {kind, sheets:[{name,rows,cols,headers}], total_rows}
+    summary: dict  # spreadsheet: {kind, sheets, total_rows} | document: {kind, lines, chars, pages, text_pages}
 
 
 def _reject(path: Optional[Path], code: int, detail: str) -> HTTPException:
@@ -85,9 +83,9 @@ def _reject(path: Optional[Path], code: int, detail: str) -> HTTPException:
     "/files",
     response_model=UploadResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Upload a spreadsheet (.xlsx/.csv) the model can read",
+    summary="Upload a file the model can read (.xlsx/.csv/.pdf/.docx/.txt/.md/.json)",
     responses={
-        400: {"description": "Bad extension, corrupt file, or zip-bomb."},
+        400: {"description": "Bad extension, corrupt/encrypted file, or zip-bomb."},
         401: {"description": "Missing/invalid JWT."},
         413: {"description": "File exceeds the size limit."},
     },
@@ -100,8 +98,12 @@ async def upload_file(
     settings = get_settings()
     # 1) extension allowlist (cheap, before touching disk)
     ext = Path(file.filename or "").suffix.lower()
-    if ext not in _UPLOAD_TYPES:
-        raise _reject(None, 400, "only .xlsx and .csv files are accepted")
+    if ext not in ingest.UPLOAD_TYPES:
+        raise _reject(
+            None,
+            400,
+            "only .xlsx, .csv, .pdf, .docx, .txt, .md and .json files are accepted",
+        )
 
     # 2) stream to the owner's folder under a UUID name, counting bytes (413 cap)
     file_id = uuid4().hex
@@ -127,21 +129,23 @@ async def upload_file(
     if size == 0:
         raise _reject(dest, 400, "uploaded file is empty")
 
-    # 3) xlsx zip-bomb guard: refuse absurd uncompressed expansion
-    if ext == ".xlsx":
+    # 3) zip-bomb guard for the OOXML formats: refuse absurd expansion
+    if ext in (".xlsx", ".docx"):
         try:
             with zipfile.ZipFile(dest) as zf:
                 uncompressed = sum(i.file_size for i in zf.infolist())
         except zipfile.BadZipFile:
-            raise _reject(dest, 400, "file is not a valid .xlsx workbook")
+            raise _reject(dest, 400, f"file is not a valid {ext} document")
         if uncompressed > settings.upload_xlsx_max_uncompressed:
-            raise _reject(dest, 400, "spreadsheet expands too large to process safely")
+            raise _reject(dest, 400, "file expands too large to process safely")
 
-    # 4) parse check + summary (never evaluates formulas). Bad file -> unlink+400.
+    # 4) parse check + summary. Never evaluates formulas; never OCRs. A scanned
+    # PDF passes here deliberately — it is a valid file, and read_document is
+    # where the user is told it has no text layer. Bad file -> unlink + 400.
     try:
-        summary = readers.summarize(dest)
+        summary = await asyncio.to_thread(ingest.summarize, dest)
     except readers.ReadError as exc:
-        raise _reject(dest, 400, f"could not read the spreadsheet ({exc})")
+        raise _reject(dest, 400, f"could not read the file ({exc})")
 
     # 5) durable owned row, source='uploaded'
     await repo.record_file(
@@ -149,7 +153,7 @@ async def upload_file(
         id=file_id,
         user_id=user.id,
         filename=file.filename,
-        media_type=_UPLOAD_TYPES[ext],
+        media_type=ingest.UPLOAD_TYPES[ext],
         size=size,
         path=str(dest),
         source="uploaded",
@@ -159,7 +163,7 @@ async def upload_file(
     return UploadResponse(
         id=file_id,
         filename=file.filename,
-        media_type=_UPLOAD_TYPES[ext],
+        media_type=ingest.UPLOAD_TYPES[ext],
         size=size,
         source="uploaded",
         summary=summary.as_dict(),
