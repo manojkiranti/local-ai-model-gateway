@@ -138,6 +138,17 @@ def test_corrupt_docx_raises_read_error(tmp_path):
         documents.read_lines(p)
 
 
+def test_missing_docx_raises_read_error_without_leaking_the_path(tmp_path):
+    """A missing .docx file must raise ReadError with a clean message that
+    doesn't leak the absolute storage path or user id into model context."""
+    p = tmp_path / "gone.docx"  # never written
+    with pytest.raises(ReadError) as excinfo:
+        documents.read_lines(p)
+    error_msg = str(excinfo.value)
+    assert str(p) not in error_msg
+    assert "could not read the Word document" in error_msg
+
+
 def test_docx_failure_during_block_walk_raises_read_error_not_raw(tmp_path, monkeypatch):
     """Finding 6: a well-formed zip that parses fine at `Document()` can still
     raise while WALKING its blocks (or reading `.rows`/`cell.text`) if the
@@ -263,6 +274,17 @@ def test_corrupt_pdf_raises_read_error(tmp_path):
     p = _write_bytes(tmp_path, "broken.pdf", b"%PDF-1.4\nthis is not a pdf body")
     with pytest.raises(ReadError):
         documents.read_lines(p)
+
+
+def test_missing_pdf_raises_read_error_without_leaking_the_path(tmp_path):
+    """A missing .pdf file must raise ReadError with a clean message that
+    doesn't leak the absolute storage path or user id into model context."""
+    p = tmp_path / "gone.pdf"  # never written
+    with pytest.raises(ReadError) as excinfo:
+        documents.read_lines(p)
+    error_msg = str(excinfo.value)
+    assert str(p) not in error_msg
+    assert "could not read the PDF" in error_msg
 
 
 def test_pdf_extraction_failure_logs_and_falls_back_to_scanned_marker(tmp_path, monkeypatch, caplog):

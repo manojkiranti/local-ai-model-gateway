@@ -131,7 +131,13 @@ def _read_docx(path: Path) -> DocumentText:
             style = getattr(getattr(block, "style", None), "name", "") or ""
             lines.append(f"# {text}" if style.startswith("Heading") and text else text)
     except Exception as exc:  # noqa: BLE001 - any docx/zip/XML failure is a ReadError
-        raise ReadError(f"could not read the Word document: {exc}") from exc
+        # Use exc.strerror if it is an OSError, otherwise use the exception type
+        # name. Don't use str(exc) — it may embed the absolute path or user id.
+        if isinstance(exc, OSError):
+            msg = exc.strerror or 'I/O error'
+        else:
+            msg = type(exc).__name__
+        raise ReadError(f"could not read the Word document: {msg}") from exc
     return DocumentText(kind="Word document", lines=lines)
 
 
@@ -159,7 +165,13 @@ def _read_pdf(path: Path) -> DocumentText:
     except EncryptedDocument:
         raise
     except Exception as exc:  # noqa: BLE001 - no pypdf exception escapes this module
-        raise ReadError(f"could not read the PDF: {exc}") from exc
+        # Use exc.strerror if it is an OSError, otherwise use the exception type
+        # name. Don't use str(exc) — it may embed the absolute path or user id.
+        if isinstance(exc, OSError):
+            msg = exc.strerror or 'I/O error'
+        else:
+            msg = type(exc).__name__
+        raise ReadError(f"could not read the PDF: {msg}") from exc
 
     limit = min(total, MAX_PDF_PAGES)
     lines: list[str] = []
@@ -167,7 +179,7 @@ def _read_pdf(path: Path) -> DocumentText:
     for index in range(limit):
         try:
             raw = reader.pages[index].extract_text() or ""
-        except Exception as exc:  # noqa: BLE001 - exception is now logged, per-page failure doesn't kill the document
+        except Exception as exc:  # noqa: BLE001 - exception is logged; per-page failure doesn't kill document
             logger.warning(f"PDF page {index + 1} extraction failed: {exc}")
             raw = ""
         page_lines = [ln.rstrip() for ln in raw.splitlines() if ln.strip()]
