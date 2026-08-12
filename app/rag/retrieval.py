@@ -66,6 +66,8 @@ fused AS (
     SELECT COALESCE(d.id, l.id) AS id,
            d.distance      AS dense_distance,
            l.lexical_score AS lexical_score,
+           d.rank          AS dense_rank,
+           l.rank          AS lexical_rank,
            COALESCE(1.0 / (:rrf_k + d.rank), 0)
          + COALESCE(1.0 / (:rrf_k + l.rank), 0) AS rrf_score
       FROM dense d
@@ -80,7 +82,9 @@ SELECT c.id            AS chunk_id,
        c.element_type  AS element_type,
        fused.rrf_score      AS rrf_score,
        fused.dense_distance AS dense_distance,
-       fused.lexical_score  AS lexical_score
+       fused.lexical_score  AS lexical_score,
+       fused.dense_rank     AS dense_rank,
+       fused.lexical_rank   AS lexical_rank
   FROM fused
   JOIN document_chunks c ON c.id = fused.id
   JOIN documents doc     ON doc.id = c.document_id
@@ -109,6 +113,12 @@ class RetrievedChunk:
     # corpus-independent meaning and ts_rank_cd is unnormalized.
     dense_distance: float | None
     lexical_score: float | None
+    # Which rank each channel gave this chunk, or None if that channel did not
+    # return it at all. Diagnostics only — never rendered into the tool result.
+    # These make a bad retrieval attributable to a channel from stored data
+    # instead of a hand-built reproduction.
+    dense_rank: int | None
+    lexical_rank: int | None
 
 
 def _vector_literal(vector: list[float]) -> str:
@@ -172,6 +182,10 @@ async def search_chunks(
             ),
             lexical_score=(
                 None if r["lexical_score"] is None else float(r["lexical_score"])
+            ),
+            dense_rank=(None if r["dense_rank"] is None else int(r["dense_rank"])),
+            lexical_rank=(
+                None if r["lexical_rank"] is None else int(r["lexical_rank"])
             ),
         )
         for r in rows

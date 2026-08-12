@@ -217,3 +217,36 @@ def test_a_stopword_only_query_does_not_raise(corpus):
 def test_punctuation_heavy_query_does_not_raise(corpus):
     """to_tsquery would throw on this; websearch_to_tsquery must not."""
     assert _search(corpus["hr"], "what is the & leave || policy ???", _unit(0)) is not None
+
+
+def test_results_carry_the_rank_from_each_channel(corpus):
+    """Diagnostics: when retrieval returns the wrong passage, these say WHICH
+    channel surfaced it. Both ranks are already computed to drive RRF; before
+    this they were never selected out, so diagnosing a bad result meant
+    reproducing the query by hand."""
+    rows = _search(corpus["hr"], "annual leave", _unit(0))
+    assert rows
+    for r in rows:
+        # RRF only returns a row if at least one channel found it.
+        assert r.dense_rank is not None or r.lexical_rank is not None
+        assert r.dense_rank is None or r.dense_rank >= 1
+        assert r.lexical_rank is None or r.lexical_rank >= 1
+
+
+def test_a_chunk_only_one_channel_found_has_none_for_the_other(corpus):
+    """A dense-only hit (no lexical overlap) must not be reported as if the
+    lexical channel ranked it too — that would make the diagnostics lie about
+    attribution. Reuses the same scenario as
+    test_dense_channel_finds_a_chunk_with_no_lexical_overlap, which guarantees
+    at least one genuinely dense-only row, so this isn't a vacuous check."""
+    hits = _search(corpus["hr"], "zzzznomatchterm", _unit(9))
+    dense_only = [h for h in hits if h.lexical_score is None]
+    assert dense_only  # the parking chunk has no lexical overlap with the query
+    for h in dense_only:
+        assert h.dense_rank is not None
+        assert h.lexical_rank is None
+    for r in hits:
+        if r.lexical_score is None:
+            assert r.lexical_rank is None
+        if r.dense_distance is None:
+            assert r.dense_rank is None

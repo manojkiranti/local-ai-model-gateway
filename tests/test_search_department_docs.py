@@ -23,6 +23,7 @@ def _chunk(i, body="Annual leave accrues monthly.", page=3, title="HR Leave Poli
         chunk_id=i, document_id=f"doc{i}", title=title, content=body,
         page_number=page, section="Leave Policy > Annual", element_type="text",
         rrf_score=1.0 / (60 + i + 1), dense_distance=0.2, lexical_score=0.5,
+        dense_rank=i, lexical_rank=i,
     )
 
 
