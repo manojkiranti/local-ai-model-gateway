@@ -13,11 +13,14 @@ Caps on how much reaches the model live in the tool, not here.
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
 from .readers import ReadError
+
+logger = logging.getLogger("app.files")
 
 DOCUMENT_EXTS = {".pdf", ".docx", ".txt", ".md", ".json"}
 
@@ -139,7 +142,8 @@ def _read_pdf(path: Path) -> DocumentText:
     for index in range(limit):
         try:
             raw = reader.pages[index].extract_text() or ""
-        except Exception:  # noqa: BLE001 - one bad page must not kill the document
+        except Exception as exc:  # noqa: BLE001 - exception is now logged, per-page failure doesn't kill the document
+            logger.warning(f"PDF page {index + 1} extraction failed: {exc}")
             raw = ""
         page_lines = [ln.rstrip() for ln in raw.splitlines() if ln.strip()]
         if page_lines:

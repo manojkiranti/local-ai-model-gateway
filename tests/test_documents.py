@@ -209,3 +209,41 @@ def test_corrupt_pdf_raises_read_error(tmp_path):
     p = _write_bytes(tmp_path, "broken.pdf", b"%PDF-1.4\nthis is not a pdf body")
     with pytest.raises(ReadError):
         documents.read_lines(p)
+
+
+def test_pdf_extraction_failure_logs_and_falls_back_to_scanned_marker(tmp_path, monkeypatch, caplog):
+    """Extract_text failure is logged but doesn't kill the document."""
+    import logging
+
+    # Create a real PDF with two readable pages
+    p = _write_bytes(tmp_path, "a.pdf", _text_pdf_bytes(["Page one", "Page two"]))
+
+    # Monkey-patch extract_text at the pypdf module level to fail on page 2 (index 1)
+    from pypdf import PageObject
+
+    original_extract_text = PageObject.extract_text
+    call_count = [0]
+
+    def failing_extract_text(self):
+        idx = call_count[0]
+        call_count[0] += 1
+        if idx == 1:  # Fail on page 2
+            raise ValueError("Simulated pypdf extraction failure")
+        return original_extract_text(self)
+
+    monkeypatch.setattr(PageObject, "extract_text", failing_extract_text)
+
+    # Capture warnings
+    with caplog.at_level(logging.WARNING):
+        doc = documents.read_lines(p)
+
+    # Assert the document still parsed
+    assert doc.kind == "PDF"
+    assert doc.pages == 2
+    assert doc.text_pages == 1  # Only page 1 had extractable text
+
+    # Assert page 2 got the scanned-image marker
+    assert "[page 2] (no extractable text — likely a scanned image)" in doc.lines
+
+    # Assert the warning was logged
+    assert any("page 2 extraction failed" in record.message for record in caplog.records)
