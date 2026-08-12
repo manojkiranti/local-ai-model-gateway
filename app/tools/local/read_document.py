@@ -36,12 +36,19 @@ DOC_MAX_CHARS = MODEL_RESULT_CAP - HEADER_BUDGET  # 7600
 
 def _window(
     lines: list[str], start_line: int, max_lines: Optional[int]
-) -> tuple[list[str], int, bool]:
-    """Return (window, last_line_number, truncated).
+) -> tuple[list[str], int, bool, Optional[tuple[int, int]]]:
+    """Return (window, last_line_number, truncated, hard_cut).
 
     Truncation is on WHOLE lines: a line that would cross the budget is dropped
     entirely, so `last_line_number` is exactly what the model received and
     `last_line_number + 1` is exactly where it should resume.
+
+    `hard_cut` is `(line_number, original_length)` when a single line longer
+    than the ENTIRE character budget had to be cut mid-line, else `None`. That
+    case is invisible to `truncated` when it is also the LAST line in the
+    document: there is no next line to resume at, so `last < len(lines)` is
+    False even though real content was dropped. The caller uses `hard_cut` to
+    say so regardless of `truncated`.
     """
     start = max(1, start_line)
     index = start - 1
@@ -52,12 +59,14 @@ def _window(
 
     out: list[str] = []
     used = 0
-    for line in selected:
+    hard_cut: Optional[tuple[int, int]] = None
+    for offset, line in enumerate(selected):
         cost = len(line) + 1  # + the newline that joins it
         if not out and cost > DOC_MAX_CHARS:
             # A single line longer than the entire budget. Emit it alone and
             # hard-cut, or the reader could never make progress past it.
             out.append(line[:DOC_MAX_CHARS] + " …[long line truncated]")
+            hard_cut = (index + offset + 1, len(line))
             break
         if used + cost > DOC_MAX_CHARS:
             break
@@ -65,21 +74,41 @@ def _window(
         used += cost
 
     last = index + len(out)
-    return out, last, last < len(lines)
+    return out, last, last < len(lines), hard_cut
 
 
-def _header(doc: documents.DocumentText, start: int, last: int, truncated: bool) -> list[str]:
+def _header(
+    doc: documents.DocumentText,
+    start: int,
+    last: int,
+    truncated: bool,
+    hard_cut: Optional[tuple[int, int]],
+) -> list[str]:
     total = len(doc.lines)
+    line_word = "line" if total == 1 else "lines"
     if doc.pages is not None:
         page_word = "page" if doc.pages == 1 else "pages"
         head = (
-            f"{doc.kind}, {doc.pages} {page_word}, {total} lines — "
+            f"{doc.kind}, {doc.pages} {page_word}, {total} {line_word} — "
             f"showing lines {start}–{last} of {total}."
         )
     else:
-        head = f"{doc.kind}, {total} lines — showing lines {start}–{last} of {total}."
+        head = f"{doc.kind}, {total} {line_word} — showing lines {start}–{last} of {total}."
     out = [head]
 
+    if hard_cut is not None:
+        # This can fire even when `truncated` is False (the cut line was the
+        # LAST line in the document, so there is nothing to resume at) — that
+        # is exactly the case a trailing "…[long line truncated]" suffix at
+        # the very end of the body cannot announce: metadata leads so a
+        # truthful signal reaches the model even if the body itself gets cut
+        # by agent/loop.py's own end-of-result truncation.
+        line_no, length = hard_cut
+        out.append(
+            f"NOTE: line {line_no} is {length} characters, longer than the "
+            f"{DOC_MAX_CHARS}-character read budget — it was hard-cut, and the "
+            f"rest of that line is NOT retrievable by paging."
+        )
     if truncated:
         out.append(
             f"TRUNCATED: call read_document again with start_line={last + 1} to continue."
@@ -145,8 +174,8 @@ async def _read_document(args: dict[str, Any]) -> str:
             f"has {len(doc.lines)} lines."
         )
 
-    window, last, truncated = _window(doc.lines, start_line, max_lines)
-    header = _header(doc, max(1, start_line), last, truncated)
+    window, last, truncated, hard_cut = _window(doc.lines, start_line, max_lines)
+    header = _header(doc, max(1, start_line), last, truncated, hard_cut)
     return "\n".join(header + [""] + window)
 
 

@@ -204,7 +204,14 @@ def test_our_budget_stays_under_the_agent_loops_cap():
 def test_overlong_single_line_is_hard_cut_and_continuation_is_exact():
     """A single line longer than the whole char budget must still let the
     reader make progress: emitted alone, hard-cut, and the reported next
-    start_line must be exactly the line after it — no skip, no repeat."""
+    start_line must be exactly the line after it — no skip, no repeat.
+
+    The header must ALSO name the hard-cut inline (Finding 3): a bare
+    "…[long line truncated]" suffix at the very end of the body is exactly the
+    position `agent/loop.py`'s own end-of-result cut can eat, and the design's
+    whole premise is that metadata leading the result is the only trustworthy
+    signal of truncation.
+    """
     long_line = "y" * (read_document.DOC_MAX_CHARS + 500)
     body = f"{long_line}\nnext line"
     fid = _save(body.encode(), "long.txt")
@@ -213,9 +220,14 @@ def test_overlong_single_line_is_hard_cut_and_continuation_is_exact():
     assert len(out) <= read_document.MODEL_RESULT_CAP
 
     lines = out.splitlines()
-    header, note = lines[0], lines[1]
-    body_lines = [ln for ln in lines[2:] if ln]
+    header, hard_cut_note, note = lines[0], lines[1], lines[2]
+    body_lines = [ln for ln in lines[3:] if ln]
     assert header == "Text file, 2 lines — showing lines 1–1 of 2."
+    assert hard_cut_note == (
+        f"NOTE: line 1 is {len(long_line)} characters, longer than the "
+        f"{read_document.DOC_MAX_CHARS}-character read budget — it was "
+        f"hard-cut, and the rest of that line is NOT retrievable by paging."
+    )
     assert note == "TRUNCATED: call read_document again with start_line=2 to continue."
     # the over-long line is emitted alone, hard-cut with the truncation suffix
     assert len(body_lines) == 1
@@ -228,6 +240,28 @@ def test_overlong_single_line_is_hard_cut_and_continuation_is_exact():
     assert next_start == 2
     second = _read({"file_id": fid, "start_line": next_start})
     assert second == "Text file, 2 lines — showing lines 2–2 of 2.\n\nnext line"
+
+
+def test_single_overlong_line_announces_hard_cut_even_when_not_truncated():
+    """The exact repro from the finding: a document that is ONE line, longer
+    than the whole char budget. `truncated` is False (there is no next line to
+    resume at — last(1) < total(1) is False), so before this fix the header
+    read as a complete 1-line document while ~42k characters were silently
+    dropped, with the only signal being the trailing inline suffix at the very
+    END of the body — the position the design says is untrustworthy. Also
+    exercises the singular "1 line" fix (Finding 4)."""
+    long_line = "x" * 50_000
+    fid = _save(long_line.encode(), "huge.txt")
+
+    out = _read({"file_id": fid})
+    lines = out.splitlines()
+    assert lines[0] == "Text file, 1 line — showing lines 1–1 of 1."
+    assert "TRUNCATED" not in lines[1]  # nothing to resume — this was the only line
+    assert lines[1] == (
+        f"NOTE: line 1 is {len(long_line)} characters, longer than the "
+        f"{read_document.DOC_MAX_CHARS}-character read budget — it was "
+        f"hard-cut, and the rest of that line is NOT retrievable by paging."
+    )
 
 
 def _verbose_then_scanned_pdf_over_page_cap(tmp_path) -> bytes:
