@@ -4,7 +4,7 @@ import dataclasses
 
 import pytest
 
-from app.rag.chunking import Chunk, chunk_table, chunk_text, renumber
+from app.rag.chunking import Block, Chunk, chunk_table, chunk_text, merge_blocks, renumber
 
 
 def test_short_text_is_one_chunk():
@@ -100,3 +100,71 @@ def test_chunk_is_immutable():
     c = Chunk(content="x", chunk_index=0)
     with pytest.raises(dataclasses.FrozenInstanceError):
         c.content = "y"
+
+
+def _b(text, section="S1", page=None, kind="text"):
+    return Block(text=text, section=section, page_number=page, element_type=kind)
+
+
+def test_merge_joins_consecutive_blocks_in_the_same_section():
+    out = merge_blocks([_b("alpha"), _b("beta"), _b("gamma")], max_chars=2000)
+    assert len(out) == 1
+    assert out[0].text == "alpha\nbeta\ngamma"
+    assert out[0].section == "S1"
+
+
+def test_merge_flushes_when_the_heading_path_changes():
+    out = merge_blocks([_b("a", "S1"), _b("b", "S2")], max_chars=2000)
+    assert [c.text for c in out] == ["a", "b"]
+    assert [c.section for c in out] == ["S1", "S2"]
+
+
+def test_merge_flushes_when_the_page_changes():
+    """page_number is citation-bearing — search_department_docs renders it into
+    the citation the model is told to cite, so a merged block must not span
+    pages or it attributes a clause to a page it is not on."""
+    out = merge_blocks([_b("a", page=1), _b("b", page=2)], max_chars=2000)
+    assert [c.text for c in out] == ["a", "b"]
+    assert [c.page_number for c in out] == [1, 2]
+
+
+def test_merge_does_not_flush_when_every_page_is_none():
+    """The DOCX case: a .docx has no fixed pages, so Docling gives no page_no.
+    If None-vs-None counted as a change, every DOCX block would flush and
+    merging would do nothing at all."""
+    out = merge_blocks([_b("a"), _b("b"), _b("c")], max_chars=2000)
+    assert len(out) == 1
+
+
+def test_merge_flushes_at_max_chars():
+    out = merge_blocks([_b("x" * 60), _b("y" * 60)], max_chars=100)
+    assert [len(c.text) for c in out] == [60, 60]
+
+
+def test_a_table_stands_alone_and_forces_a_flush():
+    out = merge_blocks(
+        [_b("intro"), _b("| a | b |", kind="table"), _b("outro")], max_chars=2000
+    )
+    assert [c.text for c in out] == ["intro", "| a | b |", "outro"]
+    assert out[1].element_type == "table"
+
+
+def test_merge_skips_blank_blocks():
+    out = merge_blocks([_b("a"), _b("   "), _b("b")], max_chars=2000)
+    assert len(out) == 1
+    assert out[0].text == "a\nb"
+
+
+def test_merged_block_keeps_the_first_blocks_metadata():
+    out = merge_blocks([_b("a", "S1", 3), _b("b", "S1", 3)], max_chars=2000)
+    assert (out[0].section, out[0].page_number, out[0].element_type) == ("S1", 3, "text")
+
+
+def test_a_block_longer_than_max_chars_survives_whole():
+    """chunk_text splits it downstream; merge must not drop it."""
+    out = merge_blocks([_b("x" * 500)], max_chars=100)
+    assert len(out) == 1 and len(out[0].text) == 500
+
+
+def test_merge_of_nothing_is_nothing():
+    assert merge_blocks([], max_chars=2000) == []

@@ -28,6 +28,21 @@ class Chunk:
     token_count: int | None = None
 
 
+@dataclass(frozen=True)
+class Block:
+    """One parsed element BEFORE it becomes a Chunk.
+
+    Docling emits a Block per layout element — a heading, a list bullet, a
+    stray page number. `merge_blocks` is what turns a run of those back into a
+    passage.
+    """
+
+    text: str
+    section: str | None = None
+    page_number: int | None = None
+    element_type: str = "text"
+
+
 def _split_point(text: str, limit: int) -> int:
     """Best boundary at or before `limit`: paragraph, then sentence, then word."""
     window = text[:limit]
@@ -128,3 +143,49 @@ def renumber(chunks: Sequence[Chunk]) -> list[Chunk]:
     """Make `chunk_index` contiguous from 0 across concatenated groups —
     `uq_document_chunks_doc_index` requires uniqueness per document."""
     return [replace(c, chunk_index=i) for i, c in enumerate(chunks)]
+
+
+def merge_blocks(blocks: Sequence[Block], *, max_chars: int) -> list[Block]:
+    """Join consecutive blocks that belong to the same passage.
+
+    Without this, chunking one Docling element at a time produced 559 chunks
+    averaging 181 characters for a single policy document — half of them under
+    60 — so real prose was buried under fragments and `max_chars` never meant
+    anything. Measured 2026-08-12; see the design spec.
+
+    Flushes when the passage's identity changes (`section` or `page_number`),
+    when a table is involved, or when the budget would be exceeded.
+    """
+    merged: list[Block] = []
+    buffer: list[Block] = []
+
+    def flush() -> None:
+        nonlocal buffer
+        if buffer:
+            merged.append(
+                replace(buffer[0], text="\n".join(b.text for b in buffer))
+            )
+            buffer = []
+
+    for block in blocks:
+        if not block.text.strip():
+            continue
+        # A table stands alone: a markdown grid spliced into surrounding
+        # sentences is unreadable to the model AND to the lexical channel.
+        if block.element_type == "table":
+            flush()
+            merged.append(block)
+            continue
+        if buffer:
+            head = buffer[0]
+            size = sum(len(b.text) + 1 for b in buffer)
+            if (
+                block.section != head.section
+                or block.page_number != head.page_number
+                or size + len(block.text) + 1 > max_chars
+            ):
+                flush()
+        buffer.append(block)
+
+    flush()
+    return merged
