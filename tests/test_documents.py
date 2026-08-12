@@ -279,3 +279,35 @@ def test_summary_as_dict_round_trips(tmp_path):
     assert data["lines"] == 2
     assert data["chars"] > 0
     assert data["pages"] is None
+
+
+def test_ingest_dispatches_both_families(tmp_path):
+    from app.files import ingest
+
+    txt = _write(tmp_path, "a.txt", "one\ntwo")
+    assert ingest.summarize(txt).text() == "Text file, 2 lines"
+
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    wb.active.append(["name", "amount"])
+    wb.active.append(["a", 1])
+    xlsx = tmp_path / "b.xlsx"
+    wb.save(str(xlsx))
+    assert ingest.summarize(xlsx).text().startswith("Excel, ")
+
+
+def test_upload_types_cover_every_supported_extension():
+    from app.files import ingest
+
+    assert set(ingest.UPLOAD_TYPES) == ingest.SPREADSHEET_EXTS | ingest.DOCUMENT_EXTS
+    assert ".xlsm" not in ingest.UPLOAD_TYPES  # macro-enabled stays out
+    assert ingest.UPLOAD_TYPES[".pdf"] == "application/pdf"
+
+
+def test_ingest_rejects_an_unknown_extension(tmp_path):
+    from app.files import ingest
+
+    p = _write(tmp_path, "a.rtf", "hi")
+    with pytest.raises(ReadError):
+        ingest.summarize(p)
