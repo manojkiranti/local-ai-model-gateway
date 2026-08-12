@@ -177,3 +177,50 @@ def read_lines(path: Path) -> DocumentText:
     if ext == ".pdf":
         return _read_pdf(path)
     raise ReadError(f"unsupported document type '{ext}'")
+
+
+# --------------------------------------------------------------------------- #
+# Public: compact summary (for the upload response + the chat attachment note)
+# --------------------------------------------------------------------------- #
+@dataclass
+class DocumentSummary:
+    kind: str
+    lines: int
+    chars: int
+    pages: Optional[int] = None
+    text_pages: Optional[int] = None
+
+    def as_dict(self) -> dict:
+        return {
+            "kind": self.kind,
+            "lines": self.lines,
+            "chars": self.chars,
+            "pages": self.pages,
+            "text_pages": self.text_pages,
+        }
+
+    def text(self) -> str:
+        """One-line human/model summary, e.g. 'PDF, 12 pages, 340 lines'."""
+        if self.pages is not None:
+            page_word = "page" if self.pages == 1 else "pages"
+            if not self.text_pages:
+                return f"{self.kind}, {self.pages} {page_word}, no extractable text (scanned)"
+            return f"{self.kind}, {self.pages} {page_word}, {self.lines} lines"
+        line_word = "line" if self.lines == 1 else "lines"
+        return f"{self.kind}, {self.lines} {line_word}"
+
+
+def summarize_document(path: Path) -> DocumentSummary:
+    """Structure summary of a document (raises ReadError on an unreadable file).
+
+    Computed FROM read_lines — one parse — so the summary and what the read tool
+    later returns can never disagree about kind or counts.
+    """
+    doc = read_lines(Path(path))
+    return DocumentSummary(
+        kind=doc.kind,
+        lines=len(doc.lines),
+        chars=sum(len(line) for line in doc.lines),
+        pages=doc.pages,
+        text_pages=doc.text_pages,
+    )

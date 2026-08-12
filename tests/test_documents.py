@@ -247,3 +247,35 @@ def test_pdf_extraction_failure_logs_and_falls_back_to_scanned_marker(tmp_path, 
 
     # Assert the warning was logged
     assert any("page 2 extraction failed" in record.message for record in caplog.records)
+
+
+def test_summary_text_for_each_kind(tmp_path):
+    txt = _write(tmp_path, "a.txt", "one\ntwo\nthree")
+    assert documents.summarize_document(txt).text() == "Text file, 3 lines"
+
+    pdf = _write_bytes(tmp_path, "a.pdf", _text_pdf_bytes(["hello", "world"]))
+    assert documents.summarize_document(pdf).text().startswith("PDF, 2 pages, ")
+
+    docx = _make_docx(tmp_path, "s.docx")
+    assert documents.summarize_document(docx).text().startswith("Word document, ")
+
+
+def test_scanned_pdf_summary_says_so(tmp_path):
+    p = _write_bytes(tmp_path, "scan.pdf", _image_only_pdf_bytes(tmp_path, 2))
+    assert documents.summarize_document(p).text() == (
+        "PDF, 2 pages, no extractable text (scanned)"
+    )
+
+
+def test_summary_and_reader_agree_on_kind(tmp_path):
+    p = _write(tmp_path, "bad.json", "{oops")
+    assert documents.summarize_document(p).kind == documents.read_lines(p).kind == "JSON (unparsed)"
+
+
+def test_summary_as_dict_round_trips(tmp_path):
+    p = _write(tmp_path, "a.md", "# hi\ntext")
+    data = documents.summarize_document(p).as_dict()
+    assert data["kind"] == "Markdown"
+    assert data["lines"] == 2
+    assert data["chars"] > 0
+    assert data["pages"] is None
