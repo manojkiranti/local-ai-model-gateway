@@ -49,9 +49,13 @@ uploaded files: `models`=`generated_files` table (with `source`
 contextvars + async `save`/`resolve_file` + in-memory fallback, `sink`=
 `PostgresFileSink` (owns its own commit), `source`=`PostgresFileSource`
 (owner-scoped id→path resolver) + `turn_files` (installs sink+source together),
-`readers`=xlsx/csv→`Table` normalizer (pure, no formula eval), `router`=upload
+`readers`=xlsx/csv→`Table` normalizer (pure, no formula eval), `documents`=
+pdf/docx/txt/md/json→flat lines normalizer (pure; PDF page markers,
+scanned-vs-empty distinction), `ingest`=extension→family dispatch (spreadsheet
+vs document) shared by the upload route and turn-open, `router`=upload
 `POST /v1/files` + `GET /v1/files` list + owner-scoped `/v1/files/{id}`; feeds
-create_excel/html/chart/pdf/csv/docx and inspect_excel/read_excel),
+create_excel/html/chart/pdf/csv/docx and inspect_excel/read_excel/
+read_document),
 `history/` (chat-history: `models` = `chat_sessions`
 + `chat_messages`, `repository` = data access, `service.open_turn` = shared
 turn-open used by chat, `router` = `/v1/sessions`),
@@ -71,9 +75,10 @@ process, `router`/`jobs_router` = `/v1/departments` + `/v1/ingest-jobs`).
 ## Endpoints
 Public: `/health`, `POST /auth/register`, `POST /auth/login`.
 Authed (JWT): `GET /users/me`, `GET /users` (admin), `POST /v1/chat`,
-`GET /v1/tools`, `GET /v1/mcp/status`, `POST /v1/files` (upload .xlsx/.csv →
-`generated_files` row `source=uploaded`; 400 bad ext/corrupt/zip-bomb, 413 over
-size cap), `GET /v1/files` (caller's files, newest first; `?source=` filters),
+`GET /v1/tools`, `GET /v1/mcp/status`, `POST /v1/files` (upload .xlsx/.csv/
+.pdf/.docx/.txt/.md/.json → `generated_files` row `source=uploaded`; 400 bad
+ext/corrupt/zip-bomb, 413 over size cap), `GET /v1/files` (caller's files,
+newest first; `?source=` filters),
 `GET /v1/files/{id}` (owner-scoped download; 404 if not yours),
 `DELETE /v1/files/{id}` (owner-scoped; 204, removes row + on-disk file),
 `GET /v1/sessions`, `GET /v1/sessions/{id}`, `DELETE /v1/sessions/{id}`,
@@ -197,6 +202,29 @@ events (`token`/`tool_call`/`tool_result`/`done`) + the new id in the
   ownership (404 on foreign id), persists `{id,filename,summary}` on the user
   message (`chat_messages.attachments` JSONB), and `build_context_messages`
   re-emits the attachment note on later turns so ids survive without resending.
+- **`read_document` reads ONE attached .pdf/.docx/.txt/.md/.json** by `file_id`
+  (spreadsheets 400 with a pointer to `inspect_excel`/`read_excel`).
+  `app/files/documents.py` normalizes every format to flat lines (`documents.py`
+  is pure — no DB/HTTP — shared by this tool AND the upload route's summary via
+  `app/files/ingest.py`'s extension→family dispatch); a PDF's page boundaries
+  appear as `[page N]` marker lines inside that same line stream, so there's
+  only one paging unit. Two deliberate departures from `read_excel`, both about
+  truncation honesty: **metadata leads** (the header — total lines, and if
+  truncated the `start_line=` to resume from — is put FIRST, because
+  `agent/loop.py` cuts an oversized tool result from the END, which is exactly
+  where `read_excel` puts its own continuation note); and **truncation is on
+  WHOLE lines, done by the tool before the loop ever sees the result** — a line
+  that would cross the budget is dropped entirely rather than sliced, so the
+  promised resume point is exactly where the model's view actually stopped, not
+  mid-line. The scanned-PDF seam: `documents.py` reports facts only (a scanned
+  page comes back with `text_pages == 0`, no exception); the tool is what turns
+  "a PDF with pages but zero pages of text" into a distinct
+  `ERROR: ... OCR is not available yet` — separate from the ordinary per-page
+  `(no extractable text — likely a scanned image)` marker a MIXED scan/text PDF
+  gets, so a fully-scanned file and a mostly-readable one with a couple of
+  scanned pages read differently to the model. Locked by
+  `tests/test_document_eval.py` (8 deterministic cases, target 8/8) and the
+  routing-description cross-reference test in `tests/test_excel_read_tools.py`.
 - **Exactly ONE attachment set is active** — the newest. `build_context_messages`
   replays older sets with superseded wording and no summary; a turn that carries
   its own upload passes `pending_attachments=True` so every replayed set is
