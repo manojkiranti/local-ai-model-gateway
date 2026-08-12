@@ -189,3 +189,24 @@ def merge_blocks(blocks: Sequence[Block], *, max_chars: int) -> list[Block]:
 
     flush()
     return merged
+
+
+def drop_small_blocks(
+    blocks: Sequence[Block], *, min_body_chars: int
+) -> list[Block]:
+    """Remove orphaned fragments. MUST run AFTER `merge_blocks`.
+
+    The order is load-bearing. Run this first and it deletes real content: the
+    45-character body "means Assets Liability Committee of the Bank." is a
+    glossary definition that is short only because the term it defines is a
+    separate Docling element. After merging, anything still this small is
+    layout debris — a page number, a stray "th" from "279th".
+
+    Tables are exempt at any size: a small table is real content, and its
+    information density is not proportional to its character count.
+    """
+    return [
+        b
+        for b in blocks
+        if b.element_type == "table" or len(b.text.strip()) >= min_body_chars
+    ]

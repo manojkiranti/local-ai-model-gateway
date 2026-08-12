@@ -4,7 +4,7 @@ import dataclasses
 
 import pytest
 
-from app.rag.chunking import Block, Chunk, chunk_table, chunk_text, merge_blocks, renumber
+from app.rag.chunking import Block, Chunk, chunk_table, chunk_text, drop_small_blocks, merge_blocks, renumber
 
 
 def test_short_text_is_one_chunk():
@@ -168,3 +168,32 @@ def test_a_block_longer_than_max_chars_survives_whole():
 
 def test_merge_of_nothing_is_nothing():
     assert merge_blocks([], max_chars=2000) == []
+
+
+def test_drop_small_removes_layout_debris():
+    out = drop_small_blocks([_b("th"), _b("2026"), _b("x" * 200)], min_body_chars=40)
+    assert [len(c.text) for c in out] == [200]
+
+
+def test_drop_small_keeps_a_real_glossary_definition_at_the_default():
+    """The reason the default is 40 and not 60: this 45-char definition is real
+    content that a coarser floor would delete."""
+    body = "means Assets Liability Committee of the Bank."
+    assert len(body) == 45
+    assert drop_small_blocks([_b(body)], min_body_chars=40) == [_b(body)]
+
+
+def test_drop_small_exempts_tables_at_any_size():
+    """A small table is real content; its information density is not
+    proportional to its character count."""
+    tiny_table = _b("| a |", kind="table")
+    assert drop_small_blocks([tiny_table], min_body_chars=40) == [tiny_table]
+
+
+def test_drop_small_measures_the_stripped_body():
+    assert drop_small_blocks([_b("  ab  ")], min_body_chars=5) == []
+
+
+def test_drop_small_boundary_is_inclusive():
+    assert drop_small_blocks([_b("x" * 40)], min_body_chars=40) != []
+    assert drop_small_blocks([_b("x" * 39)], min_body_chars=40) == []
