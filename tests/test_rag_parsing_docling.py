@@ -25,11 +25,16 @@ def docx_file(tmp_path_factory):
     # A second paragraph in the SAME section: without it, every heading in this
     # fixture guards exactly one body block, so there is never a second block
     # for merge_blocks to join and test_docling_output_is_merged_not_fragmented
-    # could not distinguish "merges correctly" from "never merges".
+    # could not distinguish "merges correctly" from "never merges". Each
+    # paragraph is deliberately kept UNDER 200 chars (53 and 150) so only their
+    # merged sum (~204, plus the "\n\n"-joined section prefix _with_context
+    # adds) can clear the test's >200 threshold — if merge_blocks stopped
+    # merging, this fixture would fail the test again rather than pass by
+    # accident on one oversized paragraph.
     doc.add_paragraph(
         "Requests must be submitted at least two weeks in advance through the "
-        "HR portal, and managers should confirm coverage before approving any "
-        "leave that would leave a team short-staffed during a critical period."
+        "HR portal, and a manager must confirm team coverage before any leave "
+        "is approved."
     )
     doc.add_heading("Carry Over", level=2)
     doc.add_paragraph("Up to five days may be carried into the next year.")
@@ -195,3 +200,34 @@ def test_front_matter_is_not_indexed(docx_toc_file):
     )
     assert all("Table of Contents" not in (c.section or "") for c in chunks)
     assert chunks, "the real content should survive"
+
+
+def test_wholly_front_matter_document_raises_the_front_matter_error(
+    tmp_path_factory,
+):
+    """A document that is ENTIRELY a skipped section collects zero blocks —
+    the same surface symptom a scanned PDF produces. The two failure modes
+    must stay distinguishable (an admin needs to tell "this is a scan" from
+    "this file is nothing but a Table of Contents"), so this must raise the
+    front-matter message, never the scanned-PDF one."""
+    from docx import Document
+
+    doc = Document()
+    doc.add_heading("Table of Contents", level=1)
+    for line in (
+        "4.1 Investment in Government Securities    12",
+        "4.7 Other Investments    20",
+    ):
+        doc.add_paragraph(line)
+    path = tmp_path_factory.mktemp("docling_toc_only") / "toc_only.docx"
+    doc.save(path)
+
+    with pytest.raises(ParseError) as exc_info:
+        parse_to_chunks(
+            path, "docx",
+            max_chars=2000, overlap_chars=200,
+            skip_sections={"table of contents"},
+        )
+    message = str(exc_info.value)
+    assert "front matter or fragments" in message
+    assert "scanned PDF" not in message

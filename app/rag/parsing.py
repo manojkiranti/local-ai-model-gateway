@@ -217,6 +217,35 @@ def _parse_with_docling(
     `page_no` from `item.prov`, the heading path, and the element label.
     Verified against docling 2.118: `iterate_items()` yields `(item, level)`,
     `item.prov[0].page_no` is 1-based, and `item.label` is a `DocItemLabel`.
+
+    Four phases, in this order:
+
+    1. **Collect** — walk `iterate_items()` into `Block`s, tracking the heading
+       stack for `section` and dropping anything under a `skip_sections` entry
+       (e.g. a Table of Contents) before it ever becomes a `Block`.
+    2. **Merge** (`merge_blocks`) — join consecutive blocks that share a
+       section/page into passages, so `max_chars` is a target to fill, not a
+       per-element ceiling.
+    3. **Filter** (`drop_small_blocks`, tables exempt) — drop what merging
+       revealed as genuine layout debris (`min_body_chars`), now that merging
+       has had the chance to rescue anything that was only orphaned.
+    4. **Chunk** (`chunk_text` per merged block) — split any still-oversized
+       passage and re-attach the heading path to chunk content.
+
+    Two distinct `ParseError`s, both preserved so an admin can tell the
+    failure modes apart:
+
+    - Zero blocks survive collection *and* none were skipped as front matter
+      -> a scanned PDF with no extractable text at all (`"a scanned PDF needs
+      OCR"`).
+    - Zero blocks survive collection but at least one was skipped as front
+      matter -> a document that is wholly front matter, e.g. a
+      Table-of-Contents-only file (`"front matter or fragments"`). Without
+      counting skips, this case collects zero blocks exactly like a scan does,
+      and would otherwise be misdiagnosed as one.
+    - Blocks survive collection but nothing survives merge+filter+chunk (all
+      orphan fragments too small to keep) -> the same `"front matter or
+      fragments"` message, for the same reason: nothing indexable came out.
     """
     try:
         converter = _docling_converter()
@@ -233,6 +262,10 @@ def _parse_with_docling(
 
     headings: list[tuple[int, str]] = []
     blocks: list[Block] = []
+    # Distinguishes "nothing survived collection because it's a scan" from
+    # "nothing survived collection because it was all front matter" — both
+    # leave `blocks` empty, and only this counter tells them apart.
+    skipped_front_matter = 0
 
     for item, _tree_level in document.iterate_items():
         label = getattr(getattr(item, "label", None), "value", "") or ""
@@ -255,6 +288,7 @@ def _parse_with_docling(
         # and ts_rank_cd favours short text — it outranked real prose 7 slots
         # out of 12. Measured 2026-08-12; see the design spec.
         if _is_skipped_section(section, skip_sections or set()):
+            skipped_front_matter += 1
             continue
 
         if label == "table":
@@ -277,6 +311,15 @@ def _parse_with_docling(
         )
 
     if not blocks:
+        # Both leave `blocks` empty, but they are not the same failure: a
+        # wholly-front-matter document (e.g. a Table-of-Contents-only file)
+        # skipped everything it saw, while a scanned PDF never had extractable
+        # text to skip. Collapsing them would tell an admin to go find a
+        # scanner for a file that never needed OCR.
+        if skipped_front_matter:
+            raise ParseError(
+                "document contained only front matter or fragments — nothing to index"
+            )
         raise ParseError(
             "document produced no text — a scanned PDF needs OCR, which v1 does not do"
         )
