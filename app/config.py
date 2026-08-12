@@ -103,6 +103,14 @@ class Settings(BaseSettings):
     rag_embed_batch: int = 32  # texts per /v1/embeddings request
     rag_chunk_max_chars: int = 2000
     rag_chunk_overlap_chars: int = 200
+    # Applied AFTER merging, so it only ever sees orphaned fragments. 40 is an
+    # empirically chosen default for the current corpus, NOT a universally safe
+    # threshold — the smallest real content observed was a 45-char glossary
+    # definition, and post-merge bodies average ~1481 chars. Re-check the
+    # body-length distribution before changing it for a different corpus.
+    rag_chunk_min_body_chars: int = 40
+    # Front matter, matched against the FIRST segment of a chunk's heading path.
+    rag_skip_sections: str = "table of contents,contents,index"
     # Worker loop timing.
     rag_ingest_poll_seconds: float = 2.0
     rag_ingest_stale_minutes: int = 10  # running + stale heartbeat -> failed
@@ -167,6 +175,10 @@ class Settings(BaseSettings):
     @property
     def fetch_url_allowed_hosts(self) -> list[str]:
         return [h.lower() for h in self._csv(self.fetch_url_allowlist)]
+
+    @property
+    def rag_skipped_sections(self) -> set[str]:
+        return {s.lower() for s in self._csv(self.rag_skip_sections)}
 
 
 @lru_cache

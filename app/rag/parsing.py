@@ -20,6 +20,7 @@ the API image. `tests/test_rag_parsing.py` asserts this.
 
 from __future__ import annotations
 
+import re
 from dataclasses import replace
 from pathlib import Path
 
@@ -100,6 +101,24 @@ def _parse_spreadsheet(path: Path, *, max_chars: int) -> list[Chunk]:
 
 def _heading_path(stack: list[tuple[int, str]]) -> str | None:
     return " > ".join(text for _level, text in stack) if stack else None
+
+
+def _normalize_heading(text: str) -> str:
+    """Casefold, collapse internal whitespace, drop trailing punctuation."""
+    return re.sub(r"\s+", " ", text).strip().strip(".:;—-").strip().casefold()
+
+
+def _is_skipped_section(section: str | None, skip: set[str]) -> bool:
+    """True when a chunk's heading path starts with front matter.
+
+    Matches the FIRST segment only, deliberately: that catches
+    "Table of Contents" and "Table of Contents > 5.2.5 …" while leaving a
+    legitimate "Chapter 3 > Index of Limits" indexed. Matching any segment
+    would delete exactly the content most worth keeping in a policy document.
+    """
+    if not section or not skip:
+        return False
+    return _normalize_heading(section.split(" > ", 1)[0]) in skip
 
 
 def _with_context(chunks: list[Chunk], section: str | None) -> list[Chunk]:

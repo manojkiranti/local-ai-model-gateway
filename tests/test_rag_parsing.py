@@ -155,3 +155,43 @@ def test_docling_is_not_imported_at_module_scope():
         capture_output=True, text=True, check=True,
     ).stdout.strip()
     assert out == "", f"importing app.rag.parsing pulled in: {out}"
+
+
+def test_normalize_heading_folds_case_whitespace_and_trailing_punctuation():
+    from app.rag.parsing import _normalize_heading
+
+    assert _normalize_heading("  Table   of  Contents :  ") == "table of contents"
+    assert _normalize_heading("CONTENTS.") == "contents"
+
+
+def test_front_matter_is_skipped_by_first_segment():
+    from app.rag.parsing import _is_skipped_section
+
+    skip = {"table of contents", "contents", "index"}
+    assert _is_skipped_section("Table of Contents", skip)
+    assert _is_skipped_section("Table of Contents > 5.2.5 Assurance of Limits", skip)
+
+
+def test_a_legitimate_index_section_is_not_skipped():
+    """First-segment-only is the guard: a policy document's own
+    'Index of Limits' under a real chapter must stay indexed."""
+    from app.rag.parsing import _is_skipped_section
+
+    skip = {"table of contents", "contents", "index"}
+    assert not _is_skipped_section("Chapter 3 > Index of Limits", skip)
+    assert not _is_skipped_section("Chapter 4: Investment Products", skip)
+
+
+def test_skip_is_inert_with_no_section_or_empty_set():
+    from app.rag.parsing import _is_skipped_section
+
+    assert not _is_skipped_section(None, {"contents"})
+    assert not _is_skipped_section("Contents", set())
+
+
+def test_settings_expose_the_skip_list_normalized():
+    from app.config import Settings
+
+    s = Settings(rag_skip_sections="Table of Contents, Contents ,Index")
+    assert s.rag_skipped_sections == {"table of contents", "contents", "index"}
+    assert s.rag_chunk_min_body_chars == 40
