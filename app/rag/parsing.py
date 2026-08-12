@@ -149,6 +149,7 @@ def _pdf_pipeline_options():
     docling_settings.inference.compile_torch_models = False
 
     options = PdfPipelineOptions()
+
     options.do_ocr = False
     options.accelerator_options = AcceleratorOptions(device=AcceleratorDevice.CPU)
     return options
