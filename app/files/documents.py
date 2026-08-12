@@ -44,10 +44,23 @@ class DocumentText:
 
 
 def _decode(path: Path) -> str:
-    """Bytes -> str, never raising. utf-8-sig strips a BOM when present and is
-    plain utf-8 otherwise; errors='replace' means a binary file renamed .txt
-    degrades to mojibake instead of crashing the reader."""
-    return path.read_bytes().decode("utf-8-sig", errors="replace")
+    """Bytes -> str, never raising (well-formed input). utf-8-sig strips a BOM
+    when present and is plain utf-8 otherwise; errors='replace' means a binary
+    file renamed .txt degrades to mojibake instead of crashing the reader.
+
+    The read itself CAN raise: a `generated_files` row whose on-disk file was
+    removed (or is momentarily unreachable) hits `read_bytes()` with an
+    `OSError`. Left unguarded, that surfaces in the agent loop as a raw
+    "[Errno 2] No such file or directory: '/…/files/3/{uuid}.txt'" — leaking
+    the absolute storage path and the numeric user id into model context.
+    `readers.py` already converts the equivalent failure to `ReadError`; do the
+    same here, without repeating the path in the message.
+    """
+    try:
+        raw = path.read_bytes()
+    except OSError as exc:
+        raise ReadError(f"could not read the file ({exc.strerror or 'I/O error'})") from exc
+    return raw.decode("utf-8-sig", errors="replace")
 
 
 def _read_text(path: Path, ext: str) -> DocumentText:
@@ -57,13 +70,20 @@ def _read_text(path: Path, ext: str) -> DocumentText:
 
 def _read_json(path: Path) -> DocumentText:
     text = _decode(path)
+    # Deeply nested JSON (e.g. ~400 KB of nothing but '['*200000 + ']'*200000,
+    # well under the upload size cap) blows the C-accelerated parser's stack
+    # with a RecursionError, not a ValueError — json.dumps on the re-serialize
+    # side can do the same for a structure that parsed fine but is still very
+    # deep. Neither is a genuine parse failure worth rejecting the upload for
+    # (the contract here is "raises only when a file genuinely cannot be
+    # parsed"), so both fall back to the same raw-text path as invalid JSON.
     try:
         parsed = json.loads(text)
-    except ValueError:
+        pretty = json.dumps(parsed, indent=2, ensure_ascii=False)
+    except (ValueError, RecursionError):
         # Deliberately NOT an error: near-valid JSON is still readable, and the
         # kind tells the model it is looking at raw text.
         return DocumentText(kind="JSON (unparsed)", lines=text.splitlines())
-    pretty = json.dumps(parsed, indent=2, ensure_ascii=False)
     return DocumentText(kind="JSON", lines=pretty.splitlines())
 
 
@@ -91,22 +111,27 @@ def _read_docx(path: Path) -> DocumentText:
     from docx import Document
     from docx.table import Table
 
+    # A well-formed zip with malformed XML inside (or a block whose style/text
+    # accessors choke on it) can raise AFTER Document() succeeds — e.g. while
+    # iterating blocks, reading `block.rows`, or `cell.text`. That failure is
+    # exactly as much "this .docx cannot be read" as a bad zip header, so the
+    # try covers the whole parse, not just the constructor: a non-ReadError
+    # escaping here takes the same uncaught-500 path as Finding 2's JSON bug.
     try:
         doc = Document(str(path))
-    except Exception as exc:  # noqa: BLE001 - any docx/zip failure is a ReadError
+        lines: list[str] = []
+        for block in _iter_docx_blocks(doc):
+            if isinstance(block, Table):
+                lines.append("")
+                for row in block.rows:
+                    lines.append(" | ".join(cell.text.strip() for cell in row.cells))
+                lines.append("")
+                continue
+            text = block.text.strip()
+            style = getattr(getattr(block, "style", None), "name", "") or ""
+            lines.append(f"# {text}" if style.startswith("Heading") and text else text)
+    except Exception as exc:  # noqa: BLE001 - any docx/zip/XML failure is a ReadError
         raise ReadError(f"could not read the Word document: {exc}") from exc
-
-    lines: list[str] = []
-    for block in _iter_docx_blocks(doc):
-        if isinstance(block, Table):
-            lines.append("")
-            for row in block.rows:
-                lines.append(" | ".join(cell.text.strip() for cell in row.cells))
-            lines.append("")
-            continue
-        text = block.text.strip()
-        style = getattr(getattr(block, "style", None), "name", "") or ""
-        lines.append(f"# {text}" if style.startswith("Heading") and text else text)
     return DocumentText(kind="Word document", lines=lines)
 
 
@@ -201,12 +226,12 @@ class DocumentSummary:
 
     def text(self) -> str:
         """One-line human/model summary, e.g. 'PDF, 12 pages, 340 lines'."""
+        line_word = "line" if self.lines == 1 else "lines"
         if self.pages is not None:
             page_word = "page" if self.pages == 1 else "pages"
             if not self.text_pages:
                 return f"{self.kind}, {self.pages} {page_word}, no extractable text (scanned)"
-            return f"{self.kind}, {self.pages} {page_word}, {self.lines} lines"
-        line_word = "line" if self.lines == 1 else "lines"
+            return f"{self.kind}, {self.pages} {page_word}, {self.lines} {line_word}"
         return f"{self.kind}, {self.lines} {line_word}"
 
 

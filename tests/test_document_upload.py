@@ -96,6 +96,33 @@ def test_txt_and_md_uploads_are_accepted():
         assert _upload(client, owner, "notes.md", b"# hi\n", "text/markdown").status_code == 201
 
 
+def test_json_upload_is_accepted():
+    """The module docstring names .json among the supported extensions, but
+    (until this fix) nothing here actually uploaded one."""
+    with TestClient(app) as client:
+        owner = _auth(client, OWNER)
+        up = _upload(client, owner, "a.json", b'{"loan": {"term": 30}}', "application/json")
+        assert up.status_code == 201, up.text
+        body = up.json()
+        assert body["media_type"] == "application/json"
+        assert body["summary"]["kind"] == "JSON"
+
+
+def test_deeply_nested_json_is_accepted_not_500(tmp_path):
+    """Finding 2's exact repro: ~400 KB of nothing but brackets, well under the
+    10 MB cap, is deep enough to blow json's recursive parser (RecursionError,
+    not ValueError). Unparseable JSON is explicitly NOT an error in this
+    design (documents.py's own contract + the spec's error table) — it must be
+    accepted and served as raw text, not crash the upload route with a 500 and
+    leave the file orphaned on disk with no `generated_files` row."""
+    raw = b"[" * 200_000 + b"]" * 200_000
+    with TestClient(app) as client:
+        owner = _auth(client, OWNER)
+        up = _upload(client, owner, "deep.json", raw, "application/json")
+        assert up.status_code == 201, up.text
+        assert up.json()["summary"]["kind"] == "JSON (unparsed)"
+
+
 def test_docx_upload_is_accepted(tmp_path):
     from docx import Document
 

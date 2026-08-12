@@ -55,10 +55,44 @@ def test_invalid_json_falls_back_to_raw_text(tmp_path):
     assert doc.lines == ['{"a": 1,,,}']
 
 
+def test_deeply_nested_json_raises_recursionerror_from_the_stdlib_parser():
+    """Documents the underlying failure this module now guards against: the
+    stdlib parser itself raises RecursionError, not ValueError, on JSON this
+    deep — confirming _read_json needs its own catch rather than relying on
+    json.loads's documented exception type."""
+    raw = "[" * 200_000 + "]" * 200_000
+    with pytest.raises(RecursionError):
+        json.loads(raw)
+
+
+def test_deeply_nested_json_falls_back_to_raw_text_not_recursionerror(tmp_path):
+    """~400 KB, well under the 10 MB upload cap, but deep enough to blow the
+    parser's stack. This must behave EXACTLY like other unparseable JSON
+    (raw-text fallback), never raise — a RecursionError escaping here is not a
+    ReadError, so router.py's `except readers.ReadError` would miss it and the
+    upload route would 500 with the file orphaned on disk."""
+    raw = "[" * 200_000 + "]" * 200_000
+    p = _write(tmp_path, "deep.json", raw)
+    doc = documents.read_lines(p)
+    assert doc.kind == "JSON (unparsed)"
+    assert doc.lines == [raw]
+
+
 def test_unsupported_extension_raises(tmp_path):
     p = _write(tmp_path, "a.rtf", "hi")
     with pytest.raises(ReadError):
         documents.read_lines(p)
+
+
+def test_missing_file_raises_read_error_without_leaking_the_path(tmp_path):
+    """A generated_files row whose on-disk file vanished must surface as a
+    clean ReadError, not a raw OSError — and the message must not repeat the
+    absolute storage path (which would leak into model context via
+    read_document's error string)."""
+    p = tmp_path / "gone.txt"  # never written
+    with pytest.raises(ReadError) as excinfo:
+        documents.read_lines(p)
+    assert str(p) not in str(excinfo.value)
 
 
 def _make_docx(tmp_path, name="a.docx"):
@@ -100,6 +134,26 @@ def test_docx_preserves_document_order(tmp_path):
 def test_corrupt_docx_raises_read_error(tmp_path):
     p = tmp_path / "broken.docx"
     p.write_bytes(b"not a zip at all")
+    with pytest.raises(ReadError):
+        documents.read_lines(p)
+
+
+def test_docx_failure_during_block_walk_raises_read_error_not_raw(tmp_path, monkeypatch):
+    """Finding 6: a well-formed zip that parses fine at `Document()` can still
+    raise while WALKING its blocks (or reading `.rows`/`cell.text`) if the
+    XML underneath a paragraph/table is malformed in a way python-docx only
+    chokes on when that content is actually visited. The original try block
+    covered only `Document(str(path))`, so this class of failure escaped as a
+    raw exception and took the same uncaught-500 path as Finding 2's JSON bug.
+    Simulated here by making `Paragraph.text` raise, standing in for content
+    that only fails once visited."""
+    from docx.text.paragraph import Paragraph
+
+    def _broken_text(self):
+        raise RuntimeError("simulated malformed XML underneath this paragraph")
+
+    monkeypatch.setattr(Paragraph, "text", property(_broken_text))
+    p = _make_docx(tmp_path, "broken_body.docx")
     with pytest.raises(ReadError):
         documents.read_lines(p)
 
