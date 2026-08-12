@@ -130,10 +130,12 @@ events (`token`/`tool_call`/`tool_result`/`done`) + the new id in the
   (Ollama's shim ignores a passthrough `options.num_ctx`; verified 0.32.5 —
   requested 8192, loaded 4096). Set context server-wide on the Ollama service:
   `OLLAMA_CONTEXT_LENGTH=32768`. Without it Ollama defaults to **4096**, which is
-  too small — the 15 local tool schemas alone are **3475 tokens** (measured
-  2026-08-11 via `usage.prompt_tokens`, qwen2.5; a bare turn's prompt floor is
-  3778, leaving ~300 of a 4096 window), so one 8000-char
-  tool result overflows. This matches vLLM's `--max-model-len` (a launch flag),
+  too small — **15** local tool schemas alone measured **3475 tokens** on
+  2026-08-11 (via `usage.prompt_tokens`, qwen2.5; a bare turn's prompt floor was
+  3778, leaving ~300 of a 4096 window). `LOCAL_TOOLS` is now **16** (`read_document`
+  landed after that measurement) — the token figure has not been re-measured
+  since, so treat it as a floor, not the current count, until it is. Either way
+  one 8000-char tool result overflows. This matches vLLM's `--max-model-len` (a launch flag),
   so it stays a config value across backends. See
   `docs/llm-transport-and-deployment.md`.
 - Use `resp.aiter_lines()` for SSE — never `aiter_bytes()` with manual `\n\n`

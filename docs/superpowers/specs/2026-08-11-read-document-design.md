@@ -228,8 +228,13 @@ those are unreadable by anything, and the user can act on that at upload time.
   as well as `.xlsx`.
 - **Text extraction only.** `pypdf` is pure Python with no shell-out and no
   renderer; embedded JavaScript and `/Launch` actions are never executed.
-- **Output bounded three ways** independent of input size: page cap, line
-  window, character budget. A decompression-heavy PDF cannot blow context.
+- **Output to the model is bounded three ways** independent of input size:
+  page cap, line window, character budget. A decompression-heavy PDF cannot
+  blow *context*. It CAN blow *memory*: unlike `.xlsx`/`.docx` (zip-bomb
+  guarded in `router.py` at upload time), a `.pdf` has no decompression guard,
+  and `pypdf` inflates `FlateDecode` page streams with no size limit inside
+  the API process. The three output bounds above are downstream of that
+  extraction and don't help until it's already finished. See "Known issues".
 - **No `eval`**; JSON via `json.loads`.
 - **`errors="replace"`** on text decode — a hostile or binary file degrades to
   mojibake rather than crashing the reader.
@@ -302,6 +307,21 @@ most `MAX_TOOL_RESULT_CHARS` (8k), so its trailing next-page guidance can be cut
 and its `start_row` advice can overshoot the rows the model actually saw. Same
 class of bug this spec avoids for documents by leading with metadata and
 self-truncating. Fixing `read_excel` is a separate change.
+
+**No PDF decompression guard.** `.xlsx`/`.docx` get a cumulative-uncompressed-size
+check against the zip's `infolist()` before either is ever parsed (`router.py`).
+A PDF has no equivalent: `pypdf` decompresses each page's `FlateDecode` stream
+into memory with no size ceiling, so a small file engineered to inflate
+massively can spike API-process memory before `read_document`'s three output
+bounds ever get a chance to apply — they bound what reaches the *model*, not
+what `pypdf` allocates while extracting. Deferred rather than fixed here because
+the obvious naive guard — stop extracting once a cumulative extracted-character
+ceiling is hit — reintroduces the exact lying-header problem this design exists
+to prevent: `doc.pages`/`doc.text_pages` (and therefore the header's total line
+count) would become partial without any signal saying so, unless the guard is
+threaded through as its own reported fact (closer to `pages_skipped`) rather
+than a silent early exit. That's real design work, not a one-line change, so it
+stays out of scope for this slice.
 
 ## Not in scope
 
