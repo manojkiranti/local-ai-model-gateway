@@ -115,10 +115,16 @@ def _is_skipped_section(section: str | None, skip: set[str]) -> bool:
     "Table of Contents" and "Table of Contents > 5.2.5 …" while leaving a
     legitimate "Chapter 3 > Index of Limits" indexed. Matching any segment
     would delete exactly the content most worth keeping in a policy document.
+
+    Both the configured skip entries and the heading are normalized via
+    _normalize_heading, so irregular formatting (trailing punctuation, doubled
+    spaces) in the config list does not cause silent non-matches.
     """
     if not section or not skip:
         return False
-    return _normalize_heading(section.split(" > ", 1)[0]) in skip
+    normalized_heading = _normalize_heading(section.split(" > ", 1)[0])
+    normalized_skip = {_normalize_heading(s) for s in skip}
+    return normalized_heading in normalized_skip
 
 
 def _with_context(chunks: list[Chunk], section: str | None) -> list[Chunk]:

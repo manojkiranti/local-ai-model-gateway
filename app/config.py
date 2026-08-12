@@ -178,7 +178,10 @@ class Settings(BaseSettings):
 
     @property
     def rag_skipped_sections(self) -> set[str]:
-        return {s.lower() for s in self._csv(self.rag_skip_sections)}
+        # Normalization (case, whitespace, punctuation) happens at the point of
+        # comparison in parsing._is_skipped_section, so both the configured
+        # entries and the heading are normalized by the same function.
+        return set(self._csv(self.rag_skip_sections))
 
 
 @lru_cache

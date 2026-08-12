@@ -189,9 +189,22 @@ def test_skip_is_inert_with_no_section_or_empty_set():
     assert not _is_skipped_section("Contents", set())
 
 
-def test_settings_expose_the_skip_list_normalized():
+def test_skip_entry_with_irregular_formatting_still_matches():
+    """Trailing punctuation and doubled spaces in the skip config don't cause
+    silent non-matches: _normalize_heading is applied to both sides."""
+    from app.rag.parsing import _is_skipped_section
+
+    # Config entries with irregular formatting
+    skip = {"  Table  of   Contents. ", "contents:", "INDEX ;"}
+    assert _is_skipped_section("Table of Contents", skip)
+    assert _is_skipped_section("Contents", skip)
+    assert _is_skipped_section("Index", skip)
+
+
+def test_settings_expose_the_skip_list_raw():
     from app.config import Settings
 
+    # The property returns raw CSV items; normalization happens in parsing.
     s = Settings(rag_skip_sections="Table of Contents, Contents ,Index")
-    assert s.rag_skipped_sections == {"table of contents", "contents", "index"}
+    assert s.rag_skipped_sections == {"Table of Contents", "Contents", "Index"}
     assert s.rag_chunk_min_body_chars == 40
