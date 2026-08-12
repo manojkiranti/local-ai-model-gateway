@@ -199,3 +199,91 @@ def test_our_budget_stays_under_the_agent_loops_cap():
 
     assert read_document.MODEL_RESULT_CAP == MAX_TOOL_RESULT_CHARS
     assert read_document.DOC_MAX_CHARS < MAX_TOOL_RESULT_CHARS
+
+
+def test_overlong_single_line_is_hard_cut_and_continuation_is_exact():
+    """A single line longer than the whole char budget must still let the
+    reader make progress: emitted alone, hard-cut, and the reported next
+    start_line must be exactly the line after it — no skip, no repeat."""
+    long_line = "y" * (read_document.DOC_MAX_CHARS + 500)
+    body = f"{long_line}\nnext line"
+    fid = _save(body.encode(), "long.txt")
+
+    out = _read({"file_id": fid})
+    assert len(out) <= read_document.MODEL_RESULT_CAP
+
+    lines = out.splitlines()
+    header, note = lines[0], lines[1]
+    body_lines = [ln for ln in lines[2:] if ln]
+    assert header == "Text file, 2 lines — showing lines 1–1 of 2."
+    assert note == "TRUNCATED: call read_document again with start_line=2 to continue."
+    # the over-long line is emitted alone, hard-cut with the truncation suffix
+    assert len(body_lines) == 1
+    assert body_lines[0] == long_line[: read_document.DOC_MAX_CHARS] + " …[long line truncated]"
+
+    # continuation from the reported start_line neither skips nor repeats:
+    # "next line" is the first (and only) thing in the second window.
+    marker = "start_line="
+    next_start = int(note[note.index(marker) + len(marker) :].split(" ", 1)[0])
+    assert next_start == 2
+    second = _read({"file_id": fid, "start_line": next_start})
+    assert second == "Text file, 2 lines — showing lines 2–2 of 2.\n\nnext line"
+
+
+def _verbose_then_scanned_pdf_over_page_cap(tmp_path) -> bytes:
+    """4-page PDF built to force all four possible _header lines at once:
+    page 1 alone is verbose enough to blow the char budget (-> TRUNCATED),
+    page 2 is image-only with no text (-> the scanned-pages count), and
+    pages 3-4 exist purely to be skipped once MAX_PDF_PAGES is monkeypatched
+    down to 2 (-> PARTIAL).
+    """
+    from fpdf import FPDF
+    from fpdf.enums import XPos, YPos
+    from PIL import Image
+
+    img = tmp_path / "cap.png"
+    Image.new("RGB", (64, 64), (180, 180, 180)).save(img)
+
+    pdf = FPDF()
+    # A custom, very tall page for page 1 so ~250 lines of filler fit on ONE
+    # page without fpdf2 auto-paginating (which would break the page count
+    # this test relies on).
+    pdf.add_page(format=(210, 3000))
+    pdf.set_font("Helvetica", size=12)
+    for i in range(250):
+        pdf.multi_cell(
+            0, 5, f"line of filler text number {i:04d} " * 3,
+            new_x=XPos.LMARGIN, new_y=YPos.NEXT,
+        )
+
+    pdf.add_page()  # page 2: image only, no extractable text
+    pdf.image(str(img), x=10, y=10, w=50)
+
+    pdf.add_page()  # page 3: beyond the page cap, never read
+    pdf.set_font("Helvetica", size=12)
+    pdf.multi_cell(0, 10, "page three")
+    pdf.add_page()  # page 4: beyond the page cap, never read
+    pdf.multi_cell(0, 10, "page four")
+
+    return bytes(pdf.output())
+
+
+def test_header_carries_all_four_lines_at_once_and_stays_under_the_cap(tmp_path, monkeypatch):
+    """Worst case for HEADER_BUDGET: the main head, TRUNCATED, PARTIAL (page
+    cap), and the scanned-pages count all fire on the same read. By hand the
+    margin holds; this proves it rather than asserting it by design."""
+    from app.files import documents
+
+    monkeypatch.setattr(documents, "MAX_PDF_PAGES", 2)
+    fid = _save(
+        _verbose_then_scanned_pdf_over_page_cap(tmp_path), "big.pdf", PDF_MEDIA_TYPE
+    )
+
+    out = _read({"file_id": fid})
+    assert len(out) <= read_document.MODEL_RESULT_CAP
+
+    lines = out.splitlines()
+    assert lines[0] == "PDF, 4 pages, 252 lines — showing lines 1–80 of 252."
+    assert lines[1] == "TRUNCATED: call read_document again with start_line=81 to continue."
+    assert lines[2] == "PARTIAL: pages 3–4 were not read (limit 2 pages)."
+    assert lines[3] == "1 of 2 pages have no extractable text (likely scanned images)."
