@@ -323,6 +323,21 @@ threaded through as its own reported fact (closer to `pages_skipped`) rather
 than a silent early exit. That's real design work, not a one-line change, so it
 stays out of scope for this slice.
 
+**A five-line header plus a hard-cut body can exceed `MODEL_RESULT_CAP` by ~10
+chars.** `HEADER_BUDGET` is 400 and the worst-case header measures 385, but the
+hard-cut body is `DOC_MAX_CHARS + 23` — the `" …[long line truncated]"` suffix
+is appended *after* the `[:DOC_MAX_CHARS]` slice, so it overruns its own budget.
+Reachable only when one PDF read triggers all of: an over-long line, overall
+truncation, the 500-page cap, and a scanned page. Total lands at ~8010 against
+the 8000 cap. Left as-is because it degrades in the safe direction: `_for_model`
+cuts from the END, so the whole metadata block survives and only ~10–25
+characters of an already-hard-cut line are lost — it does not resurrect the
+lying-header failure this design exists to prevent. Fix when convenient by
+slicing at `DOC_MAX_CHARS - len(suffix)`, and extend
+`test_header_carries_all_four_lines_at_once_and_stays_under_the_cap` to a
+five-line worst case (it currently proves only the four-line one, which is why
+the fifth line was added without the lock noticing).
+
 ## Not in scope
 
 OCR / extracting text from scanned pages — scanned PDFs themselves are accepted,
