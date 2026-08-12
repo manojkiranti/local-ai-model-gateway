@@ -128,3 +128,20 @@ def test_descriptions_route_totals_to_aggregate_excel():
     # read_excel's cap warning has to name the uncapped alternative, not just
     # say "capped".
     assert "aggregate_excel" in read_excel.SPEC.description
+
+
+def test_descriptions_route_attached_documents_to_read_document():
+    """Tool descriptions ARE the routing prompt. Without these cross-references
+    the model picks search_department_docs for an attached PDF (answering from
+    the corpus instead of the file in front of it) or read_document for a
+    spreadsheet."""
+    from app.tools.local import read_document, search_department_docs
+
+    doc_desc = read_document.SPEC.description
+    assert "read_excel" in doc_desc
+    assert "aggregate_excel" in doc_desc
+    assert "search_department_docs" in doc_desc
+    assert "attached" in doc_desc.lower()
+
+    # and the corpus tool keeps pointing spreadsheet totals elsewhere
+    assert "aggregate_excel" in search_department_docs.SPEC.description
