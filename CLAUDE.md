@@ -20,6 +20,11 @@ hardware, which model runs where (`qwen3.5:35b-a3b` chat, `qwen3-embedding:4b-q8
 Postgres + pgvector layout, ports, RAG settings, what is not yet live. Read it
 instead of guessing the environment; update it when any of it changes.
 
+**NRB integration status/roadmap lives in `docs/nrb-integration.md`** —
+Phase 1 (`get_nrb_forex`) done and live-evaluated; Phases 2–5 (document
+discovery/sync/ingestion/search) not started. Read it before touching
+anything NRB-related instead of re-deriving status from chat history.
+
 ## Environment / commands
 - **Use THIS project's `.venv`** (`.venv/bin/python`, `.venv/bin/pip`, `.venv/bin/uvicorn`,
   `.venv/bin/alembic`, `.venv/bin/pytest`). Never install into a sibling's venv. Python 3.10.
