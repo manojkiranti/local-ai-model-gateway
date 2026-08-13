@@ -185,8 +185,14 @@ requirements-worker.txt API dependencies plus Docling
 
 ## Testing and verification
 
-- Add focused tests beside the behavior being changed, then run the narrowest
-  relevant test file. Run the full suite for broad or cross-cutting changes.
+- Every production-code behavior change must include new or updated automated
+  tests in the same task. For bug fixes, add a regression test that fails
+  without the fix.
+- Do not consider an implementation complete until the narrowest relevant test
+  suite passes. Run the full suite for broad or cross-cutting changes.
+- Documentation-only and comment-only changes do not require tests. If a test
+  cannot reasonably be added or executed, explain why in the final response and
+  state what verification was performed instead.
 - Integration/live tests may skip when Postgres, Ollama, Docling models, or the
   embedding model are unavailable. Report skips honestly; they are not proof of
   live integration.
