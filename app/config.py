@@ -92,6 +92,29 @@ class Settings(BaseSettings):
     # never point this tool at a host of its choosing (that is fetch_url's job,
     # with fetch_url's SSRF guards). The `/rates` path is hardcoded in the client.
     nrb_api_base_url: str = "https://www.nrb.org.np/api/forex/v1"
+    # The public website, for sitemap discovery (Phase 2 inventory — not a tool,
+    # not model-reachable). Separate from the Forex API base because that one is
+    # a versioned API path; this is the site root. Its HOST is also the trust
+    # boundary for discovery: every sitemap and every URL, including ones NRB's
+    # own sitemap points at, must be on this host or it is reported and skipped.
+    nrb_site_base_url: str = "https://www.nrb.org.np"
+    # Pause between requests when enumerating NRB's REST API or probing pages.
+    # The ONE tunable in the discovery layer: byte caps, timeouts and page bounds
+    # are module constants (app/nrb/sitemap.py, wp_api.py, page.py) because they
+    # follow from the site's measured shape, whereas how hard we may lean on a
+    # central bank's website is an operational judgement that varies by
+    # environment and permission. 0 disables pacing.
+    nrb_crawl_delay_seconds: float = 0.25
+    # Where downloaded NRB attachments live (Phase 5). A SEPARATE tree from
+    # rag_docs_dir: these are raw upstream artefacts, not department corpus
+    # documents — only Phase 7 decides which of them becomes a `documents` row.
+    # Relative values are anchored to the REPO ROOT, not the process CWD, by
+    # `app/nrb/filestore.base_dir` (the fetch command is run from wherever a
+    # developer is standing, and two CWDs must not mean two corpora). The layout
+    # is content-addressed, so this directory holds one blob per distinct sha256.
+    # Byte caps and timeouts stay module constants in `app/nrb/fetch.py` because
+    # they follow from the corpus's measured shape (largest file observed: 46 MB).
+    nrb_files_dir: str = "nrb_files"
 
     # --- RAG: department corpus ingestion ---
     # Corpus documents are org knowledge, NOT per-user files — separate tree.

@@ -38,6 +38,11 @@ generated_files/
 # these are ingested content, not source.
 rag_documents/
 
+# Downloaded NRB attachments (NRB_FILES_DIR default). Content-addressed blobs
+# fetched from nrb.org.np by scripts/nrb_fetch.py — upstream artefacts, not source,
+# and the full corpus is ~8.6 GB. `.incoming/` holds partial downloads.
+nrb_files/
+
 # Subagent-driven-development scratch (ledgers, task briefs, review packages).
 # Plans themselves live in docs/superpowers/plans/ and ARE committed.
 .superpowers/

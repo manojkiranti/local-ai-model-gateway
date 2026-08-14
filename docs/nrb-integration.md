@@ -4,7 +4,7 @@
 live, what broke and how it was fixed, and what's deliberately not built yet.
 Code-level gotchas stay in `CLAUDE.md` (grep `nrb`); this is the status view.
 
-Last verified: **2026-08-12**.
+Last verified: **2026-08-14**.
 
 ---
 
@@ -13,14 +13,31 @@ Last verified: **2026-08-12**.
 | Phase | What | Status |
 |---|---|---|
 | 1 | `get_nrb_forex` — live forex rates tool | **Done, tested, live-evaluated** |
-| 2 | NRB document discovery (circulars, directives, policy, laws) | Not started |
-| 3 | Incremental sync (scheduled, hash-compare, queue ingestion) | Not started |
-| 4 | Documents through the existing RAG pipeline (parse/chunk/embed) | Not started |
-| 5 | `search_nrb_documents` tool | Not started |
+| 2 | Sitemap discovery + source inventory | **Done, live-run 2026-08-13** |
+| 3 | Page/document-level discovery + attachment inventory | **Done, full-corpus run 2026-08-14** |
+| 4 | Persistent catalog + idempotent metadata sync | **Done, live-run twice 2026-08-14** — §9 |
+| 5 | Attachment download → MIME validation → SHA-256 → local storage | **Done, live-fetched 2026-08-14** — §10 |
+| 6 | Parsing (PDF/DOCX/spreadsheets, Nepali + legacy fonts, OCR fallback) | Not started — gate in §10.9 |
+| 7 | Chunk + embed into the existing `documents`/`document_chunks` pipeline | Not started |
+| 8 | `search_nrb_documents` tool | Not started |
+
+**The roadmap was renumbered when Phase 4 was specified.** It previously read
+"Phase 4 = documents through the RAG pipeline (download/parse/chunk/embed), Phase
+5 = search tool", i.e. one phase for everything after discovery. Phase 4 is now
+only **persistence and reconciliation**, and what used to be inside it is Phases
+5–7. So *"Phase 4/5 is done" does NOT mean any NRB document is searchable* — bytes
+are on disk, but nothing has been parsed, chunked or embedded. §8 (the old gate) is
+kept for the decisions it records; §9 is Phase 4 as built and §10 is Phase 5.
 
 Phase 1 is a self-contained vertical slice: a local tool + a dedicated API
-client, no shared state with Phases 2–5. Building those later touches the
-existing department-RAG pipeline (`app/rag/`), not this phase's files.
+client, no shared state with the rest. **Phases 2 and 3 are both read-only
+reconnaissance** — no tables, no cron, no persistence, nothing downloaded,
+nothing registered in `LOCAL_TOOLS`; they exist so Phase 4 could be designed
+against the real site instead of a guess. **Phase 4 adds four tables and a manual
+sync command and still downloads nothing**; **Phase 5 adds the download and stores
+raw bytes and still parses nothing.** Both stay deliberately separate from
+`app/rag/` — Phase 7 is where that finally gets touched. Nothing through Phase 5 is
+registered in `LOCAL_TOOLS`, reachable by the model, or exposed on any endpoint.
 
 ---
 
@@ -133,7 +150,32 @@ the window is set. Raising context buys time; truncation is the durable fix.
 ## 3. How to verify (repeatable, not read-once)
 
 ```bash
-# unit suite — pure, HTTP mocked, no network, no live model
+# unit suites — pure, HTTP mocked, no network, no live model
+.venv/bin/pytest tests/test_nrb_forex.py tests/test_nrb_sitemap.py tests/test_nrb_pages.py
+
+# Phase 4 catalog suites (test_nrb_sync_integration needs Postgres; it skips
+# without one, and every test rolls back — see the file's isolation note)
+.venv/bin/pytest tests/test_nrb_catalog.py tests/test_nrb_sync_integration.py
+
+# bounded live inventories (network, no model)
+.venv/bin/python scripts/nrb_sitemap_inventory.py
+.venv/bin/python scripts/nrb_document_inventory.py --limit 800 --verify 40
+
+# the catalog sync (network + Postgres). Run it TWICE — the second run reporting
+# all-zero is the acceptance test. --dry-run changes nothing.
+.venv/bin/python scripts/nrb_sync.py --dry-run
+.venv/bin/python scripts/nrb_sync.py -v
+.venv/bin/python scripts/nrb_sync.py -v
+
+# Phase 5 fetch suites
+.venv/bin/pytest tests/test_nrb_fetch.py tests/test_nrb_fetch_integration.py
+
+# downloading files (network + Postgres + disk). Scope is REQUIRED; --dry-run makes
+# no HTTP request at all and prints how many files and bytes were selected.
+.venv/bin/python scripts/nrb_fetch.py --core --dry-run
+.venv/bin/python scripts/nrb_fetch.py --section circular --limit 25 -v
+
+# forex unit suite alone
 .venv/bin/pytest tests/test_nrb_forex.py
 
 # live routing eval — real agent loop, real model, live NRB API
@@ -179,19 +221,940 @@ swap.
 
 ---
 
-## 5. Phase 2–5 — deferred, not started
+## 5. Phase 2 — what shipped, and what the live site turned out to be
 
-Document discovery (circulars, directives, monetary policy, laws, regulations,
-notices, reports, publications), scheduled incremental sync, ingestion through
-the existing `app/rag/` pipeline, and a `search_nrb_documents` tool. These
-reuse the department-RAG infrastructure (Postgres + pgvector — no second
-vector database) rather than anything built for Phase 1.
+### Files
 
-`get_nrb_forex`'s description already carries the negative-routing clause
-("not for monetary policy, circulars, directives...") so the two tools route
-correctly against each other once Phase 5 exists; `search_nrb_documents`'s
-description should reciprocate ("not for forex rates; use get_nrb_forex").
+```
+app/nrb/sitemap.py                   host guard, bounded fetch, XML parsing, the walk
+app/nrb/classify.py                  pure deterministic URL classifier
+app/nrb/report.py                    pure aggregation + rendering
+scripts/nrb_sitemap_inventory.py     the manual run (--json / --urls / --sample / --root)
+tests/test_nrb_sitemap.py            109 unit tests, HTTP mocked, no network
+```
 
-Not scoped yet: crawl targets/frequency, dedup/hash strategy, Nepali-language
-and legacy-font PDF handling (OCR fallback likely needed — flagged in
-`CLAUDE.md`'s RAG section as a known gap for scanned documents generally).
+Config: one new setting, `NRB_SITE_BASE_URL` (default `https://www.nrb.org.np`).
+Separate from `NRB_API_BASE_URL` because that is a versioned API path; its **host
+is also the discovery trust boundary**. Nothing was added to `LOCAL_TOOLS`.
+
+```
+scripts/nrb_sitemap_inventory.py
+   → sitemap.discover()      probe root → walk index → fetch children (bounded)
+        → parse_sitemap()    namespace-agnostic, doctype/entity-refused
+        → normalize_url()    dedup key; original loc always retained
+        → classify_url()     section / department / resource_type / page_kind
+   → report.summarize() → report.render()
+```
+
+### Live inventory (2026-08-13)
+
+Root: **`https://www.nrb.org.np/sitemap_index.xml`** (`/sitemap.xml` 301s to it).
+**60** sitemaps fetched (index + 59 children, all `urlset` — depth 2, no nesting).
+**19,480** URLs discovered, **19,480** unique (0 duplicates), 0 rejected, 0 errors.
+`lastmod` on every entry, spanning 2019-12-05 → 2026-08-13.
+
+| page_kind | count | | resource_type | count |
+|---|---|---|---|---|
+| `document_post` | 18,567 (95.3%) | | `html` | **19,480 (100%)** |
+| `news_post` | 415 | | | |
+| `taxonomy_archive` | 359 | | | |
+| `page` / `post_type_archive` / `department_page` / `office_page` / root | 139 | | | |
+
+Sections: `unknown` 18,666 (95.8%), `research` 230, `other` 193, `media` 177,
+`faq` 35, `report` 31, `statistics` 31, `circular` 28, `notice` 18,
+`guideline_manual` 12, `publication` 11, `license_registry` 9,
+`monetary_operations` 8, `directive`/`monetary_policy`/`act`/`rule_bylaw`/
+`enforcement_action` 4 each, `procurement` 5, `career` 3, `forex` 3.
+
+Top owners (of 33 codes): `bfr` 5,400 · `pdm` 3,584 · `red` 2,299 · `ofg` 2,296 ·
+`gsd` 951 · `fxm` 544 · `hrm` 538 · `psd` 433 · `fmd` 384 · `fiu` 208 · `mfd` 201.
+1,202 URLs have no owner (categories, dated posts, standalone pages).
+
+### The finding that matters
+
+**The sitemap says who published a document, never what it is.** 18,567 documents
+live at `/{owner}/{slug}/` with a Devanagari title slug; the
+directive/circular/act vocabulary appears only on the 359 `/category/…` archive
+pages. So the 95.8% `unknown` is the site's shape, not a weak classifier — which
+is why `page_kind` exists as a separate field. Three consequences for Phase 3:
+
+1. **There is no URL rule waiting to be found.** Section has to come from the
+   category archives (359 pages, paginated) or from each post's own page.
+2. **No attachment URLs are in the sitemap at all** — zero `.pdf`. PDFs are
+   linked from inside the HTML pages, so document discovery is necessarily a
+   page-level crawl, not a sitemap read.
+3. ~~**The WordPress REST API is disabled** (`/wp-json/wp/v2/…` → 404), so the
+   cheap route to per-post categories and attachments is closed.~~
+   **This was wrong, and Phase 3 corrected it.** `/wp-json/` is disabled but NRB
+   moved the REST prefix to **`/api/`**, which is fully open. Only the default
+   path was tested. See §7 — it changed Phase 3's whole design.
+
+Chronology is safe: every URL carries a `lastmod`, so the directive-plus-later-
+circulars ordering that Phase 3+ needs is available without re-crawling.
+
+### Surprises worth remembering
+
+* Sitemap **filenames disagree with paths**: the eight office sitemaps publish
+  `/federal-offices/<code>/<slug>/` (owner in the *second* segment, 385 URLs), and
+  `ditty_news_ticker-sitemap.xml` publishes `/ticker/…`.
+* NRB runs a **misspelled duplicate category** (`inforcement-actions-offsite-onsite`
+  alongside `enforcement-actions-offsite-onsite`) with live posts in it. Kept.
+* **`fepd` does not exist** on the site. The relevant codes are `fxm` and `ficpd`.
+* A 404 returns a **~100 KB HTML page**, so "is this a sitemap" is decided on the
+  parsed root element.
+* Paged post types split at exactly 1000 URLs (`bfr-sitemap1..6`).
+* All 18 remaining unrecognised path roots are single institutional pages (about,
+  contact, organogram, privacy policy…). No unmapped `/category/` roots remain.
+* `/departments/` has 29 pages but only 27 are owner codes — `statistics-division`
+  and `statistics-data-links` are pages with no post type, so they own no
+  documents and correctly get `department=null`.
+* NRB publishes an **`/api-docs-v1/` page — it documents the Forex API only.**
+  Checked, because an official document API would have removed the need to crawl
+  at all. There is no *documented* one — but there is an undocumented one, the
+  WordPress REST API at `/api/`, which Phase 3 found and now uses (§7).
+* The site nav exposes NRB's own editorial hierarchy ("Laws, Policies &
+  Guidelines → Acts / Rules and Bylaws / Guidelines and Manuals", "Regulations &
+  Supervisions → Circulars", …), which is a third possible route to section
+  membership and cheaper than either option in §6 — worth pricing before choosing.
+
+### Bounds and trust
+
+Host: exactly the `NRB_SITE_BASE_URL` host — no subdomains, no userinfo, https
+required for anything fetched. Every child sitemap loc is re-checked, so NRB's own
+sitemap cannot walk us off site. Redirects are not followed except **one hop at
+root probing**, same-host and https (that 301 is real). Depth ≤ 3, ≤ 300 sitemaps,
+≤ 200,000 URLs, ≤ 10 MB per response, 5 s connect / 30 s read, sequential
+requests. Any bound that bites lands in `inventory.truncated`, prints a banner and
+exits 1. `fetch_url`'s SSRF guards are neither reused nor relaxed.
+
+### Evaluation & Improvement (Phase 2)
+
+1. **Success metric** — share of discovered URLs carrying a *correct and useful*
+   classification. Today: 100% carry an accurate `page_kind` and 95.3% carry an
+   owner; only 4.2% carry a section, which is the ceiling the sitemap allows.
+   Phase 3's own metric is what lifts the section number, so the honest Phase 2
+   metric is **zero URLs silently lost or misfiled**: 0 rejected, 0 errors, 0
+   unmapped categories, 18 unrecognised roots — all named in the report.
+2. **Eval** — `tests/test_nrb_sitemap.py`, 109 tests, **109/109 passing**. The
+   labelled set is 23 category→section cases plus 8 resource-type and 12
+   page_kind/owner cases, all URL shapes copied verbatim from the live sitemap.
+   Bounds, host rejection and XML safety are covered separately.
+3. **Feedback capture** — the report itself: `unmapped_categories` and
+   `unrecognised_path_roots` are the correction log, and every classification
+   carries an `evidence` string naming the rule that fired, so a disputed label is
+   traceable rather than arguable. `--json` output diffs cleanly between runs.
+4. **Review loop** — re-run before any Phase 3 work and after any NRB site
+   redesign; a new category or post type appears as a named to-do rather than a
+   silent `other`. Both lists being empty and counts moving only upward is the
+   pass condition.
+
+---
+
+## 6. How Phase 3 answered §5's open decision
+
+§5 left one question: how a document gets its type, given the sitemap does not
+carry one. It offered two shapes — crawl the 359 category archives, or fetch each
+of the 18.5k post pages. **Neither was necessary.** Probing the site first found a
+third route that neither option anticipated, and it is strictly better than both:
+NRB's WordPress REST API, open at `/api/`, returns each post's category ids, its
+dates and its attachment *as data*.
+
+The lesson is worth keeping: the Phase 2 conclusion "the REST API is unavailable"
+came from testing only the default `/wp-json/` path. One more probe would have
+changed Phase 3's design a week earlier.
+
+---
+
+## 7. Phase 3 — what shipped, and what a document post really is
+
+### Files
+
+```
+app/nrb/http.py                        shared host guard, URL normalization, FetchError
+app/nrb/wp_api.py                      WordPress REST reader (bounded, paged, host-guarded)
+app/nrb/attachments.py                 attachment extraction + typing (pure)
+app/nrb/documents.py                   NRBDocument + category->section resolution (pure)
+app/nrb/page.py                        bounded post-URL probe (the verification path)
+app/nrb/report.py                      + summarize_documents / render_documents
+scripts/nrb_document_inventory.py      the manual run
+tests/test_nrb_pages.py                114 unit tests, HTTP mocked, no network
+```
+
+`sitemap.py` now imports its host guard from `http.py` rather than owning a
+private copy — one trust boundary for every NRB integration. Its public surface
+is unchanged (Phase 2's 109 tests still pass untouched).
+
+Config: one new setting, `NRB_CRAWL_DELAY_SECONDS` (default 0.25). Byte caps,
+timeouts and page bounds stay module constants, because they follow from the
+site's measured shape; how hard we may lean on a central bank's website is an
+operational judgement, so that one is configurable.
+
+```
+scripts/nrb_document_inventory.py
+   -> wp_api.fetch_categories()      284 categories, 3 requests
+   -> wp_api.fetch_post_types()      which types REST actually serves
+   -> wp_api.fetch_posts(type)       100 posts/request, X-WP-Total paged
+        -> documents.build_document()          pure
+             -> attachments.extract_attachments()   acf fields, then body anchors
+             -> Taxonomy.section_for()              category parent chain
+   -> report.summarize_documents() -> render_documents()
+   -> (--verify N) page.probe_page()  does the 302 land where REST said?
+```
+
+### The design decision, and why the brief was not followed
+
+The brief specified a page-level HTML crawl: fetch each post page, scrape its
+attachment anchors. Measuring the live site first contradicted every premise of
+that plan:
+
+| The brief assumed | The site does |
+|---|---|
+| post URLs render HTML to scrape | **104 of 110 answer 302 straight to the file** (97 PDF, 4 xlsx, 3 jpg) |
+| attachments are anchors in the page | they are `acf.document_file`, a data field |
+| page HTML carries dates | it carries **none** — no `article:published_time`, no JSON-LD |
+| WP REST is unavailable | it is fully open at `/api/` |
+| ~18,567 page fetches | **~190 REST requests** for the same corpus |
+
+So REST is the data path and `page.py` is the *verification* path — it answers
+"does the post URL really redirect to the file REST claims?", which is a real
+question about trustworthiness. Measured: **60/60 probes agreed** on the full run.
+
+### Live inventory — the FULL corpus (2026-08-14)
+
+18,370 documents in **5m18s**, **zero fetch failures**, 60/60 probes agreeing.
+
+| | |
+|---|---|
+| documents normalized | **18,370** |
+| attachment links / unique | 18,298 / **18,256** (42 duplicate refs) |
+| posts with **1** attachment | **18,032 (98.2%)** |
+| posts with **0** | 205 (1.1%) |
+| posts with **2** | 133 (0.7%) |
+| PDF-looking | **16,593 (90.7%)** |
+| non-PDF | 1,705 — spreadsheet 1,556, image 115, document 34 |
+| type from WordPress's own MIME | 18,220 (99.6%); only 78 fell back to the extension |
+| title present | 18,367 / 18,370 |
+| published date present | **18,370 / 18,370** |
+| canonical URL mismatches | **0** |
+
+Attachment discovery: `acf:document_file` 18,105 · `acf:secondary_file` 115 ·
+`body_link` 78. Extensions: pdf 16,593 · xlsx 1,252 · xls 304 · jpg 84 · doc 21 ·
+docx 13 · png 11 · gif 10 · jpeg 10.
+
+**Hosts: 18,295 of 18,298 on `www.nrb.org.np`. The other 3 are the finding** —
+they point at `http://uat.nrb.org.np/wp-content/uploads/…`, a **UAT/staging host,
+over plain http**. Live NRB documents linked to a staging server. Phase 4 must
+decide explicitly what to do with them; they are currently refused by the host
+guard and reported, which is the right default.
+
+### Document type — one number would have lied
+
+Blended coverage is **71.6%** (13,149 of 18,370). That figure is misleading, and
+the report breaks it out by publication year because of it:
+
+```
+2003–2018     ~97–100%   (a few dozen to a few hundred per year)
+2019           47.5%     9,189 documents  <-- the CMS migration
+2020           96.4%     2021  95.9%   2022  97.2%   2023  89.3%
+2024           95.0%     2025  96.5%   2026  96.5%
+```
+
+**5,052 of the 5,221 untyped documents sit in one category: `upload-files`**, a
+WordPress catch-all, and almost all carry a 2019 date — NRB's bulk migration onto
+this CMS. Only 160 documents have no categories at all. So type extraction is
+~95% reliable for everything published since 2020 and the shortfall is a single,
+named, one-off legacy backlog rather than a diffuse failure.
+
+Sections (primary, full corpus): notice 3,050 · statistics 3,052 ·
+monetary_operations 2,311 · circular 1,294 · media 990 · report 652 ·
+procurement 314 · publication 340 · research 275 · license_registry 206 ·
+monetary_policy 130 · guideline_manual 120 · enforcement_action 98 ·
+directive 96 · act 90 · rule_bylaw 84 · career 25 · forex 19 · unknown 5,221.
+
+Note the regulatory core is small and tractable: directives, circulars, acts,
+rules, guidelines and monetary policy together are ~1,800 documents.
+
+### What the page HTML exposes (for the record)
+
+Sampled across owners; used only by `--verify`, never as the data path:
+
+* `<link rel=canonical>`, `og:title` (with a ` - <og:site_name>` suffix to strip),
+  `og:description`, the theme's single `.main-title`.
+* **`<meta property="article:section">`** — the WordPress category, which is a
+  useful cross-check on the REST category resolution.
+* A Yoast breadcrumb, `Home » <owner name> » <title>`, which is the only place
+  NRB spells out an owner code (`fmd` → "Financial Management Departments"). This
+  is how `owner_label` gets populated without inventing an expansion.
+* **No dates of any kind.** No JSON-LD anywhere.
+
+### Special cases Phase 4 must handle
+
+1. **Percent-encoding equivalence.** REST returns `…/आगलागी-२०७४.pdf` with literal
+   UTF-8; the 302 `Location` returns the same file percent-encoded. Comparing raw
+   strings reported phantom disagreements and would double-count the file.
+   `attachments.comparison_key` (decoded path) is the identity;
+   `Attachment.url` keeps NRB's own spelling because that is what a downloader
+   should request.
+2. **3 attachments on `uat.nrb.org.np` over http** (above).
+3. **`economic-review` (49 URLs) and `er-article` (147)** are in the sitemap but
+   **not REST-registered** — 196 documents REST cannot reach. Reported separately
+   from failures; they need the page path or a different route.
+4. **205 posts have no attachment at all** — some are genuinely empty stubs, some
+   are duplicates of a sibling post (`economic-bulletin-2023-04-mid-april` and
+   `…-2` both exist, one empty).
+5. **133 posts carry two files** (`document_file` + `secondary_file`) — usually a
+   circular plus its annex, so they are one document in two parts, not two
+   documents. That is a Phase 4 modelling decision.
+6. **A `mime_type` can disagree with the extension.** WordPress's value wins and
+   both are kept (`resource_type`/`type_source` vs `extension`).
+7. `acf` is `[]` on fieldless posts; an unset file field is `false`, not absent.
+8. Useful deterministic ACF extras exist and are retained verbatim:
+   `circular_number`, `fiscal_year`, `month`, `period`, `quarter`, `division`,
+   `province`, and tender dates (`first_date_of_publication`,
+   `last_date_of_submission`, `opening_date`).
+
+### Acceptance criteria, answered from live evidence
+
+1. **Can a document post be fetched and parsed reliably?** Yes — 18,370/18,370,
+   zero failures, though via REST rather than the page.
+2. **Authoritative title?** Yes — 18,367/18,370 (3 genuinely have none).
+3. **Date/category metadata?** Dates **100%** (REST only; the page has none).
+   Categories on 18,210 of 18,370.
+4. **Real attachment URLs?** Yes — 18,256 unique, verified against the live 302 on
+   60/60 probes.
+5. **0 / 1 / many attachments?** 1.1% / 98.2% / 0.7%.
+6. **PDF-looking?** 90.7% of links; 99.6% typed from WordPress's recorded MIME.
+7. **Hosted where?** 18,295 on `www.nrb.org.np`; 3 on the `uat.` staging host.
+8. **Type from page evidence?** 71.6% overall, **~95% for 2020 onward**; the
+   shortfall is the 2019 `upload-files` migration batch.
+9. **Edge cases?** Listed above.
+10. **Deterministic enough to automate on?** Yes for everything except the legacy
+    backlog: extraction is pure, ordered, and reproducible, and two runs over the
+    same corpus produce byte-identical reports.
+
+### Evaluation & Improvement (Phase 3)
+
+1. **Success metric** — share of document posts yielding a *trustworthy* download
+   target: a resolved attachment URL on the approved host whose type came from
+   WordPress's own MIME. Currently **18,220 / 18,370 = 99.2%**; the complement is
+   205 attachment-less posts, 78 body-link-only attachments and the 3 UAT ones.
+   Type coverage (~95% post-2019) is tracked separately because it gates
+   *routing*, not retrieval.
+2. **Eval** — `tests/test_nrb_pages.py`, **114 tests, 114/114 passing**, plus
+   Phase 2's 109 still green after the `http.py` refactor. The labelled set covers
+   28 attachment cases, 18 normalization/classification cases and 16 fetch/
+   security cases, with fixtures copied from live payloads. The live cross-check
+   is `--verify`: **60/60** redirect targets matched REST.
+3. **Feedback capture** — the report is the correction log: `unmapped_categories`,
+   `post_types_not_served_by_rest`, `off_host_examples`, `untyped_examples`,
+   `failures_by_kind` and `probe_disagreement_examples` each name a specific
+   fixable gap, and every classification carries an `evidence` string. `--json`
+   output is stable, so two runs diff cleanly.
+4. **Review loop** — re-run `--limit 800 --verify 40` before any Phase 4 work and
+   after any NRB site change; re-run `--all` when the corpus count moves
+   materially. Pass condition: zero failures, zero probe disagreements, no new
+   unmapped categories, and off-host attachments still countable on one hand.
+
+---
+
+## 8. Phase 4 — the gate
+
+Phase 4 is `discovered attachment -> download -> validate MIME/content ->
+hash/deduplicate -> PDF/text extraction -> chunk -> embed -> RAG ingestion`,
+through the existing `app/rag/` pipeline (Postgres + pgvector — no second vector
+database). None of it is built, and nothing in Phase 3 persists anything.
+
+Decisions to make **before** writing the schema, all now answerable from §7:
+
+* **Corpus scope.** The regulatory core (directives, circulars, acts, rules,
+  guidelines, monetary policy) is ~1,800 documents — a far better first ingest
+  than all 18,370, and it is exactly the set whose type is most reliable.
+* **The 2019 `upload-files` backlog** (5,052 documents): ingest untyped, leave
+  out, or classify from another signal. Do not guess from titles.
+* **Two-file posts** (133): one document or two?
+* **The 3 UAT/staging attachments** and the 196 REST-invisible posts: fetch by
+  another route, or accept the gap and record it.
+* **Identity and change detection.** `post_id` + `modified` + attachment
+  `comparison_key` are all available; a content hash needs the download Phase 4
+  introduces. Chronology for the directive/amendment problem is fully available
+  (`date`, `modified`, plus `circular_number` where NRB publishes it).
+* **Nepali / legacy-font PDF handling** — still unscoped, OCR fallback likely
+  needed (a known gap for scanned documents generally, per `CLAUDE.md`'s RAG
+  section). ~91% of the corpus is PDF, so this is the main technical risk.
+
+Routing for the search tool is unchanged: `get_nrb_forex`'s description already
+carries the negative clause ("not for monetary policy, circulars, directives…"),
+and `search_nrb_documents` should reciprocate ("not for forex rates; use
+get_nrb_forex").
+
+---
+
+## 9. Phase 4 — the persistent catalog
+
+Discovery now has somewhere to live. Phase 4 reconciles NRB's published corpus
+into Postgres on demand: what NRB publishes, which files each post points at, and
+what changed since last time. **Nothing is downloaded** — no attachment is
+fetched, no bytes are hashed, no text is extracted, nothing is embedded, no
+`ingest_jobs` row is created, `LOCAL_TOOLS` is unchanged and no endpoint was
+added.
+
+### Files
+
+```
+app/nrb/models.py                nrb_sources / nrb_files / nrb_source_files / nrb_sync_runs
+app/nrb/records.py               discovery -> rows, identity keys, the metadata hash (pure)
+app/nrb/catalog.py               set-based data access (no commits)
+app/nrb/discovery.py             one complete read of the corpus (REST + sitemap)
+app/nrb/sync.py                  the idempotent reconciliation + advisory lock
+app/nrb/report.py                + summarize_sync / render_sync
+scripts/nrb_sync.py              the manual command (--dry-run / --limit / --json)
+alembic/versions/9a1c4f7b2e05_add_nrb_catalog_tables.py
+tests/test_nrb_catalog.py        71 pure tests (no DB, no network)
+tests/test_nrb_sync_integration.py  55 tests against real Postgres
+```
+
+No new configuration. The host stays `NRB_SITE_BASE_URL`, pacing stays
+`NRB_CRAWL_DELAY_SECONDS`, the database stays `DATABASE_URL`.
+
+```
+scripts/nrb_sync.py
+   -> discovery.discover_corpus()            REST (~190 requests) + sitemap (60)
+        -> wp_api.fetch_posts / documents.build_document   (Phase 3, unchanged)
+        -> sitemap.discover()                              (Phase 2, unchanged)
+   -> sync.run_sync()
+        pg_try_advisory_lock  ->  refuse if another sync holds it
+        -> catalog.create_run()
+        -> sync.reconcile()   files -> sources -> relationships -> deactivation
+        -> catalog.finish_run()
+   -> report.render_sync()
+```
+
+### The schema, and the two identities that carry it
+
+| Table | Rows | What it is |
+|---|---|---|
+| `nrb_sources` | 18,577 | one logical NRB post |
+| `nrb_files` | 18,266 | one distinct external attachment |
+| `nrb_source_files` | 18,308 | which files a post publishes, ordered |
+| `nrb_sync_runs` | one per sync | counters + why deactivation was or was not allowed |
+
+**Source identity** is `(wp_post_type, wp_post_id)` first — WordPress's own id,
+enforced by a *partial* unique index (`WHERE wp_post_id IS NOT NULL`, because a
+sitemap-only row has none and a plain UNIQUE would allow exactly one) — and
+`url_key` as the fallback, enforced unique unconditionally. Never the title: NRB
+publishes near-identical Devanagari titles across years and three documents have
+no title at all.
+
+**File identity** is `comparison_key`, Phase 3's `attachments.comparison_key`
+reused rather than reimplemented.
+
+`url_key` is the part the brief did not anticipate, and it is the difference
+between 197 rows and 18,577. `comparison_key` was specified for files because REST
+returns `…/आगलागी-२०७४.pdf` literally while the 302 percent-encodes it — **the
+same is true of page URLs**: the sitemap percent-encodes Devanagari slugs, REST
+does not. Matching them as raw strings makes every REST document look absent from
+the sitemap, and each would be inserted a second time as a "sitemap only" stub.
+So `url_key` = `comparison_key` + a trailing-slash strip (WordPress serves
+`/bfr/slug/` and `/bfr/slug` as one page). `page_url` and `source_url` keep NRB's
+own spelling, because that is the string a fetcher must request; the `*_key`
+columns are only ever compared. Live proof: 18,380 REST documents, 18,577 sitemap
+document URLs, and exactly 197 of the latter unmatched.
+
+Other schema decisions worth not re-deriving:
+
+* **`document_type` is nullable and 5,418 rows use it.** 5,221 are the untyped
+  corpus from §7 (mostly the 2019 `upload-files` migration batch) plus the 197
+  sitemap-only rows. A type guessed from a Devanagari title would be
+  indistinguishable from a real one. `raw_taxonomy` keeps NRB's category ids,
+  slugs, names and the per-category evidence so a future reclassification runs
+  against Postgres instead of re-crawling.
+* **`sections` is a JSONB array, not a scalar.** Posts really are filed under
+  several; `document_type` is only the first by `classify.SECTIONS` order.
+* **`owner`, not `department`.** In this codebase `department` is the RAG
+  permission boundary; reusing the word here would read as access control.
+* **The three UAT attachments are rows.** `fetch_status='blocked_host'` with the
+  guard's own reason, decided by `http.check_url(..., require_https=True)` — the
+  same function the fetchers use, not a second opinion. The catalog records that
+  NRB referenced them; nothing can fetch them. A CHECK makes "blocked with no
+  reason" unrepresentable.
+* **No `content_sha256` / `content_length` / `downloaded_at`.** Phase 5 adds those
+  with its own migration when it knows their shape. Nullable columns nothing
+  writes are dead weight.
+* **`metadata_hash` excludes `sitemap_lastmod`** (Yoast derives it from
+  `post_modified`, which is hashed) and carries only the attachment
+  `comparison_key`s, not their MIME or size. A file edit is `files_updated`; a
+  post gaining or losing a file is `sources_updated`. Hashing both would
+  double-count one upstream edit and break the second-run-is-zero invariant.
+* **Timestamps are parsed with the offset derived per post from `date` −
+  `date_gmt`.** `modified` has no GMT twin, so an assumed +05:45 would shift the
+  chronology later phases need for amendment ordering by hours if NRB's WordPress
+  site timezone were ever not what we guessed. The raw strings stay in `metadata`.
+
+### Reconciliation semantics
+
+| Situation | What happens |
+|---|---|
+| new | inserted; `first_seen_at` = this run |
+| changed (`metadata_hash` moved) | updated in place; `first_seen_at` untouched |
+| unchanged | `last_seen_at` + `last_sync_run_id` advance only — **not** counted as an update |
+| missing, complete run | `is_active=false` + `deactivated_at`; never hard-deleted |
+| missing, incomplete run | nothing; the run says why |
+| reappears | reactivated, `first_seen_at` preserved |
+| attachment removed | the **relationship** goes; the `nrb_files` row stays |
+| attachment respelled (encoding only) | same file row, no change at all |
+| attachment genuinely different | new file row; the old one is retained, unreferenced |
+| REST stops returning a known post | stored REST metadata is kept, row stamped as seen, warning raised |
+
+Three safety rules, in the order they bite:
+
+1. **Absence-based deactivation requires a complete discovery** — every REST
+   collection and the whole sitemap read with no error and no truncating bound.
+   `--limit` and `--no-sitemap` are incomplete by construction.
+2. **...and a 90% shrink floor** (only applied at ≥100 known sources). A
+   "complete" run that suddenly sees 60% of the corpus is refused, because NRB
+   serving empty REST collections would otherwise deactivate thousands of good
+   rows in one statement. The run reports `partial` and names the reason.
+3. **...and `ck_nrb_sync_runs_deactivation_needs_complete`** makes the illegal
+   combination unrecordable even if a future caller tries.
+
+Two guards that are not in the brief and were added because the failure they
+prevent is silent:
+
+* **A REST source is never downgraded to `sitemap_only`.** One post type dropping
+  out of REST for a single run would otherwise strip the attachments off every
+  source it owns — `bfr` alone is 5,400 — while the run still called itself clean.
+* **`sitemap_only` rows are only created when the REST pass was complete**
+  (`Discovery.rest_complete`, a separate question from `Discovery.complete`). On
+  `--limit 300`, "in the sitemap but not in REST" would name ~18,267 URLs REST
+  serves perfectly well. Verified: the bounded run creates zero and says so.
+
+### Transactions, and what a crash leaves behind
+
+Phases commit separately — files, then sources, then relationships (batched, but
+always at a source boundary so a post's whole attachment set lands together), then
+deactivation, then the run row. Every phase before deactivation is *additive or
+corrective*, so a crash leaves a catalog that is **behind, never wrong**, and the
+next run finishes the job. Deactivation is the only destructive-ish statement and
+it runs last, gated as above. One 18k-row transaction was rejected deliberately:
+it would either land whole or throw away a multi-minute run.
+
+`--dry-run` runs the identical code path in one transaction and rolls it back, so
+it predicts what the real run would do — including any constraint it would violate
+— rather than approximating it. The run row is rolled back too. Verified live
+against the populated catalog: `--limit 5 --no-sitemap --dry-run` reported 5
+sources and 5 files *unchanged* and wrote nothing.
+
+### Concurrency
+
+A Postgres **session-level advisory lock** (`pg_try_advisory_lock`, key
+`NRB_SYNC` as ASCII) held on a connection dedicated to it for the whole sync,
+**taken before discovery rather than before reconciliation**. Both orderings refuse
+correctly; the first version locked later, and a live check caught that a second
+invocation would then spend ~190 requests and four minutes on a central bank's
+website before finding out it could not proceed. Discovery is read-only, so this is
+politeness, not correctness — which is exactly why it was easy to get wrong.
+`tests/test_nrb_sync_integration.py` pins it by replacing `discover_corpus` with a
+landmine while the lock is held. A
+second sync refuses with `SyncBusy` rather than waiting, because two syncs would
+interleave counters and race on the same rows. The lock is on its own connection
+because an `AsyncSession` returns its connection to the pool at every commit,
+which would silently release the lock at the first phase boundary and strand it on
+a pooled connection. No lock table and no Redis: the lock dies with the
+connection, so a killed sync leaves nothing to clean up. The `nrb_sync_runs` row
+is a record, never a mutex — a crashed run's row stays `running` forever and
+blocks nothing.
+
+### Live runs (2026-08-14, full corpus)
+
+Both against a clean database, back to back.
+
+```
+                      run #1        run #2
+sources seen          18,577        18,577
+  created             18,577             0
+  updated                  0             0
+  unchanged                0        18,577
+  reactivated              0             0
+  deactivated              0             0
+  sitemap-only           197           197
+files seen            18,266        18,266
+  created             18,266             0
+  updated                  0             0
+  unchanged                0        18,266
+  blocked                  3             3
+relationships created 18,308             0
+  removed                  0             0
+status             completed     completed
+deactivation applied    True          True
+```
+
+**Run #2 is the acceptance test and it is exactly zero.** Only `last_seen_at` and
+`last_sync_run_id` moved.
+
+Timing, and why the report prints the two halves separately: **discovery 258.3 s,
+reconciliation 4.0 s.** Reading 18.5k documents over ~190 paced REST requests plus
+60 sitemaps is the entire cost; the 18,577-source diff-and-write against Postgres
+is four seconds. A blended number would make the sync look expensive and NRB's
+site look fast, and would hide which half to look at when a run gets slower.
+
+Database verification after run #2:
+
+```
+sources                       18,577   (active 18,577, inactive 0)
+  from REST                   18,380
+  sitemap-only                   197   <- economic-review + er-article + 1 ticker
+  untyped (document_type NULL)  5,418
+files                         18,266   (blocked 3, all uat.nrb.org.np over http)
+source-file relationships     18,308
+duplicate source identities        0
+duplicate comparison keys          0
+```
+
+18,380 + 197 = 18,577 = the sitemap's document-URL count, which is the
+cross-check that `url_key` matching works: every REST document was found in the
+sitemap, and the 197 remainder is the known REST-invisible set. The one warning
+was upstream's: two posts describe the same shared PDF with different metadata.
+
+Sitemap URLs deliberately **not** persisted as sources (they are pages about
+documents, not documents): 415 `news_post`, 359 `taxonomy_archive`, 60 `page`, 39
+`post_type_archive`, 30 `department_page`, 9 `office_page`, 1 root. Counted in the
+run's `notes` rather than silently dropped.
+
+### Evaluation & Improvement (Phase 4)
+
+1. **Success metric** — the share of NRB's published corpus that is present,
+   correctly identified, and correctly attributed in the catalog, with **zero
+   duplicate identities**. Today: 18,577 of 18,577 sitemap document URLs present
+   (100%), 18,380 with full REST metadata (99.0%), 0 duplicate `url_key`s, 0
+   duplicate `comparison_key`s, 3 known-unfetchable files recorded as such. The
+   secondary metric is the one that makes the catalog trustworthy over time:
+   **a second consecutive sync must report zero meaningful changes** (measured:
+   0 created, 0 updated, 0 deactivated).
+2. **Eval** — `tests/test_nrb_catalog.py` (71 pure) + `tests/test_nrb_sync_integration.py`
+   (55 against Postgres) = **126 tests, 126/126 passing**, plus Phase 1–3's 296
+   still green (**422** NRB tests total; full suite 1,060 passing with one
+   pre-existing unrelated RAG failure, see §9.10). The labelled set covers the cases that would
+   corrupt a catalog rather than merely annoy: encoding-only URL changes, the
+   sitemap/REST identity match, reactivation, relationship removal without file
+   deletion, the shrink floor, the incomplete-run deactivation ban, and every
+   CHECK/unique constraint asserted against real Postgres. The live idempotency
+   run is the end-to-end eval and is repeatable by anyone with network access.
+3. **Feedback capture** — `nrb_sync_runs` **is** the feedback log: per-run
+   counters plus `notes` (bounded samples of errors and warnings, the bounds that
+   truncated discovery, the post types REST did not serve, the sitemap kinds
+   skipped, whether deactivation was applied and if not why). Every source also
+   carries `classification_source` (the rule that produced its type) and
+   `last_sync_run_id`, so a disputed row is traceable to a run and a rule.
+   `--json` output diffs cleanly between runs.
+4. **Review loop** — run `scripts/nrb_sync.py` twice before any Phase 5 work and
+   after any NRB site change. Pass condition: run #1 `completed`, run #2 all-zero,
+   both duplicate counts 0, `inactive` moving only when NRB genuinely withdraws
+   something, and `blocked_files` still countable on one hand. A jump in
+   `sources_deactivated` or a `deactivation_skipped` note is the signal to look at
+   NRB before looking at the code.
+
+### 9.9 The Phase 5 gate
+
+Phase 5 is `new/changed nrb_file -> safe download -> real MIME validation ->
+SHA-256 -> local storage`. The catalog now answers the questions the old §8 could
+not:
+
+* **Corpus scope is a query, not a guess.** `SELECT count(*) FROM nrb_sources
+  WHERE document_type IN ('directive','circular','act','rule_bylaw',
+  'guideline_manual','monetary_policy')` is the ~1,800-document regulatory core,
+  and `ix_nrb_sources_document_type` exists for exactly that.
+* **The work queue is `nrb_files WHERE fetch_status = 'pending'`**, which by
+  construction excludes the three blocked UAT files.
+* **Change detection is already recorded** — `metadata_hash`, `modified_at`,
+  `first_seen_at`/`last_seen_at` per file. What is still missing is *content*
+  identity, which needs the download: Phase 5 adds `content_sha256`,
+  `content_length`, `downloaded_at` and the `fetched`/`failed` values in
+  `ck_nrb_files_fetch_status` (that CHECK must be edited, not bypassed).
+* **Still undecided:** whether to ingest the 5,418 untyped sources, and Nepali /
+  legacy-font PDF handling with an OCR fallback (~91% of the corpus is PDF, so
+  this remains the main technical risk). Neither is a schema question any more.
+
+### 9.10 Migration lineage: source citations are DEFERRED, not abandoned
+
+**Decision, 2026-08-14 (the user's, recorded so nobody re-opens it as a bug):**
+`feat/rag-source-citations` is **parked**. It is not superseded, not abandoned and
+must not be deleted — source citations simply are not part of the current NRB
+milestone. Nothing about it is being reconciled now.
+
+Five facts this pins down:
+
+1. **`feat/rag-source-citations` is intentionally deferred, not abandoned.** The
+   branch stays as it is, local and on origin. It carries ~1,577 lines that exist
+   nowhere else (`app/rag/sources.py`, the chat/history/tool provenance changes,
+   four test files) plus a `rag_docs_base` fix `main` lacks. Not merged, not
+   rebased, not cherry-picked, not deleted.
+2. **`local_ai_gateway` (the real dev DB) remains tied to that branch's
+   revision.** It is stamped at `d4a91f2c7b3e`, so on this branch `alembic
+   current` fails with *"Can't locate revision identified by 'd4a91f2c7b3e'"* —
+   expected, and left exactly that way. `chat_messages.sources` and its data stay
+   untouched.
+3. **NRB Phase 5+ development and testing use the Phase 4 scratch database**
+   (`local_ai_gateway_p4`), where the NRB catalog migration and the full
+   18,577-source catalog are already verified. Point `DATABASE_URL` at it; see the
+   command block below.
+4. **Before NRB is merged or deployed against the real dev/production database,
+   the Alembic lineage must be revisited** and a decision made about citations.
+   That is a gate on merging NRB, not on building it. The two candidate routes and
+   the measured conflict analysis are kept below so the decision can be made from
+   evidence rather than re-derived.
+5. **No destructive database or migration-history operation is authorized** by
+   this deferral: no `alembic stamp`, no dropping `chat_messages.sources`, no
+   recreating or migrating `local_ai_gateway`, no editing `d4a91f2c7b3e`, no
+   squashing history.
+
+### 9.11 The lineage facts, for whoever revisits point 4
+
+**The dev database cannot be migrated from this branch.** `local_ai_gateway` is
+stamped at `d4a91f2c7b3e` (`add_chat_message_sources`), a revision that exists
+only on the unmerged `feat/rag-source-citations` branch, so on `feat/nrb-sitemap`
+even `alembic current` fails with *"Can't locate revision identified by
+'d4a91f2c7b3e'"*. Phase 4's migration was therefore verified — upgrade, downgrade,
+re-upgrade and `alembic check` (no drift) — plus both live syncs and the whole test
+suite, against a scratch database created for it:
+
+```bash
+psql -h 127.0.0.1 -U postgres -c "CREATE DATABASE local_ai_gateway_p4 OWNER gateway"
+psql -h 127.0.0.1 -U postgres -d local_ai_gateway_p4 -c "CREATE EXTENSION vector"
+DATABASE_URL=postgresql+asyncpg://gateway:***@127.0.0.1:5432/local_ai_gateway_p4 \
+    .venv/bin/alembic upgrade head
+```
+
+`9a1c4f7b2e05` revises `c33c0fd56028`, and `d4a91f2c7b3e` revises `c33c0fd56028`
+too — so once both files coexist in one branch there are genuinely **two Alembic
+heads** off a common ancestor. Nothing was changed about the dev DB's stamp.
+
+**The preferred route when this is revisited (NOT yet done, and deferred by the
+decision in §9.10) is a rebase, not an Alembic merge revision.**
+`feat/rag-source-citations` lands on `main` first, in its own PR; then
+`feat/nrb-sitemap` rebases onto `main` and `9a1c4f7b2e05`'s `down_revision` is
+pointed at `d4a91f2c7b3e`. Rationale:
+
+* Every branch in this repository is a linear ancestor of `main`. A merge DAG in
+  `alembic/versions` would be the only non-linear thing in the codebase, and it
+  would exist solely to record a coincidence of timing.
+* `9a1c4f7b2e05` is **not yet committed**, so choosing its parent is *authoring*
+  it, not rewriting published history. The only thing that has ever seen the old
+  parent is the scratch database, which is disposable.
+* The dev DB is already at `d4a91f2c7b3e`, so after the rebase
+  `alembic upgrade head` applies **exactly one** migration and no merge revision
+  is needed anywhere.
+* Merging the citations branch into the NRB branch instead would put an unreviewed
+  feature into the NRB PR and require resolving that feature's conflicts here.
+
+Recipe, for when the citations branch has landed. **Nothing below has been run,
+and none of it is authorized by the current deferral** — it is written down so the
+decision in §9.10 point 4 costs an hour rather than a day:
+
+```bash
+git rebase main                      # onto a main that contains d4a91f2c7b3e
+# then edit 9a1c4f7b2e05: down_revision = "d4a91f2c7b3e"
+.venv/bin/alembic heads              # must print exactly one
+.venv/bin/alembic check              # must print no new operations
+.venv/bin/alembic upgrade head       # on the dev DB: applies 9a1c4f7b2e05 only
+.venv/bin/python scripts/nrb_sync.py -v   # twice; the second must be all-zero
+```
+
+The five merge conflicts between the two branches were measured (`git merge-tree`,
+no working tree touched) and are all mechanical, which is what makes landing the
+citations branch on `main` cheap: `app/rag/parsing.py` and
+`tests/test_rag_parsing_docling.py` are **duplicates of changes already on main**
+(the CPU/no-OCR Docling pinning), `app/rag/retrieval.py` is additive on both sides
+(`file_name`/`file_type` vs `dense_rank`/`lexical_rank`), `app/config.py` adds
+`PROJECT_ROOT`/`rag_docs_base` which main **lacks**, and `.env.docker.example` is
+two rewrites of the same comment block. The citations branch is therefore *not*
+superseded — 1,577 lines of it (`app/rag/sources.py`, the chat/history/tool
+changes) exist nowhere else, and its `rag_docs_base` fix is one main should have.
+
+**One pre-existing test failure, unrelated.**
+`tests/test_rag_reingest_integration.py::test_department_filter_restricts_the_set`
+asserts an **unscoped** total of 2 documents, so any leftover `documents` rows from
+an earlier test break it. It fails identically on a stashed tree with no Phase 4
+code present (verified by `git stash push -u`), and it is the same dirty-database
+failure noted during Phase 3. Not fixed here: the fix is to scope that assertion to
+its own fixture, which is RAG's business.
+
+---
+
+## 10. Phase 5 — downloading the files
+
+The catalog can now say *we have this file*, not merely *NRB publishes it*. For a
+chosen slice of the corpus, `scripts/nrb_fetch.py` streams each file to disk under a
+byte cap, hashes it, checks the bytes against NRB's claim about them, stores it
+content-addressed, and records the result.
+
+**Still nothing is parsed.** No PDF is opened, no OCR runs, no text is extracted, no
+chunk or embedding exists, no `documents`/`ingest_jobs` row is created, `LOCAL_TOOLS`
+is unchanged and no endpoint was added. A stored file is a raw artefact; what it
+*says* is Phase 6's question.
+
+### Files
+
+```
+app/nrb/sniff.py                 magic-byte typing (pure, stdlib only)
+app/nrb/filestore.py             content-addressed blob store
+app/nrb/locks.py                 the advisory-lock rule, now shared with the sync
+app/nrb/fetch.py                 the downloader + one pass
+app/nrb/catalog.py               + select_fetch_targets / record_fetch_outcomes / fetch runs
+app/nrb/report.py                + summarize_fetch / render_fetch
+scripts/nrb_fetch.py             the manual command
+alembic/versions/2b7f5c9d1a34_add_nrb_file_download_columns.py
+tests/test_nrb_fetch.py             56 pure tests (no DB, no network)
+tests/test_nrb_fetch_integration.py 20 tests against real Postgres
+```
+
+One new setting, `NRB_FILES_DIR` (default `nrb_files`, gitignored). Byte caps and
+timeouts stay module constants, as in Phases 2–3: they follow from the corpus's
+measured shape (largest file live: 46 MB → `MAX_FILE_BYTES = 64 MB`), while pacing —
+how hard we may lean on a central bank — remains `NRB_CRAWL_DELAY_SECONDS`.
+
+### Scope is mandatory, and the numbers are why
+
+The command **refuses to run without a scope**. Measured from the catalog:
+
+| scope | files | reported size |
+|---|---|---|
+| everything (`--all`) | 18,263 | **8,793 MB** |
+| PDFs only | 16,560 | 8,131 MB |
+| spreadsheets | 1,554 | 619 MB |
+| **the regulatory core (`--core`)** | **1,804** | **1,537 MB** |
+
+`--core` is `circular, directive, act, rule_bylaw, guideline_manual,
+monetary_policy` — the set whose document type is most reliable (~95% post-2019, vs
+the 2019 `upload-files` backlog), and the obvious first ingest. 74 files report no
+size at all, so every total above is a floor. `--dry-run` prints this without making
+a single HTTP request.
+
+### The three things that make a stored file trustworthy
+
+1. **HTML where a document was promised is a failure, not a file.** WordPress
+   answers a missing file with a **200 and a themed ~100 KB HTML page** (Phase 2
+   measured that on this site). Storing one as `circular-15.pdf` would hand Phase 6 a
+   navigation menu to index as the text of a regulatory circular — a wrong document
+   that parses cleanly, which is far worse than a recorded gap. `app/nrb/sniff.py`
+   identifies the body from magic bytes; a `web` body against a document promise is
+   recorded as `failed` and nothing is written. (An HTML file that NRB *said* was
+   HTML is fine — the rule is about the mismatch.)
+2. **A `Content-Length` that disagrees with the body is a failure.** A truncated PDF
+   still opens and still parses; its tail is simply missing.
+3. **The path is the checksum.** `<sha256[:2]>/<sha256>.<ext>` under `NRB_FILES_DIR`,
+   so a blob is self-verifying, identical bytes republished under two URLs occupy one
+   file, and no Devanagari filename or `..` ever reaches the filesystem. Writes are
+   atomic: bytes stream to `.incoming/<uuid>.part` and are `os.replace`d into place
+   once the hash is known — the final name cannot be chosen up front.
+
+Type disagreements that are *not* the HTML case (NRB says PDF, bytes are a
+spreadsheet) are **stored and recorded**, not rejected: `sniffed_mime` sits beside
+`reported_mime_type` and the disagreement goes in `fetch_error`, for Phase 6 to
+judge. An unsniffable body (`application/octet-stream`) is also kept — rejecting it
+would lose real files whose type nothing at the front identifies.
+
+### Safety, unchanged from Phases 2–4
+
+`http.check_url(..., require_https=True)` is re-checked **at the code that opens the
+socket**, not trusted from the catalog row. Redirects are refused rather than
+followed. Bodies stream with a hard cap, so nothing is buffered in memory. Requests
+are sequential and paced. There is no retry inside a pass — a failure is recorded and
+`--retry-failed` is an explicit later decision. The three `uat.nrb.org.np`
+attachments cannot be selected at all: `select_fetch_targets` only ever asks for
+`pending` (plus `failed` on request), so `blocked_host` is excluded by construction
+rather than by a `WHERE` clause someone could forget.
+
+### Resumable, not idempotent — and the difference matters
+
+The sync is idempotent: run it twice, the second run changes nothing. A fetch is
+**resumable**: selection is `pending`-only in id order, results commit every 25
+files, so a second invocation with the same scope picks up the *next* unfetched
+files rather than redoing the last ones. A repeat pass over an *exhausted* scope
+selects zero and is a genuine no-op (covered by
+`test_a_second_pass_has_nothing_left_to_do`).
+
+Because storage is content-addressed, the worst an interruption can leave is an
+unreferenced blob — the next attempt at that file hashes to the same key, finds it
+present, and records it. There is no cleanup step to forget.
+
+Concurrency is a second advisory lock (`NRB_FTCH`), taken **before selection**, so a
+second pass refuses in milliseconds instead of racing on the same rows and doubling
+the load on NRB. `app/nrb/locks.py` now holds that rule once for both commands,
+including the reason it needs a dedicated connection (an `AsyncSession` returns its
+connection to the pool at every commit, which would silently release the lock).
+
+### Live evidence (2026-08-14)
+
+Two bounded passes, `--section circular --limit 25` each, against the scratch DB:
+
+```
+                    pass #1     pass #2
+selected                 25          25   <- the NEXT 25, not the same ones
+fetched                  25          25
+failed                    0           0
+already on disk           1           0   <- byte-identical to a sibling
+downloaded           15.5 MB     12.5 MB
+newly stored         14.8 MB     13.2 MB
+status            completed   completed
+```
+
+Verified afterwards: **24 blobs on disk for 25 rows** (one duplicate pair sharing a
+`storage_key`), `sha256sum` of each blob equals its own filename, all 25 sniffed
+`application/pdf` — NRB's recorded MIME agreed 25/25 — zero type disagreements, zero
+`.part` files left behind, and 50 files `fetched` / 18,213 still `pending` after the
+two passes.
+
+The duplicate turning up **within the first 25 files** is the finding: content
+addressing was not a hypothetical saving. Phase 3 had measured 42 duplicate
+attachment *references*; identical bytes under *different* URLs is a separate and
+apparently larger class, so the 8.6 GB reported total is an upper bound on disk.
+
+### Evaluation & Improvement (Phase 5)
+
+1. **Success metric** — the share of selected files that become a **trustworthy
+   local artefact**: stored, hashed, and of the type NRB claimed. Live: **50/50
+   (100%)** across two passes, 0 failures, 0 type disagreements, 100% of blobs
+   verifying against their own filename. The metric that matters more as scale grows
+   is the complement: **files stored that are not what they claim to be**, which the
+   soft-404 rule is designed to hold at zero. That number is queryable
+   (`fetch_status='fetched' AND fetch_error IS NOT NULL`), and it is 0.
+2. **Eval** — `tests/test_nrb_fetch.py` (56 pure) + `tests/test_nrb_fetch_integration.py`
+   (20 against Postgres) = **76 tests, 76/76 passing**; all NRB suites together are
+   **498/498**. The labelled set is the failure catalogue rather than the happy path:
+   the themed soft-404 in five spellings, a truncated transfer, an empty body, a
+   redirect, an over-cap body, a timeout, a transport error, the UAT host, plain http,
+   an off-host URL, a non-fatal type disagreement, an unsniffable body, and the
+   duplicate-bytes case. Two of them were written because the implementation was
+   wrong first: a leaked `.part` file on the cap path, and a sniffer that called
+   control-character binary "text/plain".
+3. **Feedback capture** — `nrb_fetch_runs` is the log: per-pass counters, the
+   **recorded `scope`** (a fetch is always a slice, so the counters are meaningless
+   without it), bounded samples of failures and type disagreements, and why a pass
+   stopped early. Per file, `nrb_files` keeps `fetch_attempts`, `http_status`,
+   `fetch_error`, `sniffed_mime` and `downloaded_at`, so a permanently broken URL is
+   visible instead of being retried forever.
+4. **Review loop** — before a large pass, run `--dry-run` and read the file count and
+   size. After it, check `files_failed` and the failure samples: a cluster of soft-404s
+   means NRB moved or withdrew files (re-run `nrb_sync.py` first), while a cluster of
+   timeouts means back off the pacing. Re-check `distinct_blobs` against `fetched`
+   occasionally — a widening gap is duplication, not a bug. Pass condition: no
+   failures outside the known-explained set, and `duplicate comparison keys` still 0
+   in the sync report.
+
+### 10.9 The Phase 6 gate
+
+Phase 6 is parsing: PDF/DOCX/spreadsheet text extraction for a Nepali corpus, with
+legacy-font detection and an OCR fallback. What Phase 5 leaves it:
+
+* A work queue that is a query — `nrb_files WHERE fetch_status = 'fetched'` — with
+  `storage_key`, `content_length`, `sniffed_mime` and `resource_type` per row.
+* Type answers it can trust as far as bytes go, and an honest limit where they do
+  not: **OLE2 (`.xls`/`.doc`) is identified as a family, not a format**, because
+  telling those apart means walking the OLE directory — which is a parser, i.e.
+  Phase 6's job. A ZIP whose flavour is not in its first 4 KB likewise degrades to
+  `application/zip`.
+* Still undecided, and unchanged by Phase 5: **whether the 5,418 untyped sources get
+  ingested**, and **how Nepali/legacy-font PDFs are handled** (~91% of the corpus is
+  PDF, so this remains the main technical risk). Neither is a schema question.
+* Not yet built, and deliberately: conditional re-download (no ETag/`Last-Modified`
+  is stored, so a file NRB edits in place is not re-fetched until someone asks).
