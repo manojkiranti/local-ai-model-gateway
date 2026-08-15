@@ -42,10 +42,16 @@ in `docs/nrb/phase6a-{profile,calibration}.txt`. **Phase 6B Task 1 (legacy-font 
 (2026-08-15, §12)**: Preeti recovers correctly above `legacy_line_ratio >= 0.80`
 (7/10 blobs; one converts line-for-line identically to its rendered page), all 14
 negative controls reconstruct byte-identically, and no routing is wired.
+**Phase 6B Task 2 (`native-2` routing classifier) is MEASURED and recommended
+(2026-08-15, §13)**: 381 native-2 rows sit beside native-1's, 7/7 English-table
+false positives corrected, spreadsheets judged per CELL for the first time
+(0 → 11 flagged), and 4 minority Preeti regions found inside Unicode-majority
+documents — with `legacy_line_ratio >= 0.20` **unchanged**. Classification only:
+it never invokes the converter.
 **NRB documents are now parsed
 and classified, but still NOT chunked, embedded or searchable** — the rest of 6B
 (OCR strategy), 7 (chunk+embed) and 8 (`search_nrb_documents`) are
-not started; the 6B gate and its recommendation are §11.9 and §12.10. The roadmap was renumbered when Phase 4 was scoped down to
+not started; the 6B gate and its recommendations are §11.9, §12.10 and §13.11. The roadmap was renumbered when Phase 4 was scoped down to
 persistence; read that doc before touching anything NRB-related instead of
 re-deriving status from chat history.
 
@@ -85,9 +91,13 @@ lazily); `legacy_font`+`devanagari`+`lexicon`+`legacy_convert`+`legacy_eval`
 (`legacy_font` is the ONLY file that knows npttf2utf exists — GPL-3, lazy import,
 `requirements-nrb.txt` which `Dockerfile` does not install; `devanagari`+`lexicon`
 are the plausibility signals; `legacy_convert` is per-line/per-cell routing +
-validation; writes NOTHING); `report` = all of them — everything but `client` is
+validation; writes NOTHING); `units`+`routing` = Phase 6B Task 2 `native-2`
+(three-state judgment units — lines for text, CELLS for spreadsheets — and the
+routing classifier; imports NOTHING from `legacy_font`, run via
+`scripts/nrb_extract.py --extractor-version native-2` and compared by
+`scripts/nrb_native2_compare.py`); `report` = all of them — everything but `client` is
 **not** model-facing, run via
-`scripts/nrb_{sitemap_inventory,document_inventory,sync,fetch,sample,extract,calibrate,build_lexicon,legacy_eval}.py`), `tools/` (`registry.py` = engine; `local/` package = one module
+`scripts/nrb_{sitemap_inventory,document_inventory,sync,fetch,sample,extract,calibrate,build_lexicon,legacy_eval,native2_compare}.py`), `tools/` (`registry.py` = engine; `local/` package = one module
 per in-process tool, each exporting a `SPEC`, aggregated in `local/__init__.py`'s
 `LOCAL_TOOLS`), `agent/` (hand-rolled loop; `loop.stream_turn` = async event
 generator, `loop.run_turn` = collect for non-stream, `schemas` = trace types —
@@ -353,6 +363,26 @@ events (`token`/`tool_call`/`tool_result`/`done`) + the new id in the
   too-short-to-judge branch and ambiguous replacement; without it 5 of 7 English
   controls lost lines. Never lower it to raise recall — see `docs/nrb-integration.md`
   §12.2.
+- **`native-2` fixed the detector; it did NOT move the threshold.** The version
+  selects the CLASSIFIER only — same parser, same text, same `quality` metrics, so
+  `native-1` rows stay reproducible and both sit in `nrb_extractions` side by side
+  (identity is `(content_sha256, extractor_version)`). The English-table defect was
+  located before it was fixed: over 355 flagged lines in the seven known tables the
+  **intra-word-symbol rule fired on 89.3%**, the vowel-less rule on 2.5%. So three
+  narrow signal corrections in `app/nrb/units.py` — symbols only in letter-bearing
+  tokens, compounds (`FIU-Nepal`, `F/Y`) exempt, acronyms (`NRB`, `SLF`) out of the
+  vowel test — and `legacy_line_ratio >= 0.20` **untouched**. Four things a rewrite
+  must not lose: (1) units are three-state, and `unjudged` (blank/numeric/too-short)
+  is in NEITHER half of the ratio — that dilution is how 57 Preeti lines hid in
+  `84862ab6866a`; (2) that shrunken denominator needs `MIN_JUDGED_FOR_RATIO = 8` (or
+  `MIN_LEGACY_ABSOLUTE = 4`), or a document flags on 1 legacy unit out of 3 —
+  measured, six of them; (3) spreadsheets are judged per CELL because `|` is a
+  Preeti codepoint, and structure no longer short-circuits the linguistic rules;
+  (4) the minority-region rule needs all three of ≥10 units, run ≥3 and ≥50% of
+  CONTESTED units (neither Unicode nor English) — and an `unjudged` unit must not
+  break a run. `routing.py`/`units.py` import nothing from `legacy_font`: the
+  converter is GPL-3, and a classifier that needed it would drag the licence gate
+  into every deployment.
 - **`app/nrb/catalog.py` uses Core statements, never `update(Model)`, and that is
   load-bearing.** `nrb_sources` maps the attribute `meta` onto the column named
   `metadata` (declarative reserves `metadata`). A Core insert wants the key

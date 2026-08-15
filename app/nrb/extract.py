@@ -431,6 +431,11 @@ async def _extract_all(
                     path,
                     family=sniff.family_for(target.sniffed_mime),
                     extension=target.extension,
+                    # The pass's version drives the CLASSIFIER, not the parser —
+                    # so a `native-2` row is the same bytes read the same way and
+                    # judged by different rules, which is the only way the two
+                    # versions are comparable side by side.
+                    extractor_version=extractor_version,
                 )
                 row = _row_for(
                     target, result, extractor_version=extractor_version, now=now

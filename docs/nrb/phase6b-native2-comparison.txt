@@ -1,0 +1,215 @@
+================================================================================
+NRB PHASE 6B TASK 2 — native-1 vs native-2 OVER THE FROZEN BENCHMARK
+================================================================================
+
+Classification only. No legacy conversion ran, npttf2utf was never invoked,
+no OCR, no chunking, no embeddings, no pgvector, and zero HTTP requests —
+the same 381 blobs Phase 6A fetched, re-read from disk and re-judged.
+native-1's rows are untouched and sit alongside native-2's for comparison.
+
+IDENTITY
+--------------------------------------------------------------------------------
+  parent benchmark      1ae297dba1c33c7db9976f817806f6666371695a31e1f424d046993d581a1312
+  manifest entries      400
+  native-1 rows           381
+  native-2 rows           381
+  compared (both)       381
+  never fetched (404)   19   — a stated gap, not retried
+
+================================================================================
+STATUS TRANSITIONS
+================================================================================
+
+native-1         native-2     blobs
+-----------  --  -----------  -----
+extracted    ->  extracted    111
+extracted    ->  suspicious   15
+failed       ->  failed       2
+needs_ocr    ->  needs_ocr    51
+suspicious   ->  extracted    40
+suspicious   ->  suspicious   139
+unsupported  ->  unsupported  23
+
+================================================================================
+REASON TRANSITIONS
+================================================================================
+
+native-1                   native-2               blobs
+---------------------  --  ---------------------  -----
+clean                  ->  clean                  111
+clean                  ->  legacy_font_suspected  15
+image_file             ->  image_file             22
+legacy_font_suspected  ->  clean                  40
+legacy_font_suspected  ->  legacy_font_suspected  139
+no_native_parser       ->  no_native_parser       23
+no_text_layer          ->  no_text_layer          28
+parser_error           ->  parser_error           2
+sparse_text_layer      ->  sparse_text_layer      1
+
+  legacy_font_suspected -> not suspected : 40
+  not suspected -> legacy_font_suspected : 15
+
+  A transition is a CHANGE, not a vindication. The manual review of these
+  cases is in docs/nrb/phase6b-native2-manual-review.txt.
+
+================================================================================
+ENGLISH-TABLE NEGATIVE CONTROLS
+================================================================================
+
+  The six Docling-rescue tables from phase6a-calibration.txt plus the
+  hand-reviewed false positive from phase6a-profile.txt STEP 5. Every one
+  is readable English that native-1 flagged.
+
+blob          n1_legacy  n2_unit  native-1                          native-2         result
+------------  ---------  -------  --------------------------------  ---------------  ---------
+1ad95ea9f45c  0.2182     0.0482   suspicious/legacy_font_suspected  extracted/clean  CORRECTED
+38c6d43c3ed1  0.2121     0.0606   suspicious/legacy_font_suspected  extracted/clean  CORRECTED
+46e0c17f27a1  0.2381     0.0000   suspicious/legacy_font_suspected  extracted/clean  CORRECTED
+7e2257c289d2  0.2523     0.1242   suspicious/legacy_font_suspected  extracted/clean  CORRECTED
+c807fe4e767e  0.5787     0.0102   suspicious/legacy_font_suspected  extracted/clean  CORRECTED
+e4961a48d3d2  0.2632     0.0000   suspicious/legacy_font_suspected  extracted/clean  CORRECTED
+05fa82badf94  0.2632     0.0000   suspicious/legacy_font_suspected  extracted/clean  CORRECTED
+
+  corrected: 7 of 7
+
+================================================================================
+SPREADSHEETS
+================================================================================
+
+  native-1 judges a workbook STRUCTURALLY and returns before any linguistic
+  rule, so every parsed benchmark spreadsheet came back clean. native-2
+  scores its CELLS — never the ' | '-joined row, because `|` is a Preeti
+  codepoint.
+
+  benchmark spreadsheets           44
+  with text-bearing cells          44
+  native-1 legacy-suspected        0
+  native-2 legacy-suspected        11
+  newly flagged by native-2        11
+
+    156a7dab82ce
+    1ac8962b1214
+    36661db8f086
+    3754f5b86246
+    6190801f45d6
+    886c0a3fea88
+    8df7b02f8a13
+    942bd6ab6b30
+    99f97553bcf4
+    c4226047d2e1
+    db7ed24da33b
+
+================================================================================
+MINORITY LEGACY REGIONS
+================================================================================
+
+  Documents routed suspicious by the REGION rule despite a global
+  legacy_line_ratio the 0.20 threshold would pass. The global threshold was
+  NOT lowered — see docs/nrb-integration.md §13.
+
+  detected: 4
+
+    67c07d707b0e
+    84862ab6866a
+    af112eebcab6
+    e2a965b219b1
+
+================================================================================
+NAMED REGRESSION CASES
+================================================================================
+
+  known mixed unicode+preeti  (84862ab6866a)
+    native-1 extracted/clean   ->   native-2 suspicious/legacy_font_suspected
+    legacy_line_ratio=0.0444  unit_ratio=0.0444  legacy_units=57  max_run=3  contested=1.0
+    warnings=['minority_legacy_region']
+
+  known preeti spreadsheet  (8df7b02f8a13)
+    native-1 extracted/clean   ->   native-2 suspicious/legacy_font_suspected
+    legacy_line_ratio=0.2204  unit_ratio=0.9663  legacy_units=602  max_run=443  contested=0.9663
+    warnings=[]
+
+  known unknown encoding  (9892625b8531)
+    native-1 suspicious/legacy_font_suspected   ->   native-2 suspicious/legacy_font_suspected
+    legacy_line_ratio=0.98  unit_ratio=0.96  legacy_units=48  max_run=23  contested=0.96
+    warnings=[]
+
+================================================================================
+LEGACY SEVERITY DISTRIBUTION
+================================================================================
+
+  Over blobs each version calls legacy_font_suspected. The native-1
+  legacy_line_ratio is reported for BOTH versions so Phase 6B Task 1's
+  severity evidence stays readable, alongside native-2's own unit ratio.
+
+band       n1 (n1 ratio)  n2 (n1 ratio)  n2 (unit ratio)
+---------  -------------  -------------  ---------------
+>=0.80     127            126            144
+0.50-0.80  16             11             4
+0.20-0.50  36             3              2
+<=0.20     0              14             4
+
+  `<=0.20` under native-2 is the minority-region population: flagged by
+  the region rule, not by the global ratio.
+
+================================================================================
+EVERY CHANGED BLOB
+================================================================================
+
+blob          family       native-1                          native-2                          n1_ratio  unit_ratio  leg_units  run  contested  eng_units  warnings
+------------  -----------  --------------------------------  --------------------------------  --------  ----------  ---------  ---  ---------  ---------  ----------------------
+05fa82badf94  pdf          suspicious/legacy_font_suspected  extracted/clean                   0.2632    0.0000      0          0    0.000      2          -
+09781a9ba84a  pdf          suspicious/legacy_font_suspected  extracted/clean                   0.2500    0.0000      0          0    0.000      2          -
+156a7dab82ce  spreadsheet  extracted/clean                   suspicious/legacy_font_suspected  0.0000    0.9000      27         27   1.000      3          -
+1ac8962b1214  spreadsheet  extracted/clean                   suspicious/legacy_font_suspected  0.0000    0.9000      27         27   1.000      3          -
+1ad95ea9f45c  pdf          suspicious/legacy_font_suspected  extracted/clean                   0.2182    0.0482      8          2    0.157      115        -
+2039c2927185  pdf          suspicious/legacy_font_suspected  extracted/clean                   0.2083    0.0184      3          1    0.075      123        -
+2cea5e01239c  pdf          suspicious/legacy_font_suspected  extracted/clean                   0.2632    0.0000      0          0    0.000      2          -
+33d9d216c57a  pdf          suspicious/legacy_font_suspected  extracted/clean                   0.2907    0.0839      24         2    0.511      239        -
+36661db8f086  spreadsheet  extracted/clean                   suspicious/legacy_font_suspected  0.0000    0.9000      27         27   1.000      3          -
+3754f5b86246  spreadsheet  extracted/clean                   suspicious/legacy_font_suspected  0.0000    0.5185      14         11   0.778      9          -
+38c6d43c3ed1  pdf          suspicious/legacy_font_suspected  extracted/clean                   0.2121    0.0606      2          1    0.333      27         -
+3b9555f3a7da  pdf          suspicious/legacy_font_suspected  extracted/clean                   0.2952    0.1640      31         6    0.463      122        -
+45cd9143cccb  pdf          suspicious/legacy_font_suspected  extracted/clean                   0.2632    0.0000      0          0    0.000      2          -
+46e0c17f27a1  pdf          suspicious/legacy_font_suspected  extracted/clean                   0.2381    0.0000      0          0    0.000      179        -
+48c028a8b862  pdf          suspicious/legacy_font_suspected  extracted/clean                   0.2632    0.0000      0          0    0.000      2          -
+5b53d694ca25  pdf          suspicious/legacy_font_suspected  extracted/clean                   0.2894    0.0786      25         2    0.472      265        -
+6190801f45d6  spreadsheet  extracted/clean                   suspicious/legacy_font_suspected  0.1692    0.9666      376        155  0.967      0          -
+658f2589bdc1  pdf          suspicious/legacy_font_suspected  extracted/clean                   0.2454    0.0083      38         3    0.095      4202       -
+67c07d707b0e  pdf          extracted/clean                   suspicious/legacy_font_suspected  0.0667    0.0052      12         7    0.923      2274       minority_legacy_region
+74e83a72b806  pdf          suspicious/legacy_font_suspected  extracted/clean                   0.2389    0.0000      0          0    0.000      112        -
+752454d03c8d  pdf          suspicious/legacy_font_suspected  extracted/clean                   0.2665    0.0208      6          1    0.065      195        -
+7de2036ace49  pdf          suspicious/legacy_font_suspected  extracted/clean                   0.6774    0.0000      0          0    0.000      26         -
+7e2257c289d2  pdf          suspicious/legacy_font_suspected  extracted/clean                   0.2523    0.1242      37         3    0.336      183        -
+84862ab6866a  pdf          extracted/clean                   suspicious/legacy_font_suspected  0.0444    0.0444      57         3    1.000      0          minority_legacy_region
+84f0bebef17e  pdf          suspicious/legacy_font_suspected  extracted/clean                   0.5787    0.0102      2          2    0.061      163        -
+886c0a3fea88  spreadsheet  extracted/clean                   suspicious/legacy_font_suspected  0.1767    0.9828      286        128  0.983      0          -
+895360bbf985  pdf          suspicious/legacy_font_suspected  extracted/clean                   0.2143    0.0000      0          0    0.000      9          -
+8a96c0e5f615  pdf          suspicious/legacy_font_suspected  extracted/clean                   0.2812    0.0345      1          1    0.125      21         -
+8df7b02f8a13  spreadsheet  extracted/clean                   suspicious/legacy_font_suspected  0.2204    0.9663      602        443  0.966      0          -
+942bd6ab6b30  spreadsheet  extracted/clean                   suspicious/legacy_font_suspected  0.1757    0.9585      300        124  0.959      0          -
+99f97553bcf4  spreadsheet  extracted/clean                   suspicious/legacy_font_suspected  0.1538    0.9685      400        169  0.969      0          -
+9fa6434886b1  pdf          suspicious/legacy_font_suspected  extracted/clean                   0.3197    0.0086      3          1    0.046      282        -
+aaec551f52f6  pdf          suspicious/legacy_font_suspected  extracted/clean                   0.2500    0.0476      1          1    0.125      13         -
+af112eebcab6  pdf          extracted/clean                   suspicious/legacy_font_suspected  0.0284    0.0251      21         21   1.000      0          minority_legacy_region
+b09d82371ec1  pdf          suspicious/legacy_font_suspected  extracted/clean                   0.2069    0.0000      0          0    0.000      9          -
+b0dbdad3bc37  pdf          suspicious/legacy_font_suspected  extracted/clean                   0.3500    0.0000      0          0    0.000      3          -
+bb740abe484b  pdf          suspicious/legacy_font_suspected  extracted/clean                   0.3684    0.0000      0          0    0.000      2          -
+bef28ea8b45a  pdf          suspicious/legacy_font_suspected  extracted/clean                   0.2778    0.0000      0          0    0.000      2          -
+c4226047d2e1  spreadsheet  extracted/clean                   suspicious/legacy_font_suspected  0.1807    0.9900      493        258  0.990      0          -
+c5763fd654e5  pdf          suspicious/legacy_font_suspected  extracted/clean                   0.2853    0.0767      24         2    0.511      266        -
+c807fe4e767e  pdf          suspicious/legacy_font_suspected  extracted/clean                   0.5787    0.0102      2          2    0.061      163        -
+d503895a7abc  pdf          suspicious/legacy_font_suspected  extracted/clean                   0.3254    0.0343      6          1    0.080      100        -
+db7ed24da33b  spreadsheet  extracted/clean                   suspicious/legacy_font_suspected  0.1917    0.9714      441        244  0.971      0          -
+df78389e2433  pdf          suspicious/legacy_font_suspected  extracted/clean                   0.2143    0.0769      2          1    0.667      23         -
+e2a965b219b1  pdf          extracted/clean                   suspicious/legacy_font_suspected  0.0763    0.0081      11         7    1.000      1347       minority_legacy_region
+e3f41341c78a  pdf          suspicious/legacy_font_suspected  extracted/clean                   0.2632    0.0000      0          0    0.000      2          -
+e45d80e65096  pdf          suspicious/legacy_font_suspected  extracted/clean                   0.2632    0.0000      0          0    0.000      2          -
+e4961a48d3d2  pdf          suspicious/legacy_font_suspected  extracted/clean                   0.2632    0.0000      0          0    0.000      2          -
+e74b8de26c61  document     suspicious/legacy_font_suspected  extracted/clean                   1.0000    1.0000      1          1    1.000      0          -
+ee554a00cd63  pdf          suspicious/legacy_font_suspected  extracted/clean                   0.2924    0.0394      34         3    0.245      724        -
+f09c53af7750  pdf          suspicious/legacy_font_suspected  extracted/clean                   0.2500    0.0000      0          0    0.000      3          -
+f66453faff99  pdf          suspicious/legacy_font_suspected  extracted/clean                   0.7000    0.0000      0          0    0.000      25         -
+f895b0012565  pdf          suspicious/legacy_font_suspected  extracted/clean                   0.7689    0.1803      512        9    0.488      1792       -
+fc4091426f49  pdf          suspicious/legacy_font_suspected  extracted/clean                   0.2699    0.0298      9          2    0.125      230        -
+ffee066336ae  pdf          suspicious/legacy_font_suspected  extracted/clean                   0.3063    0.0345      6          1    0.082      101        -
+

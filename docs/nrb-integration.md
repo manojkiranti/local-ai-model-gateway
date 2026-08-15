@@ -19,7 +19,7 @@ build-only so far — see §11).
 | 4 | Persistent catalog + idempotent metadata sync | **Done, live-run twice 2026-08-14** — §9 |
 | 5 | Attachment download → MIME validation → SHA-256 → local storage | **Done, live-fetched 2026-08-14** — §10 |
 | 6A | Native extraction + quality profiling (**no OCR**) | **Done, live-profiled 2026-08-15** — 400-file benchmark fetched, 381 extracted, pypdf-vs-Docling calibrated — §11 |
-| 6B | OCR / legacy-font strategy, chosen from 6A's evidence | **Task 1 (legacy-font conversion) evaluated 2026-08-15, NOT deployed** — §12. OCR strategy still not started |
+| 6B | OCR / legacy-font strategy, chosen from 6A's evidence | **Task 1 (conversion) evaluated, NOT deployed — §12. Task 2 (`native-2` routing classifier) MEASURED and recommended 2026-08-15 — §13.** Conversion routing + OCR strategy still not started |
 | 7 | Chunk + embed into the existing `documents`/`document_chunks` pipeline | Not started |
 | 8 | `search_nrb_documents` tool | Not started |
 
@@ -1960,3 +1960,267 @@ encoding` deserves its own status in the `nrb_extractions` vocabulary, whether
 the 0.50–0.80 band is better served by a richer lexicon or by OCR, and the
 licence gate. None is answerable from this evidence, which is why none is
 answered here.
+
+## 13. Phase 6B Task 2 — `native-2`, the routing classifier (MEASURED)
+
+**State as of 2026-08-15: native-2 is implemented, re-run over the frozen Phase
+6A benchmark, and recommended as the routing gate.** It **classifies only** — it
+converts nothing, never invokes `npttf2utf`, and works on a machine where that
+package was never installed. `native-1`'s 381 rows are untouched and sit beside
+native-2's 381 for comparison.
+
+Evidence, committed verbatim:
+
+* **`docs/nrb/phase6b-native2-comparison.txt`** — the generated side-by-side:
+  status and reason transition matrices, the seven English controls, the
+  spreadsheet population, the minority regions, severity distributions, and every
+  changed blob with the metrics that explain it.
+* **`docs/nrb/phase6b-native2-manual-review.txt`** — the by-eye work, the
+  independent cross-check against Task 1, and one defect native-2 introduced.
+
+### The three answers
+
+**A. Did native-2 eliminate the English-table false positives without hiding real
+legacy Nepali? Yes, on both halves.** All **7 of 7** known English tables are
+corrected (`legacy_line_ratio` 0.2121–0.5787 → unit ratio 0.0000–0.1242). And the
+converse holds independently: of the 16 documents Phase 6B Task 1 recovered or
+partially recovered with a real converter, **15 are still `legacy_font_suspected`**
+— the one exception recovered 4% Devanagari, i.e. Task 1's label was generous.
+
+**B. Can native-2 detect legacy text in spreadsheets? Yes — 0 → 11.** native-1
+found legacy in **0 of 44** parsed benchmark workbooks because `quality.classify`
+returns on structure alone. native-2 scores their **cells** and flags 11,
+including Phase 6A's known false negative `8df7b02f8a13` (unit ratio 0.9663 over
+623 judged cells).
+
+**C. Can native-2 detect a minority Preeti region inside a Unicode document?
+Yes — 4 cases, including the regression case.** `84862ab6866a` moves to
+`suspicious` with the warning `minority_legacy_region`, and its
+`legacy_line_ratio` is **still 0.0444** — the global threshold was not lowered.
+
+**D. How many blobs would native-2 send to a future conversion stage?** 154 of
+381 are `legacy_font_suspected`; **144 of them sit at unit ratio ≥ 0.80**, which
+is the band Task 1 measured as reliably recoverable. 4 sit at 0.50–0.80, 2 at
+0.20–0.50, and 4 arrive only through the region rule.
+
+**E. Is native-2 trustworthy enough to be the production routing gate?** Yes, on
+the evidence here, with the Nepali confirmation in §13.6 outstanding.
+
+### 13.1 The transition matrix
+
+| native-1 | → native-2 | blobs |
+|---|---|---|
+| `clean` | `clean` | 105 |
+| `clean` | **`legacy_font_suspected`** | **15** |
+| `legacy_font_suspected` | **`clean`** | **40** |
+| `legacy_font_suspected` | `legacy_font_suspected` | 139 |
+| everything else | unchanged | 76 |
+
+Nothing moved into or out of `needs_ocr` (51), `unsupported` (23) or `failed` (2).
+Those rules are native-1's, carried over unedited: re-deciding them would make the
+comparison unreadable.
+
+### 13.2 What actually changed, and why each change exists
+
+**Not** a new heuristic. The shape signals are native-1's own — vowel-less tokens,
+intra-word symbols, intra-word case switches, **at the same thresholds**. What
+changed is the *signals* and the *unit*, each traced to a measured defect.
+
+The English-table cause was measured before anything was written. Over 355 flagged
+lines in the seven known tables, the **intra-word-symbol rule fired on 89.3%**
+while the vowel-less rule fired on 2.5% and case switches on 10.4%. So the symbol
+signal was the defect, and it got three narrow corrections:
+
+1. **Symbols count only in tokens that contain letters.** `2,123,180.00` is a
+   formatted number, not a glyph-mapped word.
+2. **A well-formed compound is not glyph-mapped.** `FIU-Nepal`, `AML/CFT`, `F/Y`
+   split into letter runs that are each pronounceable, an acronym, or a single
+   capital. `q_fie(` and `4{i-4;f` do not.
+3. **Acronyms are not judged on vowels.** `NRB`, `SLF`, `IRC` have none because
+   that is what an acronym is; `iv. NRB Bond - - -` scored 0.50 against a 0.30
+   threshold. All-caps tokens leave the vowel test's numerator *and* denominator.
+
+None of the three can shelter Preeti: glyph-mapped text is relentlessly mixed-case
+and vowel-poor across whole lines, not in isolated acronyms.
+
+### 13.3 Three-state units, and why `unjudged` had to exist
+
+`app/nrb/units.py`. Native-1's detector answers `True`/`False`/`None` but
+`legacy_line_ratio` collapses that to two halves. Native-2 keeps three:
+
+```
+legacy_candidate    glyph-mapped shape; needs recovery
+trusted_nonlegacy   positively identified as fine (english_like, unicode_devanagari)
+unjudged            no linguistic evidence either way (empty, too_short, numeric)
+```
+
+A numeric row, a row of dashes and a page number are not evidence that a
+document's Nepali is fine, and counting them as such is precisely how 57 Preeti
+lines hid inside `84862ab6866a`'s Unicode majority.
+
+**`english_like` is a positive identification made from ORTHOGRAPHY, never a word
+list.** Phase 6A already proved the cheap version unsafe — a document-level
+`stopword_rate` gate missed 7 of 49 real circulars, one scoring 0.248, *higher*
+than real English prose, because glyph-mapped text is full of short ASCII tokens
+that match stopwords by chance. So the rule is: enough real words, essentially all
+vowel-bearing, no mid-word case switching. Preeti runs 0.43–0.54 vowel-less and
+0.40–0.60 case-switching and cannot reach that by accident.
+`test_a_few_accidental_english_stopwords_do_not_exempt_preeti` locks it.
+
+### 13.4 Spreadsheets are judged per CELL, and the separator is why
+
+`extraction.py` renders a row as `" | ".join(cells)` so there is something to
+store — and **`|` is a Preeti codepoint that maps to `्र`**. A rendered row is
+unsafe to score and unsafe to convert, so `_extract_spreadsheet` now collects the
+individual cells alongside the rendered text and hands *those* to the classifier.
+Cell identity is preserved so the future converter can work per cell too.
+
+Structure is still checked first — an empty workbook is still `empty_spreadsheet`
+— but it no longer *ends* the classification. Valid workbook structure and
+trustworthy cell text are two different claims.
+
+What this found is not scattered accidents: `156a7dab82ce`, `1ac8962b1214` and
+`36661db8f086` are the **same Microfinance progress report from three different
+quarters**, with byte-identical Preeti row labels
+(`sfo{If]q ePsf] lhNnf ;+Vof` = कार्यक्षेत्र भएको जिल्ला संख्या). A recurring
+statistical series, published quarterly, entirely invisible to native-1.
+
+### 13.5 The minority-region rule, and what it is not
+
+Three conditions, all required: **≥10 legacy units**, a **contiguous run ≥3**, and
+**≥50% of the *contested* units** — those that are neither Unicode nor
+positively-English. The contested denominator is the load-bearing part: it
+measures a Preeti section against the other *latin* text rather than against a
+whole Unicode document.
+
+Each condition alone is nonsense on this corpus — a count alone flags any long
+document with odd lines, a run alone flags a stray table fragment, and a ratio
+alone is the global measure that already missed the case. An `unjudged` unit does
+**not** break a run (blank lines sit inside real legacy regions constantly); a
+positively-clean unit does.
+
+**The global 0.20 threshold was NOT lowered**, and
+`test_the_global_threshold_was_not_lowered_to_achieve_that` asserts it. Lowering
+it would have traded this false negative for a flood of false positives and
+destroyed the meaning of Task 1's severity evidence.
+
+### 13.6 Manual review, and an independent instrument
+
+Deterministic samples — the five lowest `content_sha256` in each direction:
+
+* **5 of 5 `suspicious → clean` correct.** All readable English statistics tables
+  (Treasury Bills ownership, Open Market Operations, Monetary Operation summary).
+* **5 of 5 `clean → suspicious` correct.** All spreadsheets with genuine Preeti
+  row labels. *Nepali reading provisional — see below.*
+* **0 newly observed false positives, 0 newly observed false negatives.**
+
+The strongest evidence is not a hand reading. **14 of the 40 `suspicious → clean`
+blobs were also in Task 1's conversion cohort**, where a real Preeti converter was
+run over them: all 14 recovered `devanagari_ratio ≤ 0.042` — there was no Preeti
+in them to recover. **Agree 14, disagree 0.** A shape classifier and a font
+converter are independent instruments and they concur.
+
+**Outstanding:** a Nepali reader should confirm the five spreadsheet cases and the
+Preeti reading of `8df7b02f8a13` before native-2 becomes the production gate.
+Sections A, C and the cross-check are script-independent.
+
+### 13.7 A defect native-2 introduced, found by the benchmark
+
+Marking uninformative units `unjudged` is right, and it shrinks the denominator.
+The first native-2 run flagged **six** documents on the strength of a *single*
+legacy unit out of three or four judged — a ratio over four units is not a
+measurement, and native-1 never saw this because its denominator included every
+numeric row. Fixed with `MIN_JUDGED_FOR_RATIO = 8`, plus
+`MIN_LEGACY_ABSOLUTE = 4` so a short *wholly*-Preeti document still flags. The
+pass was deleted and re-run from scratch; all six are clean. Recorded rather than
+quietly corrected — it is exactly the kind of defect a rule change introduces and
+only a benchmark finds.
+
+### 13.8 Version isolation
+
+`EXTRACTOR_VERSION` is still `native-1` and still the default. The version selects
+the **classifier only** — the same pypdf/python-docx/openpyxl call, the same text,
+the same `quality` metrics — so a `native-2` row is the same bytes read the same
+way and judged by different rules, which is the only thing that makes the two
+comparable. Every native-1 metric is present and identical in a native-2 row
+(`test_native2_keeps_every_native1_metric_and_adds_its_own`), and
+`legacy_line_ratio` still means exactly what Task 1's severity evidence says it
+means.
+
+New metrics live in the existing `metrics` JSONB — **no migration** — namespaced
+so a reader can tell which numbers are new: `unit_total`, `unit_judged`,
+`unit_legacy_candidates`, `unit_trusted`, `unit_unjudged`, `unit_english`,
+`unit_unicode`, `unit_numeric`, `unit_legacy_ratio`,
+`unit_contested_legacy_ratio`, `unit_max_legacy_run`, `minority_legacy_detected`,
+and `spreadsheet_text_cells`.
+
+The status/reason vocabulary is unchanged. There is deliberately **no `preeti`
+reason**: native-2 detects a legacy *candidate* and never claims to know the font
+mapping. A minority-region verdict names itself in `warnings`, because a reader
+seeing `suspicious` against a 0.0444 ratio would otherwise think the classifier
+had misfired.
+
+### 13.9 What is deliberately absent
+
+No conversion of any kind and **no `npttf2utf` invocation** —
+`test_no_legacy_converter_is_invoked_during_classification` monkeypatches the
+whole adapter to explode, and `test_routing_does_not_import_the_converter_module`
+parses the AST of both new modules to prove neither references it. That is not
+hygiene: the converter is GPL-3 and excluded from the API image, and a classifier
+that needed it would drag the licence gate into every deployment.
+
+No `>= 0.80 → convert` rule, no `converted` status, no mutation of extracted text.
+No OCR, no chunking, no embeddings, no pgvector, no `documents`/`document_chunks`/
+`ingest_jobs` rows, no `search_nrb_documents`, no `LOCAL_TOOLS` entry, no
+endpoint, no migration, no `alembic stamp`, nothing on
+`feat/rag-source-citations`, and no write to the real `local_ai_gateway`. **Zero
+HTTP requests** — the pass reads local blobs only, and the 19 benchmark 404s
+remain a stated gap that was not retried and not substituted.
+
+### 13.10 Evaluation & Improvement (Phase 6B Task 2)
+
+1. **Success metric** — the share of blobs whose *status is correct*, in both
+   directions, judged against hand-labelled cases. Measured: **7 of 7** English
+   controls corrected, **15 of 16** Task-1-recoverable documents retained, **11**
+   spreadsheets recovered from a population where native-1 scored 0 of 44, and
+   **0** newly observed false positives or negatives in a deterministic 10-case
+   review.
+2. **Eval** — 50 tests in `tests/test_nrb_native2_routing.py`, whose fixtures are
+   text *shapes* from the frozen benchmark rather than document identities (a
+   test that special-cased `05fa82badf94` would pass while the rule stayed
+   broken), plus the full 381-blob re-run and the independent Task 1 cross-check.
+   All NRB suites: **973 passing / 3 skipped**, up from 923/3.
+3. **Feedback capture** — both versions' rows coexist in `nrb_extractions`, keyed
+   on `(content_sha256, extractor_version)`, so every transition is auditable
+   against its predecessor forever and `nrb_native2_compare.py` reproduces the
+   comparison byte for byte. The `unit_*` metrics are the routing explanation:
+   any verdict can be traced to counts a human can check.
+4. **Review loop** — before native-2 becomes the production gate, get the Nepali
+   confirmation in §13.6. Re-run the comparison whenever a rule changes and read
+   the transition matrix, not the headline. The rule §11.9 sets still binds: a
+   threshold must not be re-tuned against the cohort that fitted it — so the
+   0.80 conversion-queue figure below is a *report*, not a policy, and wants a
+   fresh cohort before it becomes one.
+
+### 13.11 The gate to the conversion-routing task
+
+**Not decided here, deliberately.** Task 1's evidence pointed at
+`legacy_line_ratio >= 0.80`, and native-2 changes which units are judged, so that
+number had to be re-measured rather than promoted. Re-measured, over native-2's
+own unit ratio, across the 154 blobs it calls legacy:
+
+| band | blobs |
+|---|---|
+| ≥ 0.80 | **144** |
+| 0.50–0.80 | 4 |
+| 0.20–0.50 | 2 |
+| via the region rule only | 4 |
+
+The distribution is far more bimodal than native-1's (127 / 16 / 36), which is the
+point: the middle band was mostly mis-flagged tables and they are gone. Whether
+144 becomes the conversion queue is the next task's decision.
+
+**Still undecided:** which OCR engine, whether `unknown_legacy_encoding` deserves
+its own `reason` value, whether the 4 region-detected documents should be
+converted per-region rather than per-document, and the GPL-3 licence gate from
+§12.7. None is answerable from this evidence.

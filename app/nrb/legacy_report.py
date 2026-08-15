@@ -211,3 +211,148 @@ def render_evaluation(evidence: dict[str, Any]) -> str:
         ]
 
     return "\n".join(L) + "\n"
+
+
+def render_native2(ev: dict[str, Any]) -> str:
+    """The native-1 vs native-2 comparison, from the evidence the compare pass built.
+
+    Deterministic: every counter is emitted in sorted order and no timestamp
+    enters the body, so re-running over unchanged rows reproduces the file byte
+    for byte and a diff means a measurement moved.
+    """
+    L: list[str] = []
+    ident = ev["identity"]
+
+    L += [_RULE, "NRB PHASE 6B TASK 2 — native-1 vs native-2 OVER THE FROZEN BENCHMARK",
+          _RULE, ""]
+    L += [
+        "Classification only. No legacy conversion ran, npttf2utf was never invoked,",
+        "no OCR, no chunking, no embeddings, no pgvector, and zero HTTP requests —",
+        "the same 381 blobs Phase 6A fetched, re-read from disk and re-judged.",
+        "native-1's rows are untouched and sit alongside native-2's for comparison.",
+        "",
+        "IDENTITY",
+        _THIN,
+        f"  parent benchmark      {ident['parent_fingerprint']}",
+        f"  manifest entries      {ident['manifest_entries']}",
+        f"  {ident['v1']} rows           {ident['v1_rows']}",
+        f"  {ident['v2']} rows           {ident['v2_rows']}",
+        f"  compared (both)       {ident['compared']}",
+        f"  never fetched (404)   {ident['unavailable']}   — a stated gap, not retried",
+        "",
+    ]
+
+    L += [_RULE, "STATUS TRANSITIONS", _RULE, ""]
+    rows = [[a, "->", b, n] for (a, b), n in sorted(ev["status_transitions"].items())]
+    L.append(_table(rows, ["native-1", "", "native-2", "blobs"]))
+    L.append("")
+
+    L += [_RULE, "REASON TRANSITIONS", _RULE, ""]
+    rows = [[a, "->", b, n] for (a, b), n in sorted(ev["reason_transitions"].items())]
+    L.append(_table(rows, ["native-1", "", "native-2", "blobs"]))
+    L += [
+        "",
+        f"  legacy_font_suspected -> not suspected : {len(ev['suspicious_to_clean'])}",
+        f"  not suspected -> legacy_font_suspected : {len(ev['clean_to_suspicious'])}",
+        "",
+        "  A transition is a CHANGE, not a vindication. The manual review of these",
+        "  cases is in docs/nrb/phase6b-native2-manual-review.txt.",
+        "",
+    ]
+
+    L += [_RULE, "ENGLISH-TABLE NEGATIVE CONTROLS", _RULE, ""]
+    L += ["  The six Docling-rescue tables from phase6a-calibration.txt plus the",
+          "  hand-reviewed false positive from phase6a-profile.txt STEP 5. Every one",
+          "  is readable English that native-1 flagged.", ""]
+    rows = [
+        [c["sha"], f"{c['legacy_before']:.4f}",
+         f"{c['unit_ratio']:.4f}" if c["unit_ratio"] is not None else "-",
+         c["v1"], c["v2"], "CORRECTED" if c["corrected"] else "unchanged"]
+        for c in ev["english_controls"]
+    ]
+    L.append(_table(rows, ["blob", "n1_legacy", "n2_unit", "native-1", "native-2",
+                           "result"]))
+    corrected = sum(1 for c in ev["english_controls"] if c["corrected"])
+    L += ["", f"  corrected: {corrected} of {len(ev['english_controls'])}", ""]
+
+    sheets = ev["spreadsheets"]
+    L += [_RULE, "SPREADSHEETS", _RULE, ""]
+    L += [
+        "  native-1 judges a workbook STRUCTURALLY and returns before any linguistic",
+        "  rule, so every parsed benchmark spreadsheet came back clean. native-2",
+        "  scores its CELLS — never the ' | '-joined row, because `|` is a Preeti",
+        "  codepoint.",
+        "",
+        f"  benchmark spreadsheets           {sheets['total']}",
+        f"  with text-bearing cells          {sheets['with_text_cells']}",
+        f"  native-1 legacy-suspected        {sheets['v1_legacy']}",
+        f"  native-2 legacy-suspected        {sheets['v2_legacy']}",
+        f"  newly flagged by native-2        {len(sheets['newly_flagged'])}",
+        "",
+    ]
+    for sha in sheets["newly_flagged"]:
+        L.append(f"    {sha[:12]}")
+    L.append("")
+
+    L += [_RULE, "MINORITY LEGACY REGIONS", _RULE, ""]
+    L += [
+        "  Documents routed suspicious by the REGION rule despite a global",
+        "  legacy_line_ratio the 0.20 threshold would pass. The global threshold was",
+        "  NOT lowered — see docs/nrb-integration.md §13.",
+        "",
+        f"  detected: {len(ev['minority'])}",
+        "",
+    ]
+    for sha in ev["minority"][:40]:
+        L.append(f"    {sha[:12]}")
+    L.append("")
+
+    L += [_RULE, "NAMED REGRESSION CASES", _RULE, ""]
+    for label, c in sorted(ev["named_cases"].items()):
+        L += [
+            f"  {label}  ({c['sha']})",
+            f"    native-1 {c['v1']}   ->   native-2 {c['v2']}",
+            f"    legacy_line_ratio={c['legacy_line_ratio']}  unit_ratio={c['unit_ratio']}"
+            f"  legacy_units={c['legacy_units']}  max_run={c['max_run']}"
+            f"  contested={c['contested']}",
+            f"    warnings={c['warnings']}",
+            "",
+        ]
+
+    L += [_RULE, "LEGACY SEVERITY DISTRIBUTION", _RULE, ""]
+    L += ["  Over blobs each version calls legacy_font_suspected. The native-1",
+          "  legacy_line_ratio is reported for BOTH versions so Phase 6B Task 1's",
+          "  severity evidence stays readable, alongside native-2's own unit ratio.",
+          ""]
+    order = [">=0.80", "0.50-0.80", "0.20-0.50", "<=0.20"]
+    rows = [
+        [band,
+         ev["bands"]["v1"].get(band, 0),
+         ev["bands"]["v2_by_legacy_line_ratio"].get(band, 0),
+         ev["bands"]["v2_by_unit_ratio"].get(band, 0)]
+        for band in order
+    ]
+    L.append(_table(rows, ["band", "n1 (n1 ratio)", "n2 (n1 ratio)",
+                           "n2 (unit ratio)"]))
+    L += ["", "  `<=0.20` under native-2 is the minority-region population: flagged by",
+          "  the region rule, not by the global ratio.", ""]
+
+    if ev["changed_detail"]:
+        L += [_RULE, "EVERY CHANGED BLOB", _RULE, ""]
+        rows = [
+            [c["sha"][:12], c["family"], c["v1"], c["v2"],
+             f"{c['legacy_line_ratio']:.4f}",
+             f"{c['unit_ratio']:.4f}" if c["unit_ratio"] is not None else "-",
+             c["legacy_units"] if c["legacy_units"] is not None else "-",
+             c["max_run"] if c["max_run"] is not None else "-",
+             f"{c['contested']:.3f}" if c["contested"] is not None else "-",
+             c["english_units"] if c["english_units"] is not None else "-",
+             ",".join(c["warnings"]) or "-"]
+            for c in ev["changed_detail"]
+        ]
+        L.append(_table(rows, ["blob", "family", "native-1", "native-2",
+                               "n1_ratio", "unit_ratio", "leg_units", "run",
+                               "contested", "eng_units", "warnings"]))
+        L.append("")
+
+    return "\n".join(L) + "\n"

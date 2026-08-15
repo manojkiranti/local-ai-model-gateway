@@ -1,0 +1,168 @@
+================================================================================
+NRB PHASE 6B TASK 2 — MANUAL REVIEW OF NATIVE-2 TRANSITIONS
+================================================================================
+
+Hand-written, 2026-08-15. The generated companion is
+`phase6b-native2-comparison.txt`; this records what was checked BY EYE, because a
+classifier must not be the only witness to its own correctness.
+
+Sampling is deterministic: the five LOWEST content_sha256 in each transition
+direction, plus every named regression case. Not "whatever looked interesting".
+
+STATUS: assessments below are the ASSISTANT's reading. The Nepali judgements are
+marked; a Nepali reader should confirm the spreadsheet cases before native-2
+becomes the production routing gate. The English judgements need no confirmation.
+
+--------------------------------------------------------------------------------
+A. FIVE suspicious -> clean  (native-1 said legacy, native-2 says clean)
+--------------------------------------------------------------------------------
+  05fa82badf94  n1=0.2632  "Instruments Times Offer Amount" / "i. Reverse Repo -"
+  09781a9ba84a  n1=0.2500  the same Monetary Operation Summary layout
+  1ad95ea9f45c  n1=0.2182  "PUBLIC DEBT MANAGEMENT DEPT.,THAPATHALI, KATHMANDU"
+                           "Ownership Structure of 28 & 182-Days T/B Issued…"
+  2039c2927185  n1=0.2083  "OPEN MARKET OPERATIONS STATISTICS"
+                           "Internal Debt Liability of Government of Nepal"
+  2cea5e01239c  n1=0.2632  the same Monetary Operation Summary layout
+
+ASSESSMENT: **5 of 5 are correct reclassifications.** Every one is a readable
+English statistical table from Public Debt Management or Monetary Operations.
+There is no Nepali in any of them to lose. native-1 flagged them because
+formatted numbers (`2,123,180.00`), dash-filled cells and acronyms (`NRB`, `SLF`,
+`T/B`) tripped the intra-word-symbol and vowel-less rules.
+
+--------------------------------------------------------------------------------
+B. FIVE clean -> suspicious  (native-1 said clean, native-2 says legacy)
+--------------------------------------------------------------------------------
+All five are SPREADSHEETS — the population native-1 never looked at.
+
+  156a7dab82ce  Micro Finance Institutions Supervision Dept, Asoj 2078
+  1ac8962b1214  Micro Finance Promotion & Supervision Dept, Asar 2075
+  36661db8f086  Micro Finance Institutions Supervision Dept, Ashoj 2077
+  3754f5b86246  Sources and Uses Report, Chaitra End 2078
+  6190801f45d6  agricultural statistics workbook
+
+Their English headers are intact and correctly identified (`english_like`), and
+the Preeti is in the row labels:
+
+  sfo{If]q ePsf] lhNnf ;+Vof          -> कार्यक्षेत्र भएको जिल्ला संख्या
+  s'n shf{ ljt/0f -?= xhf/df_          -> कुल कर्जा वितरण (रु= हजारमा)
+  k|d'v s[lif afnLn] 9fs]sf] e"–If]q   -> प्रमुख कृषि बालीले ढाकेको भू–क्षेत्र
+  k|d'v s[lif afnLsf] pTkfbg          -> प्रमुख कृषि बालीको उत्पादन
+
+ASSESSMENT (Nepali reading PROVISIONAL): **5 of 5 are true positives.** These are
+unmistakably Preeti-encoded Nepali row labels sitting in structurally valid
+workbooks. The shape is the same one Phase 6A hand-identified in `8df7b02f8a13`.
+
+WHAT THIS MEANS BEYOND THE FIVE: they are not scattered accidents. `156a7dab82ce`,
+`1ac8962b1214` and `36661db8f086` are the SAME Microfinance progress report from
+three different quarters, with byte-identical Preeti headers. §11.9 called the
+spreadsheet gap "the single most consequential gap 6A leaves"; this is what was
+behind it — a recurring statistical series, published quarterly, entirely
+invisible to native-1.
+
+--------------------------------------------------------------------------------
+C. THE SEVEN ENGLISH-TABLE NEGATIVE CONTROLS
+--------------------------------------------------------------------------------
+Six Docling-rescue tables (phase6a-calibration.txt) + the hand-reviewed false
+positive (phase6a-profile.txt STEP 5).
+
+  blob          n1 legacy_line_ratio   native-2 unit ratio   result
+  1ad95ea9f45c  0.2182                 0.0482                CORRECTED
+  38c6d43c3ed1  0.2121                 0.0606                CORRECTED
+  46e0c17f27a1  0.2381                 0.0000                CORRECTED
+  7e2257c289d2  0.2523                 0.1242                CORRECTED
+  c807fe4e767e  0.5787                 0.0102                CORRECTED
+  e4961a48d3d2  0.2632                 0.0000                CORRECTED
+  05fa82badf94  0.2632                 0.0000                CORRECTED
+
+RESULT: **7 of 7**, and none by a document-specific exception — the three rules
+that fixed them are general facts about English orthography, and the tests assert
+them on text shapes, never on a sha.
+
+--------------------------------------------------------------------------------
+D. THE NAMED REGRESSION CASES
+--------------------------------------------------------------------------------
+8df7b02f8a13  KNOWN PREETI SPREADSHEET (Phase 6A's false negative)
+    native-1 extracted/clean  ->  native-2 suspicious/legacy_font_suspected
+    unit_ratio 0.9663 over 623 judged cells, 602 legacy, max run 443.
+    DETECTED. (Nepali reading provisional; the content was already hand-identified
+    as Preeti in phase6a-profile.txt.)
+
+84862ab6866a  KNOWN MIXED UNICODE + PREETI
+    native-1 extracted/clean  ->  native-2 suspicious/legacy_font_suspected
+    legacy_line_ratio 0.0444 — UNCHANGED, the global threshold was not lowered.
+    Routed by the region rule: 57 legacy units, max run 3, contested ratio 1.000,
+    warning `minority_legacy_region`.
+    DETECTED, and detected for the right reason.
+
+9892625b8531  KNOWN UNKNOWN ENCODING (readable Nepali, not a Preeti keystroke map)
+    native-1 suspicious  ->  native-2 suspicious.  UNCHANGED, as required:
+    native-2 must route garbled native text away from clean ingestion whether or
+    not any converter can read it.
+
+--------------------------------------------------------------------------------
+E. GENUINE UNICODE AND OCR CASES
+--------------------------------------------------------------------------------
+The four pure Unicode Devanagari blobs (075bf12eb087, 35445ee37706,
+af112eebcab6, f7bed3c3c806): three unchanged and clean.
+
+  af112eebcab6 moved clean -> suspicious via the region rule (21 legacy units,
+  run 21, contested 1.000). Inspected: its extraction contains a genuinely
+  garbled non-Unicode block
+  (`erftr qrq 3r$r{ qqnft \rfrs-d Er{ifuflq, Roe{ qT dqritrq`) alongside real
+  Devanagari. Phase 6B Task 1 saw the same block and its converter REJECTED it.
+  Two instruments agree the block is not trustworthy text, so flagging the
+  document is correct — it is a second mixed-script case, not a false positive on
+  Unicode.
+
+All 51 needs_ocr blobs and all 23 unsupported blobs are unchanged. No no-text or
+image file was routed to legacy.
+
+--------------------------------------------------------------------------------
+F. INDEPENDENT CROSS-CHECK AGAINST PHASE 6B TASK 1
+--------------------------------------------------------------------------------
+The strongest evidence here is not a hand reading. 14 of the 40
+`suspicious -> clean` blobs were also in Task 1's conversion cohort, where a
+Preeti converter was run over them and the resulting Devanagari measured:
+
+    all 14 recovered devanagari_ratio <= 0.042 — i.e. there was no Preeti in
+    them to recover.  AGREE 14, DISAGREE 0.
+
+Conversely, of the 16 documents Task 1 recovered or partially recovered, **15
+remain legacy_font_suspected under native-2**. The one exception,
+`895360bbf985`, recovered devanagari_ratio 0.0419 — Task 1's "recovered" label
+was generous on a tiny document, and it appears in the AGREE list above.
+
+A shape classifier and a font converter are independent instruments. They agree
+on which documents were never Preeti.
+
+--------------------------------------------------------------------------------
+G. A DEFECT NATIVE-2 INTRODUCED, AND THE BENCHMARK CAUGHT
+--------------------------------------------------------------------------------
+Marking uninformative units `unjudged` is correct, and it shrinks the
+denominator. In the first native-2 run that flagged SIX documents on the strength
+of a single legacy unit out of three or four judged (5504d7f5eb74, e7d44c7f04c0,
+917712da7765, 834f70add6e7, 333cad7d028a, 8a57093ed457) — a ratio over four units
+is not a measurement. native-1 never saw this because its denominator included
+every numeric row.
+
+Fixed with a floor (`MIN_JUDGED_FOR_RATIO = 8`, or `MIN_LEGACY_ABSOLUTE = 4` so a
+short wholly-Preeti document still flags), the pass was re-run from scratch, and
+all six are clean. Recorded here rather than quietly corrected, because it is the
+kind of defect a rule change introduces and only a benchmark finds.
+
+================================================================================
+SUMMARY
+================================================================================
+  suspicious -> clean reviewed          5 of 40   — 5 correct, 0 wrong
+  clean -> suspicious reviewed          5 of 15   — 5 correct, 0 wrong
+  english-table controls corrected      7 of 7
+  named regression cases correct        3 of 3
+  newly observed FALSE POSITIVES        0
+  newly observed FALSE NEGATIVES        0
+  defects native-2 introduced           1 (small denominator) — found and fixed
+  independent agreement with Task 1     14 of 14
+
+  Requiring Nepali-reader confirmation: section B (five spreadsheets) and the
+  Preeti reading of 8df7b02f8a13. Sections A, C, F and the English half of B
+  are script-independent and need no confirmation.

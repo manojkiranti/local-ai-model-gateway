@@ -66,6 +66,17 @@ __all__ = [
 # threshold change in `quality.py` does.
 EXTRACTOR_VERSION = "native-1"
 
+# native-2 is a CLASSIFIER change, not a parser change. Every extractor below is
+# untouched: the same pypdf/python-docx/openpyxl call, the same text, the same
+# `quality` metrics. What differs is which classifier reads the evidence, and that
+# native-2 is additionally handed the document's judgment UNITS — lines for text,
+# CELLS for a spreadsheet. See `app/nrb/routing.py`.
+#
+# The dispatch is by version rather than by a flag so a row can never be ambiguous
+# about which rules produced it: identity is (content_sha256, extractor_version),
+# and both versions' rows sit side by side for comparison.
+SUPPORTED_EXTRACTOR_VERSIONS = (EXTRACTOR_VERSION, "native-2")
+
 # A sanity-check window for a human reading the report, not a cached artefact.
 # NO extracted text is persisted beyond this: Phase 7 re-parses with Docling for
 # chunking, and a stored text blob is something a later phase would eventually
@@ -136,6 +147,8 @@ def _result(
     text: str,
     extra_metrics: dict[str, Any] | None = None,
     started: float,
+    extractor_version: str = EXTRACTOR_VERSION,
+    units: Sequence[str] | None = None,
 ) -> ExtractionResult:
     """Classify the evidence and flatten every measurement into one row.
 
@@ -143,9 +156,29 @@ def _result(
     (they separate a partial scan from a sparse text layer) and both halves of the
     legacy-line ratio (a ratio alone cannot be audited) are carried, because
     Phase 6B has to be able to re-slice this without re-parsing 8.6 GB.
+
+    `extractor_version` picks the classifier and nothing else. native-1 takes the
+    identical path it always did — `quality.classify(evidence)`, same evidence,
+    same metrics — so its rows stay reproducible byte for byte. native-2 adds the
+    unit assessment on top and never removes a native-1 metric.
+
+    `units` are the judgment units. `None` means "derive them from the text",
+    which is right for prose and PDFs; a spreadsheet passes its CELLS explicitly,
+    because the `" | "`-joined row it stores as text is not safe to score (`|` is
+    a Preeti codepoint).
     """
-    verdict = quality.classify(evidence)
     metrics: dict[str, Any] = {}
+    if extractor_version == EXTRACTOR_VERSION:
+        verdict = quality.classify(evidence)
+    else:
+        from . import routing, units as units_mod
+
+        unit_texts = (
+            list(units) if units is not None else list(units_mod.units_from_text(text))
+        )
+        routed = routing.RoutingEvidence.build(evidence, unit_texts)
+        verdict = routing.classify_v2(routed)
+        metrics.update(routing.unit_metrics(routed.profile))
     if evidence.text_metrics is not None:
         metrics.update(evidence.text_metrics.as_dict())
     if evidence.pages is not None:
@@ -191,7 +224,10 @@ def _result(
     )
 
 
-def _failed(family: str, message: str, started: float) -> ExtractionResult:
+def _failed(
+    family: str, message: str, started: float,
+    extractor_version: str = EXTRACTOR_VERSION,
+) -> ExtractionResult:
     """A recorded failure. One bad file must never abort a batch."""
     return _result(
         parser="none",
@@ -199,10 +235,13 @@ def _failed(family: str, message: str, started: float) -> ExtractionResult:
         evidence=quality.Evidence(family, False, message, None, None, None),
         text="",
         started=started,
+        extractor_version=extractor_version,
     )
 
 
-def _no_parser(family: str, started: float) -> ExtractionResult:
+def _no_parser(
+    family: str, started: float, extractor_version: str = EXTRACTOR_VERSION,
+) -> ExtractionResult:
     """A valid file we decline to open: an image, or a format with no parser."""
     return _result(
         parser="none",
@@ -210,6 +249,7 @@ def _no_parser(family: str, started: float) -> ExtractionResult:
         evidence=quality.Evidence(family, False, None, None, None, None),
         text="",
         started=started,
+        extractor_version=extractor_version,
     )
 
 
@@ -220,6 +260,7 @@ def result_from_pages(
     family: str = "pdf",
     started: float | None = None,
     extra_metrics: dict[str, Any] | None = None,
+    extractor_version: str = EXTRACTOR_VERSION,
 ) -> ExtractionResult:
     """Score a PDF's per-page text. THE shared path — pypdf and Docling both use it.
 
@@ -244,10 +285,14 @@ def result_from_pages(
         text=text,
         extra_metrics=extra_metrics,
         started=time.monotonic() if started is None else started,
+        extractor_version=extractor_version,
     )
 
 
-def _extract_pdf(path: Path, family: str, started: float) -> ExtractionResult:
+def _extract_pdf(
+    path: Path, family: str, started: float,
+    extractor_version: str = EXTRACTOR_VERSION,
+) -> ExtractionResult:
     read = file_documents.read_pdf_pages(path)
     return result_from_pages(
         read.pages,
@@ -255,10 +300,14 @@ def _extract_pdf(path: Path, family: str, started: float) -> ExtractionResult:
         family=family,
         started=started,
         extra_metrics={"pages_skipped": read.skipped},
+        extractor_version=extractor_version,
     )
 
 
-def _extract_document(path: Path, family: str, started: float) -> ExtractionResult:
+def _extract_document(
+    path: Path, family: str, started: float,
+    extractor_version: str = EXTRACTOR_VERSION,
+) -> ExtractionResult:
     doc = file_documents.read_lines(path)
     text = "\n".join(doc.lines)
     return _result(
@@ -274,10 +323,14 @@ def _extract_document(path: Path, family: str, started: float) -> ExtractionResu
         ),
         text=text,
         started=started,
+        extractor_version=extractor_version,
     )
 
 
-def _extract_spreadsheet(path: Path, family: str, started: float) -> ExtractionResult:
+def _extract_spreadsheet(
+    path: Path, family: str, started: float,
+    extractor_version: str = EXTRACTOR_VERSION,
+) -> ExtractionResult:
     """Every sheet, bounded, as text plus structure.
 
     Judged STRUCTURALLY by `classify` (are there cells?), not linguistically: a
@@ -291,12 +344,20 @@ def _extract_spreadsheet(path: Path, family: str, started: float) -> ExtractionR
     rows_seen = 0
     cells_total = 0
     cells_filled = 0
+    # The judgment units, kept as INDIVIDUAL cells. `parts` is the rendered text
+    # (`" | "`-joined, for storage and for native-1's metrics); `cells` is what
+    # native-2 actually scores. They must not be the same list: `|` is a Preeti
+    # codepoint that maps to `्र`, so a rendered row is unsafe to judge and
+    # unsafe to convert. Cell identity is preserved so a later converter can work
+    # per cell too. See `units.cells_from_rows`.
+    cells: list[str] = []
     for name in names:
         with readers.open_sheet_rows(path, sheet=name) as stream:
             if stream.headers:
                 parts.append(" | ".join(stream.headers))
                 cells_total += len(stream.headers)
                 cells_filled += sum(1 for h in stream.headers if str(h).strip())
+                cells.extend(str(h) for h in stream.headers if str(h).strip())
             for row in stream.rows:
                 if rows_seen >= MAX_SHEET_ROWS:
                     break
@@ -305,6 +366,7 @@ def _extract_spreadsheet(path: Path, family: str, started: float) -> ExtractionR
                 cells_filled += sum(1 for c in row if str(c).strip())
                 if any(str(c).strip() for c in row):
                     parts.append(" | ".join(str(c) for c in row))
+                    cells.extend(str(c) for c in row if str(c).strip())
     text = "\n".join(parts)
     return _result(
         parser="openpyxl",
@@ -325,12 +387,20 @@ def _extract_spreadsheet(path: Path, family: str, started: float) -> ExtractionR
             ),
         ),
         text=text,
-        extra_metrics={"rows_truncated": int(rows_seen >= MAX_SHEET_ROWS)},
+        extra_metrics={
+            "rows_truncated": int(rows_seen >= MAX_SHEET_ROWS),
+            "spreadsheet_text_cells": len(cells),
+        },
         started=started,
+        extractor_version=extractor_version,
+        units=cells,
     )
 
 
-def _extract_text(path: Path, family: str, started: float) -> ExtractionResult:
+def _extract_text(
+    path: Path, family: str, started: float,
+    extractor_version: str = EXTRACTOR_VERSION,
+) -> ExtractionResult:
     body = path.read_bytes().decode("utf-8-sig", errors="replace")
     return _result(
         parser="text",
@@ -340,11 +410,16 @@ def _extract_text(path: Path, family: str, started: float) -> ExtractionResult:
         ),
         text=body,
         started=started,
+        extractor_version=extractor_version,
     )
 
 
 def extract_file(
-    path: Path, *, family: str, extension: str | None
+    path: Path,
+    *,
+    family: str,
+    extension: str | None,
+    extractor_version: str = EXTRACTOR_VERSION,
 ) -> ExtractionResult:
     """Extract and classify one blob. NEVER raises.
 
@@ -364,42 +439,42 @@ def extract_file(
     # Checked before the family, because a sniffer that answered `unknown` must
     # not let an extension route a legacy Excel file into openpyxl.
     if ext in LEGACY_OFFICE_EXTENSIONS:
-        return _no_parser("office_legacy", started)
+        return _no_parser("office_legacy", started, extractor_version=extractor_version)
 
     if family == "unknown" and ext in _EXTENSION_FAMILIES:
         family = _EXTENSION_FAMILIES[ext]
 
     # No parser: decided without opening the file at all.
     if family in quality.UNSUPPORTED_FAMILIES or family == "image":
-        return _no_parser(family, started)
+        return _no_parser(family, started, extractor_version=extractor_version)
 
     try:
         size = path.stat().st_size
     except OSError as exc:
-        return _failed(family, f"OSError: {exc.strerror or 'unreadable'}", started)
+        return _failed(family, f"OSError: {exc.strerror or 'unreadable'}", started, extractor_version=extractor_version)
     if size > MAX_EXTRACT_BYTES:
-        return _failed(family, f"file exceeds {MAX_EXTRACT_BYTES} bytes", started)
+        return _failed(family, f"file exceeds {MAX_EXTRACT_BYTES} bytes", started, extractor_version=extractor_version)
     if size == 0:
-        return _failed(family, "empty file", started)
+        return _failed(family, "empty file", started, extractor_version=extractor_version)
 
     try:
         if family == "pdf":
-            return _extract_pdf(path, family, started)
+            return _extract_pdf(path, family, started, extractor_version=extractor_version)
         if family == "document":
-            return _extract_document(path, family, started)
+            return _extract_document(path, family, started, extractor_version=extractor_version)
         if family == "spreadsheet":
-            return _extract_spreadsheet(path, family, started)
+            return _extract_spreadsheet(path, family, started, extractor_version=extractor_version)
         if family == "text":
-            return _extract_text(path, family, started)
+            return _extract_text(path, family, started, extractor_version=extractor_version)
     except ReadError as exc:
         # Already sanitised by `documents.py`/`readers.py` — no path, no user id.
-        return _failed(family, str(exc), started)
+        return _failed(family, str(exc), started, extractor_version=extractor_version)
     except Exception as exc:  # noqa: BLE001 - a batch must survive any parser bug
         logger.warning("NRB extract: %s failed (%s)", family, type(exc).__name__)
-        return _failed(family, type(exc).__name__, started)
+        return _failed(family, type(exc).__name__, started, extractor_version=extractor_version)
 
     # A family with no branch above. Honest rather than silent.
-    return _no_parser(family, started)
+    return _no_parser(family, started, extractor_version=extractor_version)
 
 
 # --------------------------------------------------------------------------- #
