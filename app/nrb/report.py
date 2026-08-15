@@ -28,7 +28,7 @@ Report choices worth naming, all about not flattering the extractor:
 from __future__ import annotations
 
 from collections import Counter
-from typing import Any
+from typing import Any, Sequence
 
 from .attachments import RESOURCE_TYPES as ATTACHMENT_TYPES
 from .classify import RESOURCE_TYPES, SECTIONS
@@ -40,6 +40,7 @@ __all__ = [
     "summarize_sync", "render_sync",
     "summarize_fetch", "render_fetch",
     "summarize_sample", "render_sample",
+    "summarize_extraction", "render_extraction", "LEGACY_BANDS",
 ]
 
 SAMPLE_SIZE = 25   # bounded: a sample to inspect, not a second copy of the data
@@ -895,5 +896,372 @@ def render_sample(summary: dict[str, Any]) -> str:
     if summary["notes"]:
         out.append("Notes:")
         out += [f"  {note}" for note in summary["notes"]]
+        out.append("")
+    return "\n".join(out)
+
+
+# --------------------------------------------------------------------------- #
+# The extraction profile (Phase 6A, Task 9)
+# --------------------------------------------------------------------------- #
+# Bands for `legacy_line_ratio`, the per-LINE legacy-font measurement. The
+# 0.20 edge is `quality.LEGACY_LINE_RATIO`, the classifier's own threshold — it
+# is NOT re-derived or re-tuned here, and a band boundary moving would silently
+# change what the published profile means. The bands exist because 0.28 and 1.00
+# are both `suspicious` and describe very different documents: one has a readable
+# English annex behind a Preeti covering note, the other is unusable throughout,
+# and Phase 6B has to size those two cohorts separately.
+LEGACY_BANDS: tuple[tuple[str, float, float], ...] = (
+    ("0", 0.0, 0.0),
+    (">0-<0.20", 0.0, 0.20),
+    ("0.20-<0.50", 0.20, 0.50),
+    ("0.50-<0.80", 0.50, 0.80),
+    (">=0.80", 0.80, 1.01),
+)
+
+
+def _band_for(value: float) -> str:
+    """The band a ratio falls in. Edges come from `LEGACY_BANDS` alone, so the
+    boundaries cannot drift away from the labels printed next to them."""
+    if value <= 0:
+        return LEGACY_BANDS[0][0]
+    for name, _low, high in LEGACY_BANDS[1:]:
+        if value < high:
+            return name
+    return LEGACY_BANDS[-1][0]
+
+
+def _distribution(values: Sequence[float | int]) -> dict[str, Any]:
+    """A deterministic five-number-ish summary. No sampling, no row order.
+
+    Percentiles by nearest-rank on the sorted values, so the same inputs always
+    give the same answer regardless of the order they arrived in — the property
+    that lets two runs of the profile be diffed.
+    """
+    ordered = sorted(float(v) for v in values if v is not None)
+    if not ordered:
+        return {"n": 0, "min": None, "p25": None, "median": None,
+                "p75": None, "p90": None, "max": None, "zero": 0}
+
+    def at(fraction: float) -> float:
+        index = min(int(fraction * len(ordered)), len(ordered) - 1)
+        return round(ordered[index], 4)
+
+    return {
+        "n": len(ordered),
+        "min": round(ordered[0], 4),
+        "p25": at(0.25),
+        "median": at(0.50),
+        "p75": at(0.75),
+        "p90": at(0.90),
+        "max": round(ordered[-1], 4),
+        "zero": sum(1 for v in ordered if v == 0),
+    }
+
+
+def _empty_cell() -> dict[str, Any]:
+    return {
+        "manifest_files": 0,
+        "fetched_files": 0,
+        "unique_blobs": 0,
+        "extracted_blobs": 0,
+        "files_not_extracted": 0,
+        "by_status": {},
+    }
+
+
+def summarize_extraction(
+    result: Any,
+    *,
+    cohort: Any = None,
+    manifest: Any = None,
+    manifest_path: str | None = None,
+) -> dict[str, Any]:
+    """A JSON-ready profile of one extraction pass. Deterministic and pure.
+
+    `result` is an `app.nrb.extract.ExtractResult`, `cohort` an
+    `app.nrb.profile.Cohort`, `manifest` an `app.nrb.manifest.Manifest`; all typed
+    loosely for the same reason as the other summarizers — this module stays free
+    of model and session imports.
+
+    THREE POPULATIONS, NEVER MERGED
+      * `source_coverage` counts MANIFEST FILES. Its denominator is the frozen
+        cohort, so a file that was never downloaded still appears; it does not
+        quietly leave the denominator and flatter every percentage above it.
+      * `blob_coverage` counts unique `content_sha256`. Two cohort files with
+        identical bytes are one blob, one extraction and one verdict.
+      * the verdict and metric sections count BLOBS, because that is the unit a
+        verdict is about; the metadata breakdowns count FILES, because that is
+        the unit a document type is about. Each section says which it is.
+
+    Source metadata enters ONLY here, from the manifest's own frozen entries —
+    not from a fresh catalog read, so a source re-typed by a later sync cannot
+    silently re-label a cohort that has already been profiled.
+    """
+    counters = dict(result.counters)
+    accounting = dict(result.cohort or {})
+    source = dict(accounting.get("source") or {})
+    blob = dict(accounting.get("blob") or {})
+
+    # A cohort's verdicts cover the WHOLE cohort — including blobs a previous
+    # pass extracted — which is what a benchmark report needs. Without one, the
+    # pass carries the verdicts for the blobs it touched, so a `--section` run
+    # still reports statuses instead of a bare "49 persisted".
+    verdicts = list(
+        (cohort.verdicts if cohort is not None else result.verdicts).values()
+    )
+    statuses: Counter[str] = Counter(v.status for v in verdicts)
+    reasons: Counter[str] = Counter(v.reason for v in verdicts)
+    warnings: Counter[str] = Counter(w for v in verdicts for w in v.warnings)
+
+    # --- page structure, over the blobs that have a page concept ---------- #
+    paged = [v for v in verdicts if v.page_count is not None]
+    pages_total = sum(v.page_count or 0 for v in paged)
+    pages_with_text = sum(v.pages_with_text or 0 for v in paged)
+    no_native_text = sum(
+        1 for v in paged
+        if (v.page_count or 0) > 0 and (v.pages_with_text or 0) == 0
+    )
+
+    # --- legacy severity --------------------------------------------------- #
+    bands: dict[str, int] = {name: 0 for name, _, _ in LEGACY_BANDS}
+    for verdict in verdicts:
+        if verdict.legacy_line_ratio is not None:
+            bands[_band_for(verdict.legacy_line_ratio)] += 1
+
+    summary: dict[str, Any] = {
+        "pass": {
+            "status": result.status,
+            "dry_run": result.dry_run,
+            "extractor_version": result.extractor_version,
+            "manifest_path": manifest_path,
+            "selection_sha256": getattr(manifest, "selection_sha256", None),
+            "manifest_entries": len(getattr(manifest, "entries", ()) or ()),
+            "duration_seconds": round(result.duration_seconds, 1),
+        },
+        "scope": dict(result.scope),
+        "source_coverage": source,
+        "blob_coverage": {
+            **blob,
+            "selected_this_pass": counters.get("blobs_selected", 0),
+            "attempted_this_pass": counters.get("blobs_attempted", 0),
+            "persisted_this_pass": counters.get("blobs_persisted", 0),
+            "failed_this_pass": counters.get("blobs_failed", 0),
+            "missing_on_disk": counters.get("blobs_missing_on_disk", 0),
+            "corrupt_on_disk": counters.get("blobs_corrupt_on_disk", 0),
+        },
+        "by_status": _ordered(statuses),
+        "by_reason": _ordered(reasons),
+        "warnings": _ordered(warnings),
+        "metrics": {
+            "char_count": _distribution([v.char_count for v in verdicts]),
+            "devanagari_ratio": _distribution(
+                [v.devanagari_ratio for v in verdicts
+                 if v.devanagari_ratio is not None]
+            ),
+            "legacy_line_ratio": _distribution(
+                [v.legacy_line_ratio for v in verdicts
+                 if v.legacy_line_ratio is not None]
+            ),
+            "text_page_coverage": _distribution(
+                [v.text_page_coverage for v in verdicts
+                 if v.text_page_coverage is not None]
+            ),
+            "median_chars_per_text_page": _distribution(
+                [v.median_chars_per_text_page for v in verdicts
+                 if v.median_chars_per_text_page is not None]
+            ),
+        },
+        "pages": {
+            "blobs_with_pages": len(paged),
+            "total_pages": pages_total,
+            "pages_with_text": pages_with_text,
+            "pages_without_text": pages_total - pages_with_text,
+            "documents_with_no_native_text": no_native_text,
+        },
+        "legacy": {
+            "legacy_font_suspected": reasons.get("legacy_font_suspected", 0),
+            "threshold": LEGACY_BANDS[2][1],
+            "bands": bands,
+        },
+        "catalog": dict(result.counts),
+        "notes": dict(result.notes),
+        "breakdowns": {},
+    }
+
+    if cohort is not None and manifest is not None:
+        summary["breakdowns"] = _extraction_breakdowns(cohort, manifest)
+    return summary
+
+
+def _extraction_breakdowns(cohort: Any, manifest: Any) -> dict[str, Any]:
+    """Verdict coverage by the cohort's own frozen metadata. Counted in FILES.
+
+    Every cell carries all four denominators, because they answer different
+    questions and a percentage over the wrong one is how an unfetched half of a
+    cohort disappears:
+
+        manifest_files      what the benchmark asked for
+        fetched_files       what was acquired
+        unique_blobs        what there was to extract (duplicates collapsed)
+        extracted_blobs     what has a verdict at this extractor version
+
+    `by_status` is over FETCHED files, using their blob's verdict, and
+    `files_not_extracted` is the remainder — so `sum(by_status) +
+    files_not_extracted == fetched_files` always holds and nothing falls out of
+    the accounting silently.
+    """
+    state = {key.comparison_key: key for key in cohort.keys}
+    dimensions = {
+        "by_cohort": lambda e: (e.get("sampling_stratum") or "/").split("/")[0]
+                               or "unknown",
+        "by_year": lambda e: str(e.get("year") or "unknown"),
+        "by_document_type": lambda e: e.get("document_type") or "untyped",
+        "by_resource_type": lambda e: e.get("resource_type") or "unknown",
+        "by_owner": lambda e: e.get("owner") or "unknown",
+    }
+    out: dict[str, dict[str, Any]] = {name: {} for name in dimensions}
+
+    for name, label_of in dimensions.items():
+        blobs_per_label: dict[str, set[str]] = {}
+        extracted_per_label: dict[str, set[str]] = {}
+        for entry in manifest.entries:
+            label = label_of(entry)
+            cell = out[name].setdefault(label, _empty_cell())
+            cell["manifest_files"] += 1
+
+            key = state.get(entry["comparison_key"])
+            if key is None or not key.fetched:
+                continue
+            cell["fetched_files"] += 1
+            sha = key.content_sha256
+            blobs_per_label.setdefault(label, set()).add(sha)
+            verdict = cohort.verdicts.get(sha)
+            if verdict is None:
+                cell["files_not_extracted"] += 1
+            else:
+                cell["by_status"][verdict.status] = (
+                    cell["by_status"].get(verdict.status, 0) + 1
+                )
+                extracted_per_label.setdefault(label, set()).add(sha)
+        for label, cell in out[name].items():
+            cell["unique_blobs"] = len(blobs_per_label.get(label, ()))
+            cell["extracted_blobs"] = len(extracted_per_label.get(label, ()))
+            cell["by_status"] = dict(sorted(cell["by_status"].items()))
+
+    return {
+        name: dict(sorted(cells.items(), key=lambda kv: (-kv[1]["manifest_files"],
+                                                         kv[0])))
+        for name, cells in out.items()
+    }
+
+
+def render_extraction(summary: dict[str, Any]) -> str:
+    """The operator's view of an extraction pass.
+
+    Leads with the cohort identity — a profile of the wrong 400 files is worse
+    than no profile — then the two coverage blocks, kept visually apart because
+    conflating them is the specific mistake this report exists to prevent.
+    """
+    ident = summary["pass"]
+    source = summary["source_coverage"]
+    blob = summary["blob_coverage"]
+    dry = "  (DRY RUN — nothing was parsed or written)" if ident["dry_run"] else ""
+
+    out: list[str] = [
+        f"NRB native extraction — {ident['status']}{dry}",
+        "=" * 72,
+        f"Extractor version:    {ident['extractor_version']}",
+        f"Manifest:             {ident['manifest_path'] or '(no manifest scope)'}",
+        f"Cohort fingerprint:   {ident['selection_sha256'] or '(none)'}",
+        f"Duration:             {ident['duration_seconds']:,.1f}s",
+        "",
+        "Source coverage (MANIFEST FILES — the frozen benchmark)",
+        f"  requested:          {source.get('requested', 0):>8,}",
+        f"  in the catalog:     {source.get('in_catalog', 0):>8,}",
+        f"  missing:            {source.get('missing_from_catalog', 0):>8,}"
+        "   (a stale manifest; the only real defect here)",
+        f"  fetched:            {source.get('fetched', 0):>8,}",
+        f"  not fetched yet:    {source.get('unfetched', 0):>8,}"
+        "   (reported, never substituted)",
+    ]
+    for status, count in (source.get("by_fetch_status") or {}).items():
+        out.append(f"    {status:<16} {count:>8,}")
+
+    out += [
+        "",
+        "Blob coverage (UNIQUE content_sha256 — the extraction unit)",
+        f"  unique fetched:     {blob.get('unique_fetched', 0):>8,}",
+        f"  duplicates:         {blob.get('duplicates_collapsed', 0):>8,}"
+        "   (same bytes, two cohort files — one extraction)",
+        f"  already extracted:  {blob.get('already_extracted', 0):>8,}"
+        "   (at this exact extractor version)",
+        f"  pending:            {blob.get('pending_extraction', 0):>8,}",
+        f"  selected this pass: {blob.get('selected_this_pass', 0):>8,}",
+        f"  attempted:          {blob.get('attempted_this_pass', 0):>8,}",
+        f"  persisted:          {blob.get('persisted_this_pass', 0):>8,}",
+        f"  failed:             {blob.get('failed_this_pass', 0):>8,}",
+        f"  missing on disk:    {blob.get('missing_on_disk', 0):>8,}",
+        f"  corrupt on disk:    {blob.get('corrupt_on_disk', 0):>8,}",
+        "",
+    ]
+
+    total_blobs = sum(summary["by_status"].values())
+    out += _block("Verdicts (per BLOB)", summary["by_status"], total_blobs or None)
+    out += _block("Reasons (per BLOB)", summary["by_reason"], total_blobs or None)
+    if summary["warnings"]:
+        out += _block("Warnings", summary["warnings"])
+
+    out.append("Metric distributions (per BLOB)")
+    for name, dist in summary["metrics"].items():
+        if not dist["n"]:
+            continue
+        out.append(
+            f"  {name:<28} n={dist['n']:<6} min={dist['min']:<9} "
+            f"median={dist['median']:<9} p90={dist['p90']:<9} max={dist['max']}"
+        )
+    out.append("")
+
+    pages = summary["pages"]
+    out += [
+        "Pages",
+        f"  documents with pages: {pages['blobs_with_pages']:>8,}",
+        f"  total pages:          {pages['total_pages']:>8,}",
+        f"  pages with text:      {pages['pages_with_text']:>8,}",
+        f"  pages without text:   {pages['pages_without_text']:>8,}",
+        f"  no native text at all:{pages['documents_with_no_native_text']:>8,}",
+        "",
+        "Legacy-font severity (legacy_line_ratio, threshold "
+        f"{summary['legacy']['threshold']})",
+        f"  legacy_font_suspected:{summary['legacy']['legacy_font_suspected']:>8,}",
+    ]
+    for band, count in summary["legacy"]["bands"].items():
+        out.append(f"    {band:<14} {count:>8,}")
+    out.append("")
+
+    for name, title in (
+        ("by_cohort", "Year cohort"),
+        ("by_resource_type", "File format"),
+        ("by_document_type", "Document type"),
+    ):
+        cells = (summary.get("breakdowns") or {}).get(name) or {}
+        if not cells:
+            continue
+        out.append(f"{title} (manifest / fetched / blobs / extracted)")
+        for label, cell in cells.items():
+            verdicts = " ".join(
+                f"{status}={count}" for status, count in cell["by_status"].items()
+            )
+            out.append(
+                f"  {label:<22} {cell['manifest_files']:>5,} /"
+                f" {cell['fetched_files']:>5,} / {cell['unique_blobs']:>5,} /"
+                f" {cell['extracted_blobs']:>5,}   {verdicts}"
+            )
+        out.append("")
+
+    failures = (summary.get("notes") or {}).get("failures") or []
+    if failures:
+        total = summary["notes"].get("failure_count", len(failures))
+        out.append(f"Failures (showing {len(failures)} of {total:,}):")
+        out += [f"  {item}" for item in failures]
         out.append("")
     return "\n".join(out)

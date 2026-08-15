@@ -189,7 +189,14 @@ the window is set. Raising context buys time; truncation is the durable fix.
 # catalog queries around extraction — the last needs Postgres and rolls back)
 .venv/bin/pytest tests/test_nrb_quality.py tests/test_nrb_extraction.py \
     tests/test_nrb_manifest.py tests/test_nrb_sampling.py \
+    tests/test_nrb_extract_pass.py tests/test_nrb_extraction_report.py \
     tests/test_nrb_extract_integration.py tests/test_files_documents_pdf_pages.py
+
+# the extraction pass. Scope is REQUIRED; --dry-run opens no blob and parses
+# nothing; NOTHING here makes a network request.
+.venv/bin/python scripts/nrb_extract.py \
+    --manifest docs/nrb/phase6a-manifest.json --dry-run
+.venv/bin/python scripts/nrb_extract.py --section circular --limit 25 -v
 
 # the benchmark cohort. Catalog-only: no HTTP, and no file is written without
 # --out. It is already FROZEN — the write below is what was run once, on
@@ -1228,6 +1235,8 @@ what is wrong with it, and only then does 6B decide what to do about it.
 | 6 | `app/nrb/{manifest,catalog,fetch,report}.py`, `scripts/nrb_fetch.py` | The exact-cohort (benchmark manifest) fetch scope, `--year`, and extraction target selection. |
 | 7 | `app/nrb/sampling.py` | The deterministic stratified sampler: candidate canonicalization, seeded ranking, four-pass allocation with cap redistribution, allocation diagnostics. Pure. |
 | 7A | `app/nrb/manifest.py`, `app/nrb/report.py`, `scripts/nrb_sample.py` | `build_manifest`, the `selection_sha256` fingerprint, the freeze/verify guard, and the command that writes a cohort. |
+| 8 | `app/nrb/extract.py`, `app/nrb/locks.py`, `scripts/nrb_extract.py` | The pass: manifest → catalog rows → unique blobs → extract → record. Advisory lock `NRB_XTRC`, batched commits, resumable, failure-isolated, zero network. |
+| 9 | `app/nrb/profile.py`, `app/nrb/report.py` | The read-time cohort query and the deterministic profile: source/blob coverage, verdicts, metric distributions, legacy-severity bands, metadata breakdowns. |
 
 ### The legacy-font detector, and the measurement that rebuilt it
 
@@ -1406,6 +1415,59 @@ document-type / format breakdowns (n = 15–131), never from a single cell.
 the committed file — parameters, count, canonical order, the 120 ceiling and the
 fingerprint — with no database and no network.
 
+### The extraction pass, and the two populations it must never merge
+
+`app/nrb/extract.py` (`run_extract`), run by `scripts/nrb_extract.py`. Scope is
+required — extraction is CPU-bound over 18.3k files — and the resolution runs one
+way only:
+
+```
+manifest comparison_key -> nrb_files row -> content_sha256 + storage_key -> ONE target per sha
+```
+
+A URL in a manifest is never an input, nothing scans a directory, and a key the
+catalog does not know is reported missing rather than substituted. **400 cohort
+files is not 400 extractions**: some are not downloaded, and two cohort files with
+identical bytes are one blob, one attempt and one verdict. `app/nrb/profile.py`
+resolves both populations and the report prints them in separate blocks —
+`source_coverage` denominated on the frozen manifest (so an unfetched file cannot
+quietly leave the denominator and flatter every percentage), `blob_coverage` on
+unique `content_sha256`.
+
+"Current" is an exact `(content_sha256, extractor_version)` match. **A row written
+by an older extractor never makes a blob current** — that is the invalidation
+handle, and the pass selects by sha through the leading column of
+`ux_nrb_extractions_content_version`, never by scanning `extractor_version <>`.
+`--limit` applies *after* cohort resolution, content deduplication and
+current-version filtering, to a list ordered by the manifest's own rank, so
+`--limit 10` is the same ten blobs every run.
+
+Every blob is hashed against the sha in its own filename before parsing: the path
+IS the checksum, so bytes that no longer match are corrupt on disk, and a
+truncated PDF is exactly the input that yields plausible-looking partial text.
+Missing and corrupt are counted separately and recorded as `failed` rows rather
+than skipped — a skipped blob would stay pending forever and never appear in a
+status count. `--dry-run` opens no blob, calls no parser and writes no row.
+
+**Live smoke over the 49 already-fetched circulars** (throwaway extractor version
+`probe-6a-smoke`, rows deleted afterwards, so the benchmark's `native-1` state is
+untouched): 49 blobs in 11.0 s, 0 failures, 380 pages.
+
+```
+suspicious / legacy_font_suspected            49 / 49   (100%)
+devanagari_ratio                              0.0 at every percentile
+legacy_line_ratio    min 0.281 · median 0.980 · max 1.000
+  0.20-<0.50  3      0.50-<0.80  2      >=0.80  44
+text_page_coverage   min 0.50  · median 0.929 · pages without text 31 of 380
+```
+
+That reproduces the finding the phase exists for, through the whole pass this
+time: the text extracts cleanly and is wrong. The band split is the part a single
+"49/49 suspicious" number hides — 44 are unusable throughout, 3 sit in 0.20–0.50
+because a real English annex is bound behind a Preeti-encoded Nepali covering
+note. `legacy_line_ratio > 0.20` is the classifier's own threshold and was **not**
+re-tuned here; the report's bands read it rather than restating it.
+
 ### Live evidence so far (scratch DB `local_ai_gateway_p4`, 2026-08-15)
 
 ```
@@ -1434,10 +1496,13 @@ for department RAG) and Docling is still never imported at module scope. Nothing
 
 ### Remaining tasks
 
-8 the extraction pass (advisory lock `NRB_XTRC`, batched, resumable) · 9 the
-profile + report · 10 the CLI · 11 Docling calibration (pypdf vs Docling over the
-*same* quality metrics — not via `parse_to_chunks`, which would measure RAG
-filtering) · 12 Postgres integration tests · 13 the live profile · 14 docs.
+11 Docling calibration (pypdf vs Docling over the *same* quality metrics — not
+via `parse_to_chunks`, which would measure RAG filtering; the subset comes from
+`manifest.select_manifest_subset`, so it can only name files the screen already
+saw) · 13 the live profile, which needs the cohort **fetched** first · 14 docs.
+
+Task 10 (the CLI) and Task 12 (Postgres integration tests) landed with Tasks 8–9
+rather than separately: the pass is not verifiable without both.
 
 ### Evaluation & Improvement (Phase 6A)
 

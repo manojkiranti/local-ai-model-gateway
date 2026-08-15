@@ -88,6 +88,7 @@ __all__ = [
     "insert_sources",
     "load_file_index",
     "load_relationships",
+    "bounded_keys",
     "load_sample_rows",
     "load_source_index",
     "record_extractions",
@@ -705,7 +706,7 @@ class FetchTarget:
     fetch_attempts: int
 
 
-def _bounded_keys(keys: Sequence[str]) -> list[str]:
+def bounded_keys(keys: Sequence[str]) -> list[str]:
     """Distinct keys, order-stable, refused if there are too many.
 
     Deduplicated because a hand-edited manifest can name the same file twice and
@@ -776,7 +777,7 @@ async def select_fetch_targets(
     if resource_types:
         stmt = stmt.where(NRBFile.resource_type.in_(list(resource_types)))
     if keys:
-        stmt = stmt.where(NRBFile.comparison_key.in_(_bounded_keys(keys)))
+        stmt = stmt.where(NRBFile.comparison_key.in_(bounded_keys(keys)))
 
     if sections or owners or years or not include_inactive:
         link = (
@@ -853,7 +854,7 @@ async def resolve_manifest_keys(
     returned as missing instead of being dropped, because a manifest drifting away
     from the corpus is exactly the failure this phase must not paper over.
     """
-    distinct = _bounded_keys(keys)
+    distinct = bounded_keys(keys)
     if not distinct:
         return ManifestResolution(0, 0, {}, ())
     found: dict[str, str] = {}
@@ -1053,7 +1054,7 @@ async def select_extract_targets(
     if resource_types:
         stmt = stmt.where(NRBFile.resource_type.in_(list(resource_types)))
     if keys:
-        stmt = stmt.where(NRBFile.comparison_key.in_(_bounded_keys(keys)))
+        stmt = stmt.where(NRBFile.comparison_key.in_(bounded_keys(keys)))
 
     if not force:
         done = select(NRBExtraction.id).where(
@@ -1179,7 +1180,7 @@ async def count_unfetched(session: AsyncSession, keys: Sequence[str]) -> int:
     """
     if not keys:
         return 0
-    distinct = _bounded_keys(keys)
+    distinct = bounded_keys(keys)
     fetched = int(
         (
             await session.execute(

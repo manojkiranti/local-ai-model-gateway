@@ -338,3 +338,470 @@ def test_a_file_only_reachable_from_a_deactivated_source_is_not_sampled():
         return await catalog.load_sample_rows(session)
 
     assert _run(go) == []
+
+
+# --------------------------------------------------------------------------- #
+# A whole extraction pass (real commits, owner-scoped, cleaned up)
+#
+# `run_extract` manages its own sessions and really commits, so these tests do
+# NOT use the rolled-back harness above. They scope to a unique owner code and a
+# unique blob store, and delete only their own rows — the same isolation rule
+# `test_nrb_fetch_integration`'s pass tests follow, and for the same reason: a
+# test that selected a developer's real catalog would write extraction rows over
+# it.
+# --------------------------------------------------------------------------- #
+import asyncio
+import hashlib
+import uuid
+
+from sqlalchemy import text as _text
+from sqlalchemy.ext.asyncio import async_sessionmaker
+
+from app.nrb import extract as extract_mod
+from app.nrb import extraction as extraction_mod
+from app.nrb import filestore, profile, report
+from app.nrb.quality import STATUS_FAILED
+from tests.test_nrb_sync_integration import _engine, _skip_if_no_db
+
+
+def _pdf_bytes(lines):
+    """A real PDF with real text, built in-process — no committed binaries."""
+    from fpdf import FPDF
+
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("helvetica", size=12)
+    for line in lines:
+        pdf.cell(0, 8, line, new_x="LMARGIN", new_y="NEXT")
+    return bytes(pdf.output())
+
+
+ENGLISH_PDF = _pdf_bytes([
+    "Nepal Rastra Bank issued a circular to all licensed institutions today.",
+    "The circular requires that every bank shall report its exposure to the",
+    "central bank within thirty days of the end of the quarter.",
+])
+OTHER_PDF = _pdf_bytes([
+    "Bank Supervision Department annual report for the fiscal year.",
+    "All licensed institutions shall submit the statement within the period.",
+])
+
+
+@pytest.fixture()
+def blobs(tmp_path):
+    """Four cohort files over three states, with real bytes on disk.
+
+    * `shared_a` and `shared_b` are two catalog files with IDENTICAL bytes — the
+      case the whole source-vs-blob distinction exists for.
+    * `other` is a second, distinct blob.
+    * `unfetched` is a cohort member that has not been downloaded, so the pass
+      has to report it rather than substitute something else.
+    """
+    _skip_if_no_db()
+    owner = f"zz{uuid.uuid4().hex[:8]}"
+    tag = uuid.uuid4().hex[:8]
+    shared_sha = hashlib.sha256(ENGLISH_PDF).hexdigest()
+    other_sha = hashlib.sha256(OTHER_PDF).hexdigest()
+
+    for body, sha in ((ENGLISH_PDF, shared_sha), (OTHER_PDF, other_sha)):
+        path = tmp_path / filestore.storage_key_for(sha, "pdf")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(body)
+
+    files = {
+        "shared_a": (f"{UPLOADS}/{tag}-a.pdf", shared_sha, len(ENGLISH_PDF)),
+        "shared_b": (f"{UPLOADS}/{tag}-b.pdf", shared_sha, len(ENGLISH_PDF)),
+        "other": (f"{UPLOADS}/{tag}-c.pdf", other_sha, len(OTHER_PDF)),
+        "unfetched": (f"{UPLOADS}/{tag}-d.pdf", None, None),
+    }
+
+    async def setup():
+        engine = _engine()
+        try:
+            factory = async_sessionmaker(engine, expire_on_commit=False)
+            async with factory() as session:
+                ids = await _seed(
+                    session, owner=owner, section="circular",
+                    published=datetime(2019, 5, 1, tzinfo=timezone.utc),
+                    files=[{"name": name, "url": url}
+                           for name, (url, _s, _l) in files.items()],
+                )
+                for name, (_url, sha, length) in files.items():
+                    if sha is None:
+                        continue
+                    await session.execute(_text(
+                        "UPDATE nrb_files SET fetch_status = 'fetched',"
+                        " content_sha256 = :sha, content_length = :len,"
+                        " storage_key = :key, sniffed_mime = 'application/pdf'"
+                        " WHERE id = :id"),
+                        {"sha": sha, "len": length, "id": ids[name],
+                         "key": filestore.storage_key_for(sha, "pdf")})
+                await session.commit()
+                return ids
+        finally:
+            await engine.dispose()
+
+    ids = asyncio.run(setup())
+    yield {
+        "owner": owner, "ids": ids, "base": tmp_path,
+        "keys": {name: url for name, (url, _s, _l) in files.items()},
+        "shared_sha": shared_sha, "other_sha": other_sha,
+    }
+
+    async def teardown():
+        engine = _engine()
+        try:
+            async with engine.begin() as conn:
+                await conn.execute(_text(
+                    "DELETE FROM nrb_extractions WHERE content_sha256 = ANY(:s)"),
+                    {"s": [shared_sha, other_sha]})
+                await conn.execute(_text(
+                    "DELETE FROM nrb_source_files WHERE file_id = ANY(:ids)"),
+                    {"ids": list(ids.values())})
+                await conn.execute(_text(
+                    "DELETE FROM nrb_files WHERE id = ANY(:ids)"),
+                    {"ids": list(ids.values())})
+                await conn.execute(_text(
+                    "DELETE FROM nrb_sources WHERE owner = :o"), {"o": owner})
+        finally:
+            await engine.dispose()
+
+    asyncio.run(teardown())
+
+
+def _cohort_keys(blobs, *names):
+    names = names or ("shared_a", "shared_b", "other", "unfetched")
+    return [blobs["keys"][name] for name in names]
+
+
+def _pass(blobs, **kwargs):
+    """A real `run_extract` over the fixture's blob store."""
+    async def go():
+        engine = _engine()
+        try:
+            factory = async_sessionmaker(engine, expire_on_commit=False)
+            return await extract_mod.run_extract(
+                engine=engine, session_factory=factory, base_dir=blobs["base"],
+                **kwargs,
+            )
+        finally:
+            await engine.dispose()
+
+    return asyncio.run(go())
+
+
+def _rows(shas):
+    async def go():
+        engine = _engine()
+        try:
+            async with engine.connect() as conn:
+                result = await conn.execute(_text(
+                    "SELECT content_sha256, extractor_version, status, reason,"
+                    " char_count, legacy_line_ratio, page_count, error, preview"
+                    " FROM nrb_extractions WHERE content_sha256 = ANY(:s)"
+                    " ORDER BY content_sha256, extractor_version"), {"s": list(shas)})
+                return result.mappings().all()
+        finally:
+            await engine.dispose()
+
+    return asyncio.run(go())
+
+
+# --- A. exact manifest scope ------------------------------------------------ #
+def test_only_the_cohorts_own_blobs_are_ever_extracted(blobs):
+    """A file outside the manifest can never become a target, whatever else is in
+    the catalog."""
+    result = _pass(blobs, keys=_cohort_keys(blobs, "other"))
+    assert result.counters["blobs_attempted"] == 1
+    rows = _rows([blobs["shared_sha"], blobs["other_sha"]])
+    assert [row["content_sha256"] for row in rows] == [blobs["other_sha"]]
+
+
+# --- B. source-vs-blob identity --------------------------------------------- #
+def test_two_cohort_files_sharing_bytes_are_one_extraction(blobs):
+    """The case the whole design turns on. Two logical benchmark files, identical
+    content: one attempt, one row, and the report can still speak for both."""
+    result = _pass(blobs, keys=_cohort_keys(blobs, "shared_a", "shared_b"))
+    assert result.cohort["source"]["requested"] == 2
+    assert result.cohort["source"]["fetched"] == 2
+    assert result.cohort["blob"]["unique_fetched"] == 1
+    assert result.cohort["blob"]["duplicates_collapsed"] == 1
+    assert result.counters["blobs_attempted"] == 1
+    assert len(_rows([blobs["shared_sha"]])) == 1
+
+
+def test_the_report_associates_one_verdict_with_both_manifest_entries(blobs):
+    _pass(blobs, keys=_cohort_keys(blobs, "shared_a", "shared_b"))
+
+    async def go():
+        engine = _engine()
+        try:
+            factory = async_sessionmaker(engine, expire_on_commit=False)
+            async with factory() as session:
+                return await profile.load_cohort(
+                    session, keys=_cohort_keys(blobs, "shared_a", "shared_b"),
+                    extractor_version=extraction_mod.EXTRACTOR_VERSION,
+                )
+        finally:
+            await engine.dispose()
+
+    cohort = asyncio.run(go())
+    assert len(cohort.verdicts) == 1
+    assert set(cohort.keys_for(blobs["shared_sha"])) == set(
+        _cohort_keys(blobs, "shared_a", "shared_b")
+    )
+
+
+# --- C/D. extractor-version semantics --------------------------------------- #
+def test_a_blob_already_extracted_at_this_version_is_skipped(blobs):
+    first = _pass(blobs, keys=_cohort_keys(blobs))
+    assert first.counters["blobs_attempted"] == 2      # two unique blobs
+
+    second = _pass(blobs, keys=_cohort_keys(blobs))
+    assert second.counters["blobs_selected"] == 0
+    assert second.counters["blobs_attempted"] == 0
+    assert second.cohort["blob"]["already_extracted"] == 2
+    assert second.cohort["blob"]["pending_extraction"] == 0
+
+
+def test_an_older_extraction_does_not_make_a_blob_current(blobs):
+    """The skip is an EXACT (content_sha256, extractor_version) match. A result
+    from an older extractor is a previous answer to a question the current rules
+    would answer differently — it must not suppress the current work."""
+    _pass(blobs, keys=_cohort_keys(blobs), extractor_version="native-0")
+    assert len(_rows([blobs["shared_sha"]])) == 1
+
+    current = _pass(blobs, keys=_cohort_keys(blobs))
+    assert current.counters["blobs_attempted"] == 2
+    versions = {row["extractor_version"] for row in _rows([blobs["shared_sha"]])}
+    assert versions == {"native-0", extraction_mod.EXTRACTOR_VERSION}
+
+
+def test_force_re_extracts_a_blob_recorded_at_this_version(blobs):
+    _pass(blobs, keys=_cohort_keys(blobs))
+    again = _pass(blobs, keys=_cohort_keys(blobs), force=True)
+    assert again.counters["blobs_attempted"] == 2
+    # Still one row per (blob, version): the upsert replaced, it did not duplicate.
+    assert len(_rows([blobs["shared_sha"]])) == 1
+
+
+# --- E. dry run -------------------------------------------------------------- #
+def test_a_dry_run_calls_no_parser_and_writes_no_row(blobs, monkeypatch):
+    def explode(*args, **kwargs):    # pragma: no cover - must never run
+        raise AssertionError("a dry run called the parser")
+
+    monkeypatch.setattr(extract_mod, "extract_file", explode)
+    result = _pass(blobs, keys=_cohort_keys(blobs), dry_run=True)
+
+    assert result.dry_run is True
+    assert result.counters["blobs_selected"] == 2      # it still says what it would do
+    assert result.counters["blobs_attempted"] == 0
+    assert result.counters["blobs_persisted"] == 0
+    assert _rows([blobs["shared_sha"], blobs["other_sha"]]) == []
+
+
+def test_a_dry_run_still_reports_the_full_cohort_accounting(blobs):
+    result = _pass(blobs, keys=_cohort_keys(blobs), dry_run=True)
+    assert result.cohort["source"]["requested"] == 4
+    assert result.cohort["source"]["fetched"] == 3
+    assert result.cohort["source"]["unfetched"] == 1
+    assert result.cohort["blob"]["unique_fetched"] == 2
+    assert result.cohort["blob"]["duplicates_collapsed"] == 1
+    assert result.cohort["blob"]["pending_extraction"] == 2
+
+
+def test_a_dry_run_makes_no_http_request(blobs, monkeypatch):
+    import httpx as _httpx
+
+    def explode(*args, **kwargs):    # pragma: no cover - must never run
+        raise AssertionError("the extraction pass made an HTTP request")
+
+    for name in ("AsyncClient", "Client", "get", "request", "stream"):
+        monkeypatch.setattr(_httpx, name, explode)
+    assert _pass(blobs, keys=_cohort_keys(blobs), dry_run=True).ok
+
+
+def test_a_real_pass_makes_no_http_request_either(blobs, monkeypatch):
+    """Phase 6A reads local blobs. There is no network in this path at all."""
+    import httpx as _httpx
+
+    def explode(*args, **kwargs):    # pragma: no cover - must never run
+        raise AssertionError("the extraction pass made an HTTP request")
+
+    for name in ("AsyncClient", "Client", "get", "request", "stream"):
+        monkeypatch.setattr(_httpx, name, explode)
+    assert _pass(blobs, keys=_cohort_keys(blobs)).counters["blobs_persisted"] == 2
+
+
+# --- F. failure isolation ---------------------------------------------------- #
+def test_a_missing_blob_is_recorded_and_the_pass_continues(blobs):
+    """One unreadable file must not cost the other 399 measurements."""
+    (blobs["base"] / filestore.storage_key_for(blobs["shared_sha"], "pdf")).unlink()
+
+    result = _pass(blobs, keys=_cohort_keys(blobs))
+    assert result.counters["blobs_attempted"] == 2
+    assert result.counters["blobs_persisted"] == 2
+    assert result.counters["blobs_failed"] == 1
+    assert result.counters["blobs_missing_on_disk"] == 1
+
+    by_sha = {row["content_sha256"]: row for row in
+              _rows([blobs["shared_sha"], blobs["other_sha"]])}
+    assert by_sha[blobs["shared_sha"]]["status"] == STATUS_FAILED
+    assert "missing" in by_sha[blobs["shared_sha"]]["error"]
+    assert by_sha[blobs["other_sha"]]["status"] != STATUS_FAILED
+
+
+def test_a_corrupt_blob_is_caught_before_it_is_parsed(blobs):
+    """The path IS the checksum, so bytes that no longer hash to their own name
+    are corrupt — and a truncated PDF is exactly the input that yields
+    plausible-looking partial text."""
+    path = blobs["base"] / filestore.storage_key_for(blobs["shared_sha"], "pdf")
+    path.write_bytes(ENGLISH_PDF[: len(ENGLISH_PDF) // 2])
+
+    result = _pass(blobs, keys=_cohort_keys(blobs))
+    assert result.counters["blobs_corrupt_on_disk"] == 1
+    row = {r["content_sha256"]: r for r in _rows([blobs["shared_sha"]])}
+    assert row[blobs["shared_sha"]]["status"] == STATUS_FAILED
+    assert "hash" in row[blobs["shared_sha"]]["error"]
+
+
+def test_a_failure_never_carries_a_filesystem_path_into_the_database(blobs):
+    (blobs["base"] / filestore.storage_key_for(blobs["other_sha"], "pdf")).unlink()
+    _pass(blobs, keys=_cohort_keys(blobs))
+    for row in _rows([blobs["other_sha"]]):
+        assert str(blobs["base"]) not in (row["error"] or "")
+
+
+# --- G. the upsert replaces everything --------------------------------------- #
+def test_re_extraction_cannot_leave_a_stale_severity_metric(blobs):
+    """`record_extractions` derives its conflict-update set by subtraction from
+    the table, so a metric column added later is refreshed rather than keeping its
+    first value. This proves it end to end: a row written with one set of numbers
+    is fully replaced, not partially patched."""
+    async def poison():
+        engine = _engine()
+        try:
+            async with engine.begin() as conn:
+                await conn.execute(_text(
+                    "INSERT INTO nrb_extractions (content_sha256, extractor_version,"
+                    " parser, media_family, status, reason, warnings, char_count,"
+                    " legacy_line_ratio, legacy_lines, judged_lines, page_count,"
+                    " metrics, preview)"
+                    " VALUES (:sha, :v, 'pypdf', 'pdf', 'suspicious',"
+                    " 'legacy_font_suspected', '[\"stale\"]'::jsonb, 999999,"
+                    " 0.99, 99, 100, 42, '{\"stale\": true}'::jsonb, 'STALE')"),
+                    {"sha": blobs["shared_sha"],
+                     "v": extraction_mod.EXTRACTOR_VERSION})
+        finally:
+            await engine.dispose()
+
+    asyncio.run(poison())
+    _pass(blobs, keys=_cohort_keys(blobs), force=True)
+
+    row = {r["content_sha256"]: r for r in _rows([blobs["shared_sha"]])}[
+        blobs["shared_sha"]
+    ]
+    assert row["char_count"] != 999999
+    assert row["legacy_line_ratio"] != 0.99
+    assert row["page_count"] == 1
+    assert row["preview"] != "STALE"
+    assert row["status"] != "suspicious" or row["reason"] != "legacy_font_suspected"
+
+
+# --- H. missing and unfetched entries ---------------------------------------- #
+def test_an_unfetched_cohort_file_is_reported_and_never_substituted(blobs):
+    result = _pass(blobs, keys=_cohort_keys(blobs))
+    assert result.cohort["source"]["unfetched"] == 1
+    assert result.cohort["source"]["by_fetch_status"]["pending"] == 1
+    assert result.counters["blobs_attempted"] == 2      # not 3, and not backfilled
+
+
+def test_a_cohort_key_the_catalog_does_not_know_is_reported_missing(blobs):
+    keys = _cohort_keys(blobs) + ["https://www.nrb.org.np/contents/uploads/nope.pdf"]
+    result = _pass(blobs, keys=keys, dry_run=True)
+    assert result.cohort["source"]["requested"] == 5
+    assert result.cohort["source"]["in_catalog"] == 4
+    assert result.cohort["source"]["missing_from_catalog"] == 1
+    assert result.cohort["blob"]["unique_fetched"] == 2      # nothing invented
+
+
+# --- I. deterministic --limit ------------------------------------------------ #
+def test_limit_takes_the_first_blobs_of_the_cohort_in_manifest_order(blobs):
+    """`--limit 1` over a cohort whose first entry is `other` must take `other`,
+    whatever order the query returned — that is what makes a bounded developer
+    run reproducible."""
+    first = _pass(
+        blobs, keys=_cohort_keys(blobs, "other", "shared_a"), limit=1, dry_run=True
+    )
+    assert first.counters["blobs_selected"] == 1
+
+    result = _pass(
+        blobs, keys=_cohort_keys(blobs, "other", "shared_a"), limit=1
+    )
+    assert [row["content_sha256"] for row in
+            _rows([blobs["shared_sha"], blobs["other_sha"]])] == [blobs["other_sha"]]
+    assert result.counters["blobs_attempted"] == 1
+
+
+def test_limit_is_applied_after_deduplication_not_to_raw_rows(blobs):
+    """Two cohort files, one blob: `--limit 2` cannot manufacture a second
+    extraction out of the duplicate."""
+    result = _pass(
+        blobs, keys=_cohort_keys(blobs, "shared_a", "shared_b"), limit=2,
+        dry_run=True,
+    )
+    assert result.counters["blobs_selected"] == 1
+
+
+# --- the whole thing, through the report ------------------------------------- #
+def test_the_pass_and_the_report_agree_on_every_population(blobs):
+    result = _pass(blobs, keys=_cohort_keys(blobs))
+
+    async def go():
+        engine = _engine()
+        try:
+            factory = async_sessionmaker(engine, expire_on_commit=False)
+            async with factory() as session:
+                return await profile.load_cohort(
+                    session, keys=_cohort_keys(blobs),
+                    extractor_version=extraction_mod.EXTRACTOR_VERSION,
+                )
+        finally:
+            await engine.dispose()
+
+    cohort = asyncio.run(go())
+    summary = report.summarize_extraction(result, cohort=cohort)
+    assert summary["source_coverage"]["requested"] == 4
+    assert summary["source_coverage"]["fetched"] == 3
+    assert summary["source_coverage"]["unfetched"] == 1
+    assert summary["blob_coverage"]["unique_fetched"] == 2
+    assert summary["blob_coverage"]["duplicates_collapsed"] == 1
+    assert summary["blob_coverage"]["already_extracted"] == 2
+    assert sum(summary["by_status"].values()) == 2       # per BLOB, not per file
+    assert report.render_extraction(summary)
+
+
+def test_a_pass_with_no_cohort_still_reports_its_verdicts(blobs):
+    """`--section circular` and `--all` are legitimate non-benchmark passes, and
+    they have no manifest to carry verdicts. A report that said "2 blobs
+    persisted" and showed no statuses at all would be worse than no report — the
+    numbers would look like a successful pass that measured nothing."""
+    result = _pass(blobs, owners=[blobs["owner"]])
+    assert result.counters["blobs_persisted"] == 2
+    assert result.cohort is None
+    assert len(result.verdicts) == 2
+
+    summary = report.summarize_extraction(result)
+    assert sum(summary["by_status"].values()) == 2
+    assert summary["by_reason"]
+    assert summary["metrics"]["char_count"]["n"] == 2
+    assert "no manifest scope" in report.render_extraction(summary)
+
+
+def test_a_dry_pass_with_no_cohort_reports_no_verdicts(blobs):
+    """Nothing was extracted, so there is nothing to report — and the selected
+    blobs are by definition NOT extracted at this version."""
+    result = _pass(blobs, owners=[blobs["owner"]], dry_run=True)
+    assert result.counters["blobs_selected"] == 2
+    assert result.verdicts == {}
+    assert report.summarize_extraction(result)["by_status"] == {}

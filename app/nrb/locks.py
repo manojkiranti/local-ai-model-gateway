@@ -31,12 +31,24 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 logger = logging.getLogger("app.nrb.locks")
 
-__all__ = ["FETCH_LOCK_KEY", "SYNC_LOCK_KEY", "LockBusy", "advisory_lock"]
+__all__ = [
+    "EXTRACT_LOCK_KEY",
+    "FETCH_LOCK_KEY",
+    "SYNC_LOCK_KEY",
+    "LockBusy",
+    "advisory_lock",
+]
 
 # ASCII, so the key is recognisable in `pg_locks` instead of being a magic number.
-# Both fit a signed bigint.
+# All three fit a signed bigint.
 SYNC_LOCK_KEY = int.from_bytes(b"NRB_SYNC", "big")
 FETCH_LOCK_KEY = int.from_bytes(b"NRB_FTCH", "big")
+# Extraction gets its own key rather than sharing the fetch's: the two commands
+# touch different tables and there is no reason a download should block a
+# CPU-bound re-extraction of blobs already on disk. Two extractions at once IS
+# worth refusing — they would select the same pending blobs and race on the
+# `(content_sha256, extractor_version)` upsert.
+EXTRACT_LOCK_KEY = int.from_bytes(b"NRB_XTRC", "big")
 
 
 class LockBusy(Exception):
