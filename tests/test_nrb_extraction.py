@@ -195,3 +195,23 @@ def test_every_result_status_and_reason_are_in_the_closed_vocabularies(tmp_path)
     for result in results:
         assert result.status in quality.STATUSES
         assert result.reason in quality.REASONS
+
+
+def test_the_database_vocabularies_match_the_classifiers():
+    """`models.py` re-states the status/reason lists as CHECK literals.
+
+    They are duplicated rather than imported so `quality.py` stays a pure module
+    the ORM never pulls into. Duplication is only safe while something notices
+    when the two drift — a status the classifier can emit but the CHECK rejects
+    would fail every insert of that kind, at the end of a long extraction pass.
+    """
+    from app.nrb import models
+
+    assert set(models.EXTRACTION_STATUSES) == set(quality.STATUSES)
+    assert set(models.EXTRACTION_REASONS) == set(quality.REASONS)
+
+
+def test_the_preview_cap_the_database_enforces_is_the_one_extraction_applies():
+    from app.nrb import models
+
+    assert models.EXTRACTION_PREVIEW_CHARS == extraction.PREVIEW_CHARS

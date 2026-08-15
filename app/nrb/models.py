@@ -45,6 +45,7 @@ from sqlalchemy import (
     BigInteger,
     Boolean,
     CheckConstraint,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -60,6 +61,9 @@ from sqlalchemy.types import DateTime
 from ..db.base import Base
 
 __all__ = [
+    "EXTRACTION_PREVIEW_CHARS",
+    "EXTRACTION_REASONS",
+    "EXTRACTION_STATUSES",
     "FETCH_BLOCKED_HOST",
     "FETCH_FAILED",
     "FETCH_FETCHED",
@@ -69,6 +73,7 @@ __all__ = [
     "FETCH_RUN_PARTIAL",
     "FETCH_RUN_RUNNING",
     "FETCH_STATUSES",
+    "NRBExtraction",
     "NRBFetchRun",
     "METADATA_STATUSES",
     "METADATA_STATUS_REST",
@@ -662,4 +667,186 @@ class NRBSyncRun(Base):
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Phase 6A: native extraction results.
+#
+# The vocabularies are re-stated here as literals rather than imported from
+# `app/nrb/quality.py`. `quality.py` is a pure, dependency-free module and the
+# ORM must not become a reason for it to grow imports; the CHECK strings below
+# and `quality.STATUSES`/`quality.REASONS` are kept in step by
+# `test_the_database_vocabularies_match_the_classifiers`.
+# --------------------------------------------------------------------------- #
+EXTRACTION_STATUSES = (
+    "extracted", "suspicious", "needs_ocr", "unsupported", "failed",
+)
+EXTRACTION_REASONS = (
+    "clean", "legacy_font_suspected", "partial_text_coverage",
+    "replacement_characters", "control_characters", "low_printable_ratio",
+    "empty_spreadsheet", "no_text_layer", "sparse_text_layer", "image_file",
+    "no_native_parser", "parser_error",
+)
+
+# The preview is a sanity-check window, not a text cache. Enforced by a CHECK
+# (see the class docstring) rather than trusted to the writer.
+EXTRACTION_PREVIEW_CHARS = 300
+
+
+def _in_list(column: str, values: tuple[str, ...]) -> str:
+    return f"{column} IN (" + ", ".join(f"'{v}'" for v in values) + ")"
+
+
+class NRBExtraction(Base):
+    """One native-extraction attempt on one BLOB. Content-intrinsic, always.
+
+    Keyed on `content_sha256`, not on an `nrb_files.id`, and that is the whole
+    design decision. Storage is content-addressed and a blob is shared: Phase 3
+    measured 42 duplicate attachment references and Phase 5 found byte-identical
+    duplicates within the first 25 files. Per-file-row extraction would parse the
+    same bytes twice and store two answers to one question.
+
+    It also forbids something subtler. A source TITLE is a useful quality signal
+    (a Devanagari title over zero-Devanagari text is strong corroboration of a
+    legacy-font extraction), but a blob referenced by one Devanagari-titled and
+    one English-titled source would store a different verdict depending on which
+    source the pass happened to reach first. That is non-deterministic persisted
+    state, and it would break the second-run-is-identical invariant every earlier
+    phase holds. So **every column here is a function of the bytes alone**, and
+    the title-assisted signal lives in `profile.py`, computed over ALL referencing
+    sources at read time.
+
+    `extractor_version` is the other half of the key and the invalidation handle:
+    bumping it makes every stored result stale and re-extractable without
+    deleting anything, and "which blobs are stale" stays a
+    `WHERE extractor_version <> …` query rather than a framework.
+
+    **No extracted text is stored.** Only `preview`, and that is held to
+    `EXTRACTION_PREVIEW_CHARS` by a CHECK rather than by the writer remembering:
+    Phase 7 re-parses with Docling for chunking anyway, and a text column that
+    could hold a whole document is something a later phase would eventually embed
+    by accident. Making it structurally impossible is cheaper than documenting
+    that it must not be done.
+
+    Column vs JSONB: the values Phase 6B is expected to FILTER on are columns
+    (status, reason, and the severity measures that size an OCR cohort); the full
+    metric set is `metrics` JSONB, because the metrics will evolve with the rules
+    and a column per idea means a migration per idea.
+    """
+
+    __tablename__ = "nrb_extractions"
+    __table_args__ = (
+        CheckConstraint(
+            _in_list("status", EXTRACTION_STATUSES),
+            name="ck_nrb_extractions_status",
+        ),
+        CheckConstraint(
+            _in_list("reason", EXTRACTION_REASONS),
+            name="ck_nrb_extractions_reason",
+        ),
+        # A `failed` row that cannot say why is indistinguishable from a bug, and
+        # a row claiming success must not carry an error. Same shape as
+        # `ck_nrb_files_blocked_reason`.
+        CheckConstraint(
+            "(status = 'failed') = (error IS NOT NULL)",
+            name="ck_nrb_extractions_error",
+        ),
+        # The legacy ratio's two halves travel together or not at all, and the
+        # numerator can never exceed the denominator — an impossible ratio is
+        # unrepresentable rather than merely unlikely.
+        CheckConstraint(
+            "(legacy_lines IS NULL) = (judged_lines IS NULL)"
+            " AND (legacy_lines IS NULL OR legacy_lines <= judged_lines)",
+            name="ck_nrb_extractions_legacy_counts",
+        ),
+        # THE guarantee that this table never becomes a document store.
+        CheckConstraint(
+            f"preview IS NULL OR char_length(preview) <= {EXTRACTION_PREVIEW_CHARS}",
+            name="ck_nrb_extractions_preview_is_bounded",
+        ),
+        # Identity. One answer per (bytes, extractor), so a repeat pass is a
+        # no-op rather than a second opinion. `content_sha256` leads, so this
+        # index also serves the join back to `nrb_files` and the staleness scan —
+        # a separate single-column index on it would be redundant.
+        Index(
+            "ux_nrb_extractions_content_version",
+            "content_sha256",
+            "extractor_version",
+            unique=True,
+        ),
+        # Phase 6B's work queue is `WHERE status IN ('needs_ocr', 'suspicious')`.
+        Index("ix_nrb_extractions_status", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+
+    # --- identity: the extraction INPUT ---------------------------------- #
+    # Not a foreign key to `nrb_files`: the relationship is many rows to one
+    # blob, and a file row being re-fetched or removed must not orphan a
+    # perfectly valid extraction OF THE SAME BYTES.
+    content_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    extractor_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    parser: Mapped[str] = mapped_column(String(32), nullable=False)
+    media_family: Mapped[str] = mapped_column(String(16), nullable=False)
+
+    # --- the verdict ------------------------------------------------------ #
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    # The rule that fired, so a disputed verdict is traceable rather than
+    # arguable — the role `classification_source` plays on `nrb_sources`.
+    reason: Mapped[str] = mapped_column(String(64), nullable=False)
+    # Findings that did NOT change the status (a partly-scanned but mostly
+    # readable PDF, a document too short to measure).
+    warnings: Mapped[list] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
+
+    # --- severity measures Phase 6B filters on ---------------------------- #
+    page_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    pages_with_text: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # How many pages carry any text at all.
+    text_page_coverage: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Two medians, because one cannot separate the two faults: over ALL pages it
+    # collapses to 0 once most pages are blank, so a partly-scanned document
+    # would read as having a sparse text layer, which is a different diagnosis.
+    median_chars_per_page: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # How much text the readable pages carry — the `sparse_text_layer` input.
+    median_chars_per_text_page: Mapped[float | None] = mapped_column(
+        Float, nullable=True
+    )
+    char_count: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    devanagari_ratio: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # THE legacy-font signal, promoted to a column because it is what sizes the
+    # OCR cohort: 0.28 and 1.00 are both "suspicious" but describe very different
+    # documents.
+    legacy_line_ratio: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Its numerator and denominator. A ratio alone cannot be audited — 0.5 over 4
+    # judged lines is not 0.5 over 900 — and `judged_lines` against `line_count`
+    # in `metrics` is the only way to see how much was too short to assess.
+    legacy_lines: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    judged_lines: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    # Everything from `quality.TextMetrics` plus the page/sheet stats. JSONB
+    # because the metric set evolves with the rules.
+    metrics: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+    # <= EXTRACTION_PREVIEW_CHARS, enforced by CHECK. NOT a text cache.
+    preview: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Exception TYPE plus a short message. Never a stack trace, never a
+    # filesystem path — the rule `app/files/documents.py` already follows.
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    extracted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
     )
