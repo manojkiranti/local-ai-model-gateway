@@ -22,10 +22,28 @@ from __future__ import annotations
 import re
 import unicodedata
 from dataclasses import asdict, dataclass
+from statistics import median
+from typing import Sequence
 
 __all__ = [
+    "Evidence",
+    "PageStats",
+    "REASONS",
+    "SheetStats",
+    "STATUSES",
+    "STATUS_EXTRACTED",
+    "STATUS_FAILED",
+    "STATUS_NEEDS_OCR",
+    "STATUS_SUSPICIOUS",
+    "STATUS_UNSUPPORTED",
     "STOPWORDS",
     "TextMetrics",
+    "legacy_line_ratio",
+    "UNSUPPORTED_FAMILIES",
+    "Verdict",
+    "classify",
+    "looks_like_legacy_font",
+    "measure_pages",
     "measure_text",
 ]
 
@@ -82,6 +100,10 @@ class TextMetrics:
     vowelless_token_ratio: float
     intraword_symbol_ratio: float
     intraword_case_switch_ratio: float
+    # Share of substantive LINES that look glyph-mapped. The primary legacy-font
+    # signal — see `legacy_line_ratio` for why the document-level numbers above
+    # could not do this job.
+    legacy_line_ratio: float
 
     def as_dict(self) -> dict[str, float | int]:
         """JSON-safe, for the `metrics` JSONB column."""
@@ -138,6 +160,76 @@ def _is_intraword_symbol(token: str) -> bool:
     return any(not _is_word_character(ch) for ch in core[1:-1])
 
 
+def _line_looks_glyph_mapped(line: str) -> bool | None:
+    """Does ONE line look like Devanagari glyphs mapped onto latin codepoints?
+
+    Returns None when the line is too short to judge, so it can be excluded from
+    the denominator rather than counted as innocent.
+
+    Shape only — `stopword_rate` is deliberately NOT consulted here. On a
+    six-token line the stopword rate is noise: it is 0.0 for most real English
+    lines too, so it would flag everything.
+    """
+    tokens = _TOKEN.findall(line)
+    if len(tokens) < LEGACY_LINE_MIN_TOKENS:
+        return None
+    non_ws = [ch for ch in line if not ch.isspace()]
+    if not non_ws:
+        return None
+    total = len(non_ws)
+    if len(_DEVANAGARI.findall(line)) / total > LEGACY_MAX_DEVANAGARI:
+        return False   # real Devanagari on this line
+    if len(_LATIN_LETTER.findall(line)) / total < LEGACY_MIN_LATIN:
+        return False   # a numeric row, not latin text
+    alpha = [t for t in tokens if _ALPHA_TOKEN.match(t) and len(t) >= 3]
+    vowelless = (
+        sum(1 for t in alpha if not _VOWEL.search(t)) / len(alpha) if alpha else 0.0
+    )
+    symbols = sum(1 for t in tokens if _is_intraword_symbol(t)) / len(tokens)
+    switches = sum(1 for t in tokens if _is_intraword_case_switch(t)) / len(tokens)
+    return (
+        vowelless > LEGACY_MIN_VOWELLESS
+        or symbols > LEGACY_MIN_INTRAWORD_SYMBOL
+        or switches > LEGACY_MIN_CASE_SWITCH
+    )
+
+
+def legacy_line_ratio(text: str) -> float:
+    """Share of substantive lines that look glyph-mapped.
+
+    THIS is the legacy-font signal, and it is measured per line because the
+    document-level numbers demonstrably cannot do it. Measured against the 49
+    fetched NRB circulars:
+
+      * A document-level rule gated on `stopword_rate < 0.02` missed **7 of 49**,
+        one of them scoring 0.248 — a *higher* stopword rate than real English
+        prose. Glyph-mapped text is full of one- and two-character ASCII tokens
+        (`a`, `t`, `is`, `on`), so short stopwords match by chance.
+      * Worse, those 7 were not detector noise. They are genuinely MIXED
+        documents: a real English annex (an audit scope, a Basel capital table)
+        behind a Preeti-encoded Nepali covering note. The document average is
+        honestly English — while the operative Nepali instruction is unreadable.
+        A whole-document statistic cannot represent that, and averaging it is how
+        the unusable half would have reached the index.
+
+    Per line, the separation is decisive rather than marginal:
+
+        English prose            0.000
+        Unicode Devanagari       0.000
+        all 49 NRB circulars     0.281 - 1.000
+
+    Lines below `LEGACY_LINE_MIN_TOKENS` are excluded from BOTH sides of the
+    ratio: a two-word heading carries no measurable structure, and counting it as
+    clean would dilute the signal in exactly the documents that are worst.
+    """
+    judged = [
+        verdict
+        for verdict in (_line_looks_glyph_mapped(line) for line in text.splitlines())
+        if verdict is not None
+    ]
+    return _ratio(sum(judged), len(judged))
+
+
 def measure_text(text: str) -> TextMetrics:
     """Every content-intrinsic metric for one extracted string.
 
@@ -192,4 +284,253 @@ def measure_text(text: str) -> TextMetrics:
         intraword_case_switch_ratio=_ratio(
             sum(1 for t in tokens if _is_intraword_case_switch(t)), len(tokens)
         ),
+        legacy_line_ratio=legacy_line_ratio(text),
     )
+
+
+# --------------------------------------------------------------------------- #
+# Closed vocabularies.
+#
+# Both are backed by a CHECK constraint on `nrb_extractions`. That is not
+# hygiene: the same lesson as `ck_nrb_files_fetch_status` — a typo'd status
+# ('needs_orc') would match no predicate and no query, so the row would read as
+# evaluated to Phase 6B while meaning nothing. Adding a value means editing the
+# CHECK.
+# --------------------------------------------------------------------------- #
+STATUS_EXTRACTED = "extracted"      # native text appears usable
+STATUS_SUSPICIOUS = "suspicious"    # text exists; do not trust it unreviewed
+STATUS_NEEDS_OCR = "needs_ocr"      # native extraction insufficient; needs pixels
+STATUS_UNSUPPORTED = "unsupported"  # valid file, no native parser implemented
+STATUS_FAILED = "failed"            # parser error, missing blob, corrupt file
+STATUSES = (
+    STATUS_EXTRACTED, STATUS_SUSPICIOUS, STATUS_NEEDS_OCR,
+    STATUS_UNSUPPORTED, STATUS_FAILED,
+)
+
+# There is no `pending`: an extraction row is keyed on (content_sha256,
+# extractor_version), so ABSENCE is pending. A status column that could also say
+# "not done yet" would be a second, disagreeing answer to the same question.
+
+REASONS = (
+    "clean",                   # extracted
+    "legacy_font_suspected",   # suspicious: latin codepoints carrying Devanagari
+    "partial_text_coverage",   # suspicious: a partly-scanned PDF
+    "replacement_characters",  # suspicious: mojibake
+    "control_characters",      # suspicious: binary leakage
+    "low_printable_ratio",     # suspicious: not renderable text
+    "empty_spreadsheet",       # suspicious: parsed, but nothing in it
+    "no_text_layer",           # needs_ocr: pages exist, text does not
+    "sparse_text_layer",       # needs_ocr: a stamped page number per page
+    "image_file",              # needs_ocr: the text is pixels
+    "no_native_parser",        # unsupported
+    "parser_error",            # failed
+)
+
+# --- thresholds ------------------------------------------------------------ #
+COVERAGE_NEEDS_OCR = 0.10       # below this, a PDF has effectively no text layer
+COVERAGE_SUSPICIOUS = 0.60      # below this, too much of the document is missing
+COVERAGE_WARN = 0.90            # below this, say so without changing the status
+MIN_CHARS_PER_PAGE = 50         # a stamped page number is not a text layer
+MAX_REPLACEMENT_RATIO = 0.005
+MAX_CONTROL_RATIO = 0.01
+MIN_PRINTABLE_RATIO = 0.95
+
+# The legacy-font gate. All four must hold before the shape signals are read.
+# Measured margins on the fixtures and on 6 real fetched circulars:
+#   English prose      stopword 0.353, vowelless 0.000, symbol 0.000
+#   Unicode Nepali     stopword 0.000  (exits at the devanagari gate)
+#   real NRB circulars stopword 0.000-0.002, vowelless 0.43-0.54, symbol 0.40-0.60
+LEGACY_MAX_DEVANAGARI = 0.01    # a line with real Devanagari is not glyph-mapped
+LEGACY_MIN_LATIN = 0.35         # it IS latin text, not a numeric row
+LEGACY_MIN_TOKENS = 50          # document floor: enough text to judge at all
+LEGACY_LINE_MIN_TOKENS = 4      # line floor: below this a line has no structure
+# At least one of these shape signals must fire on a line.
+LEGACY_MIN_VOWELLESS = 0.30
+LEGACY_MIN_INTRAWORD_SYMBOL = 0.15
+LEGACY_MIN_CASE_SWITCH = 0.10
+# Share of substantive lines that must look glyph-mapped. Measured margin:
+# English and Unicode Devanagari score 0.000; the WORST of 49 real NRB circulars
+# scores 0.281. Set at 0.20 — comfortably between, and deliberately low, because
+# a document whose Nepali half is unreadable is unsafe even when its English half
+# is perfect.
+LEGACY_LINE_RATIO = 0.20
+
+# Families with no native parser in this dependency set. `.xls` and `.doc` are
+# 324 files (1.8% of the corpus); adding xlrd/antiword is a Phase 6B decision, and
+# reporting them honestly is what makes that decision possible.
+UNSUPPORTED_FAMILIES = frozenset({"office_legacy", "archive", "web", "unknown"})
+
+
+@dataclass(frozen=True)
+class PageStats:
+    page_count: int
+    pages_with_text: int
+    text_page_coverage: float
+    # Over EVERY page — reporting only. Informative, but it falls with coverage,
+    # so it cannot distinguish the two faults below.
+    median_chars_per_page: float
+    # Over pages that produced text — what `sparse_text_layer` keys on. See
+    # `measure_pages` for why these must be two different numbers.
+    median_chars_per_text_page: float
+
+
+@dataclass(frozen=True)
+class SheetStats:
+    sheet_count: int
+    row_count: int
+    non_empty_cells: int
+    populated_ratio: float
+
+
+@dataclass(frozen=True)
+class Evidence:
+    """Everything `classify` may look at — and nothing else.
+
+    Deliberately a neutral carrier rather than `extraction.ExtractionResult`:
+    `extraction.py` imports pypdf, and the dependency must run one way so this
+    module stays trivially testable with hand-authored strings.
+
+    Note what is ABSENT: no title, no URL, no document type, no owner, no file id.
+    See the module docstring.
+    """
+
+    family: str                       # sniff.FAMILIES
+    parsed: bool                      # a parser ran to completion
+    error: str | None                 # exception type + short message
+    text_metrics: TextMetrics | None
+    pages: PageStats | None           # PDFs only
+    sheets: SheetStats | None         # spreadsheets only
+
+
+@dataclass(frozen=True)
+class Verdict:
+    status: str
+    reason: str
+    warnings: tuple[str, ...] = ()
+
+
+def measure_pages(page_texts: Sequence[str]) -> PageStats:
+    """Per-page structure for a PDF.
+
+    MEDIAN rather than mean: one 40-page scanned appendix behind a text-rich
+    cover page averages out to "text-rich" and would be classified `extracted`.
+    The median says what most of the document is like.
+
+    TWO medians, because there are two distinct faults and one number cannot tell
+    them apart:
+
+      * **How many pages have any text at all** is `text_page_coverage`. One
+        readable page in six is a partly-scanned document.
+      * **How much text the readable pages carry** is
+        `median_chars_per_text_page`. A stamped page number on every page is a
+        scan with a useless text layer — coverage 1.0, but nothing there.
+
+    A median over ALL pages collapses into the first: as soon as more than half
+    the pages are blank it reads 0 whatever the readable pages contain, so a
+    partly-scanned document would be reported as having a sparse text layer,
+    which is a different — and wrong — diagnosis.
+    """
+    lengths = [len(t.strip()) for t in page_texts]
+    with_text = [n for n in lengths if n > 0]
+    return PageStats(
+        page_count=len(lengths),
+        pages_with_text=len(with_text),
+        text_page_coverage=_ratio(len(with_text), len(lengths)),
+        median_chars_per_page=float(median(lengths)) if lengths else 0.0,
+        median_chars_per_text_page=float(median(with_text)) if with_text else 0.0,
+    )
+
+
+def looks_like_legacy_font(metrics: TextMetrics) -> bool:
+    """Latin codepoints carrying Devanagari glyphs (Preeti/Kantipur), or an
+    equally unusable embedded OCR layer.
+
+    The two are indistinguishable from the bytes and share one remedy, so this
+    does not try to separate them.
+
+    The judgement is `legacy_line_ratio` — a per-LINE measurement — for the
+    reasons documented there: a document-level rule missed 7 of 49 real NRB
+    circulars, including mixed documents whose English annex masked an unreadable
+    Nepali directive. `stopword_rate` survives as a reported metric but is no
+    longer a gate; it was the specific gate those 7 escaped through.
+
+    The only document-level condition left is having enough text to judge at all.
+    Correct Nepali needs no special exemption: every one of its lines carries real
+    Devanagari, so no line is ever counted as glyph-mapped.
+    """
+    if metrics.token_count < LEGACY_MIN_TOKENS:
+        return False
+    return metrics.legacy_line_ratio > LEGACY_LINE_RATIO
+
+
+def classify(evidence: Evidence) -> Verdict:
+    """The status of one extraction. Deterministic, ordered, first match wins.
+
+    Ties break toward `suspicious`, never toward `extracted`: a wrong document
+    that parses cleanly is the failure this whole phase exists to prevent, and it
+    is strictly worse than a recorded doubt.
+
+    There is no numeric quality score. A score invites threshold-tuning without
+    labels; the rules below are individually arguable and individually testable.
+    """
+    warnings: list[str] = []
+
+    # 1. failed — the parser could not produce anything.
+    if evidence.error is not None:
+        return Verdict(STATUS_FAILED, "parser_error")
+
+    # 2. unsupported — a valid file we have no parser for. Checked before the
+    #    text rules because there IS no text to reason about.
+    if evidence.family in UNSUPPORTED_FAMILIES:
+        return Verdict(STATUS_UNSUPPORTED, "no_native_parser")
+
+    # 3. needs_ocr — an image is a valid file whose text is pixels. NOT `failed`.
+    if evidence.family == "image":
+        return Verdict(STATUS_NEEDS_OCR, "image_file")
+
+    if not evidence.parsed or evidence.text_metrics is None:
+        return Verdict(STATUS_FAILED, "parser_error")
+
+    metrics = evidence.text_metrics
+
+    # 4. spreadsheets are judged STRUCTURALLY. A statistical table has no prose,
+    #    so every linguistic rule below would misfire on one.
+    if evidence.sheets is not None:
+        if evidence.sheets.non_empty_cells == 0:
+            return Verdict(STATUS_SUSPICIOUS, "empty_spreadsheet")
+        return Verdict(STATUS_EXTRACTED, "clean", tuple(warnings))
+
+    # Warnings are collected BEFORE any branch can return, so a verdict never
+    # silently loses one just because an earlier rule matched.
+    if metrics.token_count < LEGACY_MIN_TOKENS:
+        warnings.append("insufficient_text")
+
+    # 5. PDF structure. Two distinct faults, each with its own measurement:
+    #    almost no page has text (a scan), or the pages that do have text carry
+    #    almost none (a scan with a stamped page number). See `measure_pages`.
+    if evidence.pages is not None and evidence.pages.page_count > 0:
+        if evidence.pages.text_page_coverage < COVERAGE_NEEDS_OCR:
+            return Verdict(STATUS_NEEDS_OCR, "no_text_layer", tuple(warnings))
+        if evidence.pages.median_chars_per_text_page < MIN_CHARS_PER_PAGE:
+            return Verdict(STATUS_NEEDS_OCR, "sparse_text_layer", tuple(warnings))
+
+    # 6. suspicion, in severity order.
+    if looks_like_legacy_font(metrics):
+        return Verdict(STATUS_SUSPICIOUS, "legacy_font_suspected", tuple(warnings))
+    if metrics.replacement_char_ratio > MAX_REPLACEMENT_RATIO:
+        return Verdict(STATUS_SUSPICIOUS, "replacement_characters", tuple(warnings))
+    if metrics.control_char_ratio > MAX_CONTROL_RATIO:
+        return Verdict(STATUS_SUSPICIOUS, "control_characters", tuple(warnings))
+    if metrics.printable_ratio < MIN_PRINTABLE_RATIO:
+        return Verdict(STATUS_SUSPICIOUS, "low_printable_ratio", tuple(warnings))
+    if evidence.pages is not None and evidence.pages.page_count > 0:
+        coverage = evidence.pages.text_page_coverage
+        if coverage < COVERAGE_SUSPICIOUS:
+            return Verdict(STATUS_SUSPICIOUS, "partial_text_coverage", tuple(warnings))
+        if coverage < COVERAGE_WARN:
+            warnings.append("partial_text_coverage")
+
+    if metrics.non_whitespace_chars == 0:
+        return Verdict(STATUS_NEEDS_OCR, "no_text_layer", tuple(warnings))
+
+    return Verdict(STATUS_EXTRACTED, "clean", tuple(warnings))
