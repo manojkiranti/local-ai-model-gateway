@@ -38,6 +38,7 @@ __all__ = [
     "STATUS_UNSUPPORTED",
     "STOPWORDS",
     "TextMetrics",
+    "legacy_line_counts",
     "legacy_line_ratio",
     "UNSUPPORTED_FAMILIES",
     "Verdict",
@@ -104,6 +105,12 @@ class TextMetrics:
     # signal — see `legacy_line_ratio` for why the document-level numbers above
     # could not do this job.
     legacy_line_ratio: float
+    # The ratio's numerator and denominator, kept because the ratio alone cannot
+    # be audited. 0.5 means something very different over 4 judged lines than over
+    # 900, and `judged_lines` is also the only way to see how much of a document
+    # was too short to assess at all.
+    legacy_lines: int
+    judged_lines: int
 
     def as_dict(self) -> dict[str, float | int]:
         """JSON-safe, for the `metrics` JSONB column."""
@@ -222,12 +229,24 @@ def legacy_line_ratio(text: str) -> float:
     ratio: a two-word heading carries no measurable structure, and counting it as
     clean would dilute the signal in exactly the documents that are worst.
     """
+    legacy, judged = legacy_line_counts(text)
+    return _ratio(legacy, judged)
+
+
+def legacy_line_counts(text: str) -> tuple[int, int]:
+    """`(glyph-mapped lines, lines judged)` — the ratio's two halves.
+
+    Reported and persisted alongside the ratio, because a ratio on its own cannot
+    be audited: 0.5 over 4 judged lines and 0.5 over 900 are not the same finding,
+    and `judged_lines` against the document's own line count is the only way to
+    see how much was too short to assess.
+    """
     judged = [
         verdict
         for verdict in (_line_looks_glyph_mapped(line) for line in text.splitlines())
         if verdict is not None
     ]
-    return _ratio(sum(judged), len(judged))
+    return sum(judged), len(judged)
 
 
 def measure_text(text: str) -> TextMetrics:
@@ -256,6 +275,8 @@ def measure_text(text: str) -> TextMetrics:
 
     alpha_tokens = [t for t in tokens if _ALPHA_TOKEN.match(t) and len(t) >= 3]
     lowered = [t.lower() for t in tokens]
+    # Computed once; the ratio and both its halves are all reported.
+    _legacy_counts = legacy_line_counts(text)
 
     return TextMetrics(
         char_count=len(text),
@@ -284,7 +305,9 @@ def measure_text(text: str) -> TextMetrics:
         intraword_case_switch_ratio=_ratio(
             sum(1 for t in tokens if _is_intraword_case_switch(t)), len(tokens)
         ),
-        legacy_line_ratio=legacy_line_ratio(text),
+        legacy_line_ratio=_ratio(*_legacy_counts),
+        legacy_lines=_legacy_counts[0],
+        judged_lines=_legacy_counts[1],
     )
 
 

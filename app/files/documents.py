@@ -141,12 +141,33 @@ def _read_docx(path: Path) -> DocumentText:
     return DocumentText(kind="Word document", lines=lines)
 
 
-def _read_pdf(path: Path) -> DocumentText:
-    """PDF -> lines, one '[page N]' marker per page.
+@dataclass(frozen=True)
+class PdfPages:
+    """Per-page text from one PDF.
 
-    An empty page is NOT skipped: it emits an explicit marker, because a silent
-    gap reads to the model as "there was nothing there" rather than "this page
-    could not be extracted".
+    `pages` is capped at `MAX_PDF_PAGES`; `total` is what the file actually
+    contains, so a caller can always tell the difference between "this document
+    has 12 pages" and "we read 12 of its 500".
+    """
+
+    pages: tuple[str, ...]
+    total: int
+    skipped: int
+
+
+def read_pdf_pages(path: Path) -> PdfPages:
+    """PDF -> per-page text. The ONLY pypdf call site in this repository.
+
+    Two consumers with different needs: `_read_pdf` below flattens this into a
+    line stream with `[page N]` markers for the `read_document` tool, and NRB's
+    Phase 6A quality profiling needs the per-page character counts to compute
+    text-page coverage. Sharing the reader means encryption handling, the page
+    cap and per-page failure isolation cannot drift between them.
+
+    A page that cannot be read yields an empty string rather than aborting the
+    document: one damaged page in a 200-page directive must not lose the other
+    199. An empty page is also never dropped — for NRB it IS the scanned-page
+    signal, and a missing entry would make page coverage read as 100%.
     """
     from pypdf import PdfReader
 
@@ -174,29 +195,42 @@ def _read_pdf(path: Path) -> DocumentText:
         raise ReadError(f"could not read the PDF: {msg}") from exc
 
     limit = min(total, MAX_PDF_PAGES)
-    lines: list[str] = []
-    text_pages = 0
+    pages: list[str] = []
     for index in range(limit):
         try:
-            raw = reader.pages[index].extract_text() or ""
-        except Exception as exc:  # noqa: BLE001 - exception is logged; per-page failure doesn't kill document
+            pages.append(reader.pages[index].extract_text() or "")
+        except Exception as exc:  # noqa: BLE001 - logged; one page doesn't kill the document
             logger.warning(f"PDF page {index + 1} extraction failed: {exc}")
-            raw = ""
+            pages.append("")
+    return PdfPages(pages=tuple(pages), total=total, skipped=total - limit)
+
+
+def _read_pdf(path: Path) -> DocumentText:
+    """PDF -> lines, one '[page N]' marker per page.
+
+    An empty page is NOT skipped: it emits an explicit marker, because a silent
+    gap reads to the model as "there was nothing there" rather than "this page
+    could not be extracted".
+    """
+    read = read_pdf_pages(path)
+    lines: list[str] = []
+    text_pages = 0
+    for index, raw in enumerate(read.pages, start=1):
         page_lines = [ln.rstrip() for ln in raw.splitlines() if ln.strip()]
         if page_lines:
             text_pages += 1
-            lines.append(f"[page {index + 1}]")
+            lines.append(f"[page {index}]")
             lines.extend(page_lines)
         else:
             lines.append(
-                f"[page {index + 1}] (no extractable text — likely a scanned image)"
+                f"[page {index}] (no extractable text — likely a scanned image)"
             )
     return DocumentText(
         kind="PDF",
         lines=lines,
-        pages=total,
+        pages=read.total,
         text_pages=text_pages,
-        pages_skipped=total - limit,
+        pages_skipped=read.skipped,
     )
 
 

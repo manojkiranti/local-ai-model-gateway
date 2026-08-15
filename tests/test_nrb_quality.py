@@ -442,3 +442,20 @@ def test_every_verdict_reason_is_in_the_closed_vocabulary():
 def test_classify_is_deterministic():
     ev = _pdf_evidence(LEGACY * 6, [LEGACY] * 6)
     assert quality.classify(ev) == quality.classify(ev)
+
+
+def test_the_legacy_ratio_carries_its_numerator_and_denominator():
+    """A ratio alone cannot be audited: 0.5 over 4 lines is not 0.5 over 900."""
+    metrics = quality.measure_text(LEGACY)
+    assert metrics.judged_lines > 0
+    assert metrics.legacy_lines == metrics.judged_lines          # all of it
+    assert quality.legacy_line_counts(LEGACY) == (
+        metrics.legacy_lines,
+        metrics.judged_lines,
+    )
+
+
+def test_judged_lines_shows_how_much_of_a_document_was_too_short_to_assess():
+    metrics = quality.measure_text("NRB\nBank\nnote\n" + LEGACY)
+    assert metrics.judged_lines < metrics.non_empty_lines
+    assert metrics.legacy_lines == metrics.judged_lines
