@@ -38,10 +38,14 @@ verification + SHA-256 + content-addressed storage) done and live-fetched.
 2026-08-15**: a frozen 400-file benchmark (`docs/nrb/phase6a-manifest.json`,
 `1ae297d…`), 381 fetched, all 381 extracted at `native-1`, and a frozen 40-PDF
 pypdf-vs-Docling calibration (`81d5979…`) run over the 37 that fetched. Evidence
-in `docs/nrb/phase6a-{profile,calibration}.txt`. **NRB documents are now parsed
-and classified, but still NOT chunked, embedded or searchable** — Phases 6B
-(OCR/legacy-font strategy), 7 (chunk+embed) and 8 (`search_nrb_documents`) are
-not started; the 6B gate and its recommendation are §11.9. The roadmap was renumbered when Phase 4 was scoped down to
+in `docs/nrb/phase6a-{profile,calibration}.txt`. **Phase 6B Task 1 (legacy-font conversion) is EVALUATED, not deployed
+(2026-08-15, §12)**: Preeti recovers correctly above `legacy_line_ratio >= 0.80`
+(7/10 blobs; one converts line-for-line identically to its rendered page), all 14
+negative controls reconstruct byte-identically, and no routing is wired.
+**NRB documents are now parsed
+and classified, but still NOT chunked, embedded or searchable** — the rest of 6B
+(OCR strategy), 7 (chunk+embed) and 8 (`search_nrb_documents`) are
+not started; the 6B gate and its recommendation are §11.9 and §12.10. The roadmap was renumbered when Phase 4 was scoped down to
 persistence; read that doc before touching anything NRB-related instead of
 re-deriving status from chat history.
 
@@ -76,9 +80,14 @@ with `sync` — still no parsing); `quality`+`extraction`+`extract`+`profile`
 +`sampling`+`manifest` = Phase 6A native extraction & the frozen 400-file
 benchmark; `calibration`+`calibrate` = the frozen 40-PDF Docling calibration
 subset and the pypdf-vs-Docling comparison pass (writes NOTHING; Docling imported
-lazily); `report` = all of them — everything but `client` is
+lazily); `legacy_font`+`devanagari`+`lexicon`+`legacy_convert`+`legacy_eval`
++`legacy_report` = Phase 6B Task 1 legacy-font→Unicode conversion **evaluation**
+(`legacy_font` is the ONLY file that knows npttf2utf exists — GPL-3, lazy import,
+`requirements-nrb.txt` which `Dockerfile` does not install; `devanagari`+`lexicon`
+are the plausibility signals; `legacy_convert` is per-line/per-cell routing +
+validation; writes NOTHING); `report` = all of them — everything but `client` is
 **not** model-facing, run via
-`scripts/nrb_{sitemap_inventory,document_inventory,sync,fetch,sample,extract,calibrate}.py`), `tools/` (`registry.py` = engine; `local/` package = one module
+`scripts/nrb_{sitemap_inventory,document_inventory,sync,fetch,sample,extract,calibrate,build_lexicon,legacy_eval}.py`), `tools/` (`registry.py` = engine; `local/` package = one module
 per in-process tool, each exporting a `SPEC`, aggregated in `local/__init__.py`'s
 `LOCAL_TOOLS`), `agent/` (hand-rolled loop; `loop.stream_turn` = async event
 generator, `loop.run_turn` = collect for non-stream, `schemas` = trace types —
@@ -324,6 +333,26 @@ events (`token`/`tool_call`/`tool_result`/`done`) + the new id in the
   holds the advisory-lock rule for both commands (distinct keys, `NRB_SYNC` /
   `NRB_FTCH`, each on a dedicated connection because an `AsyncSession` releases its
   connection — and the lock — at every commit).
+- **Producing Devanagari is NOT succeeding — the Phase 6B guards run on the
+  INPUT.** Measured 2026-08-15: the benchmark's known English table
+  `Instruments Times Offer Amount` run through a Preeti converter becomes
+  `mक्ष्लकतचगभलतक mत्ष्भक इााभच mब्यगलत` — **91% Devanagari**, `legacy_line_ratio`
+  0.2632 → **0.0**, character count preserved. Every after-the-fact success signal
+  fires on a destroyed table, so validating the output cannot work; `lexicon.
+  is_confidently_english` vetoes the raw line first. Three more things a rewrite
+  must not lose: (1) **`devanagari_ratio` is anti-correlated with correctness for
+  mapping choice** — `@)^%` is `२०६५` under Preeti and nonsense `द्दण्टछ` under
+  FONTASY, and the WRONG one scores higher (0.9808 vs 0.9796); (2) the converter is
+  **not a no-op on correct Devanagari** (it turns `(मनी लाउन्डररङ)` into `९मनी
+  लाउन्डररङ०` while raising the ratio), so the Unicode guard runs before the English
+  one; (3) **`|` is a Preeti codepoint mapping to `्र`** and `extraction.py` joins
+  cells with `" | "`, so spreadsheets convert per CELL — and **ASCII digits map to
+  Devanagari digits** (`1,234.00` → `ज्ञ,द्दघद्ध।ण्ण्`, which passes every validation
+  rule), so an unjudged unit must clear `quality.LEGACY_MIN_LATIN` first.
+  `UNJUDGED_MIN_LEGACY_RATIO = 0.80` (6A's own top band) gates both the
+  too-short-to-judge branch and ambiguous replacement; without it 5 of 7 English
+  controls lost lines. Never lower it to raise recall — see `docs/nrb-integration.md`
+  §12.2.
 - **`app/nrb/catalog.py` uses Core statements, never `update(Model)`, and that is
   load-bearing.** `nrb_sources` maps the attribute `meta` onto the column named
   `metadata` (declarative reserves `metadata`). A Core insert wants the key

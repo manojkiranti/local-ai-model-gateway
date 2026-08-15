@@ -40,6 +40,7 @@ __all__ = [
     "TextMetrics",
     "legacy_line_counts",
     "legacy_line_ratio",
+    "line_looks_glyph_mapped",
     "UNSUPPORTED_FAMILIES",
     "Verdict",
     "classify",
@@ -167,7 +168,7 @@ def _is_intraword_symbol(token: str) -> bool:
     return any(not _is_word_character(ch) for ch in core[1:-1])
 
 
-def _line_looks_glyph_mapped(line: str) -> bool | None:
+def line_looks_glyph_mapped(line: str) -> bool | None:
     """Does ONE line look like Devanagari glyphs mapped onto latin codepoints?
 
     Returns None when the line is too short to judge, so it can be excluded from
@@ -176,6 +177,15 @@ def _line_looks_glyph_mapped(line: str) -> bool | None:
     Shape only — `stopword_rate` is deliberately NOT consulted here. On a
     six-token line the stopword rate is noise: it is 0.0 for most real English
     lines too, so it would flag everything.
+
+    **Public because Phase 6B routes conversion off it** (`legacy_convert.py`),
+    and a second, independently-written line detector would be free to disagree
+    with the one that produced the committed native-1 measurements. Promoted
+    verbatim: no threshold, no rule and no return value changed. The three-valued
+    result is part of the contract — `None` is not `False`, and 6B treats an
+    unjudged line inside a legacy document as a conversion candidate rather than
+    as clean text (26,087 of the suspicious cohort's 99,328 non-empty lines are
+    unjudged, and they are its headings, dates and table cells).
     """
     tokens = _TOKEN.findall(line)
     if len(tokens) < LEGACY_LINE_MIN_TOKENS:
@@ -243,7 +253,7 @@ def legacy_line_counts(text: str) -> tuple[int, int]:
     """
     judged = [
         verdict
-        for verdict in (_line_looks_glyph_mapped(line) for line in text.splitlines())
+        for verdict in (line_looks_glyph_mapped(line) for line in text.splitlines())
         if verdict is not None
     ]
     return sum(judged), len(judged)

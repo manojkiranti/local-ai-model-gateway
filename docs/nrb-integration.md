@@ -19,7 +19,7 @@ build-only so far — see §11).
 | 4 | Persistent catalog + idempotent metadata sync | **Done, live-run twice 2026-08-14** — §9 |
 | 5 | Attachment download → MIME validation → SHA-256 → local storage | **Done, live-fetched 2026-08-14** — §10 |
 | 6A | Native extraction + quality profiling (**no OCR**) | **Done, live-profiled 2026-08-15** — 400-file benchmark fetched, 381 extracted, pypdf-vs-Docling calibrated — §11 |
-| 6B | OCR / legacy-font strategy, chosen from 6A's evidence | Not started — 6A exists to decide it |
+| 6B | OCR / legacy-font strategy, chosen from 6A's evidence | **Task 1 (legacy-font conversion) evaluated 2026-08-15, NOT deployed** — §12. OCR strategy still not started |
 | 7 | Chunk + embed into the existing `documents`/`document_chunks` pipeline | Not started |
 | 8 | `search_nrb_documents` tool | Not started |
 
@@ -48,6 +48,13 @@ rather than from an assumption about a corpus that is 91% PDF and largely Nepali
 **6A runs no OCR of any kind and converts no legacy font**; that is a hard boundary,
 not a sequencing convenience. It also chunks nothing, embeds nothing, and adds no
 tool. See §11.
+
+**6B Task 1 has now evaluated legacy-font conversion and NOT deployed it** (§12).
+Preeti recovers correctly — one document converts line-for-line identically to its
+rendered page — but only above `legacy_line_ratio >= 0.80`; below that the band is
+mostly native-1's over-flagged English tables and the guards correctly decline.
+All 14 negative controls reconstruct byte-identically. `quality.classify`, the 0.20
+threshold and the 381 `native-1` rows are untouched, and no routing is wired.
 
 ---
 
@@ -1738,3 +1745,218 @@ Running the RAG suites against the scratch DB fails
 isolation too, so it is DB-state dependence rather than test-order pollution. Same
 family as the migration-lineage situation in §9.10 — a consequence of NRB work
 living on a scratch database, and resolved when that is reconciled.
+
+## 12. Phase 6B Task 1 — legacy-font conversion, EVALUATED (not deployed)
+
+**State as of 2026-08-15: evaluated on the frozen Phase 6A benchmark, with a
+recommendation. Nothing is wired into production.** `quality.classify` is
+unchanged, `legacy_line_ratio >= 0.20` is unchanged, the 381 `native-1` rows are
+unchanged, no OCR ran, nothing was chunked or embedded, and the whole pass made
+**zero network requests**.
+
+Evidence, committed verbatim:
+
+* **`docs/nrb/phase6b-legacy-conversion-evaluation.txt`** / **`.json`** — the
+  generated report: cohort identity, per-mapping counters, before/after per
+  document, negative controls, spreadsheets, performance.
+* **`docs/nrb/phase6b-manual-validation.txt`** — the by-eye work: rendered pages
+  compared against converted text, and the three corrections the controls forced.
+* **`docs/nrb/phase6b-lexicon.json`** — the frozen vocabulary the guards use
+  (`cc1fec3f…`, 6,655 English / 343 Nepali words).
+
+### The five answers
+
+**A. Can Preeti-encoded NRB text be deterministically recovered? YES.** On
+`5e0ca4500f8f` the converted output is **line-for-line identical to the rendered
+page**, Nepali dates and dandas included; `legacy_line_ratio` 1.0000 → 0.0000,
+`devanagari_ratio` 0.0000 → 0.9740. Across the 30-PDF cohort, 8 recovered, 8
+partial, 14 unresolved — but that split is almost entirely explained by severity
+(below).
+
+**B. Can a valid conversion be told apart from an English-table false positive?
+YES, but not by any signal the original brief proposed.** All seven English-table
+controls reconstruct **byte-identically, 0 lines converted, 0 preservation
+failures**. Getting there took three measured corrections — see §12.2.
+
+**C. Are there legacy documents Preeti cannot recover? YES, and one is
+visually confirmed.** `9892625b8531` is a perfectly readable Nepali circular
+whose text layer extracts as `\.qfr dqT frr+f,{ kt+r.r` — not a keystroke
+encoding at all, and the same `ffi`-run shape §11 quoted. Preeti cannot touch it;
+the validator refused every line rather than emitting confident nonsense. These
+need an `unknown_legacy_encoding` state and OCR.
+
+**D. Is line-level conversion safe for mixed English/Nepali PDFs? YES**, with
+per-line routing, per-cell for spreadsheets, and byte-exact reconstruction of
+everything not converted (line terminators included).
+
+**E. Should 6B route native → convert → validate → OCR-on-failure?**
+**Yes, but ONLY above `legacy_line_ratio >= 0.80`, and not below it.** That is
+the one number this evaluation adds, and it is the recommendation.
+
+### 12.1 What the severity split actually says
+
+| band | recovered | partial | unresolved |
+|---|---|---|---|
+| 0.20–0.50 | 1 | 0 | 9 |
+| 0.50–0.80 | 0 | 6 | 4 |
+| **0.80–1.00** | **7** | 2 | 1 |
+
+Conversion works where the document is unambiguously legacy and does almost
+nothing where it is not — which is exactly what §11.9 predicted, from the other
+direction: the 0.20–0.50 band is largely **native-1's over-flagged English
+tables**, and the guards correctly decline to convert them. The band is not a
+conversion failure; it is the classifier defect 6A already reported, seen through
+a second instrument.
+
+So the 6B queue is not 179 blobs. On the benchmark, **127 of 381 sit at >= 0.80**,
+and that is the population deterministic conversion can serve today.
+
+### 12.2 Three corrections the negative controls forced, and why they are the design
+
+Each was measured, and each earlier state is recorded in the manual-validation
+file because it is the evidence for the rule that replaced it.
+
+1. **Output validation cannot work; the guard must run on the INPUT.**
+   `Instruments Times Offer Amount` converts to `mक्ष्लकतचगभलतक mत्ष्भक इााभच
+   mब्यगलत` — 91% Devanagari, `legacy_line_ratio` 0.2632 → 0.0, character count
+   preserved. Every after-the-fact signal reports a successful recovery of a
+   table that has just been destroyed. Hence `lexicon.is_confidently_english`,
+   applied to the raw line before any converter sees it.
+2. **`devanagari_ratio` is anti-correlated with correctness for mapping choice.**
+   `@)^%` is `२०६५` under Preeti and the nonsense `द्दण्टछ` under
+   FONTASY_HIMALI_TT — and the wrong one scores **0.9808 against 0.9796**. Hence
+   `devanagari.py` (illegal clusters, latin residue) and a vocabulary score.
+3. **An unconfirmable conversion is only trustworthy in a clearly legacy
+   document.** Both the "line too short for the detector to judge" branch and the
+   "structurally fine but vocabulary can't vouch" outcome are gated on
+   `UNJUDGED_MIN_LEGACY_RATIO = 0.80` — 6A's own top severity band, not a value
+   invented here. Without the gate, 5 of 7 English controls lost lines
+   (`No.`, `Net`, `ago.`, `Reporting Stats`); with it on unjudged lines only, 4
+   of 7 still lost numeric rows (`MachhapuchureBank Ltd. 3500.00`). It costs the
+   0.50–0.80 band its recoveries, and that trade is deliberate: a missed heading
+   is a gap, a converted English cell is corruption.
+
+Two more traps, both caught by tests rather than by eye. `extraction.py` renders a
+spreadsheet row as `" | ".join(cells)` and **`|` is a Preeti codepoint mapping to
+`्र`**, so conversion is per CELL. And **Preeti maps ASCII digits to Devanagari
+digits** — `1,234.00` → `ज्ञ,द्दघद्ध।ण्ण्`, which passes every validation rule while
+destroying a number — so routing requires the detector's own `LEGACY_MIN_LATIN`
+share before an unjudged unit is a candidate.
+
+### 12.3 The mapping question
+
+`Preeti` is the best mapping on **25 of 30** documents; Kantipur and Sagarmatha
+are near-identical to it, and FONTASY_HIMALI_TT / PCS NEPALI are clearly wrong
+here (acceptance 0.3727 / 0.3911 against Preeti's 0.5747). Every mapping is run
+from the **same original text** and never chained — one mapping's corruption must
+not become another's input.
+
+**Automatic mapping identification is NOT yet feasible**, and the reason is
+specific: the Nepali half of the lexicon is built from the only genuine Unicode
+Devanagari in the benchmark — **6 blobs, 343 words** — so the measured separation
+between a right and a wrong mapping on the same line is 0.125 against 0.100. Real,
+repeatable, far too narrow to decide on. Vocabulary is therefore a *confirming*
+signal here, never a veto, and the three documents where a non-Preeti mapping won
+on score all sit in the low-severity band where the score means least. A richer
+Nepali lexicon is the prerequisite for automatic mapping selection.
+
+### 12.4 Spreadsheets, on their own denominator
+
+Six benchmark workbooks, reported apart from the PDF cohort throughout. The known
+Preeti workbook `8df7b02f8a13` recovers correctly per cell (`Plss[t jflif{s
+cfly{s ultljlw @)&^÷&&` → `एकिकृत वार्षिक आर्थिक गतिविधि २०७६/७७`), 54 cells
+accepted of 26,549. The other five are genuinely numeric and convert essentially
+nothing, which is the correct answer.
+
+This does **not** close §11.9's spreadsheet gap. It shows the converter works on
+cell strings; the classifier still never reads them, so the corpus's spreadsheets
+remain unclassified for legacy fonts. That is still `native-2`'s job.
+
+### 12.5 A THIRD false-negative class, found here
+
+`84862ab6866a` is `extracted`/`clean` with `devanagari_ratio` 0.6396 and
+`legacy_line_ratio` 0.0444 — and 29 of its lines are real Preeti that convert
+correctly (`kb M ;xfos lgb]]{zs` → `पद : सहायक निर्देशक`). It holds genuine
+Unicode Devanagari and genuine Preeti **in one file**, and the Unicode majority
+dilutes the Preeti minority below the 0.20 flag. Two of the six high-Devanagari
+benchmark blobs are this shape. Reported, not fixed — the same discipline Task 13
+followed, and more evidence for `native-2`.
+
+### 12.6 Cost
+
+**109,865 lines in 38.4s = 2,860 lines/s**, 3.9 document-mappings/s, for the
+whole cohort against all five mappings. Against 6A's measured pypdf (4,285 pages
+in 211.6s) and Docling (37 PDFs in 2,354.9s), conversion is cheap enough to sit
+in front of OCR without being priced. **No OCR timing is claimed, because none
+was measured.**
+
+### 12.7 The dependency, and the licence gate
+
+`npttf2utf==0.3.7`, declared in **`requirements-nrb.txt`** — which `Dockerfile`
+does not install, so the API image cannot acquire it by accident (same structural
+guarantee as docling and `requirements-worker.txt`). `app/nrb/legacy_font.py` is
+our own adapter behind a `LegacyFontConverter` Protocol; the import is lazy and
+absence raises `ConverterUnavailable` rather than silently no-oping. **Nothing
+from the package is copied into this repository** — no mapping table, no rule
+set, no code; `map.json` is read from the installed package at runtime.
+
+**npttf2utf is GPL-3.0, and that is an OPEN GATE, not a resolved question.** It
+was chosen because it is the only evaluated converter that is *correct*: the MIT
+alternative, `preeti-unicode-converter` 0.1.1, mangles matra reordering
+(`आर्थकि` for आर्थिक, `माैदि्रक` for मौद्रिक) and drags pymupdf + reportlab.
+GPL-3 obligations attach to **distribution**, not internal use, so this is fine
+for evaluation and for a gateway we operate — and it **must be resolved before
+this gateway is distributed to a client**. The user's decision (2026-08-15): use
+it now behind the adapter, do not vendor its tables, treat the licence as a
+deployment gate, and consider an independently-derived converter repo later.
+
+### 12.8 What is deliberately absent
+
+No production routing (`quality.classify` is untouched and the pipeline is not
+wired), no `native-2`, no threshold retune, no OCR of any kind, no chunking, no
+embeddings, no pgvector writes, no `search_nrb_documents`, no `LOCAL_TOOLS`
+entry, no endpoint, no migration, no `alembic stamp`, nothing on
+`feat/rag-source-citations`, and no write to the real `local_ai_gateway`
+database. Converted text is **not persisted anywhere** — not in Postgres, not on
+disk beyond the bounded excerpts in the evidence files.
+
+### 12.9 Evaluation & Improvement (Phase 6B Task 1)
+
+1. **Success metric** — the share of legacy-suspected blobs converted to
+   *correct* Unicode Nepali, with **zero** corruption of non-legacy content. Both
+   halves are load-bearing: a converter that recovers Nepali and damages English
+   tables is a net loss, because the corpus's English is currently fine.
+   Measured: **7 of 10 blobs at `>= 0.80` recovered; 0 of 14 negative controls
+   damaged.** Below 0.80, recovery is 1 of 20 — reported, not hidden.
+2. **Eval** — 51 tests across `tests/test_nrb_legacy_{conversion,cohort}.py`,
+   whose fixtures are real benchmark text with hand-verified Unicode, plus the
+   30-PDF frozen cohort (`b977464d…`, drawn from the 400-file benchmark by
+   content hash before any converter ran) and the 14 named negative controls.
+   All NRB suites: **923 passing / 3 skipped** (the 3 are the opt-in real-Docling
+   smoke tests), up from 872/3.
+3. **Feedback capture** — the evaluation JSON is the log: per document, per
+   mapping, every disposition counted, every validation reason recorded, and
+   bounded before/after excerpts. Nothing is persisted to Postgres, deliberately
+   — this is an experiment, and `nrb_extractions` is the canonical screen.
+   Re-running the command over the same cohort reproduces the file byte for byte.
+4. **Review loop** — before any production routing, (a) a Nepali reader confirms
+   the four flagged manual cases; (b) the licence gate in §12.7 is resolved; (c)
+   the 0.80 threshold is re-measured against a *different* cohort than the one it
+   was chosen on — the same rule §11.9 sets for the legacy threshold, and it
+   applies to this number too. Re-run whenever the lexicon or the converter pin
+   changes, and compare the per-mapping table.
+
+### 12.10 The gate to Phase 6B Task 2
+
+**Recommended order, from these measurements only.** First `native-2`, still —
+this evaluation strengthens §11.9's case rather than replacing it, and has now
+added a third false-negative class (§12.5) to the spreadsheet gap. Then wire
+conversion for `legacy_line_ratio >= 0.80` only, with everything below it and
+every rejection falling through to the OCR queue. A richer Nepali lexicon is the
+prerequisite for extending it further or for automatic mapping identification.
+
+**Still undecided, deliberately:** which OCR engine, whether `unknown_legacy_
+encoding` deserves its own status in the `nrb_extractions` vocabulary, whether
+the 0.50–0.80 band is better served by a richer lexicon or by OCR, and the
+licence gate. None is answerable from this evidence, which is why none is
+answered here.

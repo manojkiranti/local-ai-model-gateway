@@ -1,0 +1,186 @@
+================================================================================
+NRB PHASE 6B TASK 1 — MANUAL VALIDATION
+================================================================================
+
+Hand-written evidence, 2026-08-15. The machine-generated companion is
+`phase6b-legacy-conversion-evaluation.{txt,json}`; this file records what was
+checked BY EYE against the rendered pages, because no automatic signal can
+answer "is this the right Nepali".
+
+Protocol, per case:
+  1. render page 1 of the stored blob   `pdftoppm -png -r 70 -f 1 -l 1 <blob>`
+  2. read the rendered page             (the document as a human sees it)
+  3. read the native-1 extraction       (what pypdf produced)
+  4. read the converted output          (what the Preeti adapter produced)
+  5. compare 2 against 4, line by line
+
+STATUS OF THIS FILE: the assessments below are the ASSISTANT's reading, and the
+Nepali judgements are marked accordingly. A Nepali reader should confirm cases
+1 and 6 before the recommendation in nrb-integration.md §12 is acted on. Cases
+2-5 are script-independent (English preservation, byte-identity, rejection) and
+do not need a Nepali reader.
+
+--------------------------------------------------------------------------------
+CASE 1 — 5e0ca4500f8f   CONFIRMED RECOVERY   (legacy_line_ratio 1.0000 -> 0.0000)
+--------------------------------------------------------------------------------
+NRB "विज्ञप्ति" declaring Corporate Development Bank Ltd., Birgunj a problem
+institution. Rendered page 1 is fully readable Nepali set in a Preeti-family
+font. native-1: `suspicious/legacy_font_suspected`, devanagari_ratio 0.0000.
+
+Rendered page (top of document, transcribed from the image):
+    कर्पोरेट डेभलपमेन्ट बैंक लि., वीरगञ्जलाई समस्याग्रस्त घोषणा गरिएको सम्बन्धी
+    नेपाल राष्ट्र बैंकको
+    विज्ञप्ति
+    कर्पोरेट डेभलपमेन्ट बैंक लि. वीरगन्ज पर्सालाई मिति २०७१।९।४ देखि लागु हुने गरी
+    समस्याग्रस्त संस्थाको रूपमा घोषणा गरिएको छ ।
+
+Converted output (Preeti mapping, first five non-blank lines):
+    [converted] कर्पोरेट डेभलपमेन्ट बैंक लि., वीरगञ्जलाई समस्याग्रस्त घोषणा गरिएको सम्बन्धी
+    [ambiguous] नेपाल राष्ट्र बैंकको
+    [ambiguous] विज्ञप्ति
+    [converted] कर्पोरेट डेभलपमेन्ट बैंक लि. वीरगन्ज पर्सालाई मिति २०७१।९।४ देखि लागु हुने गरी
+    [converted] समस्याग्रस्त संस्थाको रूपमा घोषणा गरिएको छ ।
+
+ASSESSMENT: **line-for-line identical to the rendered page**, including the
+Nepali date २०७१।९।४ and the danda. devanagari_ratio 0.0000 -> 0.9740.
+Note the two `ambiguous` lines are the correctly-recovered TITLE — three and one
+token respectively, too short for the vocabulary check to vouch for. They are
+right, and the pipeline says only "cannot confirm". That is the intended
+behaviour and the reason `ambiguous` is not folded into `accepted`.
+
+--------------------------------------------------------------------------------
+CASE 2 — 9892625b8531   CORRECTLY REFUSED    (legacy_line_ratio 0.9800 -> 0.8800)
+--------------------------------------------------------------------------------
+NRB Bank & Financial Institution Regulation Department circular
+वै.वि.नि.वि./नीति/परिपत्र/घ/७/०७३/७४, dated २०७३/१०/१२, to class 'घ' microfinance
+institutions. **The rendered page is perfectly readable Nepali.**
+
+native-1 extraction, first lines:
+    \.qfr dqT frr+f,{ kt+r.r
+    q-r vqr : t.k.k.k.7ffi7qffi /q/e/o\el/t.sy ffi; Qoet/lollR
+    uq' 4rf4l qEkf, ffiq q-etrTil{,
+
+Converted output: every line REJECTED except one, which was held.
+
+ASSESSMENT: **this is not Preeti.** The extraction is not a keystroke encoding
+at all — note the repeated `ffi` runs, the same shape quoted in nrb-integration
+§11 (`ffihW\ffifiHrz\reU=,.`), which are plain ASCII f-f-i, not the U+FB03
+ligature. The Preeti mapping cannot recover it and the validator refused rather
+than emitting confident nonsense. **CORRECT REFUSAL, and the direct answer to
+question C: there are legacy documents in the benchmark that Preeti cannot
+recover.** They belong in an `unknown_legacy_encoding` bucket routed to OCR.
+
+--------------------------------------------------------------------------------
+CASE 3 — 041902065a1d   CONFIRMED RECOVERY   (legacy_line_ratio 0.8697 -> 0.0190)
+--------------------------------------------------------------------------------
+Akhtiyar Pratyayojan Biniyamawali 2065. The by-eye sample in
+phase6a-profile.txt already identified its preview as unmistakable Preeti.
+
+    g]kfn /fi6« a}+s                              -> नेपाल राष्ट्र बैंक
+    g]kfn /fi6« a}+ssf] k|of]hgsf] nflu dfq       -> नेपाल राष्ट्र बैंकको प्रयोजनको लागि मात्र
+    ;~rfns ;ldltn] b]xfosf ljlgodx? agfPsf] 5 .   -> सञ्चालक समितिले देहायका विनियमहरु बनाएको छ ।
+    ;+:yfnfO{ xhf{gf nufpg] ljifodf lg0f{o ug]{,  -> संस्थालाई हर्जाना लगाउने विषयमा निर्णय गर्ने,
+
+ASSESSMENT: correct Nepali on every line checked. devanagari 0.0000 -> 0.8302.
+These three lines are also the suite's fixtures in
+tests/test_nrb_legacy_conversion.py, so the mapping is locked against regression.
+
+--------------------------------------------------------------------------------
+CASE 4 — the seven ENGLISH-TABLE negative controls   ALL PASS
+--------------------------------------------------------------------------------
+1ad95ea9f45c  38c6d43c3ed1  46e0c17f27a1  7e2257c289d2  c807fe4e767e
+e4961a48d3d2  05fa82badf94
+
+Six are the Docling "rescues" from phase6a-calibration.txt; the seventh is the
+hand-reviewed false positive from phase6a-profile.txt. All sit at or just above
+the 0.20 flag and all are readable English tables.
+
+RESULT: **all seven reconstruct BYTE-IDENTICALLY. 0 lines converted, 0 English
+preservation failures.**
+
+This took three separate corrections to achieve, each measured, and the earlier
+states are recorded because they are the evidence for the rules that exist now:
+  * with output-only validation: `Instruments Times Offer Amount` became
+    `mक्ष्लकतचगभलतक mत्ष्भक इााभच mब्यगलत` and PASSED every check.
+  * with the English guard but no severity gate: 5 of 7 controls lost lines —
+    `No.`, `S.No`, `Net`, `ago.`, `Reporting Stats`, `Head Assistants: 5`.
+  * with the severity gate on unjudged lines only: 4 of 7 still lost 1-2 lines,
+    all numeric/proper-noun rows (`MachhapuchureBank Ltd. 3500.00 300.00`,
+    `Series No. ST940(kha)`). Gating AMBIGUOUS replacement the same way cleared
+    the last of them.
+
+--------------------------------------------------------------------------------
+CASE 5 — UNICODE and NO-TEXT negative controls   ALL PASS
+--------------------------------------------------------------------------------
+Genuine Unicode Devanagari: 075bf12eb087, 35445ee37706, af112eebcab6,
+f7bed3c3c806 — all four byte-identical, 0 lines converted.
+
+This is not a property of the converter, which is NOT a no-op on correct
+Devanagari: applied directly it turns `(मनी लाउन्डररङ)` into `९मनी लाउन्डररङ०`
+(parentheses become Devanagari digits) and `मन्त्रिपररषद्` into `मन्त्रपिररषद्`,
+while RAISING devanagari_ratio from 0.9616 to 0.9936. The Unicode guard is the
+only thing preventing it.
+
+No text layer: 06aeb5fc7837, 114534b26041, 1a73b14e90b2 — all byte-identical, 0
+lines converted. The converter fabricated nothing from empty input. These remain
+OCR cases.
+
+--------------------------------------------------------------------------------
+CASE 6 — 84862ab6866a   A NEW FINDING, NOT A CONTROL FAILURE
+--------------------------------------------------------------------------------
+native-1: `extracted`/`clean`, devanagari_ratio 0.6396, legacy_line_ratio 0.0444.
+It entered the run as a genuine-Unicode control and 29 of its lines changed.
+
+Inspection of those lines:
+    kb M ;xfos lgb]]{zs -;"rgf k|ljlw_   -> पद : सहायक निर्देशक (सूचना प्रविधि)
+    yk ;d"x afa"sf] gfd cfdfsf] gfd      -> थप समूह बाबूको नाम आमाको नाम
+
+ASSESSMENT: those are CORRECT conversions. The document holds real Unicode
+Devanagari and real Preeti **in the same file**, and native-1 called it clean
+because the Preeti share is small enough that legacy_line_ratio lands at 0.0444
+— well under the 0.20 flag.
+
+This is a THIRD false-negative class, alongside the spreadsheet gap §11.9 named:
+a mixed Unicode/Preeti PDF whose Preeti minority is diluted below the threshold
+by its Unicode majority. Two of the six high-Devanagari benchmark blobs are of
+this shape. It is reported, not fixed — the same discipline Task 13 followed.
+
+--------------------------------------------------------------------------------
+CASE 7 — 8df7b02f8a13   SPREADSHEET, per-cell conversion works
+--------------------------------------------------------------------------------
+The benchmark's known Preeti-encoded workbook — Phase 6A's false negative,
+classified `extracted`/`clean` because spreadsheets are judged structurally.
+
+    Plss[t jflif{s cfly{s ultljlw @)&^÷&& sf] tflnsf
+      -> एकिकृत वार्षिक आर्थिक गतिविधि २०७६/७७ को तालिका
+    k|d'v s[lif afnLn] 9fs]sf] e"–If]q
+      -> प्रमुख कृषि बालीले ढाकेको भू–क्षेत्र
+
+ASSESSMENT: correct Nepali. Text-to-text conversion works on cell strings
+exactly as it does on lines.
+
+THE TRAP, measured: `extraction.py` renders a row as `" | ".join(cells)` and `|`
+is a Preeti codepoint mapping to `्र`. Converting rendered ROWS turns every
+column separator into a Devanagari conjunct. Conversion must be per CELL, which
+is why `legacy_convert.convert_cells` exists and is tested separately.
+
+Second trap, found by a test rather than by eye: Preeti maps ASCII digits to
+Devanagari digits, so a numeric cell `1,234.00` converts to `ज्ञ,द्दघद्ध।ण्ण्` —
+high Devanagari, no illegal clusters, no latin residue, passes every validation
+rule, and destroys a number. Routing now requires the detector's own
+LEGACY_MIN_LATIN share before an unjudged unit is a candidate.
+
+================================================================================
+SUMMARY OF MANUAL VALIDATION
+================================================================================
+  visually confirmed correct recovery          2  (5e0ca4500f8f, 041902065a1d)
+    + 1 spreadsheet                            1  (8df7b02f8a13)
+  visually confirmed correct REFUSAL           1  (9892625b8531, unknown encoding)
+  english-table controls byte-identical        7 of 7
+  unicode controls byte-identical              4 of 4
+  no-text controls byte-identical              3 of 3
+  new false-negative class discovered          1  (mixed Unicode+Preeti, 84862ab6866a)
+  cases where conversion produced Devanagari
+    that is visibly WRONG and was ACCEPTED     0
+
+Pending: confirmation by a Nepali reader on cases 1, 3, 6 and 7.

@@ -1,0 +1,26 @@
+# NRB corpus tooling. NOT installed in the API image, and NOT in the worker image.
+#
+# `Dockerfile` installs `requirements.txt` and nothing else, so keeping npttf2utf
+# out of that file is a STRUCTURAL guarantee rather than a convention: the API
+# image cannot acquire it by accident. Same pattern as `requirements-worker.txt`
+# and docling, for a different reason.
+#
+# *** LICENCE GATE — READ BEFORE DISTRIBUTING THIS SOFTWARE ***
+#
+# npttf2utf is **GPL-3.0**. It is the only evaluated converter that recovers NRB
+# Preeti text correctly (the MIT alternative, `preeti-unicode-converter`, gets
+# matra reordering wrong — `आर्थकि` for आर्थिक, `माैदि्रक` for मौद्रिक — measured
+# 2026-08-15, see docs/nrb/phase6b-legacy-conversion-evaluation.txt).
+#
+# GPL-3 obligations attach to DISTRIBUTION, not to internal use. So this is fine
+# for evaluation and for a gateway we operate ourselves, and it is an OPEN GATE
+# for any build shipped to a client. Resolving it is a licensing decision, not an
+# engineering one, and it must be resolved before this gateway is distributed.
+#
+# Nothing from npttf2utf is copied into this repository — no mapping table, no
+# rule set, no code. `app/nrb/legacy_font.py` is our own adapter and imports the
+# package lazily, so replacing it later means writing one new class behind the
+# same Protocol. See docs/nrb-integration.md §12.
+-r requirements.txt
+
+npttf2utf==0.3.7

@@ -1,0 +1,257 @@
+================================================================================
+NRB PHASE 6B TASK 1 — LEGACY-FONT CONVERSION EVALUATION
+================================================================================
+
+Evidence only. No production routing was wired, no nrb_extractions row was
+written, no OCR ran, nothing was chunked, embedded or ingested, and no HTTP
+request was made. Every byte came from NRB_FILES_DIR, already on disk.
+
+IDENTITY
+--------------------------------------------------------------------------------
+  parent benchmark        1ae297dba1c33c7db9976f817806f6666371695a31e1f424d046993d581a1312
+  evaluation algorithm    legacy-conversion-eval-v1
+  cohort fingerprint      b977464d066d7e77b4fa781fbd91d792907097e1b8572b06207f291540807b04
+  lexicon fingerprint     cc1fec3f2808a0a6ecfa2b5d90490f9cb9381ec878ffabe8be2efd503d7cf797
+  converter               npttf2utf 0.3.7  (GPL-3.0 — distribution gate, see requirements-nrb.txt)
+  extractor version       native-1
+
+COVERAGE
+--------------------------------------------------------------------------------
+  legacy_font_suspected in the benchmark   165
+  PDF evaluation cohort selected           30
+  spreadsheet cohort selected              6
+  negative controls  english tables        7
+                     genuine unicode       4
+                     mixed unicode+preeti  2   (not a control — see below)
+                     no text layer         3
+  unique blobs evaluated                   52
+
+  severity bands (legacy_line_ratio), PDF cohort:
+    0.20-0.50    10
+    0.50-0.80    10
+    0.80-1.00    10
+
+================================================================================
+PER MAPPING — PDF COHORT
+================================================================================
+
+mapping            docs  attempted  accepted  ambiguous  rejected  accept_rate  mean_score
+-----------------  ----  ---------  --------  ---------  --------  -----------  ----------
+Preeti             30    7757       4458      352        927       0.5747       0.8311
+Kantipur           30    7757       4299      332        1196      0.5542       0.7937
+Sagarmatha         30    7757       4443      346        948       0.5728       0.8297
+FONTASY_HIMALI_TT  30    7757       2891      258        3103      0.3727       0.7592
+PCS NEPALI         30    7757       3034      267        3207      0.3911       0.7824
+
+  `accepted` = validated against structure AND vocabulary.
+  `ambiguous` = structurally sound, vocabulary too thin to confirm; the
+  conversion is kept and counted apart, never folded into `accepted`.
+  `rejected` = validation refused; the ORIGINAL text is preserved.
+
+================================================================================
+BEFORE / AFTER — PDF COHORT, BEST MAPPING PER DOCUMENT
+================================================================================
+
+blob          band       mapping            dev_before  dev_after  legacy_before  legacy_after  status                            recovery
+------------  ---------  -----------------  ----------  ---------  -------------  ------------  --------------------------------  ----------
+2cea5e01239c  0.20-0.50  Preeti             0.0000      0.0000     0.2632         0.2632        suspicious/legacy_font_suspected  unresolved
+3b9555f3a7da  0.20-0.50  Preeti             0.0000      0.0000     0.2952         0.2952        suspicious/legacy_font_suspected  unresolved
+45cd9143cccb  0.20-0.50  Preeti             0.0000      0.0000     0.2632         0.2632        suspicious/legacy_font_suspected  unresolved
+895360bbf985  0.20-0.50  PCS NEPALI         0.0000      0.0419     0.2143         0.1429        suspicious/legacy_font_suspected  recovered
+9fa6434886b1  0.20-0.50  Preeti             0.0000      0.0000     0.3197         0.3197        suspicious/legacy_font_suspected  unresolved
+bb740abe484b  0.20-0.50  Preeti             0.0000      0.0000     0.3684         0.3684        suspicious/legacy_font_suspected  unresolved
+c5763fd654e5  0.20-0.50  Preeti             0.0000      0.0000     0.2853         0.2853        suspicious/legacy_font_suspected  unresolved
+df78389e2433  0.20-0.50  Preeti             0.0000      0.0000     0.2143         0.2143        suspicious/legacy_font_suspected  unresolved
+f09c53af7750  0.20-0.50  Preeti             0.0000      0.0000     0.2500         0.2500        suspicious/legacy_font_suspected  unresolved
+fc4091426f49  0.20-0.50  PCS NEPALI         0.0000      0.0000     0.2699         0.2699        suspicious/legacy_font_suspected  unresolved
+259e4341646c  0.50-0.80  Preeti             0.0000      0.1604     0.5000         0.3421        suspicious/legacy_font_suspected  partial
+4d239da61149  0.50-0.80  Preeti             0.0000      0.4008     0.7808         0.4201        suspicious/legacy_font_suspected  partial
+5611f93ff3aa  0.50-0.80  Preeti             0.0000      0.6525     0.7983         0.2857        suspicious/legacy_font_suspected  partial
+7de2036ace49  0.50-0.80  Preeti             0.0000      0.0000     0.6774         0.6774        suspicious/legacy_font_suspected  unresolved
+7fb3dbd73ffe  0.50-0.80  Preeti             0.0000      0.5826     0.7794         0.2431        suspicious/legacy_font_suspected  partial
+84f0bebef17e  0.50-0.80  Preeti             0.0000      0.0000     0.5787         0.5787        suspicious/legacy_font_suspected  unresolved
+bf4530debfca  0.50-0.80  Preeti             0.0000      0.2852     0.6527         0.3267        suspicious/legacy_font_suspected  partial
+c9826c2c930d  0.50-0.80  Preeti             0.0000      0.3493     0.7714         0.4571        suspicious/legacy_font_suspected  partial
+f66453faff99  0.50-0.80  Preeti             0.0000      0.0000     0.7000         0.7000        suspicious/legacy_font_suspected  unresolved
+f895b0012565  0.50-0.80  Preeti             0.0000      0.0000     0.7689         0.7689        suspicious/legacy_font_suspected  unresolved
+41adb4cda804  0.80-1.00  Sagarmatha         0.0000      0.4883     0.9149         0.4468        suspicious/legacy_font_suspected  partial
+5e0ca4500f8f  0.80-1.00  Preeti             0.0000      0.9735     1.0000         0.0000        suspicious/legacy_font_suspected  recovered
+8189a47b9a94  0.80-1.00  FONTASY_HIMALI_TT  0.0000      0.9227     0.9643         0.0000        suspicious/legacy_font_suspected  recovered
+836b914fb13a  0.80-1.00  FONTASY_HIMALI_TT  0.0000      0.6667     0.8889         0.2222        suspicious/legacy_font_suspected  partial
+8f8570f37a8d  0.80-1.00  Preeti             0.0000      0.9928     1.0000         0.0000        suspicious/legacy_font_suspected  recovered
+9892625b8531  0.80-1.00  Preeti             0.0000      0.1538     0.9800         0.8800        suspicious/legacy_font_suspected  unresolved
+bfe32d940999  0.80-1.00  Preeti             0.0000      0.9246     0.9872         0.0274        suspicious/legacy_font_suspected  recovered
+d718e6990827  0.80-1.00  Preeti             0.0000      0.9706     1.0000         0.0085        suspicious/legacy_font_suspected  recovered
+dc56d4fdc82f  0.80-1.00  Preeti             0.0000      0.8973     0.9783         0.0652        suspicious/legacy_font_suspected  recovered
+f351133433c9  0.80-1.00  Preeti             0.0000      0.9719     1.0000         0.0000        suspicious/legacy_font_suspected  recovered
+
+RECOVERY
+--------------------------------------------------------------------------------
+  recovered      8   (>=60% of attempted lines accepted or ambiguous,
+                      legacy_line_ratio falls below the 0.20 flag)
+  partial        8
+  unresolved     14
+  english preservation failures   0
+
+================================================================================
+NEGATIVE CONTROLS
+================================================================================
+
+  A control PASSES when the reconstructed document is BYTE-IDENTICAL to
+  the original: not merely 'mostly unchanged'.
+
+  `mixed_script` rows are NOT controls. They are documents native-1 called
+  clean that hold real Devanagari AND real Preeti in one file, so changed
+  lines there are correct conversions. They are listed because a mixed
+  Unicode/Preeti document passing as clean is a finding in its own right.
+
+blob          control         lines  guarded  converted  result
+------------  --------------  -----  -------  ---------  ------
+1ad95ea9f45c  english_table   635    421      0          PASS
+38c6d43c3ed1  english_table   47     36       0          PASS
+46e0c17f27a1  english_table   233    212      0          PASS
+7e2257c289d2  english_table   738    407      0          PASS
+c807fe4e767e  english_table   243    228      0          PASS
+e4961a48d3d2  english_table   33     30       0          PASS
+05fa82badf94  english_table   34     30       0          PASS
+075bf12eb087  unicode_nepali  109    75       0          PASS
+35445ee37706  unicode_nepali  1123   739      0          PASS
+828194776362  mixed_script    208    181      0          PASS
+84862ab6866a  mixed_script    1453   1255     29         FAIL
+af112eebcab6  unicode_nepali  1068   818      0          PASS
+f7bed3c3c806  unicode_nepali  755    693      0          PASS
+06aeb5fc7837  no_text_layer   0      0        0          PASS
+114534b26041  no_text_layer   0      0        0          PASS
+1a73b14e90b2  no_text_layer   0      0        0          PASS
+
+================================================================================
+SPREADSHEETS — SEPARATE DENOMINATOR
+================================================================================
+
+  Reported apart from the PDF cohort throughout. Conversion is PER CELL:
+  extraction renders a row as ' | '.join(cells) and `|` is a Preeti
+  codepoint, so converting rendered rows destroys every separator.
+
+blob          native-1         cells  attempted  accepted  ambiguous  rejected  dev_after
+------------  ---------------  -----  ---------  --------  ---------  --------  ---------
+8df7b02f8a13  extracted/clean  26549  2834       54        2775       5         0.2331
+0a90d4a78531  extracted/clean  5045   63         7         47         9         0.0222
+110de690f8d3  extracted/clean  180    4          0         2          2         0.0088
+156a7dab82ce  extracted/clean  4104   56         8         45         3         0.0319
+1879d2b6da4e  extracted/clean  34877  107        0         77         30        0.0048
+196cfbc6795e  extracted/clean  348    6          0         2          4         0.0029
+
+================================================================================
+PERFORMANCE
+================================================================================
+
+  lines converted        109,865
+  conversion time        38.41s
+  lines/sec              2,860
+  documents/sec          3.90
+
+  For comparison, from Phase 6A's measured run over the same corpus:
+    pypdf native extraction   4,285 pages in 211.6s
+    Docling                   37 PDFs in 2,354.9s  (76.2x pypdf)
+  OCR cost is NOT measured here and no claim is made about it.
+
+================================================================================
+SAMPLES FOR MANUAL REVIEW
+================================================================================
+
+  2cea5e01239c  band=0.20-0.50  mapping=Preeti  outcome=ambiguous_held
+    BEFORE : Under IRC 1 120.00 120.00 -
+    AFTER  : ग्लमभच क्ष्च्ऋ ज्ञ ज्ञद्दण्।ण्ण् ज्ञद्दण्।ण्ण् (
+
+  3b9555f3a7da  band=0.20-0.50  mapping=Preeti  outcome=ambiguous_held
+    BEFORE : MachhapuchureBank Ltd. 1700.00 250.00 900.00 2000.00 4850.00
+    AFTER  : :बअजजबउगअजगचभद्यबलप ीतम। ज्ञठण्ण्।ण्ण् द्दछण्।ण्ण् ढण्ण्।ण्ण् द्दण्ण्ण्।ण्ण् द्धडछण्।ण्ण्
+
+  895360bbf985  band=0.20-0.50  mapping=Preeti  outcome=ambiguous_held
+    BEFORE : 3 CSC & Co., Gairidhara, Kathmandu
+    AFTER  : घ ऋक्ऋ ७ ऋय।, न्बष्चष्मजबचब, फ्बतजबलमग
+
+  9fa6434886b1  band=0.20-0.50  mapping=Preeti  outcome=ambiguous_held
+    BEFORE : 5 Nepalganj 138951 6.22 31
+    AFTER  : छ ल्भउबनिबलव ज्ञघडढछज्ञ ट।द्दद्द घज्ञ
+
+  c5763fd654e5  band=0.20-0.50  mapping=Preeti  outcome=rejected
+    BEFORE : alcoholic drinks 8.84 percent.
+    AFTER  : बअियजयष्अि मचष्लपक ड।डद्ध उभचअभलत।
+
+  df78389e2433  band=0.20-0.50  mapping=Preeti  outcome=ambiguous_held
+    BEFORE : Sealed Quotation No: SQ/BRT tO2lO8Ol81
+    AFTER  : क्भबभिम त्तगयतबतष्यल ल्यस् क्त्तरद्यच्त् तइद्दइिडइडिज्ञ
+
+  f09c53af7750  band=0.20-0.50  mapping=Preeti  outcome=rejected
+    BEFORE : SLF - - - -
+    AFTER  : क्ीँ ( ( ( (
+
+  fc4091426f49  band=0.20-0.50  mapping=Preeti  outcome=ambiguous_held
+    BEFORE : 12 NRB MCPW - - - - - -
+    AFTER  : ज्ञद्द ल्च्द्य :ऋएध् ( ( ( ( ( (
+
+  259e4341646c  band=0.50-0.80  mapping=Preeti  outcome=converted
+    BEFORE : ljj/0f o; dlxgf ut dlxgf
+    AFTER  : विवरण यस महिना गत महिना
+
+  4d239da61149  band=0.50-0.80  mapping=Preeti  outcome=ambiguous_held
+    BEFORE : ljb]zL ljlgdo sf/f]jf/ ug]{ Ohfhtkqk|fKt ;+:yfx?sf] sf/f]jf/ /
+    AFTER  : विदेशी विनिमय कारोवार गर्ने इजाजतपत्रप्राप्त संस्थाहरुको कारोवार र
+
+  5611f93ff3aa  band=0.50-0.80  mapping=Preeti  outcome=ambiguous_held
+    BEFORE : g]kfndf ljQLo kx'Frsf] l:ylt
+    AFTER  : नेपालमा वित्तीय पहुँचको स्थिति
+
+  7fb3dbd73ffe  band=0.50-0.80  mapping=Preeti  outcome=converted
+    BEFORE : g]kfn /fi6« a}+saf6 æ3Æ ju{sf] Ohfhtkqk|fKt n3'ljQ
+    AFTER  : नेपाल राष्ट्र बैंकबाट “घ” वर्गको इजाजतपत्रप्राप्त लघुवित्त
+
+  84f0bebef17e  band=0.50-0.80  mapping=Preeti  outcome=ambiguous_held
+    BEFORE : Ltd. 03/07/2024* Banepa, Kavrepalanchowk 17.08
+    AFTER  : ीतम। ण्घरण्ठरद्दण्द्दद्ध८ द्यबलभउब, प्बखचभउबबिलअजयधप ज्ञठ।ण्ड
+
+  bf4530debfca  band=0.50-0.80  mapping=Preeti  outcome=converted
+    BEFORE : cfly{s jif{ @)^#.^$ sf] df}lb|s gLltdf pNn]v ePsf gLltut Joj:yfx¿sf] k|ult tflnsf
+    AFTER  : आर्थिक वर्ष २०६३।६४ को मौद्रिक नीतिमा उल्लेख भएका नीतिगत व्यवस्थाहरूको प्रगति तालिका
+
+  c9826c2c930d  band=0.50-0.80  mapping=Preeti  outcome=converted
+    BEFORE : ueg{/ 8f= lr/+hLla g]kfn cd]l/sf k|:yfg
+    AFTER  : गभर्नर डा. चिरंजीबि नेपाल अमेरिका प्रस्थान
+
+  f895b0012565  band=0.50-0.80  mapping=Preeti  outcome=rejected
+    BEFORE : S.N. Name of Commercial Banks (Alphabetical Order) Address License Expiry (MM/DD/YYYY)
+    AFTER  : क्।ल्। mल्बभ या mऋयmभचअष्बि द्यबलपक ९ब्उिजबदभतष्अबि इचमभच० ब्ममचभकक ीष्अभलकभ भ्हउष्चथ ९ःःरम्म्रथ्थ्थ्थ्०
+
+  41adb4cda804  band=0.80-1.00  mapping=Preeti  outcome=rejected
+    BEFORE : g] kfn / fi6« a} +sg] kfn / fi6« a} +s
+    AFTER  : ने पाल र ाष्ट्र बै ंकने पाल र ाष्ट्र बै ंक
+
+  5e0ca4500f8f  band=0.80-1.00  mapping=Preeti  outcome=converted
+    BEFORE : skf]{/]6 8]enkd]G6 a}+s ln=, jL/u~hnfO{ ;d:ofu|:t 3f]if0ff ul/Psf] ;DaGwL
+    AFTER  : कर्पोरेट डेभलपमेन्ट बैंक लि., वीरगञ्जलाई समस्याग्रस्त घोषणा गरिएको सम्बन्धी
+
+  8189a47b9a94  band=0.80-1.00  mapping=Preeti  outcome=rejected
+    BEFORE : g]kfn /fi^« a}+s
+    AFTER  : नेपाल राष्६्र बैंक
+
+  836b914fb13a  band=0.80-1.00  mapping=Preeti  outcome=rejected
+    BEFORE : g]kfn /fi^« a}+s
+    AFTER  : नेपाल राष्६्र बैंक
+
+  8f8570f37a8d  band=0.80-1.00  mapping=Preeti  outcome=converted
+    BEFORE : ljQLo hfgsf/L OsfO{ (FIU-Nepal) / “s” ju{sf jfl0fHo a}+ssf sfof{Gjog
+    AFTER  : वित्तीय जानकारी इकाई ९ँक्ष्ग्(ल्भउब०ि र “क” वर्गका वाणिज्य बैंकका कार्यान्वयन
+
+  9892625b8531  band=0.80-1.00  mapping=Preeti  outcome=ambiguous
+    BEFORE : qrM {r-E q-6
+    AFTER  : त्रचः र्च(भ् त्र(ट
+
+  bfe32d940999  band=0.80-1.00  mapping=Preeti  outcome=converted
+    BEFORE : g]kfn /fi6« a}+s v'nfahf/ sf/f]af/ ljlgodfjnL -kfrf}+] ;+zf]wg, @)*!_, @)&* 1
+    AFTER  : नेपाल राष्ट्र बैंक खुलाबजार कारोबार विनियमावली (पाचौें संशोधन, २०८१), २०७८ ज्ञ
+
+  d718e6990827  band=0.80-1.00  mapping=Preeti  outcome=converted
+    BEFORE : a}+s vftf /f]Ssf tyf km's'jf;DaGwL ljlgodfjnL, @)*!
+    AFTER  : बैंक खाता रोक्का तथा फुकुवासम्बन्धी विनियमावली, २०८१
+
