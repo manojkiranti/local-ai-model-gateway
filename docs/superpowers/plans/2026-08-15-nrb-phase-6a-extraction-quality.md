@@ -4158,7 +4158,7 @@ git commit -m "feat(nrb): extraction profile report with 2019 broken out (Phase 
 
 **Files:**
 - Create: `scripts/nrb_extract.py`
-- Test: `tests/test_nrb_extract_cli.py`
+- Test: `tests/test_nrb_extract_pass.py` (AS BUILT — the CLI tests landed at the bottom of the pass's own suite rather than in a file of their own; the `tests/test_nrb_extract_cli.py` named below was never created)
 
 **Interfaces:**
 - Consumes: `extract.run_extract`, `extract.ExtractBusy`, `report.summarize_extraction`, `report.render_extraction`, `profile.load_profile`.
@@ -4166,7 +4166,7 @@ git commit -m "feat(nrb): extraction profile report with 2019 broken out (Phase 
 
 - [ ] **Step 1: Write the failing test**
 
-Create `tests/test_nrb_extract_cli.py`:
+Append to `tests/test_nrb_extract_pass.py`:
 
 ```python
 """The extraction CLI's argument contract. No DB, no parsing — run_extract is stubbed."""
@@ -4308,7 +4308,7 @@ def test_json_output_is_valid_json(monkeypatch, capsys):
 - [ ] **Step 2: Run the test to verify it fails**
 
 ```bash
-.venv/bin/pytest tests/test_nrb_extract_cli.py -q
+.venv/bin/pytest tests/test_nrb_extract_pass.py -q
 ```
 
 Expected: `FileNotFoundError` on `scripts/nrb_extract.py`.
@@ -4507,7 +4507,7 @@ if __name__ == "__main__":
 - [ ] **Step 4: Run the test to verify it passes**
 
 ```bash
-.venv/bin/pytest tests/test_nrb_extract_cli.py -q
+.venv/bin/pytest tests/test_nrb_extract_pass.py -q
 ```
 
 Expected: PASS, 8 tests. If `load_profile_for` is called on the dry-run path the monkeypatch is unnecessary but harmless — leave it, it documents the seam.
@@ -4525,7 +4525,7 @@ Expected: exit 2 with the refusal, then a dry-run summary naming the selected bl
 - [ ] **Step 6: Commit**
 
 ```bash
-git add scripts/nrb_extract.py tests/test_nrb_extract_cli.py
+git add scripts/nrb_extract.py tests/test_nrb_extract_pass.py
 git commit -m "feat(nrb): scripts/nrb_extract.py — scope-required extraction CLI (Phase 6A)"
 ```
 
@@ -5380,14 +5380,29 @@ The point of the whole phase. Everything before this was scaffolding.
 - Test: no unit test — the deliverable is measurements.
 
 **Interfaces:**
-- Consumes: `scripts/nrb_sample.py`, `scripts/nrb_fetch.py --manifest`, `scripts/nrb_extract.py --manifest`, `scripts/nrb_calibrate.py --manifest`.
+- Consumes: `scripts/nrb_sample.py`, `scripts/nrb_fetch.py --manifest`, `scripts/nrb_extract.py --manifest`, `scripts/nrb_calibrate.py --subset`.
 - Produces: the numbers Task 14 writes into `docs/nrb-integration.md`.
 
 Approved budget: **~400 files, ~400 MB.** Do not exceed it because a stratum is
 sparse — report the sparse stratum instead. **The cohort is drawn once, in Step 1,
 and never re-drawn.** Every later step names the manifest file.
 
-- [ ] **Step 1: Draw the cohort — once**
+- [x] **Step 1: Draw the cohort — once** — **ALREADY DONE, DO NOT REPEAT.**
+
+The benchmark was drawn and committed early, at **`1ccd945`**:
+`docs/nrb/phase6a-manifest.json`, 400 unique `comparison_key`s,
+`selection_sha256 = 1ae297dba1c33c7db9976f817806f6666371695a31e1f424d046993d581a1312`,
+under size 400 / seed `phase6a-v1` / floor 2 / `year_2019_cap` 120 /
+`nrb-stratified-v1`. The 40-PDF Docling calibration slice was frozen on top of it
+at **`8c26341`** (`81d5979ffeee6fbede375917fa6e3de09cb8f0475a397a21b7ad52fa233d90f5`),
+also before any acquisition, and is a strict subset of those 400.
+
+The "re-drawing is free until something is fetched" window below therefore closed
+at `8c26341`, not here: re-drawing the parent now would also invalidate a
+calibration subset that is cryptographically bound to it. Run the sanity checks
+below against the committed file if you want them; do not run the command.
+
+The original instructions follow, for the record.
 
 ```bash
 export DATABASE_URL='postgresql+asyncpg://gateway:<pw>@127.0.0.1:5432/local_ai_gateway_p4'
@@ -5474,11 +5489,26 @@ reported.
 - [ ] **Step 4: Calibrate against Docling, over the same cohort**
 
 ```bash
+# offline: the Phase 5 fetch in Step 2 was THE network operation of this phase,
+# and Docling must not become a second one. Its layout models are already cached.
+HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
 DATABASE_URL='postgresql+asyncpg://gateway:<pw>@127.0.0.1:5432/local_ai_gateway_p4' \
   .venv/bin/python scripts/nrb_calibrate.py \
-    --manifest docs/nrb/phase6a-manifest.json --limit 40 \
+    --subset docs/nrb/phase6a-docling-calibration.json \
   | tee <scratchpad>/nrb_calibration.txt
 ```
+
+**CORRECTED.** The draft was `--manifest … --limit 40`, which drew whichever 40
+pending PDF blobs the query happened to return — a set that changes with whatever
+has been fetched. The calibration slice is now a frozen artifact,
+`docs/nrb/phase6a-docling-calibration.json`
+(`subset_selection_sha256 = 81d5979ffeee6fbede375917fa6e3de09cb8f0475a397a21b7ad52fa233d90f5`),
+**drawn at commit `8c26341` BEFORE any of it was acquired** and cryptographically
+bound to the parent benchmark `1ae297d…`. Its 40 keys are a subset of the frozen
+400, so Step 2's single fetch acquires them — **there is no second,
+calibration-specific fetch**, and a subset member that fails to download is a
+reported coverage gap, never grounds to substitute another file. The CLI has no
+`--manifest` run mode; `--manifest` belongs to `--freeze`.
 
 Record the status agreement, the reason agreement, the wall-clock ratio, and
 above all the two asymmetric counts. **Read every disagreement**, with both
@@ -5573,7 +5603,8 @@ Follow §9 and §10's shape exactly: Files, the design decision and why the brie
 # Phase 6A suites (pure)
 .venv/bin/pytest tests/test_nrb_quality.py tests/test_nrb_extraction.py \
                  tests/test_nrb_sampling.py tests/test_nrb_manifest.py \
-                 tests/test_nrb_extract_cli.py tests/test_nrb_extraction_report.py
+                 tests/test_nrb_extract_pass.py tests/test_nrb_extraction_report.py \
+                 tests/test_nrb_calibration_subset.py tests/test_nrb_calibration_pass.py
 
 # Phase 6A integration (needs Postgres; every test rolls back)
 .venv/bin/pytest tests/test_nrb_extract_integration.py
@@ -5588,8 +5619,9 @@ Follow §9 and §10's shape exactly: Files, the design decision and why the brie
 .venv/bin/python scripts/nrb_extract.py --core --dry-run
 .venv/bin/python scripts/nrb_extract.py --manifest docs/nrb/phase6a-manifest.json -v
 
-# the honesty check on using pypdf rather than Docling (worker deps, slow)
-.venv/bin/python scripts/nrb_calibrate.py --manifest docs/nrb/phase6a-manifest.json --limit 40
+# the honesty check on using pypdf rather than Docling (worker deps, slow, offline)
+HF_HUB_OFFLINE=1 .venv/bin/python scripts/nrb_calibrate.py \
+    --subset docs/nrb/phase6a-docling-calibration.json
 ```
 
 - [ ] **Step 4: Add the `CLAUDE.md` gotcha**
@@ -5648,7 +5680,8 @@ Also add `quality`+`extraction`+`extract`+`sampling`+`profile` to the `app/nrb/`
 ```bash
 .venv/bin/pytest tests/test_nrb_quality.py tests/test_nrb_extraction.py \
     tests/test_nrb_sampling.py tests/test_nrb_manifest.py \
-    tests/test_nrb_extract_cli.py tests/test_nrb_extraction_report.py \
+    tests/test_nrb_extract_pass.py tests/test_nrb_extraction_report.py \
+    tests/test_nrb_calibration_subset.py tests/test_nrb_calibration_pass.py \
     tests/test_files_documents_pdf_pages.py -q
 .venv/bin/pytest tests/ -k nrb -q
 DATABASE_URL='postgresql+asyncpg://gateway:<pw>@127.0.0.1:5432/local_ai_gateway_p4' \

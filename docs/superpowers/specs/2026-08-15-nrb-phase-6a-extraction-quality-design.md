@@ -402,7 +402,13 @@ scope-is-required rule.
   cohort cannot be silently re-drawn on a second run.
 * `--dry-run` reports what would be extracted, parsing nothing.
 * `--force` re-extracts blobs already recorded at the current version.
-* `--calibrate N` runs the bounded Docling comparison.
+* Calibration is NOT a flag here. **AS BUILT** it is the separate
+  `scripts/nrb_calibrate.py --subset docs/nrb/phase6a-docling-calibration.json`,
+  run over a 40-PDF slice frozen BEFORE acquisition and bound to the parent
+  benchmark's fingerprint — the same reason sampling and extraction are
+  separate commands: a comparison slice a run could re-choose is a slice that
+  measures the run. It also keeps the worker-only Docling dependency out of a
+  command the extraction path uses.
 * `--json` for a diffable summary; `-v` for progress.
 * Advisory lock `NRB_XTRC` via `app/nrb/locks.py`, dedicated connection, same
   rule as `NRB_SYNC`/`NRB_FTCH`.
