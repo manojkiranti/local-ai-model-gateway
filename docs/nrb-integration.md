@@ -18,7 +18,7 @@ build-only so far — see §11).
 | 3 | Page/document-level discovery + attachment inventory | **Done, full-corpus run 2026-08-14** |
 | 4 | Persistent catalog + idempotent metadata sync | **Done, live-run twice 2026-08-14** — §9 |
 | 5 | Attachment download → MIME validation → SHA-256 → local storage | **Done, live-fetched 2026-08-14** — §10 |
-| 6A | Native extraction + quality profiling (**no OCR**) | **In progress** — built, not yet measured on a live cohort — §11 |
+| 6A | Native extraction + quality profiling (**no OCR**) | **Done, live-profiled 2026-08-15** — 400-file benchmark fetched, 381 extracted, pypdf-vs-Docling calibrated — §11 |
 | 6B | OCR / legacy-font strategy, chosen from 6A's evidence | Not started — 6A exists to decide it |
 | 7 | Chunk + embed into the existing `documents`/`document_chunks` pipeline | Not started |
 | 8 | `search_nrb_documents` tool | Not started |
@@ -1202,17 +1202,25 @@ legacy-font detection and an OCR fallback. What Phase 5 leaves it:
 
 ---
 
-## 11. Phase 6A — native extraction + quality profiling (IN PROGRESS)
+## 11. Phase 6A — native extraction + quality profiling (MEASURED)
 
 **Design:** `docs/superpowers/specs/2026-08-15-nrb-phase-6a-extraction-quality-design.md`
 **Plan:** `docs/superpowers/plans/2026-08-15-nrb-phase-6a-extraction-quality.md` (14 tasks)
 
-**State as of 2026-08-15: Tasks 1–7A of 14 are built and tested, and the benchmark
-cohort is FROZEN at `docs/nrb/phase6a-manifest.json`. No NRB document has been
-extracted yet, and the cohort has not been downloaded** — the extraction pass is
-Task 8 and the fetch is Task 13. The live numbers in this section are therefore
-about the *catalog* and the *cohort*, not about extraction quality; the quality
-numbers arrive with Task 13 and this section gets rewritten then.
+**State as of 2026-08-15: Tasks 1–13 of 14 are done and the phase has been
+measured on a live cohort.** The 400-file benchmark is frozen at
+`docs/nrb/phase6a-manifest.json` (`1ae297d…`), 381 of its 400 files are
+downloaded, all 381 are extracted at `native-1`, and the 40-PDF Docling
+calibration slice (`docs/nrb/phase6a-docling-calibration.json`, `81d5979…`) has
+been run over the 37 of it that fetched. The evidence is committed verbatim:
+
+* **`docs/nrb/phase6a-profile.txt`** — the fetch accounting, the extraction
+  profile, the resumability check, the by-eye validation and the throughput.
+* **`docs/nrb/phase6a-calibration.txt`** — the pypdf-vs-Docling comparison and
+  every one of its six disagreements in full.
+
+Read those for the numbers; this section is the interpretation. Only Task 14
+(this write-up) remained after them.
 
 ### Why the phase exists
 
@@ -1224,7 +1232,7 @@ glyphs onto ASCII codepoints. A pipeline that only checks "did extraction raise"
 would index all of them as English gibberish. So 6A measures the text and says
 what is wrong with it, and only then does 6B decide what to do about it.
 
-### What shipped (Tasks 1–7A)
+### What shipped (Tasks 1–13)
 
 | Task | File | What it is |
 |---|---|---|
@@ -1238,6 +1246,7 @@ what is wrong with it, and only then does 6B decide what to do about it.
 | 8 | `app/nrb/extract.py`, `app/nrb/locks.py`, `scripts/nrb_extract.py` | The pass: manifest → catalog rows → unique blobs → extract → record. Advisory lock `NRB_XTRC`, batched commits, resumable, failure-isolated, zero network. |
 | 9 | `app/nrb/profile.py`, `app/nrb/report.py` | The read-time cohort query and the deterministic profile: source/blob coverage, verdicts, metric distributions, legacy-severity bands, metadata breakdowns. |
 | 10 | `app/nrb/calibration.py`, `app/nrb/calibrate.py`, `app/nrb/extraction.py`, `scripts/nrb_calibrate.py` | The frozen Docling calibration subset (40 PDFs drawn from the benchmark itself, own fingerprint), the Docling adapter behind a lazy import + reusable converter, the parser-neutral comparison model, and the deterministic agreement/rescue report. Writes nothing. |
+| 13 | `docs/nrb/phase6a-profile.txt`, `docs/nrb/phase6a-calibration.txt` | The live profile: one fetch of the frozen 400 (381 acquired), the canonical `native-1` extraction of all 381, the resumability check, the by-eye validation, the throughput, and the pypdf-vs-Docling comparison over 37 of the frozen 40. Evidence, not code. |
 
 ### The legacy-font detector, and the measurement that rebuilt it
 
@@ -1530,21 +1539,82 @@ neither rescues the other. Docling cost 4.6 s and 18.5 s against pypdf's 61 ms a
 328 ms (57–75×). Two files is an adapter check, not a finding; the finding needs
 the frozen 40, and the frozen 40 need Task 13's acquisition.
 
-### Live evidence so far (scratch DB `local_ai_gateway_p4`, 2026-08-15)
+### Live evidence (scratch DB `local_ai_gateway_p4`, 2026-08-15)
+
+Full detail in `docs/nrb/phase6a-profile.txt` and `docs/nrb/phase6a-calibration.txt`.
+
+**The one live fetch** — `nrb_fetch.py --manifest … --max-bytes 500000000`, run
+id 315, 142.1s. 397 selected, **378 fetched, 19 failed** (every one an HTTP 404),
+302.3 MB. With the 3 already on disk that is **381 of 400 benchmark files
+(95.25%)**. The 19 are a *stated gap*: no substitute file was chosen, no second
+scope was run, and neither frozen artifact was touched. 17 of the 19 are 2019
+sources and 12 of those are Account-Block enforcement notices under
+`/contents/uploads/2019/12/` — a cluster that shape means NRB moved the files.
+The calibration slice came out **37 of 40**, and is reported as 37 everywhere.
+
+**The extraction** — 381 fetched files → **381 unique blobs** (no two share
+bytes in this cohort) → 381 rows at `native-1`, 0 pass failures. Re-running the
+identical command selected **0** pending targets.
 
 ```
-extract targets (fetched blobs, not yet extracted)   49
-blobs_extracted                                       0
-sample rows with year/type/owner                 18,266
-  2019 (NRB's CMS migration)                      9,178
-  2020-2026                                       8,203
-  <=2018                                            885
---section circular --dry-run                      1,245 files
---section circular --year 2019 --dry-run            691 files
-manifest dry run (5 keys, 1 bogus, 1 duplicated)  2 already fetched, 2 pending,
-                                                  1 missing, 1 duplicate collapsed,
-                                                  0 HTTP requests
+suspicious    179   47.0%    all legacy_font_suspected
+extracted     126   33.1%
+needs_ocr      51   13.4%    no_text_layer 28, image_file 22, sparse 1
+unsupported    23    6.0%    legacy .doc/.xls — a PARSER gap, not an OCR one
+failed          2    0.5%    PdfReadError, PdfStreamError
+
+legacy_line_ratio bands   0:42  >0-<0.20:107  0.20-<0.50:41  0.50-<0.80:17  >=0.80:127
+devanagari_ratio          > 0.5: 6 blobs (1.8%)   exactly 0.0: 321 (96.1%)
+pages                     4,285 total, 4,136 with text, 28 docs with none
 ```
+
+**The headline, now measured on a stratified benchmark rather than on 49
+circulars: 321 of 334 blobs that produced text contain no Devanagari at all.**
+Where the document *is* Nepali, the text arrives as latin codepoints carrying
+Devanagari glyphs. 127 blobs sit at `legacy_line_ratio >= 0.80` — unusable
+throughout, not merely doubtful.
+
+**The Docling calibration** (37 PDFs, offline from cached models, one converter,
+`do_ocr=False, device=cpu`): status and reason agreement **31/37 = 83.8%**,
+**Docling rescued pypdf 6, pypdf rescued Docling 0**, both_suspicious 20,
+both_extracted 6, both_failed 0. Docling read 40.7% more text and was **76.2×
+slower** (2,354.9s vs 30.9s; p95 387.8s for one document).
+
+**Throughput.** pypdf did 4,285 pages in 211.6s = **20.3 pages/s**. But the PDFs
+are not the cost: **spreadsheets are 11.5% of the blobs and 79.2% of the CPU
+time** (44 blobs, 808.3s; one 8.6 MB workbook took 262.6s alone). A corpus-wide
+estimate is driven by workbook count and size, not by page count.
+
+### Two defects the benchmark found, and neither was "fixed" here
+
+**A false positive, and it is systematic.** `05fa82badf94` is a completely
+readable *English* statistics table ("Liquidity Absorbing Instruments | Times |
+Offer Amount…") classified `suspicious`. Only 19 of its lines were long enough
+to judge and 5 tripped the intra-word-symbol rule on formatted numbers like
+`2,123,180.00` and dash-filled cells. **This is the same defect the Docling
+calibration measured**: all six of Docling's "rescues" are English tables where
+pypdf lands just above 0.20 (0.2182, 0.2121, 0.2381, 0.2523, 0.2632, 0.5787) and
+Docling just below (0.1675, 0.1250, 0.1961, 0.1517, 0.1579, 0.0214) on
+substantially the same text, because Docling's markdown table rows break lines
+differently. Read together they are one finding, not two: **native-1 over-flags
+tables, and that is the entire measured gap between the two engines.** Docling
+rescued *no* legacy-font Nepali document — on all 20 `both_suspicious` files the
+engines agree the text is Preeti, and no parser can reverse a font mapping.
+
+**A false negative, and it is worse.** `8df7b02f8a13` is a **spreadsheet** whose
+content is Preeti-encoded Nepali (`legacy_line_ratio` 0.2204 over 345/1565
+judged lines) — classified `extracted`/`clean`. Cause: `quality.classify` judges
+spreadsheets **structurally** (are there cells?) and returns before any
+linguistic rule runs, deliberately, because prose rules misfire on statistical
+tables. The consequence is that **legacy-font Nepali inside a workbook is
+invisible to the detector**: 60 of the 400 benchmark files are spreadsheets, 44
+parsed, and all 44 came back `clean`. This is the dangerous direction, and it is
+a rule gap rather than a threshold.
+
+**`legacy_line_ratio >= 0.20` was NOT changed and no classifier edit was made.**
+Both findings are the evidence for a `native-2` proposal; the plan requires that
+to be a separate reviewed decision, re-run over this same frozen manifest with
+native-1 and native-2 reported side by side.
 
 ### What is deliberately absent
 
@@ -1553,13 +1623,25 @@ no legacy-font→Unicode conversion. No chunking, no embeddings, no pgvector wri
 no `documents`/`document_chunks`/`ingest_jobs` rows, no `search_nrb_documents`, no
 `LOCAL_TOOLS` entry, no endpoint, no cron. No new runtime dependency —
 `app/rag/parsing.py` is untouched (its CPU/no-OCR Docling pinning is load-bearing
-for department RAG) and Docling is still never imported at module scope. Nothing in
-6A makes a network request: it reads local blobs.
+for department RAG) and Docling is still never imported at module scope — the
+calibration reuses `parsing._docling_converter()` rather than building a second
+pipeline that could drift into enabling OCR, and `docling_pipeline_is_native()`
+fails loudly if that pinning ever changes. That is a private dependency, kept
+deliberately and guarded; promoting it to a public boundary is Phase 7's business.
+
+**Exactly one network request was made in the whole of 6A**: Task 13's single
+`nrb_fetch.py --manifest` pass. The extraction pass reads local blobs only, and
+the Docling calibration ran with `HF_HUB_OFFLINE=1` against already-cached models
+so it could not become a second one. Nothing in 6A wrote to
+`documents`/`document_chunks`/`ingest_jobs`, and the calibration wrote nothing at
+all — `nrb_extractions` is the canonical screen and bounded experimental
+comparison data does not enter it.
 
 ### Remaining tasks
 
-13 the live profile, which needs the cohort **fetched** first — and the
-calibration run over the frozen 40, which needs the same · 14 docs.
+**None in Phase 6A.** Task 13 (the live profile) ran on 2026-08-15 and Task 14 is
+this write-up. What is left is a *decision*, not a task: whether the two defects
+above justify a `native-2` — see §11.9.
 
 Task 10 (the CLI) and Task 12 (Postgres integration tests) landed with Tasks 8–9
 rather than separately: the pass is not verifiable without both. The plan's Task
@@ -1574,16 +1656,23 @@ fingerprint and restricted to PDFs.
 
 1. **Success metric** — the share of extracted blobs whose *status is correct*,
    judged against a hand-labelled sample. Not "did extraction succeed": the whole
-   phase exists because success and correctness came apart. Current evidence is the
-   49-circular cohort at **49/49 legacy-font documents flagged, 0 false negatives**;
-   English and Unicode-Nepali controls both score 0.000. **This is one cohort and
-   one direction** — false *positives* have not been measured at scale, which is
-   exactly what Task 13's 400-file stratified sample is for.
+   phase exists because success and correctness came apart. **Now measured on the
+   400-file benchmark, and the answer is directional.** In the PDF population the
+   classifier is safe in the direction that matters — it passed no Preeti document
+   as clean and correctly left real Unicode Devanagari alone — but it over-flags:
+   **1 of 5 reviewed `suspicious` files was a readable English table**, and the
+   Docling calibration puts a floor under that at **6 of 37 PDFs (16.2%)**. In the
+   spreadsheet population it is not measured at all, because the rule never runs
+   (see §11.9). The old 49-circular figure (49/49 flagged, 0 false negatives) still
+   holds for circulars and is now the *narrowest* of the three numbers.
 2. **Eval** — the labelled sets are the fixtures in `tests/test_nrb_quality.py`
-   (47 tests, including a verbatim legacy-font shape from a real NRB circular) and
-   `tests/test_nrb_extraction.py` (19). Task 13 adds a manual validation of 5
-   `extracted` + 5 `suspicious` + 5 `needs_ocr` files read by eye against their
-   previews. All NRB suites: **612/612** as of Task 6.
+   and `tests/test_nrb_extraction.py`, plus the by-eye validation Task 13 ran over
+   the benchmark: 5 `extracted` + 5 `suspicious` + 5 `needs_ocr` (and, added
+   because 23 blobs land there, 5 `unsupported` and both `failed`), chosen by
+   lowest `content_sha256` within each status so the sample is reproducible rather
+   than "whatever the query returned". Result: **1 false positive, 1 false
+   negative**, both written up in §11.9. All NRB suites: **872 passing / 3
+   skipped** (the 3 are the opt-in real-Docling smoke tests, `NRB_DOCLING_TESTS=1`).
 3. **Feedback capture** — `nrb_extractions` is the log: status, the `reason` rule
    that fired, non-fatal `warnings`, the full metric set in JSONB, a bounded preview
    for eyeballing, and `duration_ms`. Because the row is keyed on the content hash,
@@ -1594,7 +1683,51 @@ fingerprint and restricted to PDFs.
    type coverage was a misleading average for exactly this reason — 2019 alone is
    47.5%). Compare pypdf against Docling on the same cohort and count rescues in
    both directions. Re-tune the legacy threshold only against a *new* cohort, never
-   against the one it was fitted on.
+   against the one it was fitted on — which is exactly why Task 13 stopped at
+   *reporting* the two defects rather than fixing them: the benchmark that found
+   them cannot also be the benchmark that validates the fix. A `native-2` re-runs
+   over this same frozen manifest and reports both versions side by side.
+
+### 11.9 The Phase 6B gate
+
+**What 6A hands over.** The work queue is a query, not a document:
+`SELECT * FROM nrb_extractions WHERE extractor_version = 'native-1' AND status IN
+('needs_ocr','suspicious')`. On the benchmark that is **230 of 381 blobs (60.4%)**
+— 179 legacy-font suspected and 51 needing pixels. A second, separate queue is
+`status = 'unsupported'` (23 blobs, 6.0%), which needs a **parser**, not OCR.
+
+**Three things 6B must not assume.**
+
+1. **The `suspicious` count is an upper bound, not a measurement.** At least 6 of
+   37 calibration PDFs (16.2%) and 1 of 5 hand-reviewed files are readable English
+   tables that native-1 over-flagged. Sizing an OCR or font-conversion programme
+   off 179 would over-buy.
+2. **The `clean` count is not a lower bound for spreadsheets.** 44 benchmark
+   spreadsheets were classified `extracted` by a rule that never reads their text,
+   and at least one of them is Preeti-encoded Nepali. **Every spreadsheet in the
+   corpus is currently unclassified with respect to legacy fonts**, and the query
+   above silently excludes all of them. This is the single most consequential gap
+   6A leaves.
+3. **Docling is not the remedy for either.** It rescued 6 files and every one was
+   a table pypdf mis-flagged; it rescued zero legacy-font documents, and it cannot
+   — the glyph mapping lives in the embedded font. At 76.2× the cost it buys no
+   recovery, so it stays a Phase 7 chunking dependency, not a screen.
+
+**The recommendation, from the measurements only.** Before any OCR is priced,
+do the cheap classifier work: a table-aware guard on the intra-word-symbol rule
+and a linguistic path for spreadsheets, shipped as `native-2` and re-run over
+this same frozen manifest. That directly addresses the one defect that inflates
+the 6B queue and the one that hides work from it, and it costs a 17-minute
+re-extraction. Only then is 179 (or whatever native-2 says) a number worth
+buying OCR against. Legacy-font → Unicode conversion, not OCR, is the likely
+remedy for most of it: these documents *have* a text layer, it is simply
+mis-mapped, and 127 blobs sit at `legacy_line_ratio >= 0.80`.
+
+**Still undecided, deliberately:** which OCR engine (if any), whether a Preeti
+mapping table can be built or licensed, whether `.doc`/`.xls` justify
+antiword/xlrd, and whether the 19 un-fetchable benchmark files indicate a
+corpus-wide 404 rate worth a re-sync. None of those are answerable from 6A's
+evidence, which is why 6A did not answer them.
 
 ### Known, and not caused by this work
 

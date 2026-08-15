@@ -33,9 +33,15 @@ gets reconciled before NRB is merged, not before it is built.
 Phases 1–4 done and live-verified (forex tool; sitemap inventory; REST document
 inventory; **persistent catalog + idempotent sync**, 18,577 sources / 18,266 files
 reconciled, second run all-zero). Phase 5 (download + magic-byte
-verification + SHA-256 + content-addressed storage) done and live-fetched. Phases
-6–8 (parsing/OCR, chunk+embed, `search_nrb_documents`) not started — **bytes are on
-disk, but no NRB document is parsed, embedded or searchable yet**. The roadmap was renumbered when Phase 4 was scoped down to
+verification + SHA-256 + content-addressed storage) done and live-fetched.
+**Phase 6A (native extraction + quality profiling) is done and live-profiled
+2026-08-15**: a frozen 400-file benchmark (`docs/nrb/phase6a-manifest.json`,
+`1ae297d…`), 381 fetched, all 381 extracted at `native-1`, and a frozen 40-PDF
+pypdf-vs-Docling calibration (`81d5979…`) run over the 37 that fetched. Evidence
+in `docs/nrb/phase6a-{profile,calibration}.txt`. **NRB documents are now parsed
+and classified, but still NOT chunked, embedded or searchable** — Phases 6B
+(OCR/legacy-font strategy), 7 (chunk+embed) and 8 (`search_nrb_documents`) are
+not started; the 6B gate and its recommendation are §11.9. The roadmap was renumbered when Phase 4 was scoped down to
 persistence; read that doc before touching anything NRB-related instead of
 re-deriving status from chat history.
 
