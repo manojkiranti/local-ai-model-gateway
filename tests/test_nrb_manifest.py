@@ -564,3 +564,61 @@ def test_the_cli_makes_no_http_request_at_all(tmp_path, monkeypatch):
     out = tmp_path / "cohort.json"
     assert _run_cli(module, ["--size", "20", "--out", str(out)], monkeypatch) == 0
     assert manifest_module.read_manifest(out).selected == 20
+
+
+# --------------------------------------------------------------------------- #
+# The committed cohort itself
+# --------------------------------------------------------------------------- #
+def _canonical_path():
+    import pathlib
+
+    return (pathlib.Path(__file__).resolve().parents[1]
+            / "docs" / "nrb" / "phase6a-manifest.json")
+
+
+@pytest.mark.skipif(not _canonical_path().exists(),
+                    reason="the canonical cohort has not been frozen yet")
+def test_the_committed_phase6a_cohort_is_intact():
+    """The frozen benchmark, guarded as a file rather than as a memory.
+
+    `docs/nrb/phase6a-manifest.json` is now the definition of the Phase 6A
+    cohort: every extraction number, the Docling calibration subset and the
+    published profile are all computed over exactly these 400 keys. An edit to it
+    — or a change to the sampler's canonical serialization — must fail here and
+    not be discovered when two runs' numbers stop agreeing.
+
+    Needs no database and no network: the fingerprint is recomputed from the
+    file's own contents.
+    """
+    m = manifest_module.read_manifest(_canonical_path())
+
+    assert m.version == "manifest-2"
+    assert m.algorithm_version == sampling.ALGORITHM_VERSION == "nrb-stratified-v1"
+    assert m.seed == "phase6a-v1"
+    assert m.requested == 400
+    assert m.selected == 400
+    assert len(m.entries) == 400
+    assert len(set(m.keys())) == 400
+    assert m.duplicate_entries == 0
+    assert m.shortfall == 0
+
+    # The approved policy, spelled out so a silent re-draw under other parameters
+    # cannot keep the same filename.
+    assert m.sampler["floor"] == 2
+    assert m.sampler["cohort_caps"] == {"2019": 120}
+
+    verification = manifest_module.verify_manifest(m)
+    assert verification.ok, verification
+
+    # Canonical order is what the fingerprint is taken over.
+    ranks = [sampling.rank_for(m.algorithm_version, m.seed, k) for k in m.keys()]
+    assert ranks == sorted(ranks)
+
+    # The hard historical cap, re-checked against the entries themselves rather
+    # than trusted from the diagnostics block.
+    from collections import Counter
+
+    assert Counter(e["year"] for e in m.entries)[2019] <= 120
+
+    # A manifest can only ever name NRB's own host — it selects from the catalog.
+    assert {key.split("/")[2] for key in m.keys()} == {"www.nrb.org.np"}

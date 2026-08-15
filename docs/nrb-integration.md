@@ -191,15 +191,17 @@ the window is set. Raising context buys time; truncation is the durable fix.
     tests/test_nrb_manifest.py tests/test_nrb_sampling.py \
     tests/test_nrb_extract_integration.py tests/test_files_documents_pdf_pages.py
 
-# drawing the benchmark cohort. Catalog-only: no HTTP, and no file is written
-# without --out. A cohort is drawn ONCE — an existing --out is refused.
-.venv/bin/python scripts/nrb_sample.py --size 400 --seed phase6a-v1 --dry-run
-.venv/bin/python scripts/nrb_sample.py --size 400 --seed phase6a-v1 \
-    --floor 5 --max-cohort-share 0.30 --out docs/nrb/phase6a-manifest.json
+# the benchmark cohort. Catalog-only: no HTTP, and no file is written without
+# --out. It is already FROZEN — the write below is what was run once, on
+# 2026-08-15, and re-running it is refused rather than silently re-drawing.
+.venv/bin/python scripts/nrb_sample.py --size 400 --seed phase6a-v1 --floor 2 \
+    --year-2019-cap 120 --max-cohort-share 1.0 --dry-run
+.venv/bin/python scripts/nrb_sample.py --size 400 --seed phase6a-v1 --floor 2 \
+    --year-2019-cap 120 --max-cohort-share 1.0 --out docs/nrb/phase6a-manifest.json
 .venv/bin/python scripts/nrb_sample.py --verify docs/nrb/phase6a-manifest.json
 
 # the exact benchmark cohort, and one publication year. Both dry, both zero HTTP.
-.venv/bin/python scripts/nrb_fetch.py --manifest <path> --dry-run
+.venv/bin/python scripts/nrb_fetch.py --manifest docs/nrb/phase6a-manifest.json --dry-run
 .venv/bin/python scripts/nrb_fetch.py --section circular --year 2019 --dry-run
 
 # EVERY NRB command and DB test on this branch needs the scratch database — the
@@ -1198,14 +1200,12 @@ legacy-font detection and an OCR fallback. What Phase 5 leaves it:
 **Design:** `docs/superpowers/specs/2026-08-15-nrb-phase-6a-extraction-quality-design.md`
 **Plan:** `docs/superpowers/plans/2026-08-15-nrb-phase-6a-extraction-quality.md` (14 tasks)
 
-**State as of 2026-08-15: Tasks 1–7A of 14 are built and unit/integration tested.
-No NRB document has been extracted yet, and the official benchmark cohort has not
-been frozen** — the pass that would extract is Task 8, the cohort is fetched in
-Task 13, and the sampler that draws it now exists but has only been run in dry
-mode (see *The sampler* below: two policy values still need a decision). The live
-numbers in this section are therefore about the *catalog*, not about extraction
-quality; the quality numbers arrive with Task 13 and this section gets rewritten
-then.
+**State as of 2026-08-15: Tasks 1–7A of 14 are built and tested, and the benchmark
+cohort is FROZEN at `docs/nrb/phase6a-manifest.json`. No NRB document has been
+extracted yet, and the cohort has not been downloaded** — the extraction pass is
+Task 8 and the fetch is Task 13. The live numbers in this section are therefore
+about the *catalog* and the *cohort*, not about extraction quality; the quality
+numbers arrive with Task 13 and this section gets rewritten then.
 
 ### Why the phase exists
 
@@ -1352,36 +1352,59 @@ cohort drawn on another machine tomorrow hashes the same and one edited key does
 not. `scripts/nrb_sample.py --verify <path>` recomputes it without a database or
 a network.
 
-**Live dry runs (scratch DB, 2026-08-15, no manifest written, zero HTTP):**
+Why floor 2 and not 5, which was the first draft: at 106 strata a floor of 5 wants
+459 slots of a 400 budget, so the floor pass would consume the entire budget and
+passes 2–4 would never run — the draw would be near-uniform across strata rather
+than proportional, and the share 2019 received would be an accident of how many
+strata it has. Floor 2 wants 197 slots, leaving 203 for proportional weighting and
+letting the cap actually bind.
+
+### The frozen cohort — `docs/nrb/phase6a-manifest.json`
+
+**Drawn 2026-08-15 and committed. These 400 `comparison_key`s ARE the Phase 6A
+benchmark.** Fetch, extraction, calibration and the published profile all name
+this file; nothing downstream re-samples, and files already on disk are not
+swapped out for fresh ones.
 
 ```
-candidates (unique comparison_key)   18,266   (41 with >1 source association)
-strata (cohort x type x format)         106   15 singletons, 30 with n<10, median 25
-document types / formats / owners     20 / 4 / 33
-largest stratum        2019/untyped/pdf  4,809
-size=400 seed=phase6a-v1 share=0.30, by floor:
-  floor=5   400 selected · floor short 59 · cap removed 0   · redistributed 0
-  floor=3   400 selected · floor short  0 · cap removed 21  · redistributed 21
-  floor=2   400 selected · floor short  0 · cap removed 39  · redistributed 39
-  floor=1   400 selected · floor short  0 · cap removed 60  · redistributed 60
-2019 lands at 119-120 of 400 under the 30% share cap in every configuration.
+selection_sha256   1ae297dba1c33c7db9976f817806f6666371695a31e1f424d046993d581a1312
+parameters         size 400 · seed phase6a-v1 · floor 2 · 2019 cap 120
+                   algorithm nrb-stratified-v1 · no general cohort share cap
+candidates         18,266 (41 with >1 source association) · 106 strata
+selected           400 · unique 400 · shortfall 0 · unfillable 0
+floor              197 requested / 197 allocated / 0 short
+2019               159 allocated proportionally -> capped to 120
+                   39 slots removed, 39 redistributed, 1 round
+cohorts            2019 120 (AT CAP) · 2023-2026 131 · 2020-2022 109 · <=2018 40
+formats            pdf 303 · spreadsheet 60 · image 22 · document 15
+types              20 of 20 present; notice 67, statistics 60, untyped 35,
+                   monetary_operations 33, circular 27, report 27, … faq 2
+owners             25 of 33 codes; the 8 absent are <=0.33% of the corpus each
+strata             106 of 106 represented, none empty
+catalog resolution 400 known, 0 missing (3 already fetched, 397 pending)
 ```
 
-**Two values are NOT decided and must be approved before the cohort is frozen:**
+The 2019 cap is the only hard cap. It is absolute (120 files), not a share, so it
+does not move if the requested size ever changes — the point is a fixed ceiling on
+a CMS-migration cohort that is half the corpus, not a proportion of a budget.
 
-1. **The floor.** At 106 strata a floor of 5 wants 459 slots of a 400 budget, so
-   the floor pass consumes the whole budget and passes 2–4 never run: the draw
-   becomes near-uniform across strata rather than proportional, and the 30% that
-   2019 receives is an accident of how many strata it has. A floor of 2–3 leaves
-   room for proportional weighting and actually exercises the cap. Neither is
-   wrong — uniform coverage is defensible for a *parser*-quality benchmark — but
-   it is a choice, not a default.
-2. **The 2019 ceiling.** `--max-cohort-share 0.30` (120 of 400) or an explicit
-   `--year-2019-cap`. 2019 is 9,181 of 18,266 candidates.
+Structural review before freezing found no defects. The four things that look odd
+and are not: `untyped` 35 is NRB's real `upload-files` catch-all (5,065
+candidates), not a canonicalization failure — every one of those files still has a
+year and an owner; 2003/2005/2006 are absent because they hold 6/2/2 files and
+year is not a stratification key below the cohort; the 8 absent owner codes are
+the smallest departments and owner is deliberately not stratified on; and rare
+formats are over-represented against their corpus share (15 of the 34 `.docx`, 22
+of the 115 images) because the floor exists precisely to make those cells
+measurable.
 
-Also worth knowing before reading any per-stratum number: with 400 files over 106
-strata, **every stratum is below the n<10 weak threshold**. Conclusions come from
-the cohort / document-type / format breakdowns (n = 13–120), never from a cell.
+Before reading any per-stratum number: with 400 files over 106 strata, **97 strata
+are below the n<10 weak threshold**. Conclusions come from the cohort /
+document-type / format breakdowns (n = 15–131), never from a single cell.
+
+`tests/test_nrb_manifest.py::test_the_committed_phase6a_cohort_is_intact` guards
+the committed file — parameters, count, canonical order, the 120 ceiling and the
+fingerprint — with no database and no network.
 
 ### Live evidence so far (scratch DB `local_ai_gateway_p4`, 2026-08-15)
 
