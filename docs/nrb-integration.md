@@ -4,7 +4,8 @@
 live, what broke and how it was fixed, and what's deliberately not built yet.
 Code-level gotchas stay in `CLAUDE.md` (grep `nrb`); this is the status view.
 
-Last verified: **2026-08-14**.
+Last verified: **2026-08-15** (Phases 1–5 live-verified 2026-08-14; Phase 6A is
+build-only so far — see §11).
 
 ---
 
@@ -17,7 +18,8 @@ Last verified: **2026-08-14**.
 | 3 | Page/document-level discovery + attachment inventory | **Done, full-corpus run 2026-08-14** |
 | 4 | Persistent catalog + idempotent metadata sync | **Done, live-run twice 2026-08-14** — §9 |
 | 5 | Attachment download → MIME validation → SHA-256 → local storage | **Done, live-fetched 2026-08-14** — §10 |
-| 6 | Parsing (PDF/DOCX/spreadsheets, Nepali + legacy fonts, OCR fallback) | Not started — gate in §10.9 |
+| 6A | Native extraction + quality profiling (**no OCR**) | **In progress** — built, not yet measured on a live cohort — §11 |
+| 6B | OCR / legacy-font strategy, chosen from 6A's evidence | Not started — 6A exists to decide it |
 | 7 | Chunk + embed into the existing `documents`/`document_chunks` pipeline | Not started |
 | 8 | `search_nrb_documents` tool | Not started |
 
@@ -38,6 +40,14 @@ sync command and still downloads nothing**; **Phase 5 adds the download and stor
 raw bytes and still parses nothing.** Both stay deliberately separate from
 `app/rag/` — Phase 7 is where that finally gets touched. Nothing through Phase 5 is
 registered in `LOCAL_TOOLS`, reachable by the model, or exposed on any endpoint.
+
+**Phase 6 was split.** 6A extracts text with the parsers already in the repo,
+measures it, and classifies each blob as `extracted` / `suspicious` / `needs_ocr` /
+`unsupported` / `failed` — so 6B chooses an OCR strategy from measured evidence
+rather than from an assumption about a corpus that is 91% PDF and largely Nepali.
+**6A runs no OCR of any kind and converts no legacy font**; that is a hard boundary,
+not a sequencing convenience. It also chunks nothing, embeds nothing, and adds no
+tool. See §11.
 
 ---
 
@@ -174,6 +184,21 @@ the window is set. Raising context buys time; truncation is the durable fix.
 # no HTTP request at all and prints how many files and bytes were selected.
 .venv/bin/python scripts/nrb_fetch.py --core --dry-run
 .venv/bin/python scripts/nrb_fetch.py --section circular --limit 25 -v
+
+# Phase 6A suites (quality metrics, format dispatch, manifest format, and the
+# catalog queries around extraction — the last needs Postgres and rolls back)
+.venv/bin/pytest tests/test_nrb_quality.py tests/test_nrb_extraction.py \
+    tests/test_nrb_manifest.py tests/test_nrb_extract_integration.py \
+    tests/test_files_documents_pdf_pages.py
+
+# the exact benchmark cohort, and one publication year. Both dry, both zero HTTP.
+.venv/bin/python scripts/nrb_fetch.py --manifest <path> --dry-run
+.venv/bin/python scripts/nrb_fetch.py --section circular --year 2019 --dry-run
+
+# EVERY NRB command and DB test on this branch needs the scratch database — the
+# dev DB is stamped at a revision that exists only on the deferred citations
+# branch, so `alembic current` against it fails BY DESIGN (§9.10). Do not "fix" it.
+export DATABASE_URL='postgresql+asyncpg://gateway:<pw>@127.0.0.1:5432/local_ai_gateway_p4'
 
 # forex unit suite alone
 .venv/bin/pytest tests/test_nrb_forex.py
@@ -1158,3 +1183,190 @@ legacy-font detection and an OCR fallback. What Phase 5 leaves it:
   PDF, so this remains the main technical risk). Neither is a schema question.
 * Not yet built, and deliberately: conditional re-download (no ETag/`Last-Modified`
   is stored, so a file NRB edits in place is not re-fetched until someone asks).
+
+---
+
+## 11. Phase 6A — native extraction + quality profiling (IN PROGRESS)
+
+**Design:** `docs/superpowers/specs/2026-08-15-nrb-phase-6a-extraction-quality-design.md`
+**Plan:** `docs/superpowers/plans/2026-08-15-nrb-phase-6a-extraction-quality.md` (14 tasks)
+
+**State as of 2026-08-15: Tasks 1–6 of 14 are built and unit/integration tested.
+No NRB document has been extracted yet** — the pass that would do it is Task 8,
+and the cohort it runs over is drawn in Task 7A and fetched in Task 13. The live
+numbers in this section are therefore about the *catalog*, not about extraction
+quality; the quality numbers arrive with Task 13 and this section gets rewritten
+then.
+
+### Why the phase exists
+
+Phase 5 left 49 blobs on disk and a probe over them found the failure mode that
+shapes everything here: **text that parses cleanly and is wrong.** Those PDFs
+extract without error, contain **zero Devanagari**, and read as ASCII rubbish
+(`ffihW\ffifiHrz\reU=,.`) — Preeti/Kantipur legacy fonts, which map Devanagari
+glyphs onto ASCII codepoints. A pipeline that only checks "did extraction raise"
+would index all of them as English gibberish. So 6A measures the text and says
+what is wrong with it, and only then does 6B decide what to do about it.
+
+### What shipped (Tasks 1–6)
+
+| Task | File | What it is |
+|---|---|---|
+| 1–2 | `app/nrb/quality.py` | Pure metrics + the classifier. No DB, no HTTP, no imports from `extraction.py` (evidence arrives via a neutral `Evidence` carrier). |
+| 3 | `app/files/documents.py` | `read_pdf_pages` — the **single pypdf call site** in the repo, now shared by `read_document` and by NRB. Encryption handling, the 500-page cap and per-page failure isolation cannot drift between the two. |
+| 4 | `app/nrb/extraction.py` | Format dispatch: pypdf / python-docx / openpyxl (`data_only=True`, formulas never evaluated) / text. **Never raises** — every failure is a recorded result. `.xls`/`.doc` are `unsupported`, not opened. |
+| 5 | `app/nrb/models.py`, `alembic/…b1bea6ac36c5` | The `nrb_extractions` table. |
+| 6 | `app/nrb/{manifest,catalog,fetch,report}.py`, `scripts/nrb_fetch.py` | The exact-cohort (benchmark manifest) fetch scope, `--year`, and extraction target selection. |
+
+### The legacy-font detector, and the measurement that rebuilt it
+
+The first version classified per document and **missed 7 of 49 real circulars**.
+Root cause: a `stopword_rate` gate. Glyph-mapped text is full of 1–2 character
+ASCII tokens (`a`, `t`, `is`, `on`) that match short English stopwords by chance —
+one file scored **0.248**, higher than genuine English prose. The deeper cause is
+that those 7 are genuinely *mixed*: a real English annex (audit scope, a Basel
+capital table) behind a Preeti-encoded Nepali covering note. The document average
+is honestly English while the operative Nepali directive is unreadable.
+
+Rejected on measurement: alpha-token denominators, stopwords of ≥3 and ≥4
+characters (best margin only 1.7×), and per-page detection (caught 5 of 7).
+
+What works is **per-LINE, shape-only** detection — vowel-less tokens, intra-word
+symbols, intra-word case switches — with `legacy_line_ratio > 0.20`:
+
+| corpus | ratio |
+|---|---|
+| English prose | 0.000 |
+| Unicode Devanagari Nepali | 0.000 |
+| the 49 live circulars | 0.281 – 1.000 |
+
+**49/49 flagged, 0 false negatives.** `stopword_rate` is still reported as a
+metric; it is no longer a gate. The threshold is calibrated on **one cohort** and
+is frozen — Task 13's stratified sample is the agreed next calibration point, and
+it must not be re-tuned against these 49 again.
+
+### The table
+
+`nrb_extractions`, migration **`b1bea6ac36c5`** (revises `2b7f5c9d1a34`).
+
+Identity is **`(content_sha256, extractor_version)`**, not an `nrb_files.id`, and
+there is deliberately **no foreign key**: storage is content-addressed and blobs
+are shared (Phase 3 measured 42 duplicate attachment references), so per-file-row
+extraction would parse the same bytes twice and store two answers to one question.
+A file row being re-fetched must not orphan a valid extraction *of the same bytes*.
+
+**Every column is a function of the bytes alone.** A source title is a useful
+quality signal — a Devanagari title over zero-Devanagari text corroborates a
+legacy-font verdict — but a blob referenced by one Devanagari-titled and one
+English-titled source would persist a *different verdict depending on which source
+the pass reached first*. That is non-deterministic persisted state and it would
+break the second-run-is-identical invariant every earlier phase holds, so the
+title-assisted signal lives in the read-time profile instead.
+
+Five CHECKs, each proven against live Postgres rather than assumed: closed `status`
+and `reason` vocabularies (a typo'd value would match no predicate and no query);
+`failed` ⟺ an error is present; the legacy numerator and denominator travel
+together and the numerator never exceeds the denominator; and **`preview ≤ 300`
+characters**, which is the structural guarantee that this table never becomes a
+document store. No extracted text is persisted — Phase 7 re-parses with Docling for
+chunking anyway, and a text column that could hold a whole document is something a
+later phase would eventually embed by accident.
+
+Index note: `ux_nrb_extractions_content_version` serves lookup by blob and the join
+from `nrb_files`. It does **not** serve a version-only staleness scan
+(`WHERE extractor_version <> …`) — that column is second. Left as a scan on
+purpose: it is an occasional operator query over one row per blob.
+
+### The benchmark cohort is named, not approximated
+
+Phase 5 selects `pending` rows in **id order** within a scope, and catalog id order
+is the order REST paged the post types. So `--section circular --year 2019 --limit
+60` returns the 60 *lowest ids*, and stratifying over that measures the id order
+rather than the corpus — and is not reproducible, since any later fetch changes
+what is on disk. The sample is therefore drawn **once** from the full catalog into
+a committed manifest of exact `comparison_key`s, and fetch, extraction and
+calibration all name that file.
+
+`scripts/nrb_fetch.py --manifest <path>` fetches exactly it. The manifest holds
+**catalog keys, not URLs**: keys are matched against `nrb_files.comparison_key`,
+what gets requested is the matched row's own `source_url` through the same
+`check_url` guard, and a key naming a host NRB never published matches no row and
+is reported missing. There is no path by which a file on disk introduces a URL. The
+key scope is purely additive, so a manifest still cannot select a `blocked_host`
+file, and every cap, pacing rule and soft-404 check is unchanged.
+
+Selection alone is not a report — it returns only the pending slice, so a cohort
+already on disk would read as a cohort that had lost its files. Every pass
+therefore accounts for **requested / already fetched / pending / previously failed
+/ blocked / fetched this pass / failed this pass / not in the catalog**, in the dry
+run as well as a real one. `--manifest --dry-run` makes **zero HTTP requests**.
+
+### Live evidence so far (scratch DB `local_ai_gateway_p4`, 2026-08-15)
+
+```
+extract targets (fetched blobs, not yet extracted)   49
+blobs_extracted                                       0
+sample rows with year/type/owner                 18,266
+  2019 (NRB's CMS migration)                      9,178
+  2020-2026                                       8,203
+  <=2018                                            885
+--section circular --dry-run                      1,245 files
+--section circular --year 2019 --dry-run            691 files
+manifest dry run (5 keys, 1 bogus, 1 duplicated)  2 already fetched, 2 pending,
+                                                  1 missing, 1 duplicate collapsed,
+                                                  0 HTTP requests
+```
+
+### What is deliberately absent
+
+No OCR of any kind (Tesseract, Paddle, EasyOCR, Docling OCR, vision or cloud) and
+no legacy-font→Unicode conversion. No chunking, no embeddings, no pgvector writes,
+no `documents`/`document_chunks`/`ingest_jobs` rows, no `search_nrb_documents`, no
+`LOCAL_TOOLS` entry, no endpoint, no cron. No new runtime dependency —
+`app/rag/parsing.py` is untouched (its CPU/no-OCR Docling pinning is load-bearing
+for department RAG) and Docling is still never imported at module scope. Nothing in
+6A makes a network request: it reads local blobs.
+
+### Remaining tasks
+
+7 sampler (four-pass allocation with cap redistribution) · 7A the manifest draw ·
+8 the extraction pass (advisory lock `NRB_XTRC`, batched, resumable) · 9 the
+profile + report · 10 the CLI · 11 Docling calibration (pypdf vs Docling over the
+*same* quality metrics — not via `parse_to_chunks`, which would measure RAG
+filtering) · 12 Postgres integration tests · 13 the live profile · 14 docs.
+
+### Evaluation & Improvement (Phase 6A)
+
+1. **Success metric** — the share of extracted blobs whose *status is correct*,
+   judged against a hand-labelled sample. Not "did extraction succeed": the whole
+   phase exists because success and correctness came apart. Current evidence is the
+   49-circular cohort at **49/49 legacy-font documents flagged, 0 false negatives**;
+   English and Unicode-Nepali controls both score 0.000. **This is one cohort and
+   one direction** — false *positives* have not been measured at scale, which is
+   exactly what Task 13's 400-file stratified sample is for.
+2. **Eval** — the labelled sets are the fixtures in `tests/test_nrb_quality.py`
+   (47 tests, including a verbatim legacy-font shape from a real NRB circular) and
+   `tests/test_nrb_extraction.py` (19). Task 13 adds a manual validation of 5
+   `extracted` + 5 `suspicious` + 5 `needs_ocr` files read by eye against their
+   previews. All NRB suites: **612/612** as of Task 6.
+3. **Feedback capture** — `nrb_extractions` is the log: status, the `reason` rule
+   that fired, non-fatal `warnings`, the full metric set in JSONB, a bounded preview
+   for eyeballing, and `duration_ms`. Because the row is keyed on the content hash,
+   re-running the same version is a no-op and a **version bump re-opens every blob**
+   without deleting anything, so a rule change is auditable against its predecessor.
+4. **Review loop** — per profiling run: read the status split by year cohort and
+   document type before believing any single overall percentage (Phase 3's 71.6%
+   type coverage was a misleading average for exactly this reason — 2019 alone is
+   47.5%). Compare pypdf against Docling on the same cohort and count rescues in
+   both directions. Re-tune the legacy threshold only against a *new* cohort, never
+   against the one it was fitted on.
+
+### Known, and not caused by this work
+
+Running the RAG suites against the scratch DB fails
+`tests/test_rag_reingest_integration.py::test_department_filter_restricts_the_set`
+(`assert 69 == 2`): the test assumes an empty `documents` table and
+`local_ai_gateway_p4` holds 69 non-archived rows from earlier RAG work. It fails in
+isolation too, so it is DB-state dependence rather than test-order pollution. Same
+family as the migration-lineage situation in §9.10 — a consequence of NRB work
+living on a scratch database, and resolved when that is reconciled.
