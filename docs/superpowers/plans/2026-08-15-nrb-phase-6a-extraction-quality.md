@@ -1778,13 +1778,46 @@ Two changes in one task because they share a file and neither is independently r
 - Consumes: `NRBExtraction` from Task 5, `extraction.EXTRACTOR_VERSION` from Task 4.
 - Produces:
   - `catalog.ExtractTarget` — frozen dataclass `(file_id: int, content_sha256: str, storage_key: str, extension: str | None, sniffed_mime: str | None, resource_type: str, content_length: int | None)`
-  - `catalog.select_extract_targets(session, *, sections=None, owners=None, resource_types=None, years=None, keys=None, limit=None, force=False, extractor_version: str) -> list[ExtractTarget]`
+  - `catalog.select_extract_targets(session, *, sections=None, owners=None, resource_types=None, years=None, keys=None, limit=None, force=False, extractor_version: str) -> list[ExtractTarget]` — `keys` is exact `comparison_key` values (the manifest cohort)
   - `catalog.record_extractions(session, rows: Sequence[dict[str, Any]]) -> None`
   - `catalog.extraction_counts(session, *, extractor_version: str) -> dict[str, int]`
   - `catalog.load_sample_rows(session, *, sections=None, resource_types=None) -> list[dict[str, Any]]` — the input to Task 7's sampler
-  - `catalog.select_fetch_targets(..., years: Sequence[int] | None = None)`
+  - `catalog.select_fetch_targets(..., years: Sequence[int] | None = None, keys: Sequence[str] | None = None)`
 
-- [ ] **Step 1: Add `years` to `select_fetch_targets`**
+- [ ] **Step 1: Add `years` and `keys` to `select_fetch_targets`**
+
+`keys` is exact `comparison_key` values — the benchmark manifest scope. Add it as
+a top-level predicate (not inside the source-join block), right after the
+`resource_types` filter:
+
+```python
+    if keys:
+        # Exact benchmark-manifest scope. The sample is drawn ONCE from the full
+        # catalog and written to a manifest; this is what downloads exactly those
+        # files. Approximating it with --section/--year/--limit would return the
+        # lowest catalog ids in each scope — REST paging order — so the
+        # stratification would be measuring the id order, not the corpus.
+        #
+        # Additive only: the `fetch_status.in_(statuses)` predicate above still
+        # applies, so a manifest naming a `blocked_host` file still cannot select
+        # it. Bounded by MANIFEST_MAX_KEYS so this cannot smuggle a whole-corpus
+        # fetch past the scope-is-required rule.
+        if len(keys) > MANIFEST_MAX_KEYS:
+            raise ValueError(
+                f"manifest names {len(keys)} keys; the cap is {MANIFEST_MAX_KEYS}"
+            )
+        stmt = stmt.where(NRBFile.comparison_key.in_(list(keys)))
+```
+
+and near the top of `catalog.py`, beside `BATCH`:
+
+```python
+# A manifest is a benchmark cohort, not a back door to `--all`. 5,000 keys is
+# ~12x the planned 400-file sample and well under the 18,263-file corpus.
+MANIFEST_MAX_KEYS = 5000
+```
+
+Then the `years` predicate, inside the existing `if sections or owners or not include_inactive:` block (change that condition to also test `years`):
 
 Inside the existing `if sections or owners or not include_inactive:` block, change the condition to also test `years`, and add the predicate after the `owners` one:
 
@@ -1802,11 +1835,11 @@ Inside the existing `if sections or owners or not include_inactive:` block, chan
             )
 ```
 
-Update the signature to `years: Sequence[int] | None = None` and the docstring's first paragraph to mention it.
+Update the signature to `years: Sequence[int] | None = None, keys: Sequence[str] | None = None` and the docstring's first paragraph to mention both.
 
-- [ ] **Step 2: Thread `years` through `run_fetch` and the CLI**
+- [ ] **Step 2: Thread `years` and `keys` through `run_fetch` and the CLI**
 
-In `app/nrb/fetch.py::run_fetch`, add the parameter `years: Sequence[int] | None = None`, add `"years": list(years or [])` to the `scope` dict, and pass `years=years` into `catalog.select_fetch_targets`.
+In `app/nrb/fetch.py::run_fetch`, add the parameters `years: Sequence[int] | None = None` and `keys: Sequence[str] | None = None`; add `"years": list(years or [])` and `"manifest_keys": len(keys or [])` to the `scope` dict — the **count**, not the keys, because a 400-element list in every `nrb_fetch_runs.scope` row would make the operational log unreadable and the manifest file is the durable record; and pass both into `catalog.select_fetch_targets`.
 
 In `scripts/nrb_fetch.py`, add to the scope argument group:
 
@@ -1817,9 +1850,28 @@ In `scripts/nrb_fetch.py`, add to the scope argument group:
              "because id-order selection cannot reach a cohort deliberately, and "
              "2019 (NRB's CMS migration) is half the corpus.",
     )
+    scope.add_argument(
+        "--manifest", default=None, metavar="PATH",
+        help="fetch exactly the files named in a benchmark manifest written by "
+             "scripts/nrb_sample.py. Every safety rule still applies; a manifest "
+             "cannot select a blocked_host file.",
+    )
 ```
 
-Add `args.year` to the "no scope given" test and pass `years=args.year` to `run_fetch`.
+and load it in `main` (importing `read_manifest` from `app.nrb.manifest`, Task 7A):
+
+```python
+    manifest_keys = None
+    if args.manifest:
+        manifest = read_manifest(args.manifest)
+        manifest_keys = manifest.keys()
+        print(
+            f"manifest: {len(manifest_keys)} files, drawn {manifest.drawn_at}",
+            file=sys.stderr,
+        )
+```
+
+Add `args.year` and `args.manifest` to the "no scope given" test, and pass `years=args.year, keys=manifest_keys` to `run_fetch`.
 
 - [ ] **Step 3: Verify the existing fetch suites still pass**
 
@@ -1886,10 +1938,15 @@ async def select_extract_targets(
     "excluded by the status column, not by a WHERE clause someone could forget"
     rule Phase 5 uses.
 
-    `keys` is the stratified sample from `sampling.py`: an explicit list of
-    `content_sha256` values. It composes with the other filters rather than
-    replacing them, so `--sample` and `--core` together mean "a stratified sample
-    OF the core".
+    `keys` is the benchmark manifest: exact `comparison_key` values, the same
+    identity the fetch scope uses. It composes with the other filters rather than
+    replacing them, so `--manifest` and `--core` together mean "the manifest
+    cohort, restricted to the core".
+
+    Note the interaction with DISTINCT ON: two manifest entries that turn out to
+    share bytes collapse to ONE extraction, so `blobs_selected` can be lower than
+    the manifest size. That is correct — it is one blob — and the report states
+    the two numbers separately rather than letting the gap read as a failure.
 
     `force` re-selects blobs already extracted at this version, for when a rule
     changed but `EXTRACTOR_VERSION` has not been bumped yet (development only —
@@ -1920,7 +1977,11 @@ async def select_extract_targets(
     if resource_types:
         stmt = stmt.where(NRBFile.resource_type.in_(list(resource_types)))
     if keys:
-        stmt = stmt.where(NRBFile.content_sha256.in_(list(keys)))
+        if len(keys) > MANIFEST_MAX_KEYS:
+            raise ValueError(
+                f"manifest names {len(keys)} keys; the cap is {MANIFEST_MAX_KEYS}"
+            )
+        stmt = stmt.where(NRBFile.comparison_key.in_(list(keys)))
 
     if not force:
         done = select(NRBExtraction.id).where(
@@ -2025,6 +2086,32 @@ async def extraction_counts(
         )
     )
     return counts
+
+
+async def count_unfetched(session: AsyncSession, keys: Sequence[str]) -> int:
+    """How many of these manifest keys are not on disk yet. Read-only.
+
+    A partly-fetched cohort is a legitimate mid-download state, not an error — but
+    every percentage in the profile is over the files that WERE extracted, so the
+    gap has to be said out loud rather than left for a reader to notice that
+    400 became 380.
+    """
+    if not keys:
+        return 0
+    total = int(
+        (
+            await session.execute(
+                select(func.count())
+                .select_from(NRBFile)
+                .where(
+                    NRBFile.comparison_key.in_(list(keys)),
+                    NRBFile.fetch_status == FETCH_FETCHED,
+                )
+            )
+        ).scalar_one()
+        or 0
+    )
+    return max(len(set(keys)) - total, 0)
 
 
 async def load_sample_rows(
@@ -2183,6 +2270,7 @@ def test_year_cohorts_cover_the_measured_distribution():
 
 def test_the_sample_is_bounded_by_the_requested_size():
     assert len(sampling.stratified_sample(CORPUS, size=400).keys) <= 400
+    assert len(sampling.stratified_sample(CORPUS, size=37).keys) <= 37
 
 
 def test_the_sample_is_identical_across_calls():
@@ -2260,6 +2348,69 @@ def test_a_rare_type_is_not_oversampled_to_force_parity():
     assert by_type["circular"] > by_type.get("monetary_policy", 0)
 
 
+# --- allocation: the requested size must actually be delivered ------------- #
+
+def test_a_feasible_request_returns_exactly_the_requested_size():
+    """400 asked for, 400 returned. The cap trims; it must not shrink the sample."""
+    sample = sampling.stratified_sample(CORPUS, size=400)
+    assert len(sample.keys) == 400
+    assert sample.shortfall == 0
+
+
+def test_cap_trimmed_slots_are_redistributed_rather_than_lost():
+    # Without pass 4 the cap removes 2019's excess and simply keeps the smaller
+    # total, so this returns ~250 and reads as if 400 files were profiled.
+    capped = sampling.stratified_sample(CORPUS, size=400, max_cohort_share=0.30)
+    uncapped = sampling.stratified_sample(CORPUS, size=400, max_cohort_share=1.0)
+    assert len(capped.keys) == len(uncapped.keys) == 400
+
+
+def test_the_cohort_cap_still_holds_after_redistribution():
+    from collections import Counter
+
+    sample = sampling.stratified_sample(CORPUS, size=400, max_cohort_share=0.30)
+    chosen = {r["comparison_key"]: r for r in CORPUS}
+    counts = Counter(sampling.year_cohort(chosen[k]["year"]) for k in sample.keys)
+    for cohort, n in counts.items():
+        assert n <= int(400 * 0.30), (cohort, n)
+
+
+def test_an_infeasible_request_reports_its_shortfall_instead_of_pretending():
+    # One cohort only: the 30% cap makes 120 the ceiling, whatever was asked for.
+    only_2019 = _rows(5000, year=2019, doc_type="circular")
+    sample = sampling.stratified_sample(only_2019, size=400, max_cohort_share=0.30)
+    assert len(sample.keys) == 120
+    assert sample.shortfall == 280
+    assert sample.notes
+
+
+def test_a_corpus_smaller_than_the_request_reports_a_shortfall():
+    sample = sampling.stratified_sample(_rows(7, year=2021, doc_type="act"), size=400)
+    assert len(sample.keys) == 7
+    assert sample.shortfall == 393
+    assert any("exhausted" in note for note in sample.notes)
+
+
+def test_a_floor_larger_than_the_budget_spreads_instead_of_favouring_early_strata():
+    """The floor pass must be round-robin, not a sorted walk with a break.
+
+    10 strata, floor 5, budget 12. Round-robin gives every stratum one slot and
+    then two a second. A `for key in sorted(...): take = min(floor, ...); break`
+    loop gives 5 + 5 + 2 — three strata represented and seven invisible, chosen by
+    nothing but their names.
+    """
+    corpus = []
+    for i in range(10):
+        corpus += _rows(20, year=2021, doc_type=f"type{i:02d}", prefix=f"t{i}")
+    sample = sampling.stratified_sample(
+        corpus, size=12, floor=5, max_cohort_share=1.0
+    )
+    chosen = {r["comparison_key"]: r for r in corpus}
+    represented = {chosen[k]["document_type"] for k in sample.keys}
+    assert len(sample.keys) == 12
+    assert len(represented) == 10          # lexicographic filling gives 3
+
+
 def test_keys_are_unique():
     keys = sampling.stratified_sample(CORPUS, size=400).keys
     assert len(keys) == len(set(keys))
@@ -2275,6 +2426,7 @@ def test_requesting_more_than_exists_returns_everything_once():
     small = _rows(7, year=2021, doc_type="act")
     sample = sampling.stratified_sample(small, size=400)
     assert len(sample.keys) == 7
+    assert len(set(sample.keys)) == 7
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
@@ -2354,6 +2506,12 @@ class Sample:
     keys: tuple[str, ...]
     strata: tuple[Stratum, ...]
     requested: int
+    # requested - len(keys). Non-zero means the constraints could not all be met
+    # (the corpus is smaller than `size`, or every non-capped cohort ran out of
+    # headroom). A short sample that SAYS it is short is fine; one that reads as
+    # complete is not, so this is printed rather than inferred from a length.
+    shortfall: int = 0
+    notes: tuple[str, ...] = ()
 
 
 def year_cohort(year: int | None) -> str:
@@ -2388,21 +2546,41 @@ def stratified_sample(
 ) -> Sample:
     """A reproducible, representative sample of `size` files.
 
-    Three passes, in this order, because each constrains the next:
+    Four passes, in this order, because each constrains the next:
 
-      1. **Floor** — every non-empty stratum gets up to `floor` rows, so a
-         12-document type is measurable at all.
-      2. **Proportional** — the remaining budget is split by stratum size, so a
-         700-file stratum is not represented as thinly as a 3-file one.
+      1. **Floor, round-robin** — one slot at a time across every non-empty
+         stratum, so a 12-document type is measurable at all. Round-robin and not
+         "walk the sorted list handing out `floor` each until the budget dies":
+         that second form is what a `for … break` loop does, and when the budget
+         cannot cover every stratum it silently gives everything to the
+         lexicographically early ones. One slot at a time means an insufficient
+         budget costs every stratum its depth, never its existence.
+      2. **Proportional** — the remaining budget is split by stratum headroom, so
+         a 700-file stratum is not represented as thinly as a 3-file one.
       3. **Cohort cap** — no year cohort may exceed `max_cohort_share` of the
-         total. Applied last because it can only ever remove.
+         total. 2019 is half the corpus and would otherwise be half the sample,
+         which would make every "is 2019 worse?" comparison a comparison of 2019
+         with a rounding error.
+      4. **Redistribution** — every slot the cap removed is handed back, same
+         deterministic round-robin, to strata in cohorts that are NOT at their
+         cap and still have headroom. Without this the cap silently shrinks a
+         400-file request to whatever survived trimming, so the caller would get a
+         sample both smaller and differently shaped than the one they asked for.
+         The cap is re-checked before every grant, so this can never breach it.
+
+    When the request is genuinely infeasible — fewer rows than `size`, or every
+    non-capped cohort exhausted — the result carries a `shortfall` and a note
+    saying which constraint bound. It is never silently rounded down.
 
     Strata are `(year cohort, document type, resource type)`. Owner is NOT a
     stratification key — 33 codes crossed with the rest shatters into single-digit
     cells — but it is carried through for the report to break out afterwards.
     """
     if not rows or size <= 0:
-        return Sample(keys=(), strata=(), requested=size)
+        return Sample(
+            keys=(), strata=(), requested=size,
+            shortfall=max(size, 0), notes=("no rows to sample",) if size > 0 else (),
+        )
 
     buckets: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
     for row in rows:
@@ -2414,56 +2592,109 @@ def stratified_sample(
         buckets.setdefault(key, []).append(row)
 
     # Sorting the ROWS inside each bucket is what makes the result independent of
-    # the input order; sorting the BUCKET KEYS makes the allocation loop stable.
+    # the input order; sorting the BUCKET KEYS makes every loop below stable.
     for bucket in buckets.values():
         bucket.sort(key=_order_key)
     ordered_keys = sorted(buckets)
+    # Round-robin order: larger strata first, ties broken lexically for
+    # determinism. Deliberately NOT plain lexical order — see pass 1.
+    rr_order = sorted(ordered_keys, key=lambda k: (-len(buckets[k]), k))
 
     allocation = {key: 0 for key in ordered_keys}
+    notes: list[str] = []
+    cap = int(size * max_cohort_share)
+    cohort_totals: dict[str, int] = {cohort: 0 for cohort in COHORTS}
+
+    def grant(key: tuple[str, str, str]) -> None:
+        allocation[key] += 1
+        cohort_totals[key[0]] = cohort_totals.get(key[0], 0) + 1
+
+    def revoke(key: tuple[str, str, str]) -> None:
+        allocation[key] -= 1
+        cohort_totals[key[0]] -= 1
+
+    # 1. floor — one slot at a time, so an insufficient budget spreads.
     remaining = size
+    progress = True
+    while remaining > 0 and progress:
+        progress = False
+        for key in rr_order:
+            if remaining <= 0:
+                break
+            if allocation[key] >= floor or allocation[key] >= len(buckets[key]):
+                continue
+            grant(key)
+            remaining -= 1
+            progress = True
 
-    # 1. floor
-    for key in ordered_keys:
-        take = min(floor, len(buckets[key]), remaining)
-        allocation[key] = take
-        remaining -= take
-        if remaining <= 0:
-            break
-
-    # 2. proportional over what is left in each bucket
+    # 2. proportional over remaining headroom.
     if remaining > 0:
         headroom = {k: len(buckets[k]) - allocation[k] for k in ordered_keys}
         total = sum(headroom.values())
         if total > 0:
             for key in ordered_keys:
                 extra = min(headroom[key], int(remaining * headroom[key] / total))
-                allocation[key] += extra
-            # Integer division leaves a remainder; hand it to the largest buckets
-            # first, deterministically.
+                for _ in range(extra):
+                    grant(key)
+            # Integer division leaves a remainder; hand it out deterministically,
+            # largest remaining headroom first.
             spent = sum(allocation.values())
-            for key in sorted(ordered_keys, key=lambda k: (-headroom[k], k)):
+            for key in sorted(
+                ordered_keys, key=lambda k: (-(len(buckets[k]) - allocation[k]), k)
+            ):
                 if spent >= size:
                     break
                 if allocation[key] < len(buckets[key]):
-                    allocation[key] += 1
+                    grant(key)
                     spent += 1
 
-    # 3. cohort cap — 2019 is half the corpus and would otherwise be half the
-    #    sample, which would make every "is 2019 worse?" comparison a comparison
-    #    of 2019 with a rounding error.
-    cap = int(size * max_cohort_share)
-    for cohort in COHORTS:
+    # 3. cohort cap.
+    for cohort in sorted({k[0] for k in ordered_keys}):
         keys_in = [k for k in ordered_keys if k[0] == cohort]
-        over = sum(allocation[k] for k in keys_in) - cap
-        # Trim the largest allocations first, never below the floor, so the cap
-        # costs breadth nothing.
-        while over > 0:
+        while cohort_totals.get(cohort, 0) > cap:
+            # Trim above the floor first, so the cap costs depth before breadth.
+            # Only when nothing is above the floor does it cost breadth — and it
+            # says so, because a cap and a floor CAN genuinely conflict (one
+            # cohort with more than cap/floor strata) and silently keeping the
+            # floor would mean silently breaching the cap.
             trimmable = [k for k in keys_in if allocation[k] > floor]
             if not trimmable:
+                trimmable = [k for k in keys_in if allocation[k] > 0]
+                if trimmable:
+                    notes.append(
+                        f"cohort {cohort}: the {max_cohort_share:.0%} cap forced "
+                        f"strata below the floor of {floor}"
+                    )
+            if not trimmable:
+                notes.append(f"cohort {cohort}: cannot be trimmed to the cap")
                 break
-            biggest = max(trimmable, key=lambda k: (allocation[k], k))
-            allocation[biggest] -= 1
-            over -= 1
+            revoke(max(trimmable, key=lambda k: (allocation[k], k)))
+
+    # 4. redistribution — give back what the cap took, to cohorts with room.
+    spent = sum(allocation.values())
+    progress = True
+    while spent < size and progress:
+        progress = False
+        for key in rr_order:
+            if spent >= size:
+                break
+            if allocation[key] >= len(buckets[key]):
+                continue
+            if cohort_totals.get(key[0], 0) >= cap:
+                continue
+            grant(key)
+            spent += 1
+            progress = True
+    if spent < size:
+        exhausted = all(
+            allocation[k] >= len(buckets[k]) for k in ordered_keys
+        )
+        notes.append(
+            "corpus exhausted before the requested size"
+            if exhausted
+            else f"every cohort reached the {max_cohort_share:.0%} cap "
+                 f"({cap} of {size}) before the requested size"
+        )
 
     keys: list[str] = []
     strata: list[Stratum] = []
@@ -2482,7 +2713,13 @@ def stratified_sample(
                 weak=len(chosen) < WEAK_THRESHOLD,
             )
         )
-    return Sample(keys=tuple(keys), strata=tuple(strata), requested=size)
+    return Sample(
+        keys=tuple(keys),
+        strata=tuple(strata),
+        requested=size,
+        shortfall=max(size - len(keys), 0),
+        notes=tuple(notes),
+    )
 ```
 
 - [ ] **Step 4: Run the tests to verify they pass**
@@ -2491,13 +2728,480 @@ def stratified_sample(
 .venv/bin/pytest tests/test_nrb_sampling.py -q
 ```
 
-Expected: PASS, 15 tests.
+Expected: PASS, 21 tests.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add app/nrb/sampling.py tests/test_nrb_sampling.py
 git commit -m "feat(nrb): deterministic stratified corpus sampling (Phase 6A)"
+```
+
+---
+
+### Task 7A: The benchmark manifest (`app/nrb/manifest.py`, `scripts/nrb_sample.py`)
+
+The sample is drawn **once**, from the full catalog, and written down. Everything
+downstream names that file.
+
+**Files:**
+- Create: `app/nrb/manifest.py`
+- Create: `scripts/nrb_sample.py`
+- Test: `tests/test_nrb_manifest.py`
+
+**Interfaces:**
+- Consumes: `sampling.stratified_sample`, `sampling.Sample`, `catalog.load_sample_rows`.
+- Produces: `MANIFEST_VERSION: str`, `Manifest` (frozen dataclass: `version`, `drawn_at`, `requested`, `shortfall`, `sampler: dict`, `catalog_counts: dict`, `strata: tuple[dict, ...]`, `notes: tuple[str, ...]`, `entries: tuple[dict, ...]`), `Manifest.keys() -> tuple[str, ...]`, `build_manifest(rows, sample, *, drawn_at, catalog_counts) -> Manifest`, `write_manifest(manifest, path) -> None`, `read_manifest(path) -> Manifest`, `MANIFEST_MAX_KEYS`.
+
+- [ ] **Step 1: Write the failing tests**
+
+Create `tests/test_nrb_manifest.py`:
+
+```python
+"""The benchmark manifest — drawn once, then named by everything downstream."""
+
+import json
+
+import pytest
+
+from app.nrb import manifest as manifest_module
+from app.nrb import sampling
+
+ROWS = [
+    {
+        "comparison_key": f"https://www.nrb.org.np/uploads/doc-{i}.pdf",
+        "resource_type": "pdf" if i % 3 else "spreadsheet",
+        "fetch_status": "pending",
+        "content_sha256": None,
+        "document_type": "circular" if i % 2 else "directive",
+        "owner": "bfr" if i % 4 else "red",
+        "year": 2019 if i % 5 else 2024,
+    }
+    for i in range(200)
+]
+
+
+def _manifest(size=40):
+    sample = sampling.stratified_sample(ROWS, size=size)
+    return manifest_module.build_manifest(
+        ROWS, sample,
+        drawn_at="2026-08-15T00:00:00+00:00",
+        catalog_counts={"files": 200, "fetched": 0},
+    )
+
+
+def test_every_entry_carries_the_exact_key_and_its_strata():
+    entry = _manifest().entries[0]
+    assert entry["comparison_key"].startswith("https://")
+    for field in ("year", "document_type", "resource_type", "owner", "stratum"):
+        assert field in entry
+
+
+def test_the_manifest_records_how_it_was_drawn():
+    m = _manifest()
+    assert m.sampler["floor"] == 5
+    assert m.sampler["max_cohort_share"] == 0.30
+    assert m.requested == 40
+    assert m.drawn_at == "2026-08-15T00:00:00+00:00"
+    assert m.catalog_counts["files"] == 200
+
+
+def test_keys_match_the_entries_exactly_and_are_unique():
+    m = _manifest()
+    assert len(m.keys()) == len(m.entries) == len(set(m.keys()))
+
+
+def test_it_round_trips_through_disk_unchanged(tmp_path):
+    m = _manifest()
+    path = tmp_path / "manifest.json"
+    manifest_module.write_manifest(m, path)
+    assert manifest_module.read_manifest(path) == m
+
+
+def test_the_file_is_human_readable_and_stably_ordered(tmp_path):
+    path = tmp_path / "manifest.json"
+    manifest_module.write_manifest(_manifest(), path)
+    first = path.read_text(encoding="utf-8")
+    manifest_module.write_manifest(_manifest(), path)
+    assert path.read_text(encoding="utf-8") == first     # byte-identical rewrite
+    payload = json.loads(first)
+    assert payload["version"] == manifest_module.MANIFEST_VERSION
+
+
+def test_devanagari_keys_survive_the_round_trip(tmp_path):
+    rows = [
+        {
+            "comparison_key": "https://www.nrb.org.np/uploads/आगलागी-२०७४.pdf",
+            "resource_type": "pdf", "fetch_status": "pending",
+            "content_sha256": None, "document_type": "circular",
+            "owner": "bfr", "year": 2024,
+        }
+    ]
+    sample = sampling.stratified_sample(rows, size=1)
+    m = manifest_module.build_manifest(
+        rows, sample, drawn_at="2026-08-15T00:00:00+00:00", catalog_counts={}
+    )
+    path = tmp_path / "m.json"
+    manifest_module.write_manifest(m, path)
+    assert "आगलागी" in path.read_text(encoding="utf-8")   # not \uXXXX escaped
+    assert manifest_module.read_manifest(path).keys() == m.keys()
+
+
+def test_a_manifest_over_the_cap_is_refused(tmp_path):
+    rows = [
+        {
+            "comparison_key": f"https://www.nrb.org.np/uploads/{i}.pdf",
+            "resource_type": "pdf", "fetch_status": "pending",
+            "content_sha256": None, "document_type": "circular",
+            "owner": "bfr", "year": 2024,
+        }
+        for i in range(manifest_module.MANIFEST_MAX_KEYS + 10)
+    ]
+    sample = sampling.stratified_sample(
+        rows, size=manifest_module.MANIFEST_MAX_KEYS + 10, max_cohort_share=1.0
+    )
+    with pytest.raises(ValueError, match="cap"):
+        manifest_module.build_manifest(
+            rows, sample, drawn_at="2026-08-15T00:00:00+00:00", catalog_counts={}
+        )
+
+
+def test_a_shortfall_and_its_notes_are_carried_into_the_manifest():
+    sample = sampling.stratified_sample(ROWS, size=5000)
+    m = manifest_module.build_manifest(
+        ROWS, sample, drawn_at="2026-08-15T00:00:00+00:00", catalog_counts={}
+    )
+    assert m.shortfall > 0
+    assert m.notes
+
+
+def test_reading_a_manifest_with_an_unknown_version_is_refused(tmp_path):
+    path = tmp_path / "bad.json"
+    path.write_text(json.dumps({"version": "manifest-99", "entries": []}),
+                    encoding="utf-8")
+    with pytest.raises(ValueError, match="version"):
+        manifest_module.read_manifest(path)
+```
+
+- [ ] **Step 2: Run the tests to verify they fail**
+
+```bash
+.venv/bin/pytest tests/test_nrb_manifest.py -q
+```
+
+Expected: `ModuleNotFoundError: app.nrb.manifest`.
+
+- [ ] **Step 3: Write `app/nrb/manifest.py`**
+
+```python
+"""The benchmark manifest: the Phase 6A cohort, drawn once and written down.
+
+WHY A FILE, AND NOT A FLAG
+    The first draft of this plan fetched the sample with broad
+    `--section`/`--year`/`--limit` passes and then re-sampled whatever landed on
+    disk. That is wrong twice over. Phase 5 selects `pending` rows in **id order**
+    within a scope, and catalog id order is the order REST paged the post types —
+    so "circulars from 2019, limit 60" returns the 60 with the lowest ids, and
+    stratifying over that measures the id order rather than the corpus. It is also
+    not reproducible: any later fetch changes what is on disk and therefore what
+    gets re-sampled, so two runs of the same profile would describe two different
+    cohorts.
+
+    So the sample is drawn ONCE from the full catalog, saved with each file's
+    exact `comparison_key` and its strata, and every later step — fetch, extract,
+    calibrate — names that file. The manifest is committed, which is what makes
+    the published profile something a reader can re-run rather than take on
+    trust.
+
+WHAT IS RECORDED, AND WHY EACH PART
+    * `entries` — the exact keys, each with `year`, `document_type`,
+      `resource_type`, `owner` and its `stratum`. The strata are stored rather
+      than recomputed because the catalog moves: a source re-typed by a later sync
+      must not silently re-label a cohort that has already been profiled.
+    * `sampler` — size, floor, cohort cap, sampler version. Reproducing the draw
+      needs the parameters, not just the result.
+    * `catalog_counts` + `drawn_at` — what the corpus looked like when the sample
+      was taken, so a reader can tell whether the corpus has moved since.
+    * `shortfall` + `notes` — carried verbatim from the sampler. A cohort that
+      could not be filled is a caveat on every number downstream, and it belongs
+      with the cohort rather than in someone's memory.
+
+    `comparison_key` is the identity, not `content_sha256`: the sample is drawn
+    BEFORE anything is fetched, when the hash does not exist yet.
+"""
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Sequence
+
+from .sampling import Sample, year_cohort
+
+__all__ = [
+    "MANIFEST_MAX_KEYS",
+    "MANIFEST_VERSION",
+    "Manifest",
+    "build_manifest",
+    "read_manifest",
+    "write_manifest",
+]
+
+# Bumped if the file's shape changes. `read_manifest` refuses anything else
+# rather than half-understanding it — a manifest is a benchmark definition, and
+# quietly misreading one would silently redefine the benchmark.
+MANIFEST_VERSION = "manifest-1"
+
+# A manifest is a benchmark cohort, not a back door around the scope-is-required
+# rule. 5,000 keys is ~12x the planned 400-file sample and far under the 18,263
+# file corpus. Mirrors `catalog.MANIFEST_MAX_KEYS`.
+MANIFEST_MAX_KEYS = 5000
+
+
+@dataclass(frozen=True)
+class Manifest:
+    version: str
+    drawn_at: str
+    requested: int
+    shortfall: int
+    sampler: dict[str, Any]
+    catalog_counts: dict[str, Any]
+    strata: tuple[dict[str, Any], ...]
+    notes: tuple[str, ...]
+    entries: tuple[dict[str, Any], ...]
+
+    def keys(self) -> tuple[str, ...]:
+        """The exact `comparison_key` values this cohort consists of."""
+        return tuple(entry["comparison_key"] for entry in self.entries)
+
+
+def build_manifest(
+    rows: Sequence[dict[str, Any]],
+    sample: Sample,
+    *,
+    drawn_at: str,
+    catalog_counts: dict[str, Any],
+    floor: int = 5,
+    max_cohort_share: float = 0.30,
+) -> Manifest:
+    """Freeze a drawn `Sample` into a durable cohort definition."""
+    if len(sample.keys) > MANIFEST_MAX_KEYS:
+        raise ValueError(
+            f"manifest would name {len(sample.keys)} keys; the cap is "
+            f"{MANIFEST_MAX_KEYS}. A manifest is a benchmark cohort, not a way "
+            f"to fetch the whole corpus."
+        )
+    by_key = {row["comparison_key"]: row for row in rows}
+    entries = []
+    for key in sample.keys:
+        row = by_key[key]
+        cohort = year_cohort(row.get("year"))
+        document_type = row.get("document_type") or "untyped"
+        resource_type = row.get("resource_type") or "unknown"
+        entries.append(
+            {
+                "comparison_key": key,
+                "year": row.get("year"),
+                "document_type": document_type,
+                "resource_type": resource_type,
+                "owner": row.get("owner"),
+                # Stored, not recomputed later: a source re-typed by a future sync
+                # must not silently re-label an already-profiled cohort.
+                "stratum": f"{cohort}/{document_type}/{resource_type}",
+            }
+        )
+    return Manifest(
+        version=MANIFEST_VERSION,
+        drawn_at=drawn_at,
+        requested=sample.requested,
+        shortfall=sample.shortfall,
+        sampler={
+            "size": sample.requested,
+            "floor": floor,
+            "max_cohort_share": max_cohort_share,
+            "sampler_version": MANIFEST_VERSION,
+        },
+        catalog_counts=dict(catalog_counts),
+        strata=tuple(
+            {
+                "cohort": s.cohort,
+                "document_type": s.document_type,
+                "resource_type": s.resource_type,
+                "available": s.available,
+                "selected": s.selected,
+                "weak": s.weak,
+            }
+            for s in sample.strata
+        ),
+        notes=tuple(sample.notes),
+        entries=tuple(entries),
+    )
+
+
+def write_manifest(manifest: Manifest, path: str | Path) -> None:
+    """Write the manifest as indented, non-escaped JSON.
+
+    `ensure_ascii=False` so NRB's Devanagari filenames stay readable in the
+    committed file rather than becoming a wall of `\uXXXX`. `sort_keys=True` and
+    a fixed indent so re-writing an unchanged manifest is byte-identical and a
+    real change diffs cleanly.
+    """
+    payload = {
+        "version": manifest.version,
+        "drawn_at": manifest.drawn_at,
+        "requested": manifest.requested,
+        "shortfall": manifest.shortfall,
+        "sampler": manifest.sampler,
+        "catalog_counts": manifest.catalog_counts,
+        "strata": list(manifest.strata),
+        "notes": list(manifest.notes),
+        "entries": list(manifest.entries),
+    }
+    Path(path).write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def read_manifest(path: str | Path) -> Manifest:
+    """Load a manifest, refusing a version this code does not define."""
+    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    version = payload.get("version")
+    if version != MANIFEST_VERSION:
+        raise ValueError(
+            f"manifest version {version!r} is not {MANIFEST_VERSION!r} — refusing "
+            f"to half-read a benchmark definition"
+        )
+    entries = tuple(payload.get("entries") or ())
+    if len(entries) > MANIFEST_MAX_KEYS:
+        raise ValueError(
+            f"manifest names {len(entries)} keys; the cap is {MANIFEST_MAX_KEYS}"
+        )
+    return Manifest(
+        version=version,
+        drawn_at=payload.get("drawn_at", ""),
+        requested=int(payload.get("requested", 0)),
+        shortfall=int(payload.get("shortfall", 0)),
+        sampler=payload.get("sampler") or {},
+        catalog_counts=payload.get("catalog_counts") or {},
+        strata=tuple(payload.get("strata") or ()),
+        notes=tuple(payload.get("notes") or ()),
+        entries=entries,
+    )
+```
+
+- [ ] **Step 4: Write `scripts/nrb_sample.py`**
+
+```python
+#!/usr/bin/env python
+"""Draw the Phase 6A benchmark cohort ONCE and write it to a manifest.
+
+    .venv/bin/python scripts/nrb_sample.py --size 400 --out docs/nrb/phase6a-manifest.json
+
+Separate from `nrb_extract.py` on purpose: sampling and extraction must not be the
+same command, or a second profiling run would silently re-draw the cohort and the
+two runs' numbers would not be comparable. This writes a file; everything else
+reads it.
+
+Refuses to overwrite an existing manifest without `--force`, for the same reason.
+
+Makes NO network request and downloads nothing — it reads the catalog and writes
+JSON. `scripts/nrb_fetch.py --manifest <path>` is what downloads the cohort.
+"""
+
+from __future__ import annotations
+
+import argparse
+import asyncio
+import os
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from app.nrb import catalog, sampling  # noqa: E402
+from app.nrb.manifest import build_manifest, write_manifest  # noqa: E402
+
+
+async def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--size", type=int, default=400,
+                        help="how many files the cohort should contain")
+    parser.add_argument("--out", required=True, metavar="PATH",
+                        help="where to write the manifest")
+    parser.add_argument("--floor", type=int, default=5,
+                        help="minimum files per non-empty stratum")
+    parser.add_argument("--max-cohort-share", type=float, default=0.30,
+                        help="no year cohort may exceed this share of the sample")
+    parser.add_argument("--section", action="append", default=None, metavar="TYPE",
+                        help="restrict the DRAW to these document types; repeatable")
+    parser.add_argument("--force", action="store_true",
+                        help="overwrite an existing manifest (re-draws the cohort)")
+    args = parser.parse_args(argv)
+
+    out = Path(args.out)
+    if out.exists() and not args.force:
+        print(
+            f"refusing to overwrite {out}: a manifest is drawn ONCE, and "
+            f"re-drawing it makes the new profile incomparable with the old one. "
+            f"Pass --force if that is really what you want.",
+            file=sys.stderr,
+        )
+        return 2
+
+    from app.db.session import SessionLocal
+
+    async with SessionLocal() as session:
+        rows = await catalog.load_sample_rows(session, sections=args.section)
+        counts = await catalog.catalog_counts(session)
+
+    sample = sampling.stratified_sample(
+        rows, size=args.size, floor=args.floor,
+        max_cohort_share=args.max_cohort_share,
+    )
+    manifest = build_manifest(
+        rows, sample,
+        drawn_at=datetime.now(timezone.utc).isoformat(),
+        catalog_counts=counts,
+        floor=args.floor,
+        max_cohort_share=args.max_cohort_share,
+    )
+    out.parent.mkdir(parents=True, exist_ok=True)
+    write_manifest(manifest, out)
+
+    print(f"drew {len(manifest.entries)} of {args.size} requested -> {out}")
+    if manifest.shortfall:
+        print(f"SHORTFALL {manifest.shortfall}: " + "; ".join(manifest.notes))
+    weak = [s for s in manifest.strata if s["weak"] and s["selected"]]
+    print(f"{len(manifest.strata)} strata, {len(weak)} weak (n < 10)")
+    for stratum in sorted(manifest.strata, key=lambda s: (-s["selected"], s["cohort"])):
+        if stratum["selected"]:
+            flag = "  WEAK" if stratum["weak"] else ""
+            print(f"  {stratum['cohort']:<10} {stratum['document_type']:<18} "
+                  f"{stratum['resource_type']:<12} "
+                  f"{stratum['selected']:>4}/{stratum['available']:<6}{flag}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(asyncio.run(main()))
+```
+
+- [ ] **Step 5: Run the tests to verify they pass**
+
+```bash
+.venv/bin/pytest tests/test_nrb_manifest.py -q
+```
+
+Expected: PASS, 9 tests.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add app/nrb/manifest.py scripts/nrb_sample.py tests/test_nrb_manifest.py
+git commit -m "feat(nrb): benchmark manifest — the cohort is drawn once (Phase 6A)"
 ```
 
 ---
@@ -2513,7 +3217,8 @@ Mirrors `app/nrb/fetch.py`: advisory lock, batched commits, failure isolation, r
 
 **Interfaces:**
 - Consumes: `catalog.select_extract_targets`, `catalog.record_extractions`, `catalog.extraction_counts`, `catalog.load_sample_rows`, `extraction.extract_file`, `extraction.EXTRACTOR_VERSION`, `filestore.resolve_path`, `sniff.family_for`, `sampling.stratified_sample`, `locks.advisory_lock`.
-- Produces: `ExtractResult` (dataclass: `status`, `counters: dict[str, int]`, `notes: dict`, `counts: dict[str, int]`, `scope: dict`, `dry_run: bool`, `duration_seconds: float`, `samples: list[dict]`, `.ok`), `run_extract(**kwargs) -> ExtractResult`, `ExtractBusy`.
+- Produces: `ExtractResult` (dataclass: `status`, `counters: dict[str, int]`, `notes: dict`, `counts: dict[str, int]`, `scope: dict`, `strata: list[dict]`, `dry_run: bool`, `duration_seconds: float`, `samples: list[dict]`, `.ok`), `run_extract(*, sections, owners, resource_types, years, keys, limit, force, manifest_strata, dry_run, engine, session_factory) -> ExtractResult`, `ExtractBusy`.
+- Also produces (Task 6 addendum): `catalog.count_unfetched(session, keys: Sequence[str]) -> int` — how many manifest keys are not yet `fetched`, so a partly-downloaded cohort is stated rather than silently profiled.
 
 - [ ] **Step 1: Add the lock key**
 
@@ -2564,7 +3269,7 @@ from typing import Any, Sequence
 
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
-from . import catalog, extraction, filestore, sampling, sniff
+from . import catalog, extraction, filestore, sniff
 from .catalog import ExtractTarget
 from .locks import EXTRACT_LOCK_KEY, LockBusy, advisory_lock
 from .models import FETCH_RUN_COMPLETED, FETCH_RUN_FAILED, FETCH_RUN_PARTIAL
@@ -2708,9 +3413,10 @@ async def run_extract(
     owners: Sequence[str] | None = None,
     resource_types: Sequence[str] | None = None,
     years: Sequence[int] | None = None,
-    sample: int | None = None,
+    keys: Sequence[str] | None = None,
     limit: int | None = None,
     force: bool = False,
+    manifest_strata: Sequence[dict[str, Any]] | None = None,
     dry_run: bool = False,
     engine: AsyncEngine | None = None,
     session_factory: async_sessionmaker[AsyncSession] | None = None,
@@ -2732,43 +3438,36 @@ async def run_extract(
         "owners": list(owners or []),
         "resource_types": list(resource_types or []),
         "years": list(years or []),
-        "sample": sample,
+        # The COUNT, not the keys: the manifest file is the durable record, and a
+        # 400-element list in every scope blob would make the log unreadable.
+        "manifest_keys": len(keys or []),
         "limit": limit,
         "force": force,
         "extractor_version": extraction.EXTRACTOR_VERSION,
     }
     errors: list[str] = []
     samples: dict[str, list[dict[str, Any]]] = {}
-    strata: list[dict[str, Any]] = []
+    # Carried straight from the manifest when there is one — the strata were
+    # decided at draw time and must not be recomputed from what got fetched.
+    strata: list[dict[str, Any]] = list(manifest_strata or [])
 
     async with advisory_lock(engine, EXTRACT_LOCK_KEY, what="NRB extract"):
         async with session_factory() as session:
-            keys: list[str] | None = None
-            if sample:
-                rows = await catalog.load_sample_rows(
-                    session, sections=sections, resource_types=resource_types
-                )
-                # Only blobs already on disk can be extracted; sampling over the
-                # whole catalog and then intersecting would silently shrink every
-                # stratum without saying so.
-                fetched = [r for r in rows if r.get("content_sha256")]
-                chosen = sampling.stratified_sample(fetched, size=sample)
-                keys = [
-                    r["content_sha256"]
-                    for r in fetched
-                    if r["comparison_key"] in set(chosen.keys)
-                ]
-                strata = [
-                    {
-                        "cohort": s.cohort,
-                        "document_type": s.document_type,
-                        "resource_type": s.resource_type,
-                        "available": s.available,
-                        "selected": s.selected,
-                        "weak": s.weak,
-                    }
-                    for s in chosen.strata
-                ]
+            # The cohort is NEVER re-drawn here. `keys` arrives from a manifest
+            # that was drawn once against the full catalog (`app/nrb/manifest.py`);
+            # re-sampling whatever happens to be on disk would make two runs of the
+            # same profile describe two different cohorts.
+            if keys:
+                unfetched = await catalog.count_unfetched(session, keys)
+                if unfetched:
+                    # Not fatal — a partly-fetched manifest is a legitimate state
+                    # mid-download — but it must be stated, because every
+                    # percentage downstream is over the cohort that WAS extracted.
+                    logger.warning(
+                        "NRB extract: %d of %d manifest files are not on disk; "
+                        "run scripts/nrb_fetch.py --manifest first for full coverage",
+                        unfetched, len(keys),
+                    )
 
             targets = await catalog.select_extract_targets(
                 session,
@@ -2776,7 +3475,7 @@ async def run_extract(
                 owners=owners,
                 resource_types=resource_types,
                 years=years,
-                keys=keys,
+                keys=list(keys) if keys else None,
                 limit=limit,
                 force=force,
                 extractor_version=extraction.EXTRACTOR_VERSION,
@@ -3467,7 +4166,26 @@ def test_limit_is_passed_through(monkeypatch):
     assert seen["limit"] == 17
 
 
-def test_sample_is_a_scope_on_its_own(monkeypatch):
+def test_a_manifest_is_a_scope_on_its_own_and_its_keys_are_passed_through(
+    monkeypatch, tmp_path
+):
+    from app.nrb import manifest as manifest_module, sampling
+
+    rows = [
+        {"comparison_key": f"https://www.nrb.org.np/u/{i}.pdf", "resource_type": "pdf",
+         "fetch_status": "fetched", "content_sha256": f"{i:064d}",
+         "document_type": "circular", "owner": "bfr", "year": 2024}
+        for i in range(12)
+    ]
+    path = tmp_path / "m.json"
+    manifest_module.write_manifest(
+        manifest_module.build_manifest(
+            rows, sampling.stratified_sample(rows, size=6),
+            drawn_at="2026-08-15T00:00:00+00:00", catalog_counts={},
+        ),
+        path,
+    )
+
     seen = {}
 
     async def fake(**kwargs):
@@ -3476,8 +4194,17 @@ def test_sample_is_a_scope_on_its_own(monkeypatch):
 
     monkeypatch.setattr(cli, "run_extract", fake)
     monkeypatch.setattr(cli, "load_profile_for", lambda *a, **k: {})
-    assert asyncio.run(cli.main(["--sample", "400", "--dry-run"])) == 0
-    assert seen["sample"] == 400
+    assert asyncio.run(cli.main(["--manifest", str(path), "--dry-run"])) == 0
+    assert len(seen["keys"]) == 6
+    assert all(k.startswith("https://") for k in seen["keys"])
+    # The strata travel with the cohort; they are NOT recomputed downstream.
+    assert seen["manifest_strata"]
+
+
+def test_the_cli_never_re_draws_a_cohort(monkeypatch):
+    """There is no --sample flag. Sampling is scripts/nrb_sample.py's job alone."""
+    with pytest.raises(SystemExit):
+        cli._parse_args(["--sample", "400"])
 
 
 def test_year_and_section_compose(monkeypatch):
@@ -3544,8 +4271,8 @@ SCOPE IS REQUIRED — THERE IS NO DEFAULT
     # the regulatory core
     .venv/bin/python scripts/nrb_extract.py --core
 
-    # a deterministic, stratified, representative sample (what the profile wants)
-    .venv/bin/python scripts/nrb_extract.py --sample 400
+    # the benchmark cohort, drawn once by scripts/nrb_sample.py (what the profile wants)
+    .venv/bin/python scripts/nrb_extract.py --manifest docs/nrb/phase6a-manifest.json
 
     # a bounded smoke test
     .venv/bin/python scripts/nrb_extract.py --section circular --limit 25 -v
@@ -3584,6 +4311,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.nrb.extract import ExtractBusy, run_extract  # noqa: E402
 from app.nrb.extraction import EXTRACTOR_VERSION  # noqa: E402
+from app.nrb.manifest import read_manifest  # noqa: E402
 from app.nrb.profile import load_profile  # noqa: E402
 from app.nrb.report import render_extraction, summarize_extraction  # noqa: E402
 
@@ -3620,9 +4348,10 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     scope.add_argument("--year", action="append", type=int, default=None,
                        metavar="YYYY", help="restrict to this publication year; "
                                             "repeatable")
-    scope.add_argument("--sample", type=int, default=None, metavar="N",
-                       help="a deterministic stratified sample of N fetched blobs "
-                            "across year cohort, document type and format")
+    scope.add_argument("--manifest", default=None, metavar="PATH",
+                       help="extract exactly the benchmark cohort named in a "
+                            "manifest written by scripts/nrb_sample.py. The cohort "
+                            "is never re-drawn here.")
     scope.add_argument("--limit", type=int, default=None, metavar="N",
                        help="extract at most N blobs (stable order, so it resumes)")
     scope.add_argument("--all", action="store_true",
@@ -3654,14 +4383,27 @@ async def main(argv: list[str] | None = None) -> int:
     sections = list(dict.fromkeys(sections))
 
     if not (sections or args.owner or args.resource_type or args.year
-            or args.sample or args.limit or args.all):
+            or args.manifest or args.limit or args.all):
         print(
             "refusing to start: no scope given. Extraction is CPU work over up to "
             "18.3k blobs, so a slice must be chosen explicitly — try "
-            "--sample 400, --core --dry-run, or --all if you really mean all of it.",
+            "--manifest docs/nrb/phase6a-manifest.json, --core --dry-run, or "
+            "--all if you really mean all of it.",
             file=sys.stderr,
         )
         return 2
+
+    manifest_keys = None
+    manifest_strata = None
+    if args.manifest:
+        manifest = read_manifest(args.manifest)
+        manifest_keys = manifest.keys()
+        manifest_strata = list(manifest.strata)
+        print(
+            f"manifest: {len(manifest_keys)} files drawn {manifest.drawn_at}"
+            + (f" (SHORTFALL {manifest.shortfall})" if manifest.shortfall else ""),
+            file=sys.stderr,
+        )
 
     try:
         result = await run_extract(
@@ -3669,9 +4411,10 @@ async def main(argv: list[str] | None = None) -> int:
             owners=args.owner,
             resource_types=args.resource_type,
             years=args.year,
-            sample=args.sample,
+            keys=manifest_keys,
             limit=args.limit,
             force=args.force,
+            manifest_strata=manifest_strata,
             dry_run=args.dry_run,
         )
     except ExtractBusy as exc:
@@ -3703,7 +4446,7 @@ if __name__ == "__main__":
 .venv/bin/pytest tests/test_nrb_extract_cli.py -q
 ```
 
-Expected: PASS, 7 tests. If `load_profile_for` is called on the dry-run path the monkeypatch is unnecessary but harmless — leave it, it documents the seam.
+Expected: PASS, 8 tests. If `load_profile_for` is called on the dry-run path the monkeypatch is unnecessary but harmless — leave it, it documents the seam.
 
 - [ ] **Step 5: Verify the real CLI refuses and dry-runs**
 
@@ -3724,20 +4467,29 @@ git commit -m "feat(nrb): scripts/nrb_extract.py — scope-required extraction C
 
 ---
 
-### Task 11: The Docling calibration
+### Task 11: The Docling calibration — extraction vs extraction
 
-Turns "pypdf is a fair proxy for the native extraction question" from an assertion into a measurement. Worker-only dependency, imported inside the function.
+Turns "pypdf is a fair proxy" from an assertion into a measurement. Worker-only dependency, imported inside the function.
 
 **Files:**
-- Modify: `app/nrb/extraction.py` (append `docling_status`)
+- Modify: `app/nrb/extraction.py` (append the Docling adapter)
 - Create: `scripts/nrb_calibrate.py`
-- Test: `tests/test_nrb_extraction.py` (append — the import-scope assertion), plus the existing `tests/test_rag_parsing_docling.py` as the regression gate.
+- Test: `tests/test_nrb_extraction.py` (append), plus `tests/test_rag_parsing_docling.py` as the regression gate.
 
 **Interfaces:**
-- Consumes: `app.rag.parsing._parse_with_docling`, `app.rag.parsing.ParseError` (read-only; `parsing.py` is **not** modified).
-- Produces: `extraction.docling_status(path: Path) -> tuple[str, str]` returning `(status, evidence)` in `quality.STATUSES`.
+- Consumes: `app.rag.parsing._docling_converter`, `app.rag.parsing._pdf_pipeline_options` (read-only; `parsing.py` is **not** modified).
+- Produces: `extraction.docling_pipeline_is_native() -> tuple[bool, str]`, `extraction.docling_extract(path: Path) -> ExtractionResult`.
 
-- [ ] **Step 1: Write the failing test**
+**The instrument, and why the first draft was wrong.** The first draft compared
+pypdf against `parsing.parse_to_chunks`. That is the RAG *pipeline*: Docling, then
+`merge_blocks`, then `drop_small_blocks`, then front-matter skipping, then
+chunking. A disagreement could therefore come from RAG's chunk filtering rather
+than from what Docling read off the page, and the number would not mean what it
+claimed to. This task compares **extraction with extraction**: Docling's own item
+stream, no filtering, run through the *same* `quality.measure_text` /
+`quality.measure_pages` / `quality.classify` as pypdf's output.
+
+- [ ] **Step 1: Write the failing tests**
 
 Append to `tests/test_nrb_extraction.py`:
 
@@ -3761,19 +4513,57 @@ def test_docling_is_not_imported_when_the_nrb_extraction_module_loads():
     assert proc.returncode == 0, proc.stderr
 
 
-def test_docling_status_maps_a_clean_pdf_to_extracted(tmp_path):
+def test_the_shared_docling_pipeline_is_still_cpu_and_ocr_off():
+    """The guard that makes the calibration trustworthy AND keeps Phase 6A honest.
+
+    The adapter reuses `app/rag/parsing`'s converter rather than building its own,
+    so if that pinning ever changes, the calibration would quietly start OCRing —
+    which Phase 6A forbids outright. This fails loudly instead.
+    """
     pytest.importorskip("docling")
-    status, evidence = extraction.docling_status(
-        _pdf(tmp_path, ["Nepal Rastra Bank circular for all licensed institutions"] * 2)
-    )
-    assert status in quality.STATUSES
-    assert evidence
+    ok, evidence = extraction.docling_pipeline_is_native()
+    assert ok, evidence
 
 
-def test_docling_status_maps_a_textless_pdf_to_needs_ocr(tmp_path):
+def test_docling_extract_returns_the_same_result_shape_as_pypdf(tmp_path):
     pytest.importorskip("docling")
-    status, _ = extraction.docling_status(_pdf(tmp_path, ["", "", ""]))
-    assert status == quality.STATUS_NEEDS_OCR
+    path = _pdf(tmp_path, ["Nepal Rastra Bank circular for all licensed banks"] * 2)
+    native = extraction.extract_file(path, family="pdf", extension="pdf")
+    docling = extraction.docling_extract(path)
+    assert docling.parser == "docling"
+    assert docling.status in quality.STATUSES
+    # Same fields, so the comparison is like with like.
+    assert set(docling.metrics) & set(native.metrics)
+    assert docling.char_count > 0
+
+
+def test_docling_extract_maps_a_textless_pdf_to_needs_ocr(tmp_path):
+    pytest.importorskip("docling")
+    assert extraction.docling_extract(
+        _pdf(tmp_path, ["", "", ""])
+    ).status == quality.STATUS_NEEDS_OCR
+
+
+def test_docling_extract_does_not_apply_rag_chunk_filtering(tmp_path):
+    """A short document survives here even though the RAG pipeline drops it.
+
+    `parse_to_chunks` would raise ParseError("front matter or fragments") on a
+    document this small once `drop_small_blocks` has run. The calibration must
+    still see its text, or the comparison measures RAG's filter, not Docling.
+    """
+    pytest.importorskip("docling")
+    result = extraction.docling_extract(_pdf(tmp_path, ["Short notice."]))
+    assert result.status != quality.STATUS_FAILED
+    assert "Short" in result.text
+
+
+def test_a_corrupt_pdf_does_not_raise_out_of_docling_extract(tmp_path):
+    pytest.importorskip("docling")
+    path = tmp_path / "broken.pdf"
+    path.write_bytes(b"%PDF-1.4\ngarbage")
+    result = extraction.docling_extract(path)
+    assert result.status == quality.STATUS_FAILED
+    assert str(tmp_path) not in (result.error or "")
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
@@ -3782,85 +4572,162 @@ def test_docling_status_maps_a_textless_pdf_to_needs_ocr(tmp_path):
 .venv/bin/pytest tests/test_nrb_extraction.py -q -k docling
 ```
 
-Expected: `AttributeError: module 'app.nrb.extraction' has no attribute 'docling_status'`. The import-scope test should already pass — if it fails now, something in Task 4 imported docling at module scope and must be fixed.
+Expected: `AttributeError: module 'app.nrb.extraction' has no attribute 'docling_pipeline_is_native'`. The import-scope test should already pass — if it fails now, Task 4 imported docling at module scope and must be fixed first.
 
-- [ ] **Step 3: Append `docling_status` to `app/nrb/extraction.py`**
+- [ ] **Step 3: Append the Docling adapter to `app/nrb/extraction.py`**
 
 ```python
-def docling_status(path: Path) -> tuple[str, str]:
-    """What the RAG pipeline's parser would make of this PDF. Calibration only.
+# --------------------------------------------------------------------------- #
+# Calibration: what the OTHER engine makes of the same bytes.
+#
+# Not part of the profiling path. This exists so "pypdf is a fair proxy for the
+# native-extraction question" is a measured claim rather than an assertion — and
+# so the phase question "is native Docling sufficient?" has an answer.
+# --------------------------------------------------------------------------- #
+def docling_pipeline_is_native() -> tuple[bool, str]:
+    """Is the shared Docling pipeline still CPU-pinned with OCR off?
 
-    Phase 6A screens with pypdf because it is 20-40x faster per page on CPU and
-    reads the same embedded text layer (module docstring). This function is how
-    that claim stays honest rather than asserted: run both over a bounded sample
-    and report the AGREEMENT RATE. If Docling rescues files pypdf calls
-    `needs_ocr`, the screen is wrong and the number says so.
+    Two things depend on this. The calibration is only meaningful if both engines
+    read the same embedded text layer — Docling with OCR on would be measuring a
+    different question entirely. And Phase 6A forbids running OCR at all, so
+    reusing someone else's converter means checking what it is configured to do
+    rather than assuming.
 
-    Calls `app.rag.parsing` read-only through its public `parse_to_chunks`. That
-    module is NOT modified: its CPU/no-OCR pinning is load-bearing for department
-    RAG, and Phase 6A must not change department behaviour to make NRB convenient.
-
-    Docling is imported INSIDE `parsing`'s own branch, never at module scope here
-    — `test_docling_is_not_imported_when_the_nrb_extraction_module_loads` pins
-    that, because the API image must never load torch.
-
-    `parsing` raises two distinct `ParseError` messages that mean genuinely
-    different things, and the mapping preserves the distinction:
-
-      * "produced no text — a scanned PDF needs OCR"  -> needs_ocr
-      * "only front matter or fragments"              -> suspicious
-
-    Anything else is a parser failure.
+    Returns `(ok, evidence)` so the caller can print WHY it refused.
     """
-    from ..rag.parsing import ParseError, parse_to_chunks
+    from ..rag.parsing import _pdf_pipeline_options
+
+    options = _pdf_pipeline_options()
+    device = getattr(getattr(options, "accelerator_options", None), "device", None)
+    device_name = str(getattr(device, "value", device)).lower()
+    ocr = bool(getattr(options, "do_ocr", False))
+    return (not ocr and device_name == "cpu"), f"do_ocr={ocr}, device={device_name}"
+
+
+def _docling_pages(document) -> list[str]:
+    """Docling's item stream, grouped into per-page text. NO RAG filtering.
+
+    Deliberately does NOT go through `parsing.parse_to_chunks`: that applies
+    `merge_blocks`, `drop_small_blocks`, front-matter skipping and chunking on top
+    of Docling, so a disagreement with pypdf could come from RAG's filter rather
+    than from what Docling read off the page. Every item's text is kept, in
+    document order, placed on the page `item.prov[0].page_no` reports — which is
+    what makes `quality.measure_pages` applicable to both engines and the
+    scanned-PDF rules comparable.
+    """
+    pages: dict[int, list[str]] = {}
+    ordered: list[str] = []
+    for item, _level in document.iterate_items():
+        label = getattr(getattr(item, "label", None), "value", "") or ""
+        if label == "table":
+            try:
+                text = item.export_to_markdown(document).strip()
+            except Exception:  # noqa: BLE001 - a malformed table is not fatal
+                text = ""
+        else:
+            text = (getattr(item, "text", "") or "").strip()
+        if not text:
+            continue
+        prov = getattr(item, "prov", None) or []
+        page = prov[0].page_no if prov else 0
+        pages.setdefault(page, []).append(text)
+        ordered.append(text)
 
     try:
-        chunks = parse_to_chunks(
-            path, "pdf", max_chars=2000, overlap_chars=200
-        )
-    except ParseError as exc:
-        message = str(exc)
-        if "needs OCR" in message or "produced no text" in message:
-            return quality.STATUS_NEEDS_OCR, message
-        if "front matter or fragments" in message:
-            return quality.STATUS_SUSPICIOUS, message
-        return quality.STATUS_FAILED, message
-    except Exception as exc:  # noqa: BLE001 - a calibration must not kill a batch
-        return quality.STATUS_FAILED, type(exc).__name__
+        total = int(document.num_pages())
+    except Exception:  # noqa: BLE001 - not every docling version exposes it
+        total = max(pages) if pages else 0
+    if not total:
+        # No page metadata at all: fall back to one synthetic page, so the text
+        # metrics still apply and only the page rules are skipped.
+        return ["\n".join(ordered)] if ordered else []
+    # An empty entry for a page Docling found nothing on — that IS the scanned
+    # page signal, and dropping it would make coverage read as 100%.
+    return ["\n".join(pages.get(number, [])) for number in range(1, total + 1)]
 
-    text = "\n".join(c.content for c in chunks)
-    evidence = quality.Evidence(
+
+def docling_extract(path: Path) -> ExtractionResult:
+    """Docling's native extraction, scored by the SAME rules as pypdf's.
+
+    Reuses `parsing._docling_converter()` — a private helper, and depended on
+    deliberately. Copying its three configuration lines here would create a second
+    pipeline configuration that could drift, and the way it would drift is by
+    silently enabling OCR. Reusing it means the calibration is pinned to whatever
+    department RAG actually runs, and `docling_pipeline_is_native` fails loudly if
+    that stops being CPU/no-OCR.
+
+    `app/rag/parsing.py` itself is NOT modified: its behaviour is load-bearing for
+    department RAG, and Phase 6A must not change department semantics to make NRB
+    convenient.
+    """
+    started = time.monotonic()
+    ok, evidence = docling_pipeline_is_native()
+    if not ok:
+        return _failed("pdf", f"docling pipeline is not native ({evidence})", started)
+    try:
+        from ..rag.parsing import _docling_converter
+
+        document = _docling_converter().convert(str(path)).document
+        pages = _docling_pages(document)
+    except ImportError:
+        return _failed("pdf", "docling is not installed (worker deps only)", started)
+    except Exception as exc:  # noqa: BLE001 - a calibration must not kill a batch
+        logger.warning("NRB calibrate: docling failed (%s)", type(exc).__name__)
+        return _failed("pdf", type(exc).__name__, started)
+
+    text = "\n".join(pages)
+    return _result(
+        parser="docling",
         family="pdf",
-        parsed=True,
-        error=None,
-        text_metrics=quality.measure_text(text),
-        # Docling's chunk stream does not give a clean per-page text map, so page
-        # structure is left out and the verdict rests on the text alone. That is
-        # exactly the comparison we want: does the CONTENT read the same?
-        pages=None,
-        sheets=None,
+        evidence=quality.Evidence(
+            family="pdf",
+            parsed=True,
+            error=None,
+            text_metrics=quality.measure_text(text),
+            pages=quality.measure_pages(pages) if pages else None,
+            sheets=None,
+        ),
+        text=text,
+        started=started,
     )
-    verdict = quality.classify(evidence)
-    return verdict.status, f"{len(chunks)} chunks, {len(text)} chars"
 ```
 
 - [ ] **Step 4: Write `scripts/nrb_calibrate.py`**
 
 ```python
 #!/usr/bin/env python
-"""Measure pypdf-vs-Docling agreement on a bounded sample of fetched NRB PDFs.
+"""Compare pypdf and Docling NATIVE EXTRACTION over the benchmark cohort.
 
 Phase 6A screens with pypdf (~41 pages/s) rather than Docling (~1-2 pages/s on
 CPU) because both read the same embedded text layer to answer the same question.
-This script is the evidence for that choice — and the answer to the phase
-question "is native Docling sufficient for a meaningful percentage of the
-corpus?", which cannot be answered by asserting it.
+This script is the evidence for that choice — and the answer to "is native Docling
+sufficient for a meaningful percentage of the corpus?", which cannot be answered
+by asserting it.
 
-    .venv/bin/python scripts/nrb_calibrate.py --limit 40
+    .venv/bin/python scripts/nrb_calibrate.py --manifest docs/nrb/phase6a-manifest.json --limit 40
 
-REQUIRES THE WORKER DEPENDENCIES (docling, torch). Deliberately a separate script
-so nothing in the API path can import it by accident. Slow by design: 40 files is
-minutes, not seconds. Never run this over the whole corpus.
+WHAT IS COMPARED
+    Extraction, not pipelines. It does NOT call `parse_to_chunks`, which layers
+    RAG's chunk merging, small-block dropping and front-matter skipping on top of
+    Docling — a disagreement there could come from the filter rather than the
+    parser. Both engines' raw text goes through the SAME Phase 6A metrics and
+    classifier.
+
+WHAT IS REPORTED
+    Per file: both statuses and reasons, both char counts, both Devanagari ratios,
+    the three core legacy-font metrics from each, and a bounded preview of each.
+    In aggregate: status agreement, reason agreement, and the two ASYMMETRIC
+    counts that matter more than any average —
+
+      * DOCLING RESCUES PYPDF — pypdf says needs_ocr/suspicious, Docling says
+        extracted. This is the case that would invalidate the screen.
+      * PYPDF RESCUES DOCLING — the reverse.
+
+    A single agreement percentage would hide both inside it.
+
+REQUIRES THE WORKER DEPENDENCIES (docling, torch). A separate script so nothing in
+the API path can import it. Slow by design: 40 files is minutes. Never run this
+over the whole corpus.
 """
 
 from __future__ import annotations
@@ -3875,13 +4742,38 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.nrb import catalog, extraction, filestore, sniff  # noqa: E402
+from app.nrb import catalog, extraction, filestore, quality, sniff  # noqa: E402
+from app.nrb.manifest import read_manifest  # noqa: E402
 
 DEFAULT_LIMIT = 40
+
+# The metrics printed side by side. The three after the ratios are what the
+# legacy-font rule keys on, so a disagreement about "is this garbage" is
+# attributable to a specific measurement rather than to a mood.
+COMPARED_METRICS = (
+    "char_count",
+    "devanagari_ratio",
+    "latin_letter_ratio",
+    "stopword_rate",
+    "vowelless_token_ratio",
+    "intraword_symbol_ratio",
+)
+
+
+def _metrics(result) -> dict:
+    merged = {"char_count": result.char_count}
+    for name in COMPARED_METRICS:
+        if name in result.metrics:
+            merged[name] = result.metrics[name]
+    return merged
 
 
 async def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--manifest", default=None, metavar="PATH",
+                        help="draw the calibration files from this benchmark "
+                             "cohort, so calibration and profile describe the "
+                             "same corpus")
     parser.add_argument("--limit", type=int, default=DEFAULT_LIMIT,
                         help=f"how many PDFs to compare (default {DEFAULT_LIMIT}). "
                              "Keep it small; Docling is minutes per dozen files.")
@@ -3889,17 +4781,26 @@ async def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.WARNING, stream=sys.stderr)
 
+    ok, evidence = extraction.docling_pipeline_is_native()
+    if not ok:
+        print(f"refusing to calibrate: {evidence}. The shared Docling pipeline is "
+              f"no longer CPU/no-OCR, so this would not be a native comparison — "
+              f"and Phase 6A does not run OCR.", file=sys.stderr)
+        return 2
+
+    keys = read_manifest(args.manifest).keys() if args.manifest else None
+
     from app.db.session import SessionLocal
 
     async with SessionLocal() as session:
         targets = await catalog.select_extract_targets(
-            session, resource_types=["pdf"], limit=args.limit,
-            force=True, extractor_version=extraction.EXTRACTOR_VERSION,
+            session, resource_types=["pdf"], keys=list(keys) if keys else None,
+            limit=args.limit, force=True,
+            extractor_version=extraction.EXTRACTOR_VERSION,
         )
 
     base = filestore.base_dir()
     rows = []
-    agree = 0
     started = time.monotonic()
     for target in targets:
         path = filestore.resolve_path(target.storage_key, base)
@@ -3909,42 +4810,74 @@ async def main(argv: list[str] | None = None) -> int:
             path, family=sniff.family_for(target.sniffed_mime),
             extension=target.extension,
         )
-        docling_started = time.monotonic()
-        docling, evidence = extraction.docling_status(path)
+        docling = extraction.docling_extract(path)
         rows.append({
             "sha": target.content_sha256[:12],
-            "pypdf": native.status,
-            "pypdf_reason": native.reason,
-            "docling": docling,
-            "docling_evidence": evidence,
-            "pypdf_ms": native.duration_ms,
-            "docling_ms": int((time.monotonic() - docling_started) * 1000),
+            "pypdf": {"status": native.status, "reason": native.reason,
+                      "ms": native.duration_ms, "preview": native.preview[:120],
+                      **_metrics(native)},
+            "docling": {"status": docling.status, "reason": docling.reason,
+                        "ms": docling.duration_ms, "preview": docling.preview[:120],
+                        **_metrics(docling)},
         })
-        agree += int(native.status == docling)
 
     total = len(rows) or 1
+    usable = (quality.STATUS_EXTRACTED,)
+    docling_rescues = [
+        r for r in rows
+        if r["pypdf"]["status"] in (quality.STATUS_NEEDS_OCR, quality.STATUS_SUSPICIOUS)
+        and r["docling"]["status"] in usable
+    ]
+    pypdf_rescues = [
+        r for r in rows
+        if r["docling"]["status"] in (quality.STATUS_NEEDS_OCR, quality.STATUS_SUSPICIOUS)
+        and r["pypdf"]["status"] in usable
+    ]
     summary = {
         "compared": len(rows),
-        "agreement_rate": round(agree / total, 4),
-        "disagreements": [r for r in rows if r["pypdf"] != r["docling"]],
-        "pypdf_seconds": round(sum(r["pypdf_ms"] for r in rows) / 1000, 1),
-        "docling_seconds": round(sum(r["docling_ms"] for r in rows) / 1000, 1),
+        "status_agreement": round(
+            sum(r["pypdf"]["status"] == r["docling"]["status"] for r in rows) / total, 4
+        ),
+        "reason_agreement": round(
+            sum(r["pypdf"]["reason"] == r["docling"]["reason"] for r in rows) / total, 4
+        ),
+        "docling_rescues_pypdf": len(docling_rescues),
+        "pypdf_rescues_docling": len(pypdf_rescues),
+        "pypdf_seconds": round(sum(r["pypdf"]["ms"] for r in rows) / 1000, 1),
+        "docling_seconds": round(sum(r["docling"]["ms"] for r in rows) / 1000, 1),
         "wall_seconds": round(time.monotonic() - started, 1),
+        "disagreements": [
+            r for r in rows if r["pypdf"]["status"] != r["docling"]["status"]
+        ],
+        "rows": rows,
     }
     if args.json:
         print(json.dumps(summary, indent=2, ensure_ascii=False))
-    else:
-        print(f"compared           {summary['compared']}")
-        print(f"agreement rate     {summary['agreement_rate']:.1%}")
-        print(f"pypdf total        {summary['pypdf_seconds']}s")
-        print(f"docling total      {summary['docling_seconds']}s")
-        print(f"speedup            "
-              f"{summary['docling_seconds'] / max(summary['pypdf_seconds'], 1e-9):.0f}x")
-        if summary["disagreements"]:
-            print(f"\nDISAGREEMENTS ({len(summary['disagreements'])}) — read these:")
-            for row in summary["disagreements"]:
-                print(f"  {row['sha']}  pypdf={row['pypdf']}/{row['pypdf_reason']}"
-                      f"  docling={row['docling']}  ({row['docling_evidence']})")
+        return 0
+
+    print(f"compared             {summary['compared']}")
+    print(f"status agreement     {summary['status_agreement']:.1%}")
+    print(f"reason agreement     {summary['reason_agreement']:.1%}")
+    print(f"pypdf total          {summary['pypdf_seconds']}s")
+    print(f"docling total        {summary['docling_seconds']}s")
+    print(f"speedup              "
+          f"{summary['docling_seconds'] / max(summary['pypdf_seconds'], 1e-9):.0f}x")
+    print()
+    print(f"DOCLING RESCUES PYPDF  {summary['docling_rescues_pypdf']}   "
+          f"<- this is the number that would invalidate the screen")
+    print(f"PYPDF RESCUES DOCLING  {summary['pypdf_rescues_docling']}")
+    if summary["disagreements"]:
+        print(f"\nDISAGREEMENTS ({len(summary['disagreements'])}) — read every one:")
+        for row in summary["disagreements"]:
+            print(f"\n  {row['sha']}")
+            for engine in ("pypdf", "docling"):
+                side = row[engine]
+                metrics = " ".join(
+                    f"{name}={side.get(name)}" for name in COMPARED_METRICS
+                    if name in side
+                )
+                print(f"    {engine:<8} {side['status']}/{side['reason']}  {metrics}")
+                print(f"             {side['preview'][:100]!r}")
     return 0
 
 
@@ -3965,7 +4898,7 @@ Expected: all PASS. The RAG suites must be **unchanged** — `app/rag/parsing.py
 
 ```bash
 git add app/nrb/extraction.py scripts/nrb_calibrate.py tests/test_nrb_extraction.py
-git commit -m "feat(nrb): pypdf-vs-Docling agreement calibration (Phase 6A)"
+git commit -m "feat(nrb): pypdf-vs-Docling extraction calibration, same metrics both sides"
 ```
 
 ---
@@ -4347,60 +5280,77 @@ git commit -m "test(nrb): extraction integration suite against Postgres (Phase 6
 
 ---
 
-### Task 13: The live profile — fetch a representative sample, then measure it
+### Task 13: The live profile — draw the manifest, fetch it exactly, measure it
 
 The point of the whole phase. Everything before this was scaffolding.
 
 **Files:**
-- Create: `/tmp/.../scratchpad/nrb_sample_plan.py` (throwaway; not committed)
+- Create: `docs/nrb/phase6a-manifest.json` (committed — the benchmark definition)
+- Create: `docs/nrb/phase6a-profile.txt`, `docs/nrb/phase6a-calibration.txt`
 - Test: no unit test — the deliverable is measurements.
 
 **Interfaces:**
-- Consumes: `catalog.load_sample_rows`, `sampling.stratified_sample`, `scripts/nrb_fetch.py --year/--section`, `scripts/nrb_extract.py --sample`, `scripts/nrb_calibrate.py`.
+- Consumes: `scripts/nrb_sample.py`, `scripts/nrb_fetch.py --manifest`, `scripts/nrb_extract.py --manifest`, `scripts/nrb_calibrate.py --manifest`.
 - Produces: the numbers Task 14 writes into `docs/nrb-integration.md`.
 
-Approved budget: **~400 files, ~400 MB.** Do not exceed it because a stratum is sparse — report the sparse stratum instead.
+Approved budget: **~400 files, ~400 MB.** Do not exceed it because a stratum is
+sparse — report the sparse stratum instead. **The cohort is drawn once, in Step 1,
+and never re-drawn.** Every later step names the manifest file.
 
-- [ ] **Step 1: Print the sampling plan before downloading anything**
-
-Write a throwaway script in the scratchpad that loads `catalog.load_sample_rows()`, runs `sampling.stratified_sample(rows, size=400)`, and prints per stratum: cohort, document type, resource type, available, selected, and how many are **already fetched**. Then print the per-`(section, year)` fetch commands needed to cover the gap.
+- [ ] **Step 1: Draw the cohort — once**
 
 ```bash
-DATABASE_URL='postgresql+asyncpg://gateway:<pw>@127.0.0.1:5432/local_ai_gateway_p4' \
-  .venv/bin/python <scratchpad>/nrb_sample_plan.py
+export DATABASE_URL='postgresql+asyncpg://gateway:<pw>@127.0.0.1:5432/local_ai_gateway_p4'
+.venv/bin/python scripts/nrb_sample.py --size 400 --out docs/nrb/phase6a-manifest.json
 ```
 
-Read the output before proceeding. Sanity checks: 2019 present and at ~30% not ~50%; `<=2018`, `2020-2022`, `2023-2026` all present; `act`, `rule_bylaw`, `monetary_policy`, `guideline_manual`, `directive`, `circular` all present (several will be weak — that is expected and gets reported); `pdf`, `spreadsheet`, `image` and `document` all present.
+Read the printed strata table before going further. Sanity checks:
 
-- [ ] **Step 2: Fetch the gap, in bounded scoped passes**
+- 2019 present and at ~30%, not ~50% — the cap worked.
+- `<=2018`, `2020-2022`, `2023-2026` all present.
+- `act`, `rule_bylaw`, `monetary_policy`, `guideline_manual`, `directive`,
+  `circular` all present. Several will be marked WEAK; that is expected and gets
+  reported, not fixed.
+- `pdf`, `spreadsheet`, `image` and `document` all present.
+- `SHORTFALL` is 0, or its note explains which constraint bound.
 
-The sample is chosen over the whole catalog, but only fetched blobs can be extracted, so the missing ones must be downloaded first. Use the existing Phase 5 command — never a new fetcher — one scoped pass per stratum group, with a byte budget:
+If any of that is wrong, fix the sampler and re-draw **now** — this is the only
+moment at which re-drawing is free. Once files are fetched against this manifest,
+re-drawing means the profile and the download no longer describe the same cohort.
+
+Commit the manifest immediately, before anything is fetched:
+
+```bash
+git add docs/nrb/phase6a-manifest.json
+git commit -m "docs(nrb): Phase 6A benchmark cohort — 400 files, drawn once"
+```
+
+- [ ] **Step 2: Fetch exactly that cohort**
 
 ```bash
 export DATABASE_URL='postgresql+asyncpg://gateway:<pw>@127.0.0.1:5432/local_ai_gateway_p4'
 
-# preview EVERY pass first; --dry-run makes no HTTP request at all
-.venv/bin/python scripts/nrb_fetch.py --core --year 2019 --limit 60 --dry-run
+# preview first — --dry-run makes NO HTTP request at all
+.venv/bin/python scripts/nrb_fetch.py --manifest docs/nrb/phase6a-manifest.json --dry-run
 
-# then the real passes, paced and byte-capped
-.venv/bin/python scripts/nrb_fetch.py --core --year 2019 --limit 60 --max-bytes 80000000 -v
-.venv/bin/python scripts/nrb_fetch.py --core --year 2024 --limit 40 --max-bytes 60000000 -v
-.venv/bin/python scripts/nrb_fetch.py --core --year 2025 --limit 40 --max-bytes 60000000 -v
-.venv/bin/python scripts/nrb_fetch.py --section act --limit 30 --max-bytes 40000000 -v
-.venv/bin/python scripts/nrb_fetch.py --section rule_bylaw --limit 30 --max-bytes 40000000 -v
-.venv/bin/python scripts/nrb_fetch.py --section monetary_policy --limit 30 --max-bytes 40000000 -v
-.venv/bin/python scripts/nrb_fetch.py --section guideline_manual --limit 30 --max-bytes 40000000 -v
-.venv/bin/python scripts/nrb_fetch.py --section directive --limit 30 --max-bytes 40000000 -v
-.venv/bin/python scripts/nrb_fetch.py --section statistics --type spreadsheet --limit 40 --max-bytes 40000000 -v
-.venv/bin/python scripts/nrb_fetch.py --type image --limit 15 --max-bytes 20000000 -v
-.venv/bin/python scripts/nrb_fetch.py --type document --limit 20 --max-bytes 20000000 -v
-.venv/bin/python scripts/nrb_fetch.py --year 2015 --limit 25 --max-bytes 30000000 -v
-.venv/bin/python scripts/nrb_fetch.py --year 2021 --limit 25 --max-bytes 30000000 -v
+# then the real pass, byte-capped as a belt-and-braces bound on top of the manifest
+.venv/bin/python scripts/nrb_fetch.py --manifest docs/nrb/phase6a-manifest.json \
+    --max-bytes 500000000 -v
 ```
 
-Adjust the exact limits from Step 1's output, but keep the **total at or under ~400 files / ~400 MB**. After each pass note `files_fetched`, `files_failed` and the failure samples. A cluster of soft-404s means NRB moved files and `nrb_sync.py` should be re-run first; a cluster of timeouts means back off `NRB_CRAWL_DELAY_SECONDS`.
+One command, not thirteen scoped approximations. The manifest names the exact
+files; Phase 5's host guard, HTTPS requirement, pacing, byte cap, redirect
+refusal, soft-404 rule, advisory lock and resumability all apply unchanged, and a
+manifest entry whose file is `blocked_host` still cannot be selected.
 
-Then confirm the total:
+If the pass is interrupted, **re-run the identical command** — selection is
+`pending`-only, so it resumes rather than restarting.
+
+Record `files_fetched`, `files_failed`, `files_deduplicated` and the failure
+samples. A cluster of soft-404s means NRB moved files and `nrb_sync.py` should be
+re-run first; a cluster of timeouts means back off `NRB_CRAWL_DELAY_SECONDS`.
+
+Then confirm coverage of the cohort specifically:
 
 ```bash
 PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d local_ai_gateway_p4 -At -c \
@@ -4409,32 +5359,51 @@ PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d local_ai_gateway_p4 -At -c 
 du -sh nrb_files
 ```
 
-- [ ] **Step 3: Run the profile**
+Any manifest file that did not fetch is a **stated gap**, not a silent one — note
+its count and reason. `nrb_extract.py` will warn about the same number.
+
+- [ ] **Step 3: Run the profile over the cohort**
 
 ```bash
-DATABASE_URL='postgresql+asyncpg://gateway:<pw>@127.0.0.1:5432/local_ai_gateway_p4' \
-  .venv/bin/python scripts/nrb_extract.py --sample 400 -v \
+export DATABASE_URL='postgresql+asyncpg://gateway:<pw>@127.0.0.1:5432/local_ai_gateway_p4'
+.venv/bin/python scripts/nrb_extract.py --manifest docs/nrb/phase6a-manifest.json -v \
   | tee <scratchpad>/nrb_profile.txt
 
-DATABASE_URL='postgresql+asyncpg://gateway:<pw>@127.0.0.1:5432/local_ai_gateway_p4' \
-  .venv/bin/python scripts/nrb_extract.py --sample 400 --json \
+.venv/bin/python scripts/nrb_extract.py --manifest docs/nrb/phase6a-manifest.json --json \
   > <scratchpad>/nrb_profile.json
 ```
 
-The second invocation selects zero (everything is extracted) and re-renders the profile from the database — that is also the resumability check.
+The second invocation selects zero (everything is already extracted at this
+version) and re-renders the profile from the database — which is also the
+resumability check.
 
-- [ ] **Step 4: Run the Docling calibration**
+Note the gap between the manifest size and `blobs_selected`: manifest entries
+that share bytes collapse to one blob. That is correct, and both numbers get
+reported.
+
+- [ ] **Step 4: Calibrate against Docling, over the same cohort**
 
 ```bash
 DATABASE_URL='postgresql+asyncpg://gateway:<pw>@127.0.0.1:5432/local_ai_gateway_p4' \
-  .venv/bin/python scripts/nrb_calibrate.py --limit 40 | tee <scratchpad>/nrb_calibration.txt
+  .venv/bin/python scripts/nrb_calibrate.py \
+    --manifest docs/nrb/phase6a-manifest.json --limit 40 \
+  | tee <scratchpad>/nrb_calibration.txt
 ```
 
-Record the agreement rate, the wall-clock ratio, and **read every disagreement**. A pypdf `needs_ocr` that Docling calls `extracted` is the case that would invalidate the screen; if there are several, say so plainly in the report rather than averaging them away.
+Record the status agreement, the reason agreement, the wall-clock ratio, and
+above all the two asymmetric counts. **Read every disagreement**, with both
+engines' metrics and previews side by side.
+
+`DOCLING RESCUES PYPDF` is the number that would invalidate the screen. If it is
+more than a couple of files, say so plainly and treat the "pypdf is a fair proxy"
+claim as **not established** — the profile's numbers then become a lower bound on
+usability, and that caveat goes in the report and in `docs/nrb-integration.md`.
+Do not average it away.
 
 - [ ] **Step 5: Manually validate the heuristic against the real documents**
 
-Take 5 blobs classified `extracted`, 5 `suspicious`, 5 `needs_ocr`. For each, resolve its `storage_key`, open the PDF, and compare what the page *looks* like with what was extracted:
+Take 5 blobs classified `extracted`, 5 `suspicious`, 5 `needs_ocr`, from the
+cohort:
 
 ```bash
 PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d local_ai_gateway_p4 -c \
@@ -4446,15 +5415,23 @@ PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d local_ai_gateway_p4 -c \
    WHERE e.status = 'suspicious' LIMIT 5;"
 ```
 
-Then open each `nrb_files/<storage_key>` and judge. Record honestly:
-- **False positives** — a genuinely readable document called `suspicious`. Each one is a threshold that is too tight.
-- **False negatives** — garbage called `extracted`. Each one is a threshold that is too loose, and these are the dangerous direction.
+Open each `nrb_files/<storage_key>` and compare what the page *looks* like with
+what was extracted. Record honestly:
 
-Do **not** tune a threshold to make an individual case pass. If a threshold genuinely needs to move, move it, bump `EXTRACTOR_VERSION` to `native-2`, re-run the profile, and report both numbers.
+- **False positives** — a genuinely readable document called `suspicious`. Each is
+  a threshold that is too tight.
+- **False negatives** — garbage called `extracted`. Each is a threshold that is
+  too loose, and this is the dangerous direction.
 
-- [ ] **Step 6: Record the throughput and the corpus-level extrapolation**
+Do **not** tune a threshold to make an individual case pass. If a threshold
+genuinely needs to move: move it, bump `EXTRACTOR_VERSION` to `native-2`, re-run
+the profile over **the same manifest**, and report both sets of numbers.
 
-From the profile: files/minute, pages/minute, and the share of the sample in each status. State the extrapolation to the 18,263-file corpus as an estimate **with the sample's strata named**, never as a measured fact.
+- [ ] **Step 6: Record throughput and the corpus-level extrapolation**
+
+From the profile: files/minute, pages/minute, and the share of the cohort in each
+status. State the extrapolation to the 18,263-file corpus as an estimate **with
+the cohort's strata and its weak cells named**, never as a measured fact.
 
 - [ ] **Step 7: Commit the evidence**
 
@@ -4487,7 +5464,13 @@ Change the Phase 6 row to split 6A/6B:
 
 Follow §9 and §10's shape exactly: Files, the design decision and why the brief was not followed, the live numbers as a table, special cases, and an "Evaluation & Improvement" block with the four numbered points (success metric, eval, feedback capture, review loop). Include:
 
-- The pypdf-vs-Docling decision **with the measured speed ratio and the calibration agreement rate**.
+- The pypdf-vs-Docling decision **with the measured speed ratio, the status and
+  reason agreement rates, and the two rescue counts** — and the note that the
+  comparison is extraction-vs-extraction, not against `parse_to_chunks`, because
+  that would have measured RAG's chunk filtering.
+- The benchmark manifest: that the cohort was drawn once from the full catalog and
+  is committed at `docs/nrb/phase6a-manifest.json`, so the profile is re-runnable
+  rather than merely reported — plus any manifest files that did not fetch.
 - The content-intrinsic identity decision and the shared-blob reason.
 - The full status table, by cohort with **2019 broken out**, by document type, by format.
 - The legacy-font detector's rule, its thresholds, and its measured false-positive/false-negative findings from Task 13 Step 5, stated honestly.
@@ -4499,18 +5482,24 @@ Follow §9 and §10's shape exactly: Files, the design decision and why the brie
 ```bash
 # Phase 6A suites (pure)
 .venv/bin/pytest tests/test_nrb_quality.py tests/test_nrb_extraction.py \
-                 tests/test_nrb_sampling.py tests/test_nrb_extract_cli.py \
-                 tests/test_nrb_extraction_report.py
+                 tests/test_nrb_sampling.py tests/test_nrb_manifest.py \
+                 tests/test_nrb_extract_cli.py tests/test_nrb_extraction_report.py
 
 # Phase 6A integration (needs Postgres; every test rolls back)
 .venv/bin/pytest tests/test_nrb_extract_integration.py
 
+# the benchmark cohort — drawn ONCE; --force re-draws and invalidates comparisons
+.venv/bin/python scripts/nrb_sample.py --size 400 --out docs/nrb/phase6a-manifest.json
+
+# fetch exactly that cohort (network; every Phase 5 safety rule still applies)
+.venv/bin/python scripts/nrb_fetch.py --manifest docs/nrb/phase6a-manifest.json --dry-run
+
 # the profile itself. Scope is REQUIRED; --dry-run parses nothing.
 .venv/bin/python scripts/nrb_extract.py --core --dry-run
-.venv/bin/python scripts/nrb_extract.py --sample 400 -v
+.venv/bin/python scripts/nrb_extract.py --manifest docs/nrb/phase6a-manifest.json -v
 
 # the honesty check on using pypdf rather than Docling (worker deps, slow)
-.venv/bin/python scripts/nrb_calibrate.py --limit 40
+.venv/bin/python scripts/nrb_calibrate.py --manifest docs/nrb/phase6a-manifest.json --limit 40
 ```
 
 - [ ] **Step 4: Add the `CLAUDE.md` gotcha**
@@ -4539,6 +5528,27 @@ Add to the Conventions/gotchas list, in the same voice as the existing NRB entri
   it reads `stopword_rate`** — a numeric statistical table also scores zero
   English stopwords, and without that gate every table in the corpus reads as
   garbage. Ties break toward `suspicious`, never `extracted`.
+- **The Phase 6A cohort is a committed FILE, drawn once** —
+  `docs/nrb/phase6a-manifest.json` (`app/nrb/manifest.py`, written by
+  `scripts/nrb_sample.py`), and `nrb_fetch.py`/`nrb_extract.py`/`nrb_calibrate.py`
+  all take `--manifest`. Do not go back to approximating it with
+  `--section`/`--year`/`--limit` and re-sampling what lands: Phase 5 selects
+  `pending` rows in **id order**, which is REST paging order, so stratifying over
+  the result measures the id order rather than the corpus — and it is not
+  reproducible, because any later fetch changes what there is to re-sample.
+  `sampling.stratified_sample` is floor-round-robin -> proportional -> cohort cap
+  -> **redistribute what the cap removed** (without that last pass a 400 request
+  silently returns ~250), and it reports a `shortfall` rather than rounding down.
+- **The Docling calibration compares extraction with extraction, never against
+  `parse_to_chunks`.** That function layers `merge_blocks`, `drop_small_blocks`
+  and front-matter skipping on top of Docling, so a disagreement measured through
+  it could come from RAG's chunk filter rather than from what Docling read off the
+  page. `extraction.docling_extract` reuses `parsing._docling_converter()` —
+  private, and depended on deliberately, because it carries the CPU pinning and
+  `do_ocr=False` and a copied config could drift into enabling OCR — then walks
+  `iterate_items()` itself and scores the text with the **same**
+  `quality.measure_text`/`classify` as pypdf. `docling_pipeline_is_native()` is
+  the guard that fails loudly if that pinning ever changes.
 ```
 
 Also add `quality`+`extraction`+`extract`+`sampling`+`profile` to the `app/nrb/` line in the Layout section.
@@ -4547,8 +5557,9 @@ Also add `quality`+`extraction`+`extract`+`sampling`+`profile` to the `app/nrb/`
 
 ```bash
 .venv/bin/pytest tests/test_nrb_quality.py tests/test_nrb_extraction.py \
-    tests/test_nrb_sampling.py tests/test_nrb_extract_cli.py \
-    tests/test_nrb_extraction_report.py tests/test_files_documents_pdf_pages.py -q
+    tests/test_nrb_sampling.py tests/test_nrb_manifest.py \
+    tests/test_nrb_extract_cli.py tests/test_nrb_extraction_report.py \
+    tests/test_files_documents_pdf_pages.py -q
 .venv/bin/pytest tests/ -k nrb -q
 DATABASE_URL='postgresql+asyncpg://gateway:<pw>@127.0.0.1:5432/local_ai_gateway_p4' \
   .venv/bin/pytest -q
@@ -4567,14 +5578,74 @@ git commit -m "docs(nrb): Phase 6A — extraction quality profiling, measured"
 
 ## Self-review notes
 
-Checked against the spec, section by section.
+Checked against the spec, section by section, after the three amendments.
 
-**Spec coverage.** §3 architecture → Tasks 1, 2, 4, 7, 8, 9, 10. §3.1 pypdf/Docling → Tasks 4 and 11. §3.2 the one refactor → Task 3. §4 format behaviour → Task 4 (a test per format). §5 metrics → Task 1 (every listed metric is a `TextMetrics` field or a `PageStats`/`SheetStats` field). §6 status rules → Task 2, one test per rule. §7 legacy-font → Task 2's `looks_like_legacy_font`, thresholds named as constants. §8 metadata-assisted, not persisted → Tasks 5, 9, 12 (`test_the_title_signal_is_reported_but_never_stored` and `test_two_file_rows_sharing_a_blob_produce_ONE_extraction` are the two that pin it). §9 persistence → Task 5. §10 sampling → Task 7. §11 CLI → Task 10, plus the `--year` fetch change in Task 6. §12 failure isolation and safety → Task 8's `_extract_target` and Task 12's missing/corrupt-blob tests. §13 tests → Tasks 1, 2, 4, 7, 9, 10, 12. §14 live profile → Task 13. §15 out of scope → the Global Constraints. §16 Evaluation & Improvement → Task 14 Step 2.
+**Spec coverage.** §3 architecture -> Tasks 1, 2, 4, 7, 7A, 8, 9, 10. §3.1
+pypdf/Docling, extraction-vs-extraction -> Tasks 4 and 11. §3.2 the one refactor
+-> Task 3. §4 format behaviour -> Task 4 (a test per format). §5 metrics -> Task 1
+(every listed metric is a `TextMetrics`, `PageStats` or `SheetStats` field). §6
+status rules -> Task 2, one test per rule. §7 legacy-font -> Task 2's
+`looks_like_legacy_font`, thresholds named as constants. §8 metadata-assisted, not
+persisted -> Tasks 5, 9, 12. §9 persistence -> Task 5. §10 sampling, four passes
+-> Task 7. §10.1 the manifest -> Task 7A, consumed by Tasks 6, 8, 10, 11, 13. §11
+CLI -> Task 10, plus the `--year`/`--manifest` fetch changes in Task 6. §12
+failure isolation and safety -> Task 8's `_extract_target` and Task 12's
+missing/corrupt blob tests. §13 tests -> Tasks 1, 2, 4, 7, 7A, 9, 10, 12. §14 live
+profile -> Task 13. §15 out of scope -> the Global Constraints. §16 Evaluation &
+Improvement -> Task 14 Step 2.
 
-**Type consistency.** `EXTRACTOR_VERSION` is defined once (Task 4) and imported everywhere. `ExtractionResult`'s field list in Task 4 matches every construction site in Task 8's `_extract_target`. `catalog.ExtractTarget`'s field order matches the `select_extract_targets` column order that unpacks into it. `quality.Evidence`'s six positional fields match every call site including the terse `Evidence("image", False, None, None, None, None)` in Task 2's tests. `Sample.keys` are `comparison_key` values (pre-fetch identity); Task 8 maps them to `content_sha256` before selection — the one place two identities meet, and it is commented there.
+**The three amendments, and where each is pinned by a test.**
+
+1. *Exact benchmark manifest.* `app/nrb/manifest.py` + `scripts/nrb_sample.py`
+   (Task 7A); exact-key scope on the fetch (Task 6 Step 1) and on the extract
+   (Task 6 Step 5); `--manifest` on all three CLIs; Task 13 Step 2 is ONE fetch
+   command against the manifest rather than thirteen scoped approximations.
+   Pinned by `test_a_manifest_is_a_scope_on_its_own_and_its_keys_are_passed_through`,
+   `test_the_cli_never_re_draws_a_cohort` (there is no `--sample` flag any more)
+   and the manifest round-trip suite. `count_unfetched` makes a partly-downloaded
+   cohort a stated number rather than a silent shrink.
+2. *Allocation redistribution.* Pass 1 is round-robin (not a `for … break` over a
+   sorted list), pass 4 hands back every cap-trimmed slot, and `Sample` gained
+   `shortfall` + `notes`. Pinned by the six new tests in Task 7 — exactly-400,
+   redistribution, cap-still-holds, infeasible-reports-shortfall, corpus-smaller,
+   and the floor-larger-than-budget test that asserts 10 strata represented where
+   lexicographic filling would give 3.
+3. *Calibration at the extraction level.* `docling_extract` walks
+   `iterate_items()` through `parsing._docling_converter()` and scores it with the
+   same metrics; `parse_to_chunks` is not called anywhere in the calibration path.
+   `docling_pipeline_is_native()` guards the CPU/no-OCR pinning. Pinned by
+   `test_docling_extract_does_not_apply_rag_chunk_filtering` (a short document
+   that `drop_small_blocks` would delete must still be visible) and
+   `test_the_shared_docling_pipeline_is_still_cpu_and_ocr_off`.
+
+**Type consistency.** `EXTRACTOR_VERSION` is defined once (Task 4) and imported
+everywhere. `ExtractionResult`'s field list in Task 4 matches every construction
+site in Task 8's `_extract_target` and Task 11's `docling_extract`.
+`catalog.ExtractTarget`'s field order matches the `select_extract_targets` column
+order that unpacks into it. `quality.Evidence`'s six positional fields match every
+call site. **`keys` means `comparison_key` in every signature it appears in** —
+`select_fetch_targets`, `select_extract_targets`, `count_unfetched`, `run_fetch`,
+`run_extract`, `Manifest.keys()` — which is the one identity that was ambiguous in
+the first draft, and the reason `content_sha256` is never called `keys` anywhere.
+`MANIFEST_MAX_KEYS` is defined in both `catalog.py` and `manifest.py`; the values
+must match, and the plan says so in both places.
 
 **Known soft spots, flagged rather than hidden.**
-1. Task 12's `session_factory=lambda: session` may not satisfy `run_extract`'s `async with session_factory()`. The step says to copy Phase 5's solution from `test_nrb_fetch_integration.py` rather than invent one.
-2. Task 4's spreadsheet test has one convoluted assertion; the step tells the implementer to simplify it to `assert "400" not in result.text`.
-3. Task 9's `profile.load_profile` returns `weak_strata` empty — the weak strata come from the sampler through `ExtractResult.strata`, and `summarize_extraction` merges both sources. That is deliberate, not an omission.
-4. The legacy-font thresholds are calibrated against **one** cohort (49 circulars). Task 13 Step 5 is where they meet documents that are not circulars, and the plan explicitly forbids tuning them per-case without a version bump.
+1. Task 12's `session_factory=lambda: session` may not satisfy `run_extract`'s
+   `async with session_factory()`. The step says to copy Phase 5's solution from
+   `test_nrb_fetch_integration.py` rather than invent one.
+2. Task 4's spreadsheet test has one convoluted assertion; the step tells the
+   implementer to simplify it to `assert "400" not in result.text`.
+3. `_docling_pages` depends on `document.num_pages()` and `item.prov[0].page_no`,
+   verified against docling 2.118 in `app/rag/parsing.py` but wrapped in
+   `try/except` here because a version bump could move them. If page metadata is
+   unavailable the comparison degrades to text-only and the page rules are
+   skipped — stated in the code, not silent.
+4. `parsing._docling_converter` and `_pdf_pipeline_options` are private. Depending
+   on them is deliberate (a copied config could drift into enabling OCR) and
+   `docling_pipeline_is_native()` turns a breaking change into a loud failure —
+   but it is still a private dependency, and a future maintainer should know it.
+5. The legacy-font thresholds are calibrated against **one** cohort (49
+   circulars). Task 13 Step 5 is where they meet documents that are not
+   circulars, and the plan forbids tuning them per-case without a version bump
+   and a re-run over the same manifest.

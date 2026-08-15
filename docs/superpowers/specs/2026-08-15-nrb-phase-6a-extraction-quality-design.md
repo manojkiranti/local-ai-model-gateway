@@ -71,18 +71,36 @@ answer *the same question*. Docling's value — layout analysis, table structure
 `prov[0].page_no` provenance — is what Phase 7 needs for chunking, and buys
 nothing for "is this text trustworthy".
 
-So: **pypdf is the screen**, and a bounded Docling pass over ~40 sampled files is
+So: **pypdf is the screen**, and a bounded Docling pass over ~40 manifest files is
 the **calibration**, whose output is an agreement rate between the two engines'
 status verdicts. That converts "pypdf is a fair proxy" from an assertion into a
 measurement, and it is also the honest answer to the phase question *"is native
-Docling sufficient for a meaningful percentage of the corpus?"* — if Docling
-rescues files pypdf calls `needs_ocr`, the calibration says so.
+Docling sufficient for a meaningful percentage of the corpus?"*
 
-The calibration adapter calls Docling through a read-only wrapper in
-`extraction.py` that catches `ParseError` and maps its two distinct messages
-("a scanned PDF needs OCR" vs "front matter or fragments"). Docling stays a
-worker-only dependency and is imported inside the function, never at module
-scope — the existing subprocess test that pins this keeps passing.
+**The calibration compares EXTRACTION, not pipelines.** It does not call
+`parse_to_chunks`: that applies `merge_blocks`, `drop_small_blocks` and
+front-matter skipping on top of Docling, so a disagreement could come from RAG's
+chunk filtering rather than from what Docling read off the page. Instead the
+adapter reuses `parsing._docling_converter()` — the lowest-level existing helper,
+and reused deliberately rather than reimplemented because it carries the CPU
+pinning and `do_ocr=False`, and a hand-rolled copy could silently drift into
+enabling OCR. It then walks `document.iterate_items()` itself to collect raw
+text, and runs **the same `quality.measure_text` and `quality.classify`** over
+both engines' output. Like is compared with like.
+
+A guard test asserts the converter really is CPU/no-OCR, so a future change to
+`app/rag/parsing.py` breaks the calibration loudly instead of quietly OCRing.
+
+The report is not a single agreement number. It records, per file, both statuses
+and reasons, `char_count`, `devanagari_ratio` and the three core legacy metrics
+from each engine, plus bounded previews of both — and it counts the two
+asymmetric cases explicitly: **Docling rescues pypdf** (pypdf `needs_ocr`/
+`suspicious`, Docling `extracted`) and **pypdf rescues Docling**. The first is
+the one that would invalidate the screen, and burying it inside an average is
+exactly how it would be missed.
+
+Docling stays a worker-only dependency, imported inside the function, never at
+module scope — the existing subprocess test that pins this keeps passing.
 
 ### 3.2 The one refactor
 
@@ -294,13 +312,64 @@ reproducible across runs and machines, and uncorrelated with insertion order,
 publication date or department, which id-order selection is not.
 
 Allocation follows the direction given: **representation over equal counts.**
-Proportional to stratum size, with a floor of 5 per non-empty stratum and a cap
-so no single stratum (2019 would otherwise take half) exceeds ~30% of the sample.
-Rare types (`act` 90, `rule_bylaw` 84, `monetary_policy` 130 sources) get their
-floor and are **not** oversampled to force parity. Total held at ~400; strata
-that cannot fill their floor are reported as weak rather than padded, and the
-report names every stratum whose n < 10 so no conclusion is drawn from it
+Four passes, in order:
+
+1. **Floor**, round-robin — one slot at a time across every non-empty stratum, in
+   `(-available, key)` order, until each holds `floor` or the budget runs out.
+   Round-robin rather than "walk the sorted list handing out 5 each until the
+   budget dies": that second form is what a `for … break` loop does, and when the
+   budget cannot cover every stratum it silently gives everything to the
+   lexicographically early ones. One slot at a time means an insufficient budget
+   costs every stratum its depth, not some strata their existence.
+2. **Proportional** to remaining headroom, so a 700-file stratum is not
+   represented as thinly as a 3-file one. Rare types (`act` 90, `rule_bylaw` 84,
+   `monetary_policy` 130 sources) get their floor and are **not** oversampled to
+   force parity.
+3. **Cohort cap** — no year cohort exceeds `max_cohort_share` (~30%), so 2019,
+   which is half the corpus, cannot become half the sample.
+4. **Redistribution** — every slot the cap removed is handed back, deterministic
+   round-robin, to strata in *non-capped* cohorts that still have headroom,
+   repeating until the requested size is reached or no eligible headroom remains.
+   Without this the cap silently shrinks a 400-file request to whatever was left
+   after trimming, and the sample would be both smaller and differently shaped
+   than the one that was asked for. The cap is re-checked after every grant, so
+   redistribution can never breach it.
+
+If the request is genuinely infeasible — the corpus is smaller than `size`, or
+every non-capped cohort is exhausted — the `Sample` reports a `shortfall` and the
+reason, and the report prints it. A short sample that says it is short is fine; a
+short sample that reads as complete is not.
+
+Strata that cannot fill their floor are reported as weak rather than padded, and
+the report names every stratum whose n < 10 so no conclusion is drawn from it
 silently.
+
+### 10.1 The benchmark manifest
+
+The sample is selected **exactly once, from the full catalog**, and written to a
+durable manifest — `docs/nrb/phase6a-manifest.json`, committed — holding each
+selected file's exact `comparison_key` plus its `year`, `document_type`,
+`resource_type`, `owner` and stratum, along with the sampler parameters and the
+catalog counts it was drawn from.
+
+Everything downstream then operates on **that exact cohort**: the Phase 5 fetch
+gains an exact-key scope and downloads those files and no others, extraction runs
+over the manifest, and calibration draws its ~40 files from the same set.
+
+The alternative — approximate the sample with broad `--section`/`--year`/`--limit`
+fetches and then re-sample whatever landed — was in the first draft of this plan
+and is wrong. Phase 5 selects in id order within a scope, so "circulars from
+2019, limit 60" returns the 60 with the lowest catalog ids, which is REST paging
+order. Stratifying over *that* measures the id order, not the corpus, and the
+stratification would be decorative. It is also not reproducible: a later fetch
+changes what is on disk and therefore what gets re-sampled.
+
+The exact-key scope is additive and changes no safety property: the host guard,
+HTTPS requirement, pacing, byte caps, redirect refusal, soft-404 rule and
+`fetch_status`-based selection all still apply, and a manifest key that names a
+`blocked_host` file still cannot be selected. The manifest is bounded (≤5,000
+keys) so it cannot become a way to smuggle a whole-corpus fetch past the
+scope-is-required rule.
 
 ## 11. CLI
 
@@ -309,7 +378,10 @@ silently.
 * **Scope is required.** A bare invocation prints usage and exits 2 — the corpus
   is 18,263 files and CPU extraction is not free.
 * Selectors: `--core`, `--section`, `--owner`, `--type`, `--year`, `--status`,
-  `--limit`, `--sample N` (the stratified selection), `--all`.
+  `--limit`, `--manifest PATH` (the benchmark cohort, §10.1), `--all`.
+  `scripts/nrb_sample.py` is the separate one-shot command that *writes* a
+  manifest; sampling and extraction are deliberately not the same command, so the
+  cohort cannot be silently re-drawn on a second run.
 * `--dry-run` reports what would be extracted, parsing nothing.
 * `--force` re-extracts blobs already recorded at the current version.
 * `--calibrate N` runs the bounded Docling comparison.
@@ -320,12 +392,15 @@ silently.
   **resumable, like the fetch, not idempotent**; a second pass over an exhausted
   scope selects zero.
 
-One small change to Phase 5: `--year` on `scripts/nrb_fetch.py` and a `years`
-parameter on `catalog.select_fetch_targets`. Needed because fetch selection is
-id-order and cannot deliberately reach the 2019 cohort, which is 9,182 of 18,263
-files and the one the report must isolate. ~20 lines; every existing safety
-mechanism (host guard, pacing, byte cap, soft-404 rule, lock, resumability) is
-untouched.
+Two small changes to Phase 5, both additive and neither touching a safety
+mechanism (host guard, pacing, byte cap, redirect refusal, soft-404 rule, lock,
+resumability all unchanged):
+
+* `--year` / a `years` parameter on `catalog.select_fetch_targets`. Fetch
+  selection is id-order and cannot deliberately reach the 2019 cohort, which is
+  9,182 of 18,263 files and the one the report must isolate.
+* `--manifest PATH` / a `keys` parameter taking exact `comparison_key` values, so
+  the benchmark cohort of §10.1 is downloaded exactly rather than approximated.
 
 ## 12. Failure isolation and safety
 
@@ -368,8 +443,15 @@ Coverage classes:
 * **Persistence** — status and metrics persisted; a repeat pass creates no
   duplicate row; an `extractor_version` bump marks the prior result stale;
   timestamps behave.
-* **Sampling** — deterministic across runs, bounded, multiple years, multiple
-  document types, 2019 present, weak strata reported not padded.
+* **Sampling** — deterministic across runs and across input order, bounded,
+  multiple years, multiple document types, 2019 present, weak strata reported not
+  padded; **a feasible request of 400 returns exactly 400**, cap-trimmed slots are
+  redistributed, the cohort cap still holds after redistribution, an infeasible
+  request reports its shortfall, and a floor larger than the budget does not
+  privilege lexicographically early strata.
+* **Manifest** — written once, round-trips, carries the sampler parameters,
+  bounded in size; the fetch and the extract select exactly its keys and nothing
+  else; a manifest key naming a `blocked_host` file is still unselectable.
 * **CLI** — bare invocation refuses; scope accepted; limit honoured; summary
   deterministic on fixture data.
 
@@ -381,11 +463,13 @@ the subprocess check that Docling is not imported at module scope.
 
 ## 14. Live profile
 
-1. Stratified plan over the catalog (§10), ~400 files.
-2. Fetch the missing ones through Phase 5's existing paced/bounded/resumable
-   path, scoped per stratum.
-3. Extract, classify, record.
-4. Calibrate ~40 PDFs against Docling.
+1. **Draw the manifest once** (§10, §10.1) over the full catalog, ~400 files, and
+   commit it. Every later step names this file; none of them re-samples.
+2. Fetch exactly those files through Phase 5's paced/bounded/resumable path with
+   the manifest scope.
+3. Extract, classify, record — over the manifest cohort.
+4. Calibrate ~40 PDFs **drawn from the same manifest** against Docling, comparing
+   extraction to extraction (§3.1).
 5. Report: status counts overall and by year cohort (**2019 always broken out,
    never inside a corpus average**), by document type, by file format; script
    profile; medians; throughput; and a bounded manual-inspection sample of ~10
