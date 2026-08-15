@@ -56,6 +56,7 @@ from .models import (
     FETCH_PENDING,
     FETCH_RUN_RUNNING,
     METADATA_STATUS_REST,
+    NRBExtraction,
     NRBFetchRun,
     NRBFile,
     NRBSource,
@@ -66,15 +67,19 @@ from .models import (
 from .records import FileRecord, SourceRecord
 
 __all__ = [
+    "ExtractTarget",
     "FetchTarget",
     "FileState",
+    "ManifestResolution",
     "SourceIndex",
     "SourceState",
     "catalog_counts",
+    "count_unfetched",
     "create_fetch_run",
     "create_run",
     "deactivate_unseen",
     "delete_relationships",
+    "extraction_counts",
     "fetch_counts",
     "finish_fetch_run",
     "finish_run",
@@ -83,8 +88,12 @@ __all__ = [
     "insert_sources",
     "load_file_index",
     "load_relationships",
+    "load_sample_rows",
     "load_source_index",
+    "record_extractions",
     "record_fetch_outcomes",
+    "resolve_manifest_keys",
+    "select_extract_targets",
     "select_fetch_targets",
     "touch_files",
     "touch_sources",
@@ -96,6 +105,13 @@ __all__ = [
 # Rows per statement. Bounds statement size and parameter count; atomicity comes
 # from the surrounding transaction, exactly as in `rag/ingest.CHUNK_INSERT_BATCH`.
 BATCH = 1000
+
+# A manifest is a benchmark cohort, not a back door around Phase 5's
+# scope-is-required rule. 5,000 keys is ~12x the planned 400-file sample and far
+# under the 18,263-file corpus. Mirrors `manifest.MANIFEST_MAX_KEYS`, which
+# refuses an oversized file before it is ever loaded; this is the same bound at
+# the query, so a key list assembled some other way is bounded too.
+MANIFEST_MAX_KEYS = 5000
 
 
 # --------------------------------------------------------------------------- #
@@ -689,12 +705,31 @@ class FetchTarget:
     fetch_attempts: int
 
 
+def _bounded_keys(keys: Sequence[str]) -> list[str]:
+    """Distinct keys, order-stable, refused if there are too many.
+
+    Deduplicated because a hand-edited manifest can name the same file twice and
+    that is still one download; bounded because a key list is a scope, and a scope
+    that can name the whole corpus is not one.
+    """
+    distinct = list(dict.fromkeys(keys))
+    if len(distinct) > MANIFEST_MAX_KEYS:
+        raise ValueError(
+            f"scope names {len(distinct)} catalog keys; the cap is "
+            f"{MANIFEST_MAX_KEYS}. A key list is a benchmark cohort, not a way to "
+            f"fetch the whole corpus — use --all for that, explicitly."
+        )
+    return distinct
+
+
 async def select_fetch_targets(
     session: AsyncSession,
     *,
     sections: Sequence[str] | None = None,
     owners: Sequence[str] | None = None,
     resource_types: Sequence[str] | None = None,
+    years: Sequence[int] | None = None,
+    keys: Sequence[str] | None = None,
     limit: int | None = None,
     retry_failed: bool = False,
     include_inactive: bool = False,
@@ -711,6 +746,20 @@ async def select_fetch_targets(
     join, because a file referenced by three sources must appear once, not three
     times. `include_inactive` exists for completeness; by default a file only
     reachable from deactivated sources is not fetched — NRB withdrew it.
+
+    `keys` is the exact-cohort scope: `nrb_files.comparison_key` values, normally
+    from a benchmark manifest. It **selects from** the catalog and cannot add to
+    it — a key matching no row simply selects nothing (`resolve_manifest_keys`
+    reports those), and the URL that is eventually requested is the matched row's
+    `source_url`, guarded at fetch time like any other. It is also purely
+    additive: every predicate below still applies, so a manifest naming a
+    `blocked_host` file still cannot select it, and `--manifest --core` means the
+    manifest cohort restricted to the core.
+
+    `years` filters on NRB's own publication date. It exists because id-order
+    selection cannot deliberately reach a cohort: catalog ids are REST paging
+    order, so "circulars, limit 60" is the 60 lowest ids, and 2019 — NRB's CMS
+    migration — is half the corpus.
     """
     statuses = [FETCH_PENDING] + ([FETCH_FAILED] if retry_failed else [])
     stmt = select(
@@ -726,8 +775,10 @@ async def select_fetch_targets(
 
     if resource_types:
         stmt = stmt.where(NRBFile.resource_type.in_(list(resource_types)))
+    if keys:
+        stmt = stmt.where(NRBFile.comparison_key.in_(_bounded_keys(keys)))
 
-    if sections or owners or not include_inactive:
+    if sections or owners or years or not include_inactive:
         link = (
             select(NRBSourceFile.file_id)
             .join(NRBSource, NRBSource.id == NRBSourceFile.source_id)
@@ -739,6 +790,15 @@ async def select_fetch_targets(
             link = link.where(NRBSource.document_type.in_(list(sections)))
         if owners:
             link = link.where(NRBSource.owner.in_(list(owners)))
+        if years:
+            # NRB's own `date`, which Phase 3 measured at 100% coverage. A file
+            # published by several sources is in scope if ANY of them is — the
+            # EXISTS is already per-file, so this needs no separate handling.
+            link = link.where(
+                func.extract("year", NRBSource.published_at).in_(
+                    [float(year) for year in years]
+                )
+            )
         stmt = stmt.where(link.exists())
 
     # Oldest row first: stable across runs, so an interrupted pass resumed later
@@ -747,6 +807,75 @@ async def select_fetch_targets(
     if limit is not None:
         stmt = stmt.limit(limit)
     return [FetchTarget(*row) for row in (await session.execute(stmt)).all()]
+
+
+@dataclass(frozen=True)
+class ManifestResolution:
+    """What an exact key list turned out to name in the catalog.
+
+    Selection alone cannot answer this. `select_fetch_targets` returns what will be
+    attempted, which for a manifest is only the `pending` slice — so a cohort of
+    400 whose 380 files are already on disk selects 20, and without this the pass
+    would report "20 files" and look like it had lost the other 380. Each state is
+    counted separately because they mean different things to a reader: already
+    fetched is done, pending is queued, previously failed needs `--retry-failed`,
+    blocked can never be fetched, and missing means the catalog does not know that
+    key at all — a stale manifest or a typo, and the only one that is a defect.
+    """
+
+    requested: int                      # distinct keys asked for
+    duplicate_keys: int                 # entries collapsed into those
+    by_status: dict[str, int]           # fetch_status -> count, over matched rows
+    missing: tuple[str, ...]            # keys with no `nrb_files` row at all
+
+    @property
+    def known(self) -> int:
+        return sum(self.by_status.values())
+
+    def as_dict(self, *, sample: int = 50) -> dict[str, Any]:
+        """JSON-ready, with the missing list bounded for the run record."""
+        return {
+            "requested": self.requested,
+            "duplicate_keys": self.duplicate_keys,
+            "known": self.known,
+            "by_status": dict(self.by_status),
+            "missing_count": len(self.missing),
+            "missing": list(self.missing[:sample]),
+        }
+
+
+async def resolve_manifest_keys(
+    session: AsyncSession, keys: Sequence[str]
+) -> ManifestResolution:
+    """Match exact `comparison_key` values against the catalog. Read-only.
+
+    Deliberately reports rather than filters: a key the catalog does not know is
+    returned as missing instead of being dropped, because a manifest drifting away
+    from the corpus is exactly the failure this phase must not paper over.
+    """
+    distinct = _bounded_keys(keys)
+    if not distinct:
+        return ManifestResolution(0, 0, {}, ())
+    found: dict[str, str] = {}
+    for start in range(0, len(distinct), BATCH):
+        chunk = distinct[start : start + BATCH]
+        rows = (
+            await session.execute(
+                select(NRBFile.comparison_key, NRBFile.fetch_status).where(
+                    NRBFile.comparison_key.in_(chunk)
+                )
+            )
+        ).all()
+        found.update({key: status for key, status in rows})
+    by_status: dict[str, int] = {}
+    for status in found.values():
+        by_status[status] = by_status.get(status, 0) + 1
+    return ManifestResolution(
+        requested=len(distinct),
+        duplicate_keys=len(keys) - len(distinct),
+        by_status=by_status,
+        missing=tuple(key for key in distinct if key not in found),
+    )
 
 
 async def record_fetch_outcomes(
@@ -844,3 +973,286 @@ async def fetch_counts(session: AsyncSession) -> dict[str, int]:
         select(func.coalesce(func.sum(blobs.c.content_length), 0))
     )
     return counts
+
+
+# --------------------------------------------------------------------------- #
+# Phase 6A: selecting blobs to extract, and recording the results
+# --------------------------------------------------------------------------- #
+@dataclass(frozen=True)
+class ExtractTarget:
+    """One BLOB to extract — not one file row.
+
+    `file_id` is carried for reporting only. Selection is DISTINCT on
+    `content_sha256`, because two `nrb_files` rows sharing bytes are one
+    extraction: extracting both would parse the same PDF twice and write two rows
+    the unique index would then reject.
+    """
+
+    file_id: int
+    content_sha256: str
+    storage_key: str
+    extension: str | None
+    sniffed_mime: str | None
+    resource_type: str
+    content_length: int | None
+
+
+async def select_extract_targets(
+    session: AsyncSession,
+    *,
+    extractor_version: str,
+    sections: Sequence[str] | None = None,
+    owners: Sequence[str] | None = None,
+    resource_types: Sequence[str] | None = None,
+    years: Sequence[int] | None = None,
+    keys: Sequence[str] | None = None,
+    limit: int | None = None,
+    force: bool = False,
+) -> list[ExtractTarget]:
+    """Fetched blobs with no extraction at this version, in a deterministic order.
+
+    Only `fetch_status = 'fetched'` rows can be selected, which by construction
+    excludes `pending`, `failed` and the three `blocked_host` UAT links — the same
+    "excluded by the status column, not by a WHERE clause someone could forget"
+    rule Phase 5 uses. A `fetched` row is also guaranteed by
+    `ck_nrb_files_fetched_is_complete` to name its bytes, so the sha/key checks
+    below are belt and braces rather than the guarantee.
+
+    `keys` is the benchmark cohort, the same `comparison_key` identity the fetch
+    scope uses, and it composes with the other filters rather than replacing them.
+    Note its interaction with DISTINCT ON: two cohort entries that turn out to
+    share bytes collapse to ONE extraction, so the blob count can be lower than the
+    cohort size. That is correct — it is one blob — and the report states the two
+    numbers separately rather than letting the gap read as a failure.
+
+    `force` re-selects blobs already extracted at this version, for when a rule
+    changed but `EXTRACTOR_VERSION` has not been bumped yet (development only —
+    bumping the version is the honest way to invalidate).
+    """
+    stmt = (
+        select(
+            NRBFile.id,
+            NRBFile.content_sha256,
+            NRBFile.storage_key,
+            NRBFile.extension,
+            NRBFile.sniffed_mime,
+            NRBFile.resource_type,
+            NRBFile.content_length,
+        )
+        .where(
+            NRBFile.fetch_status == FETCH_FETCHED,
+            NRBFile.content_sha256.isnot(None),
+            NRBFile.storage_key.isnot(None),
+        )
+        # One row per blob, and a stable tiebreak, so a resumed pass continues
+        # rather than re-rolling which blobs got done.
+        .distinct(NRBFile.content_sha256)
+        .order_by(NRBFile.content_sha256, NRBFile.id)
+    )
+
+    if resource_types:
+        stmt = stmt.where(NRBFile.resource_type.in_(list(resource_types)))
+    if keys:
+        stmt = stmt.where(NRBFile.comparison_key.in_(_bounded_keys(keys)))
+
+    if not force:
+        done = select(NRBExtraction.id).where(
+            NRBExtraction.content_sha256 == NRBFile.content_sha256,
+            NRBExtraction.extractor_version == extractor_version,
+        )
+        stmt = stmt.where(~done.exists())
+
+    if sections or owners or years:
+        link = (
+            select(NRBSourceFile.file_id)
+            .join(NRBSource, NRBSource.id == NRBSourceFile.source_id)
+            .where(NRBSourceFile.file_id == NRBFile.id, NRBSource.is_active.is_(True))
+        )
+        if sections:
+            link = link.where(NRBSource.document_type.in_(list(sections)))
+        if owners:
+            link = link.where(NRBSource.owner.in_(list(owners)))
+        if years:
+            link = link.where(
+                func.extract("year", NRBSource.published_at).in_(
+                    [float(year) for year in years]
+                )
+            )
+        stmt = stmt.where(link.exists())
+
+    if limit is not None:
+        # Applies to the DISTINCT result, so it counts blobs, not rows.
+        stmt = stmt.limit(limit)
+    return [ExtractTarget(*row) for row in (await session.execute(stmt)).all()]
+
+
+# Everything an upsert must NOT overwrite: the identity itself, and the row's own
+# history. Derived by subtraction from the table rather than listed positively, so
+# a metric column added later is refreshed by a re-extraction instead of silently
+# keeping its first value — which is the failure mode that made this a set
+# difference in the first place.
+_EXTRACTION_IMMUTABLE = frozenset(
+    {"id", "content_sha256", "extractor_version", "created_at"}
+)
+
+
+async def record_extractions(
+    session: AsyncSession, rows: Sequence[dict[str, Any]]
+) -> None:
+    """Upsert extraction results, by `(content_sha256, extractor_version)`.
+
+    ON CONFLICT DO UPDATE rather than a plain insert: a `--force` re-extraction has
+    to replace its previous answer rather than fail on the unique index, and an
+    interrupted pass re-selecting a blob it had already recorded must be a no-op
+    rather than an error.
+
+    Core, with column keys, per this module's opening rule.
+    """
+    if not rows:
+        return
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+    table = NRBExtraction.__table__
+    statement = pg_insert(table)
+    statement = statement.on_conflict_do_update(
+        index_elements=["content_sha256", "extractor_version"],
+        set_={
+            column.name: statement.excluded[column.name]
+            for column in table.columns
+            if column.name not in _EXTRACTION_IMMUTABLE
+        },
+    )
+    for start in range(0, len(rows), BATCH):
+        await session.execute(statement, list(rows[start : start + BATCH]))
+
+
+async def extraction_counts(
+    session: AsyncSession, *, extractor_version: str
+) -> dict[str, int]:
+    """Extraction state of the whole fetched catalog, at one version. Read-only.
+
+    `blobs_fetched` counts DISTINCT sha256, not file rows: that is the true size of
+    the work, and the gap between it and `fetched` is how much NRB republishes.
+    `stale` counts rows written by an earlier extractor — the invalidation handle,
+    and a sequential scan by design (`extractor_version` is the second column of
+    the unique index, so it is not served by it; see `models.NRBExtraction`).
+    """
+    async def scalar(stmt) -> int:
+        return int((await session.execute(stmt)).scalar_one() or 0)
+
+    counts: dict[str, int] = {
+        "blobs_fetched": await scalar(
+            select(func.count(func.distinct(NRBFile.content_sha256))).where(
+                NRBFile.fetch_status == FETCH_FETCHED
+            )
+        ),
+        "blobs_extracted": await scalar(
+            select(func.count()).select_from(NRBExtraction).where(
+                NRBExtraction.extractor_version == extractor_version
+            )
+        ),
+    }
+    rows = (
+        await session.execute(
+            select(NRBExtraction.status, func.count())
+            .where(NRBExtraction.extractor_version == extractor_version)
+            .group_by(NRBExtraction.status)
+        )
+    ).all()
+    for status, count in rows:
+        counts[status] = int(count)
+    counts["stale"] = await scalar(
+        select(func.count()).select_from(NRBExtraction).where(
+            NRBExtraction.extractor_version != extractor_version
+        )
+    )
+    return counts
+
+
+async def count_unfetched(session: AsyncSession, keys: Sequence[str]) -> int:
+    """How many of these cohort keys are not on disk yet. Read-only.
+
+    A partly-fetched cohort is a legitimate mid-download state, not an error — but
+    every percentage in the profile is over the files that WERE extracted, so the
+    gap has to be said out loud rather than left for a reader to notice that 400
+    became 380.
+    """
+    if not keys:
+        return 0
+    distinct = _bounded_keys(keys)
+    fetched = int(
+        (
+            await session.execute(
+                select(func.count())
+                .select_from(NRBFile)
+                .where(
+                    NRBFile.comparison_key.in_(distinct),
+                    NRBFile.fetch_status == FETCH_FETCHED,
+                )
+            )
+        ).scalar_one()
+        or 0
+    )
+    return max(len(distinct) - fetched, 0)
+
+
+async def load_sample_rows(
+    session: AsyncSession,
+    *,
+    sections: Sequence[str] | None = None,
+    resource_types: Sequence[str] | None = None,
+) -> list[dict[str, Any]]:
+    """Every fetchable file with its stratification keys. Read-only.
+
+    Returns FILE-level rows (one per `nrb_files` row, joined to its primary source)
+    because sampling happens BEFORE anything is fetched, when `content_sha256` is
+    still NULL — so the sample is keyed on `comparison_key` and the fetch is scoped
+    from it.
+
+    A file referenced by several sources is attributed to the FIRST by source id,
+    which is deterministic but is an approximation: 42 files really are published
+    by more than one source. The report says so rather than implying each file has
+    one owner.
+    """
+    stmt = (
+        select(
+            NRBFile.comparison_key,
+            NRBFile.resource_type,
+            NRBFile.fetch_status,
+            NRBFile.content_sha256,
+            func.min(NRBSource.id).label("source_id"),
+        )
+        .join(NRBSourceFile, NRBSourceFile.file_id == NRBFile.id)
+        .join(NRBSource, NRBSource.id == NRBSourceFile.source_id)
+        .where(NRBSource.is_active.is_(True))
+        .group_by(
+            NRBFile.comparison_key, NRBFile.resource_type,
+            NRBFile.fetch_status, NRBFile.content_sha256,
+        )
+    )
+    if resource_types:
+        stmt = stmt.where(NRBFile.resource_type.in_(list(resource_types)))
+    if sections:
+        stmt = stmt.where(NRBSource.document_type.in_(list(sections)))
+    base = stmt.subquery()
+    detailed = select(
+        base.c.comparison_key,
+        base.c.resource_type,
+        base.c.fetch_status,
+        base.c.content_sha256,
+        NRBSource.document_type,
+        NRBSource.owner,
+        func.extract("year", NRBSource.published_at).label("year"),
+    ).join(NRBSource, NRBSource.id == base.c.source_id)
+    return [
+        {
+            "comparison_key": row[0],
+            "resource_type": row[1],
+            "fetch_status": row[2],
+            "content_sha256": row[3],
+            "document_type": row[4],
+            "owner": row[5],
+            "year": int(row[6]) if row[6] is not None else None,
+        }
+        for row in (await session.execute(detailed)).all()
+    ]

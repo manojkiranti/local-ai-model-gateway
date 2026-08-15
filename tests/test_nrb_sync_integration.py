@@ -63,7 +63,14 @@ from tests.test_nrb_catalog import (
     wp_post,
 )
 
-NRB_TABLES = ("nrb_source_files", "nrb_sources", "nrb_files", "nrb_sync_runs")
+# Cleared INSIDE the rolled-back transaction, so a developer's real catalog is
+# never touched. `nrb_extractions` is here because `extraction_counts` counts
+# globally — after Phase 6A's live profile there are real rows, and a test
+# asserting exact counts would read them.
+NRB_TABLES = (
+    "nrb_source_files", "nrb_sources", "nrb_extractions", "nrb_files",
+    "nrb_sync_runs",
+)
 
 
 def _engine():

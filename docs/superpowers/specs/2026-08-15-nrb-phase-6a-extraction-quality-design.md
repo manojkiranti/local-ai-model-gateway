@@ -278,8 +278,11 @@ nrb_extractions
   extracted_at          timestamptz
   duration_ms           int
   UNIQUE (content_sha256, extractor_version)
-  INDEX (status), INDEX (content_sha256)
+  INDEX (status)
 ```
+
+As built there is no separate `INDEX (content_sha256)`: that column leads the
+unique index, which already serves lookup by blob and the join from `nrb_files`.
 
 **No extracted text is persisted.** Only a ≤300-char preview for the manual
 inspection sample. Phase 7 re-parses with Docling for chunking anyway, and a
@@ -290,7 +293,10 @@ used.
 `extractor_version` is a plain string bumped by hand when the parser or the rules
 change. The unique constraint on `(content_sha256, extractor_version)` makes
 re-running a no-op and makes "which blobs are stale" a query
-(`WHERE extractor_version <> current`). No versioning framework.
+(`WHERE extractor_version <> current`). No versioning framework. That query is a
+sequential scan — `extractor_version` is the *second* index column, so the unique
+index does not serve it — which is accepted rather than indexed: it is an
+occasional operator query over one row per blob, not something the pass runs.
 
 `nrb_files` gains **nothing**. Its business is acquisition; extraction is per
 blob, and per-row columns would extract shared bytes twice and store two answers.

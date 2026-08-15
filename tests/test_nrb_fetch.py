@@ -447,3 +447,97 @@ def test_a_blocked_row_records_the_guards_reason():
 def test_the_attempt_counter_advances_from_whatever_the_row_had():
     outcome = fetch_mod.FetchOutcome(target(fetch_attempts=3), FETCH_FAILED, error="x")
     assert fetch_mod._row_for(outcome, run_id=1, now="NOW")["fetch_attempts"] == 4
+
+
+# --------------------------------------------------------------------------- #
+# The manifest scope, at the CLI and in the report
+# --------------------------------------------------------------------------- #
+def _script():
+    import importlib.util
+    import pathlib
+
+    path = pathlib.Path(__file__).resolve().parents[1] / "scripts" / "nrb_fetch.py"
+    spec = importlib.util.spec_from_file_location("nrb_fetch_script", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_the_command_still_refuses_to_run_with_no_scope():
+    """The corpus is 8.6 GB off a central bank's website. Adding scope flags must
+    not accidentally make "no flags" mean "everything"."""
+    assert _script()._scope_given(_script()._parse_args([])) is False
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["--core"], ["--all"], ["--limit", "5"], ["--section", "circular"],
+        ["--owner", "bfr"], ["--type", "pdf"],
+        ["--year", "2019"], ["--manifest", "m.json"],
+    ],
+)
+def test_every_scope_flag_counts_as_a_scope(argv):
+    """Including the two new ones — a scope flag missing from `_scope_given` would
+    silently turn its invocation into a whole-corpus fetch."""
+    script = _script()
+    assert script._scope_given(script._parse_args(argv)) is True
+
+
+def test_the_year_flag_is_repeatable_and_numeric():
+    args = _script()._parse_args(["--year", "2019", "--year", "2024"])
+    assert args.year == [2019, 2024]
+
+
+def test_the_core_sections_are_expanded_once_and_stay_ordered():
+    script = _script()
+    args = script._parse_args(["--core", "--section", "circular"])
+    sections = script._sections_for(args)
+    assert sections[0] == "circular"                 # as typed
+    assert len(sections) == len(set(sections))       # --core did not duplicate it
+
+
+def test_the_report_accounts_for_every_manifest_state():
+    """`selected` is only the pending slice, so a cohort already on disk would read
+    as a cohort that lost its files unless each state is named."""
+    from app.nrb import report
+
+    text = report.render_fetch(
+        {
+            "run_id": 7, "status": "completed", "dry_run": False,
+            "duration_seconds": 1.0,
+            "scope": {"manifest_keys": 400, "years": [2019]},
+            "counters": {"files_selected": 18, "files_fetched": 17,
+                         "files_failed": 1},
+            "database": {},
+            "notes": {
+                "manifest": {
+                    "requested": 400, "duplicate_keys": 2, "known": 398,
+                    "by_status": {"fetched": 379, "pending": 18, "failed": 1},
+                    "missing_count": 2,
+                    "missing": ["https://www.nrb.org.np/x.pdf"],
+                },
+            },
+        }
+    )
+    for expected in (
+        "Manifest cohort", "requested:", "already fetched:", "pending:",
+        "previously failed:", "blocked:", "fetched this pass:",
+        "failed this pass:", "not in the catalog:",
+        "duplicate entries collapsed", "https://www.nrb.org.np/x.pdf",
+        "manifest keys:      400", "years:              2019",
+    ):
+        assert expected in text, expected
+
+
+def test_a_pass_with_no_manifest_prints_no_manifest_block():
+    from app.nrb import report
+
+    text = report.render_fetch(
+        {
+            "run_id": 7, "status": "completed", "dry_run": False,
+            "duration_seconds": 1.0, "scope": {}, "counters": {},
+            "database": {}, "notes": {},
+        }
+    )
+    assert "Manifest cohort" not in text

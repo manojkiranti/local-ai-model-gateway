@@ -17,6 +17,13 @@ WHAT MAKES THIS SAFE
     `NRB_CRAWL_DELAY_SECONDS`. There is no retry inside a run: a failure is recorded
     and a later `--retry-failed` pass is an explicit decision.
 
+    An exact-cohort scope (`keys`, from a Phase 6A benchmark manifest) does not
+    widen any of that. A manifest names `nrb_files.comparison_key` values, so it
+    can only ever SELECT FROM the catalog: what gets requested is the matched
+    row's `source_url`, through the same guard, and a key naming a host NRB never
+    published matches nothing and is reported missing. There is no path by which a
+    file on disk can introduce a URL.
+
 WHAT MAKES IT VERIFIABLE
     Every stored file is content-addressed by its own sha256 (`filestore`), so the
     path *is* the checksum. The bytes are also sniffed (`sniff`) and the result kept
@@ -306,6 +313,8 @@ async def run_fetch(
     sections: Sequence[str] | None = None,
     owners: Sequence[str] | None = None,
     resource_types: Sequence[str] | None = None,
+    years: Sequence[int] | None = None,
+    keys: Sequence[str] | None = None,
     limit: int | None = None,
     retry_failed: bool = False,
     max_bytes: int | None = None,
@@ -320,6 +329,14 @@ async def run_fetch(
     all the work in a rolled-back transaction. The difference is deliberate: a
     rolled-back download would still have pulled gigabytes off a central bank's
     site, which is the cost we are trying to preview.)
+
+    `keys` is an exact cohort of `nrb_files.comparison_key` values — the Phase 6A
+    benchmark manifest. It changes *which* files are selected and nothing else:
+    every guard, cap, pacing rule and status precondition below applies unchanged,
+    and the URL requested is still the catalog's `source_url`. Because a manifest
+    is a cohort rather than a queue, it is also *resolved* before selection and the
+    resolution is reported: selection returns only the pending slice, so a cohort
+    already on disk would otherwise look like a cohort that had gone missing.
     """
     from ..db.session import SessionLocal, engine as app_engine
 
@@ -331,6 +348,11 @@ async def run_fetch(
         "sections": list(sections or []),
         "owners": list(owners or []),
         "resource_types": list(resource_types or []),
+        "years": list(years or []),
+        # The COUNT, not the keys. A 400-element list in every `nrb_fetch_runs`
+        # row would make the operational log unreadable, and the manifest file is
+        # the durable record of which files those were.
+        "manifest_keys": len(set(keys or ())),
         "limit": limit,
         "retry_failed": retry_failed,
         "max_bytes": max_bytes,
@@ -341,11 +363,28 @@ async def run_fetch(
 
     async with advisory_lock(engine, FETCH_LOCK_KEY, what="NRB fetch"):
         async with session_factory() as session:
+            # Resolved BEFORE selection, and reported whether or not anything is
+            # downloaded: the manifest's own accounting (already fetched / pending
+            # / previously failed / blocked / unknown to the catalog) is not
+            # recoverable from the selection, which returns only what will be
+            # attempted.
+            manifest: dict[str, Any] | None = None
+            if keys:
+                resolution = await catalog.resolve_manifest_keys(session, keys)
+                manifest = resolution.as_dict(sample=NOTE_SAMPLE)
+                if resolution.missing:
+                    logger.warning(
+                        "NRB fetch: %d of %d manifest keys are not in the catalog",
+                        len(resolution.missing), resolution.requested,
+                    )
+
             targets = await catalog.select_fetch_targets(
                 session,
                 sections=sections,
                 owners=owners,
                 resource_types=resource_types,
+                years=years,
+                keys=keys,
                 limit=limit,
                 retry_failed=retry_failed,
             )
@@ -371,6 +410,7 @@ async def run_fetch(
                         "errors": [],
                         "warnings": [],
                         "stopped": None,
+                        "manifest": manifest,
                     },
                     counts=await catalog.fetch_counts(session),
                 )
@@ -464,6 +504,7 @@ async def run_fetch(
                 "warning_count": len(warnings),
                 "reported_bytes_selected": reported,
                 "stopped": stopped,
+                "manifest": manifest,
             }
             await catalog.finish_fetch_run(
                 session, run_id, status=status, counters=counters, notes=notes

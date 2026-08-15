@@ -720,7 +720,8 @@ class NRBExtraction(Base):
     `extractor_version` is the other half of the key and the invalidation handle:
     bumping it makes every stored result stale and re-extractable without
     deleting anything, and "which blobs are stale" stays a
-    `WHERE extractor_version <> …` query rather than a framework.
+    `WHERE extractor_version <> …` query rather than a framework. That query
+    scans (see the index note below); it is run by an operator, not by the pass.
 
     **No extracted text is stored.** Only `preview`, and that is held to
     `EXTRACTION_PREVIEW_CHARS` by a CHECK rather than by the writer remembering:
@@ -767,8 +768,13 @@ class NRBExtraction(Base):
         ),
         # Identity. One answer per (bytes, extractor), so a repeat pass is a
         # no-op rather than a second opinion. `content_sha256` leads, so this
-        # index also serves the join back to `nrb_files` and the staleness scan —
-        # a separate single-column index on it would be redundant.
+        # index also serves the lookup by blob and the join back to
+        # `nrb_files.content_sha256` — a separate single-column index on it would
+        # be redundant. It does NOT serve a version-only scan
+        # (`WHERE extractor_version <> …`): that column is second, so the
+        # staleness query is a sequential scan. Deliberate, and left alone for
+        # now — it is an occasional operator query over one row per blob, not a
+        # hot path, and an index earns its write cost only once that changes.
         Index(
             "ux_nrb_extractions_content_version",
             "content_sha256",

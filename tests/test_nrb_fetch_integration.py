@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from datetime import datetime, timezone
 
 import httpx
 import pytest
@@ -47,22 +48,27 @@ UPLOADS = "https://www.nrb.org.np/contents/uploads/2026/08"
 # --------------------------------------------------------------------------- #
 # Fixtures: rows straight into the catalog
 # --------------------------------------------------------------------------- #
-async def _seed(session, *, owner: str, files, section: str = "circular", active=True):
+async def _seed(
+    session, *, owner: str, files, section: str = "circular", active=True,
+    published: datetime | None = None, slug: str = "post",
+):
     """One source owning `files`; returns `{name: file_id}`.
 
     Raw SQL rather than the sync: these tests are about the fetch, and a
     hand-built row makes the fetch-relevant columns (reported MIME, extension,
-    status) obvious at the point of use.
+    status) obvious at the point of use. `published` is NRB's own publication
+    date, which the `--year` scope filters on; `slug` distinguishes two sources
+    owned by the same code (`url_key` is unique).
     """
     source_id = (
         await session.execute(
             text(
                 "INSERT INTO nrb_sources (page_url, url_key, metadata_status,"
-                " metadata_hash, owner, document_type, is_active) VALUES"
-                " (:u, :u, 'rest', :h, :o, :s, :a) RETURNING id"
+                " metadata_hash, owner, document_type, is_active, published_at)"
+                " VALUES (:u, :u, 'rest', :h, :o, :s, :a, :p) RETURNING id"
             ),
-            {"u": f"https://www.nrb.org.np/{owner}/post/", "h": "0" * 64,
-             "o": owner, "s": section, "a": active},
+            {"u": f"https://www.nrb.org.np/{owner}/{slug}/", "h": "0" * 64,
+             "o": owner, "s": section, "a": active, "p": published},
         )
     ).scalar_one()
     ids: dict[str, int] = {}
@@ -239,6 +245,175 @@ def test_the_limit_takes_the_oldest_rows_so_a_pass_resumes():
 
     ids = _run(go)
     assert len(ids) == 2 and ids == sorted(ids)
+
+
+def test_the_year_scope_selects_on_nrbs_own_publication_date():
+    """id order is REST paging order, so it cannot reach a cohort deliberately —
+    which matters because 2019 (NRB's CMS migration) is half the corpus."""
+    async def go(session):
+        await _seed(session, owner="bfr", slug="old",
+                    published=datetime(2019, 6, 1, tzinfo=timezone.utc),
+                    files=[{"name": "a", "url": f"{UPLOADS}/2019.pdf"}])
+        await _seed(session, owner="bfr", slug="new",
+                    published=datetime(2024, 6, 1, tzinfo=timezone.utc),
+                    files=[{"name": "b", "url": f"{UPLOADS}/2024.pdf"}])
+        return (
+            [t.source_url for t in
+             await catalog.select_fetch_targets(session, years=[2019])],
+            [t.source_url for t in
+             await catalog.select_fetch_targets(session, years=[2019, 2024])],
+        )
+
+    one, both = _run(go)
+    assert one == [f"{UPLOADS}/2019.pdf"]
+    assert sorted(both) == sorted([f"{UPLOADS}/2019.pdf", f"{UPLOADS}/2024.pdf"])
+
+
+# --------------------------------------------------------------------------- #
+# The exact-cohort (manifest) scope
+# --------------------------------------------------------------------------- #
+def test_a_manifest_selects_exactly_its_files_and_not_the_lowest_ids():
+    """THE reason the manifest exists. Broad selection is `pending` rows in id
+    order, and catalog id order is the order REST paged the post types — so a
+    `--limit 2` "sample" is the two lowest ids. Naming the files exactly must
+    return those files, even though a same-sized broad scope returns different
+    ones."""
+    async def go(session):
+        ids = await _seed(session, owner="bfr", files=[
+            {"name": str(n), "url": f"{UPLOADS}/{n}.pdf"} for n in range(6)])
+        wanted = [f"{UPLOADS}/4.pdf", f"{UPLOADS}/5.pdf"]
+        exact = await catalog.select_fetch_targets(session, keys=wanted)
+        broad = await catalog.select_fetch_targets(session, limit=2)
+        return ([t.source_url for t in exact], [t.source_url for t in broad],
+                sorted(ids.values()))
+
+    exact, broad, ids = _run(go)
+    assert exact == [f"{UPLOADS}/4.pdf", f"{UPLOADS}/5.pdf"]
+    assert broad == [f"{UPLOADS}/0.pdf", f"{UPLOADS}/1.pdf"]
+    assert not set(exact) & set(broad)      # the broad scope substituted nothing
+
+
+def test_duplicate_manifest_keys_do_not_select_the_same_file_twice():
+    async def go(session):
+        await _seed(session, owner="bfr", files=[
+            {"name": "a", "url": f"{UPLOADS}/a.pdf"}])
+        key = f"{UPLOADS}/a.pdf"
+        targets = await catalog.select_fetch_targets(session, keys=[key, key, key])
+        resolution = await catalog.resolve_manifest_keys(session, [key, key, key])
+        return targets, resolution
+
+    targets, resolution = _run(go)
+    assert len(targets) == 1
+    assert resolution.requested == 1 and resolution.duplicate_keys == 2
+
+
+def test_a_key_the_catalog_does_not_know_selects_nothing_and_is_reported():
+    """A manifest names catalog keys, so an arbitrary URL — including one on a host
+    NRB never published — matches no row. There is nothing here for it to bypass:
+    what would be requested is the matched row's own `source_url`, and there is no
+    matched row."""
+    async def go(session):
+        await _seed(session, owner="bfr", files=[
+            {"name": "real", "url": f"{UPLOADS}/real.pdf"}])
+        hostile = "https://evil.example.com/payload.pdf"
+        targets = await catalog.select_fetch_targets(session, keys=[hostile])
+        resolution = await catalog.resolve_manifest_keys(
+            session, [hostile, f"{UPLOADS}/real.pdf"]
+        )
+        return targets, resolution
+
+    targets, resolution = _run(go)
+    assert targets == []
+    assert resolution.missing == ("https://evil.example.com/payload.pdf",)
+    assert resolution.known == 1
+
+
+def test_a_manifest_cannot_select_a_blocked_file():
+    """The key scope is additive: the status precondition still applies, so the
+    three uat.nrb.org.np links stay unreachable however they are named."""
+    async def go(session):
+        await _seed(session, owner="bfr", files=[
+            {"name": "uat", "url": "http://uat.nrb.org.np/x.pdf",
+             "status": FETCH_BLOCKED_HOST, "blocked_reason": "refusing plain http"},
+        ])
+        key = "http://uat.nrb.org.np/x.pdf"
+        return (
+            await catalog.select_fetch_targets(session, keys=[key]),
+            await catalog.select_fetch_targets(session, keys=[key], retry_failed=True),
+            await catalog.resolve_manifest_keys(session, [key]),
+        )
+
+    plain, retried, resolution = _run(go)
+    assert plain == [] and retried == []
+    # Reported, not silently dropped: it is a known file that can never be fetched.
+    assert resolution.by_status == {FETCH_BLOCKED_HOST: 1}
+    assert resolution.missing == ()
+
+
+def test_a_manifest_file_already_on_disk_is_satisfied_rather_than_selected():
+    async def go(session):
+        await _seed(session, owner="bfr", files=[
+            {"name": "done", "url": f"{UPLOADS}/done.pdf"},
+            {"name": "todo", "url": f"{UPLOADS}/todo.pdf"},
+        ])
+        await session.execute(text(
+            "UPDATE nrb_files SET fetch_status='fetched', content_sha256=:h,"
+            " content_length=1, storage_key='aa/x.pdf'"
+            " WHERE comparison_key = :k"),
+            {"h": "a" * 64, "k": f"{UPLOADS}/done.pdf"})
+        await session.flush()
+        keys = [f"{UPLOADS}/done.pdf", f"{UPLOADS}/todo.pdf"]
+        return (
+            [t.source_url for t in
+             await catalog.select_fetch_targets(session, keys=keys)],
+            await catalog.resolve_manifest_keys(session, keys),
+        )
+
+    selected, resolution = _run(go)
+    assert selected == [f"{UPLOADS}/todo.pdf"]
+    assert resolution.requested == 2
+    assert resolution.by_status == {FETCH_FETCHED: 1, FETCH_PENDING: 1}
+
+
+def test_the_manifest_scope_composes_with_the_other_filters():
+    """`--manifest --type pdf` means the cohort restricted to PDFs, not the union."""
+    async def go(session):
+        await _seed(session, owner="bfr", files=[
+            {"name": "p", "url": f"{UPLOADS}/p.pdf"},
+            {"name": "s", "url": f"{UPLOADS}/s.xlsx", "extension": "xlsx",
+             "resource_type": "spreadsheet"},
+        ])
+        keys = [f"{UPLOADS}/p.pdf", f"{UPLOADS}/s.xlsx"]
+        return [
+            t.source_url for t in await catalog.select_fetch_targets(
+                session, keys=keys, resource_types=["spreadsheet"]
+            )
+        ]
+
+    assert _run(go) == [f"{UPLOADS}/s.xlsx"]
+
+
+def test_an_oversized_key_list_is_refused_rather_than_run():
+    """A key list is a scope; a scope that can name the whole corpus is not one."""
+    async def go(session):
+        keys = [f"{UPLOADS}/{n}.pdf" for n in range(catalog.MANIFEST_MAX_KEYS + 1)]
+        with pytest.raises(ValueError, match="cap"):
+            await catalog.select_fetch_targets(session, keys=keys)
+        with pytest.raises(ValueError, match="cap"):
+            await catalog.resolve_manifest_keys(session, keys)
+        return True
+
+    assert _run(go) is True
+
+
+def test_resolution_of_an_empty_key_list_is_empty_not_everything():
+    async def go(session):
+        await _seed(session, owner="bfr", files=[
+            {"name": "a", "url": f"{UPLOADS}/a.pdf"}])
+        return await catalog.resolve_manifest_keys(session, [])
+
+    resolution = _run(go)
+    assert resolution.requested == 0 and resolution.known == 0
 
 
 # --------------------------------------------------------------------------- #
@@ -551,6 +726,135 @@ def test_a_dry_run_makes_no_requests_and_writes_nothing(monkeypatch, tmp_path, c
     assert result.run_id is None
     assert result.counters["files_selected"] == 3
     assert result.notes["reported_bytes_selected"] == 0   # the fixture reports no sizes
+    assert [p for p in tmp_path.rglob("*") if p.is_file()] == []
+    assert all(row[1] == FETCH_PENDING for row in _files(corpus).values())
+
+
+def test_a_manifest_pass_downloads_exactly_the_named_file(monkeypatch, tmp_path, corpus):
+    """End to end: the cohort is one of the fixture's three files, so the other two
+    must be neither requested nor recorded — a pass that "helpfully" fetched the
+    rest would silently change what the benchmark measures."""
+    requested: list[str] = []
+    urls = corpus["urls"]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requested.append(str(request.url))
+        return httpx.Response(200, content=PDF_BODY)
+
+    monkeypatch.setattr(httpx.AsyncClient, "__init__", _init_with(handler))
+    monkeypatch.setattr(filestore, "base_dir", lambda: tmp_path)
+
+    async def go():
+        engine = _engine()
+        try:
+            factory = async_sessionmaker(engine, expire_on_commit=False)
+            return await fetch_mod.run_fetch(
+                owners=[corpus["owner"]],
+                # Named twice on purpose: a hand-edited manifest can repeat a key,
+                # and it is still one download.
+                keys=[urls["twin"], urls["twin"]],
+                engine=engine, session_factory=factory,
+            )
+        finally:
+            await engine.dispose()
+
+    result = asyncio.run(go())
+    assert requested == [urls["twin"]]
+    assert result.counters["files_selected"] == 1
+    assert result.counters["files_fetched"] == 1
+
+    rows = _files(corpus)
+    ids = corpus["ids"]
+    assert rows[ids["twin"]][1] == FETCH_FETCHED
+    assert rows[ids["pdf"]][1] == FETCH_PENDING       # untouched
+    assert rows[ids["missing"]][1] == FETCH_PENDING
+
+    manifest = result.notes["manifest"]
+    assert manifest["requested"] == 1 and manifest["duplicate_keys"] == 1
+    assert manifest["by_status"] == {FETCH_PENDING: 1}
+    assert manifest["missing_count"] == 0
+    assert result.scope["manifest_keys"] == 1        # the count, never the keys
+
+
+def test_a_second_manifest_pass_reports_the_cohort_as_already_fetched(
+    monkeypatch, tmp_path, corpus
+):
+    """Resumability seen from the cohort's side: nothing is left to select, and the
+    report must say "already fetched", not "0 files"."""
+    urls = corpus["urls"]
+    keys = [urls["pdf"], urls["twin"]]
+    _pass(monkeypatch, tmp_path, corpus, keys=keys)
+    second = _pass(monkeypatch, tmp_path, corpus, keys=keys)
+
+    assert second.counters["files_selected"] == 0
+    assert second.notes["manifest"]["by_status"] == {FETCH_FETCHED: 2}
+    assert second.notes["manifest"]["missing_count"] == 0
+    assert second.status == FETCH_RUN_COMPLETED
+
+
+def test_a_manifest_key_missing_from_the_catalog_is_reported_by_the_pass(
+    monkeypatch, tmp_path, corpus
+):
+    """A manifest drifting away from the catalog is the failure this phase must not
+    paper over — it is reported, and nothing is fetched for it."""
+    requested: list[str] = []
+    urls = corpus["urls"]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requested.append(str(request.url))
+        return httpx.Response(200, content=PDF_BODY)
+
+    monkeypatch.setattr(httpx.AsyncClient, "__init__", _init_with(handler))
+    monkeypatch.setattr(filestore, "base_dir", lambda: tmp_path)
+
+    async def go():
+        engine = _engine()
+        try:
+            factory = async_sessionmaker(engine, expire_on_commit=False)
+            return await fetch_mod.run_fetch(
+                owners=[corpus["owner"]],
+                keys=[urls["pdf"], "https://evil.example.com/payload.pdf"],
+                engine=engine, session_factory=factory,
+            )
+        finally:
+            await engine.dispose()
+
+    result = asyncio.run(go())
+    assert requested == [urls["pdf"]]
+    assert result.notes["manifest"]["missing"] == [
+        "https://evil.example.com/payload.pdf"
+    ]
+    assert result.notes["manifest"]["missing_count"] == 1
+
+
+def test_a_manifest_dry_run_makes_no_requests_and_still_reports_the_cohort(
+    monkeypatch, tmp_path, corpus
+):
+    requested: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requested.append(str(request.url))
+        return httpx.Response(200, content=PDF_BODY)
+
+    monkeypatch.setattr(httpx.AsyncClient, "__init__", _init_with(handler))
+    monkeypatch.setattr(filestore, "base_dir", lambda: tmp_path)
+
+    async def go():
+        engine = _engine()
+        try:
+            factory = async_sessionmaker(engine, expire_on_commit=False)
+            return await fetch_mod.run_fetch(
+                owners=[corpus["owner"]], keys=[corpus["urls"]["pdf"]],
+                dry_run=True, engine=engine, session_factory=factory,
+            )
+        finally:
+            await engine.dispose()
+
+    result = asyncio.run(go())
+    assert requested == []
+    assert result.run_id is None
+    assert result.counters["files_selected"] == 1
+    assert result.notes["manifest"]["requested"] == 1
     assert [p for p in tmp_path.rglob("*") if p.is_file()] == []
     assert all(row[1] == FETCH_PENDING for row in _files(corpus).values())
 

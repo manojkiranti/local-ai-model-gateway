@@ -27,6 +27,12 @@ SCOPE IS REQUIRED — THERE IS NO DEFAULT
     # one department, spreadsheets only
     .venv/bin/python scripts/nrb_fetch.py --owner red --type spreadsheet
 
+    # one publication year (2019 is NRB's CMS migration — half the corpus)
+    .venv/bin/python scripts/nrb_fetch.py --section circular --year 2019 --dry-run
+
+    # EXACTLY the Phase 6A benchmark cohort, and nothing else
+    .venv/bin/python scripts/nrb_fetch.py --manifest docs/nrb/phase6a-manifest.json
+
     # everything (explicit, and it means 8.6 GB)
     .venv/bin/python scripts/nrb_fetch.py --all --max-bytes 2000000000
 
@@ -39,7 +45,10 @@ WHAT IT WILL NOT DO
     never be selected). Follow a redirect. Buffer a body in memory. Retry inside a
     pass. Store an HTML error page as a document — WordPress answers a missing file
     with a themed 200 page, so a body that sniffs as HTML where a document was
-    promised is recorded as a failure and nothing is written.
+    promised is recorded as a failure and nothing is written. Take a URL from a
+    file: `--manifest` names catalog keys, so it selects rows the catalog already
+    holds and requests those rows' own URLs — a key the catalog does not know is
+    reported as missing, never fetched.
 
 RESUMABILITY
     Results are committed every 25 files and selection is `pending`-only in id
@@ -65,6 +74,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.nrb.fetch import run_fetch  # noqa: E402
 from app.nrb.locks import LockBusy  # noqa: E402
+from app.nrb.manifest import read_manifest  # noqa: E402
 from app.nrb.report import render_fetch, summarize_fetch  # noqa: E402
 
 # The regulatory core, in `classify.SECTIONS` vocabulary. Measured live: 1,804
@@ -95,6 +105,19 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="restrict to this resource_type (pdf, spreadsheet, document, image)",
     )
     scope.add_argument(
+        "--year", action="append", type=int, default=None, metavar="YYYY",
+        help="restrict to documents NRB published in this year; repeatable. Needed "
+             "because id-order selection cannot reach a cohort deliberately, and "
+             "2019 (NRB's CMS migration) is half the corpus.",
+    )
+    scope.add_argument(
+        "--manifest", default=None, metavar="PATH",
+        help="fetch EXACTLY the files a benchmark manifest names (Phase 6A). The "
+             "manifest holds catalog keys, not URLs: it can only select rows the "
+             "catalog already has, and every guard, cap and pacing rule still "
+             "applies — a manifest cannot select a blocked_host file.",
+    )
+    scope.add_argument(
         "--limit", type=int, default=None, metavar="N",
         help="fetch at most N files (oldest catalog rows first, so it resumes)",
     )
@@ -123,6 +146,31 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def _sections_for(args: argparse.Namespace) -> list[str]:
+    """The document types this invocation asks for, order-stable and deduplicated,
+    so the recorded scope reads the way it was typed."""
+    sections = list(args.section or [])
+    if args.core:
+        sections.extend(CORE_SECTIONS)
+    return list(dict.fromkeys(sections))
+
+
+def _scope_given(args: argparse.Namespace) -> bool:
+    """Whether ANY slice was named. A separate function because it is the rule the
+    whole command turns on — the corpus is 8.6 GB off a central bank's website —
+    and because a new scope flag that is not added here silently becomes a
+    whole-corpus fetch."""
+    return bool(
+        _sections_for(args)
+        or args.owner
+        or args.resource_type
+        or args.year
+        or args.manifest
+        or args.limit
+        or args.all
+    )
+
+
 async def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
     logging.basicConfig(
@@ -131,13 +179,9 @@ async def main(argv: list[str] | None = None) -> int:
         stream=sys.stderr,   # keeps stdout clean for --json redirection
     )
 
-    sections = list(args.section or [])
-    if args.core:
-        sections.extend(CORE_SECTIONS)
-    # Deduplicated but order-stable, so the recorded scope reads the way it was typed.
-    sections = list(dict.fromkeys(sections))
+    sections = _sections_for(args)
 
-    if not (sections or args.owner or args.resource_type or args.limit or args.all):
+    if not _scope_given(args):
         print(
             "refusing to start: no scope given. The whole corpus is ~18.3k files and "
             "~8.6 GB against a central bank's website, so a slice must be chosen "
@@ -146,11 +190,31 @@ async def main(argv: list[str] | None = None) -> int:
         )
         return 2
 
+    manifest_keys = None
+    if args.manifest:
+        try:
+            manifest = read_manifest(args.manifest)
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            print(f"refusing to start: unreadable manifest — {exc}", file=sys.stderr)
+            return 2
+        manifest_keys = manifest.keys()
+        extra = (
+            f", {manifest.duplicate_entries} duplicate entries collapsed"
+            if manifest.duplicate_entries else ""
+        )
+        print(
+            f"manifest: {len(manifest_keys)} files, drawn {manifest.drawn_at or '?'}"
+            f"{extra}",
+            file=sys.stderr,
+        )
+
     try:
         result = await run_fetch(
             sections=sections or None,
             owners=args.owner,
             resource_types=args.resource_type,
+            years=args.year,
+            keys=manifest_keys,
             limit=args.limit,
             retry_failed=args.retry_failed,
             max_bytes=args.max_bytes,

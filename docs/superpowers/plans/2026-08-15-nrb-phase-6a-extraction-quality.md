@@ -1632,7 +1632,7 @@ class NRBExtraction(Base):
 
     `extractor_version` is the other half of the key and the invalidation handle:
     bumping it makes every stored result stale and re-extractable without deleting
-    anything, and "which blobs are stale" stays a `WHERE extractor_version <> …`
+    anything, and "which blobs are stale" stays a (scanning) `WHERE extractor_version <> …`
     query rather than a framework.
 
     **No extracted text is stored** — only a bounded `preview` for human sanity
@@ -1664,8 +1664,10 @@ class NRBExtraction(Base):
         ),
         # Phase 6B's work queue is `WHERE status = 'needs_ocr'`.
         Index("ix_nrb_extractions_status", "status"),
-        # The join back to nrb_files, and the staleness scan.
-        Index("ix_nrb_extractions_sha", "content_sha256"),
+        # NO separate index on `content_sha256`: it leads the unique index above,
+        # which already serves lookup by blob and the join from `nrb_files`. A
+        # version-only staleness scan is NOT served by it either way (that column
+        # is second) and is left as a scan — an operator query, not a hot path.
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
@@ -1764,25 +1766,34 @@ git commit -m "feat(nrb): nrb_extractions table, keyed on content hash + extract
 
 ---
 
-### Task 6: Catalog access + a `--year` selector for the Phase 5 fetch
+### Task 6: The exact-cohort fetch path + catalog extraction selection
 
-Two changes in one task because they share a file and neither is independently reviewable: the year selector exists only so Task 13 can fetch a representative sample.
+Two changes in one task because they share a file and neither is independently reviewable: the exact-cohort scope exists only so Task 13 can fetch the benchmark sample rather than approximate it.
+
+**AS BUILT** — the manifest *file format* landed here rather than in Task 7A. The fetch path has to READ a manifest before anything can draw one, and reading needs no sampler; so `manifest.py` ships as the format half (`Manifest`, `read_manifest`, `write_manifest`) and Task 7A adds `build_manifest` with the sampler it depends on. Selection alone also turned out to be an inadequate report: it returns only the pending slice, so a cohort already on disk read as a cohort that had lost its files. Hence `resolve_manifest_keys` and the report's `Manifest cohort` block.
 
 **Files:**
-- Modify: `app/nrb/catalog.py` (append a Phase 6A section; extend `select_fetch_targets`)
-- Modify: `scripts/nrb_fetch.py` (add `--year`)
-- Modify: `app/nrb/fetch.py` (`run_fetch` gains `years`, records it in `scope`)
-- Test: `tests/test_nrb_extract_integration.py` (created in Task 12 — this task's gate is a manual query plus the existing fetch suites staying green)
+- Create: `app/nrb/manifest.py` (format only), `tests/test_nrb_manifest.py`, `tests/test_nrb_extract_integration.py`
+- Modify: `app/nrb/catalog.py` (append the Phase 6A section; extend `select_fetch_targets`; add `resolve_manifest_keys`)
+- Modify: `app/nrb/fetch.py` (`run_fetch` gains `years` + `keys`, resolves the cohort, records both)
+- Modify: `app/nrb/report.py` (`render_fetch` gains the cohort accounting)
+- Modify: `scripts/nrb_fetch.py` (`--year`, `--manifest`, `_scope_given`)
+- Modify: `tests/test_nrb_fetch.py`, `tests/test_nrb_fetch_integration.py`, `tests/test_nrb_sync_integration.py` (`nrb_extractions` joins `NRB_TABLES`)
 
 **Interfaces:**
 - Consumes: `NRBExtraction` from Task 5, `extraction.EXTRACTOR_VERSION` from Task 4.
 - Produces:
+  - `manifest.MANIFEST_VERSION`, `manifest.MANIFEST_MAX_KEYS`, `Manifest` (frozen: `version`, `drawn_at`, `requested`, `shortfall`, `sampler`, `catalog_counts`, `strata`, `notes`, `entries`), `Manifest.keys() -> tuple[str, ...]` (deduplicated, order-stable), `Manifest.duplicate_entries -> int`, `read_manifest(path)`, `write_manifest(manifest, path)`
+  - `catalog.ManifestResolution` — frozen `(requested: int, duplicate_keys: int, by_status: dict[str, int], missing: tuple[str, ...])`, `.known`, `.as_dict(sample=50)`
+  - `catalog.resolve_manifest_keys(session, keys) -> ManifestResolution`
   - `catalog.ExtractTarget` — frozen dataclass `(file_id: int, content_sha256: str, storage_key: str, extension: str | None, sniffed_mime: str | None, resource_type: str, content_length: int | None)`
-  - `catalog.select_extract_targets(session, *, sections=None, owners=None, resource_types=None, years=None, keys=None, limit=None, force=False, extractor_version: str) -> list[ExtractTarget]` — `keys` is exact `comparison_key` values (the manifest cohort)
+  - `catalog.select_extract_targets(session, *, extractor_version: str, sections=None, owners=None, resource_types=None, years=None, keys=None, limit=None, force=False) -> list[ExtractTarget]`
   - `catalog.record_extractions(session, rows: Sequence[dict[str, Any]]) -> None`
   - `catalog.extraction_counts(session, *, extractor_version: str) -> dict[str, int]`
+  - `catalog.count_unfetched(session, keys) -> int`
   - `catalog.load_sample_rows(session, *, sections=None, resource_types=None) -> list[dict[str, Any]]` — the input to Task 7's sampler
   - `catalog.select_fetch_targets(..., years: Sequence[int] | None = None, keys: Sequence[str] | None = None)`
+  - `catalog.MANIFEST_MAX_KEYS`
 
 - [ ] **Step 1: Add `years` and `keys` to `select_fetch_targets`**
 
@@ -2744,14 +2755,21 @@ git commit -m "feat(nrb): deterministic stratified corpus sampling (Phase 6A)"
 The sample is drawn **once**, from the full catalog, and written down. Everything
 downstream names that file.
 
+**AMENDED** — `app/nrb/manifest.py` and its format tests shipped in **Task 6**
+(the fetch path must read a manifest before anything can draw one). What is left
+here is the DRAW: `build_manifest`, which needs the sampler, and the command that
+writes the file. Add `build_manifest` to the existing module and `from .sampling
+import Sample, year_cohort` to its imports; take the format tests below as
+already written, and add only the `build_manifest` ones.
+
 **Files:**
-- Create: `app/nrb/manifest.py`
+- Modify: `app/nrb/manifest.py` (add `build_manifest`)
 - Create: `scripts/nrb_sample.py`
-- Test: `tests/test_nrb_manifest.py`
+- Test: `tests/test_nrb_manifest.py` (extend)
 
 **Interfaces:**
-- Consumes: `sampling.stratified_sample`, `sampling.Sample`, `catalog.load_sample_rows`.
-- Produces: `MANIFEST_VERSION: str`, `Manifest` (frozen dataclass: `version`, `drawn_at`, `requested`, `shortfall`, `sampler: dict`, `catalog_counts: dict`, `strata: tuple[dict, ...]`, `notes: tuple[str, ...]`, `entries: tuple[dict, ...]`), `Manifest.keys() -> tuple[str, ...]`, `build_manifest(rows, sample, *, drawn_at, catalog_counts) -> Manifest`, `write_manifest(manifest, path) -> None`, `read_manifest(path) -> Manifest`, `MANIFEST_MAX_KEYS`.
+- Consumes: `sampling.stratified_sample`, `sampling.Sample`, `sampling.year_cohort`, `catalog.load_sample_rows`, and the Task 6 format half.
+- Produces: `build_manifest(rows, sample, *, drawn_at, catalog_counts, floor=5, max_cohort_share=0.30) -> Manifest`.
 
 - [ ] **Step 1: Write the failing tests**
 

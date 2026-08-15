@@ -688,6 +688,8 @@ def render_fetch(summary: dict[str, Any]) -> str:
         f"  sections:           {', '.join(scope.get('sections') or []) or '(any)'}",
         f"  owners:             {', '.join(scope.get('owners') or []) or '(any)'}",
         f"  resource types:     {', '.join(scope.get('resource_types') or []) or '(any)'}",
+        f"  years:              {', '.join(str(y) for y in scope.get('years') or []) or '(any)'}",
+        f"  manifest keys:      {scope.get('manifest_keys') or '(none)'}",
         f"  limit:              {scope.get('limit') if scope.get('limit') is not None else '(none)'}",
         f"  retry failed:       {scope.get('retry_failed')}",
         f"  byte budget:        {_mb(scope['max_bytes']) if scope.get('max_bytes') else '(none)'}",
@@ -706,6 +708,41 @@ def render_fetch(summary: dict[str, Any]) -> str:
         f"  newly stored:       {_mb(counters.get('bytes_stored')):>12}",
         "",
     ]
+    manifest = notes.get("manifest")
+    if manifest:
+        # The cohort's own accounting. `selected` above is only the slice this pass
+        # will attempt, so without these lines a manifest already on disk reads as
+        # a manifest that lost its files. Named states, not one total: they mean
+        # different things, and only `unknown to the catalog` is a defect.
+        by_status = manifest.get("by_status") or {}
+        out += [
+            "Manifest cohort",
+            f"  requested:          {manifest.get('requested', 0):>8,}"
+            + (f"   ({manifest['duplicate_keys']} duplicate entries collapsed)"
+               if manifest.get("duplicate_keys") else ""),
+            f"  already fetched:    {by_status.get('fetched', 0):>8,}",
+            f"  pending:            {by_status.get('pending', 0):>8,}",
+            f"  previously failed:  {by_status.get('failed', 0):>8,}"
+            "   (needs --retry-failed)",
+            f"  blocked:            {by_status.get('blocked_host', 0):>8,}"
+            "   (host guard; never fetchable)",
+            f"  fetched this pass:  {counters.get('files_fetched', 0):>8,}",
+            f"  failed this pass:   {counters.get('files_failed', 0):>8,}",
+            f"  not in the catalog: {manifest.get('missing_count', 0):>8,}",
+            "",
+        ]
+        if manifest.get("missing"):
+            shown = manifest["missing"]
+            total = manifest["missing_count"]
+            noun = "key names" if total == 1 else "keys name"
+            out.append(
+                f"!! {total:,} manifest {noun} no catalog row (showing "
+                f"{len(shown)}) — the manifest and the catalog have diverged; "
+                f"re-sync, or re-draw the cohort:"
+            )
+            out += [f"  {key}" for key in shown]
+            out.append("")
+
     if notes.get("unknown_size_files"):
         out += [
             f"{notes['unknown_size_files']:,} selected files report no size, so the "
