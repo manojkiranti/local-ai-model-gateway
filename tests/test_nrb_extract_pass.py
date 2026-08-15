@@ -107,7 +107,7 @@ def test_the_manifest_rank_uses_the_first_entry_that_resolves_to_each_blob():
         verdicts={},
         extractor_version="native-1",
     )
-    assert extract_mod._manifest_rank(cohort)[sha] == 0
+    assert extract_mod.manifest_rank(cohort)[sha] == 0
 
 
 def test_unfetched_cohort_keys_contribute_no_rank():
@@ -117,7 +117,7 @@ def test_unfetched_cohort_keys_contribute_no_rank():
               CohortKey("b", "fetched", _sha("b"))),
         missing=(), verdicts={}, extractor_version="native-1",
     )
-    assert extract_mod._manifest_rank(cohort) == {_sha("b"): 1}
+    assert extract_mod.manifest_rank(cohort) == {_sha("b"): 1}
 
 
 # --------------------------------------------------------------------------- #
@@ -127,7 +127,7 @@ def test_a_blob_whose_bytes_match_its_own_name_verifies(tmp_path):
     body = b"%PDF-1.4 hello"
     path = tmp_path / "blob"
     path.write_bytes(body)
-    assert extract_mod._verify_blob(path, hashlib.sha256(body).hexdigest()) is None
+    assert extract_mod.verify_blob(path, hashlib.sha256(body).hexdigest()) is None
 
 
 def test_a_truncated_blob_is_caught_before_it_is_parsed(tmp_path):
@@ -135,14 +135,14 @@ def test_a_truncated_blob_is_caught_before_it_is_parsed(tmp_path):
     it here is much cheaper than finding it in the numbers."""
     path = tmp_path / "blob"
     path.write_bytes(b"%PDF-1.4 hel")
-    problem = extract_mod._verify_blob(
+    problem = extract_mod.verify_blob(
         path, hashlib.sha256(b"%PDF-1.4 hello").hexdigest()
     )
     assert problem == "blob does not hash to its own storage key"
 
 
 def test_a_missing_blob_is_distinguishable_from_a_corrupt_one(tmp_path):
-    problem = extract_mod._verify_blob(tmp_path / "absent", _sha("x"))
+    problem = extract_mod.verify_blob(tmp_path / "absent", _sha("x"))
     assert problem is not None
     assert "missing" in problem
 
@@ -150,7 +150,7 @@ def test_a_missing_blob_is_distinguishable_from_a_corrupt_one(tmp_path):
 def test_a_verification_problem_never_carries_the_path(tmp_path):
     """These strings reach the database. Same rule `app/files/documents.py` follows."""
     path = tmp_path / "absent"
-    problem = extract_mod._verify_blob(path, _sha("x")) or ""
+    problem = extract_mod.verify_blob(path, _sha("x")) or ""
     assert str(tmp_path) not in problem
 
 

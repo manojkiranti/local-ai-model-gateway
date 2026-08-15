@@ -66,9 +66,13 @@ persistent catalog (`nrb_sources`/`nrb_files`/`nrb_source_files`/`nrb_sync_runs`
 reconciliation — no downloads); `sniff`+`filestore`+`fetch`+`locks` = Phase 5 file
 download (`sniff` is pure magic-byte typing, `filestore` is the content-addressed
 blob store, `fetch` is the resumable pass, `locks` is the advisory-lock rule shared
-with `sync` — still no parsing); `report` = all of them — everything but `client` is
+with `sync` — still no parsing); `quality`+`extraction`+`extract`+`profile`
++`sampling`+`manifest` = Phase 6A native extraction & the frozen 400-file
+benchmark; `calibration`+`calibrate` = the frozen 40-PDF Docling calibration
+subset and the pypdf-vs-Docling comparison pass (writes NOTHING; Docling imported
+lazily); `report` = all of them — everything but `client` is
 **not** model-facing, run via
-`scripts/nrb_{sitemap_inventory,document_inventory,sync,fetch}.py`), `tools/` (`registry.py` = engine; `local/` package = one module
+`scripts/nrb_{sitemap_inventory,document_inventory,sync,fetch,sample,extract,calibrate}.py`), `tools/` (`registry.py` = engine; `local/` package = one module
 per in-process tool, each exporting a `SPEC`, aggregated in `local/__init__.py`'s
 `LOCAL_TOOLS`), `agent/` (hand-rolled loop; `loop.stream_turn` = async event
 generator, `loop.run_turn` = collect for non-stream, `schemas` = trace types —

@@ -1237,6 +1237,7 @@ what is wrong with it, and only then does 6B decide what to do about it.
 | 7A | `app/nrb/manifest.py`, `app/nrb/report.py`, `scripts/nrb_sample.py` | `build_manifest`, the `selection_sha256` fingerprint, the freeze/verify guard, and the command that writes a cohort. |
 | 8 | `app/nrb/extract.py`, `app/nrb/locks.py`, `scripts/nrb_extract.py` | The pass: manifest → catalog rows → unique blobs → extract → record. Advisory lock `NRB_XTRC`, batched commits, resumable, failure-isolated, zero network. |
 | 9 | `app/nrb/profile.py`, `app/nrb/report.py` | The read-time cohort query and the deterministic profile: source/blob coverage, verdicts, metric distributions, legacy-severity bands, metadata breakdowns. |
+| 10 | `app/nrb/calibration.py`, `app/nrb/calibrate.py`, `app/nrb/extraction.py`, `scripts/nrb_calibrate.py` | The frozen Docling calibration subset (40 PDFs drawn from the benchmark itself, own fingerprint), the Docling adapter behind a lazy import + reusable converter, the parser-neutral comparison model, and the deterministic agreement/rescue report. Writes nothing. |
 
 ### The legacy-font detector, and the measurement that rebuilt it
 
@@ -1468,6 +1469,67 @@ because a real English annex is bound behind a Preeti-encoded Nepali covering
 note. `legacy_line_ratio > 0.20` is the classifier's own threshold and was **not**
 re-tuned here; the report's bands read it rather than restating it.
 
+### The Docling calibration — frozen subset, comparison harness (Task 10)
+
+Phase 6A screens with pypdf because both engines read the same embedded text
+layer, at ~41 pages/s against Docling's ~1–2 on CPU. That is a claim; this is the
+instrument that turns it into a measurement.
+
+**The subset is frozen too**, for the same reason the cohort is:
+`docs/nrb/phase6a-docling-calibration.json`, **40 PDFs**,
+`subset_selection_sha256 = 81d5979ffeee6fbede375917fa6e3de09cb8f0475a397a21b7ad52fa233d90f5`,
+bound to parent `1ae297d…`. Drawn by `app/nrb/calibration.py` from the parent
+manifest's **own entries** — `build_subset` takes a `Manifest` and nothing else,
+no session and no engine, so there is no path by which a key outside the benchmark
+can enter the comparison. Candidates are restricted to `resource_type == pdf` (303
+of the 400): pypdf never reads a `.docx` or `.xlsx`, so including them would
+compare two different pairs of parsers and average the results.
+
+The rank is `sha256(subset_algorithm_version | parent_selection_sha256 |
+comparison_key)`, key as tiebreak. **Nothing about a file's state may reach it** —
+not fetch status, not what is on disk, not a pypdf verdict, not
+`legacy_line_ratio`, not `char_count`, not row order. Picking the files pypdf
+already found suspicious would guarantee a rescue rate and measure nothing.
+Binding the *parent fingerprint* rather than a free-text seed means the subset is
+re-derivable from the two committed files alone, and a different benchmark cannot
+draw the same 40. Distribution: cohorts 2023-2026 14 / 2020-2022 13 / 2019 10 /
+≤2018 3, across 14 document types and 15 owners; 0 of the 3 currently-fetched
+benchmark files landed in it, and that was **not** grounds to redraw.
+
+**The comparison is extraction vs extraction, never pipeline vs pipeline.**
+`extraction.docling_extract` walks Docling's own `iterate_items()` stream with no
+filtering — deliberately not `parsing.parse_to_chunks`, which layers
+`merge_blocks`, `drop_small_blocks`, front-matter skipping and chunking on top, so
+a disagreement there could come from RAG's filter rather than from what Docling
+read off the page. Both engines' page lists go through one shared
+`extraction.result_from_pages`, so `measure_text`, `measure_pages` and `classify`
+run identically on both sides at the same thresholds; `legacy_line_ratio >= 0.20`
+is untouched. `parser` is recorded as a fact and never branched on.
+
+`app/nrb/calibrate.py` (`run_calibration`, run by `scripts/nrb_calibrate.py`)
+resolves the subset the same one-way path the extraction pass uses, dedups to
+unique blobs, and **writes nothing**: `nrb_extractions` is the canonical screen at
+one `extractor_version`, and bounded experimental calibration data must not enter
+it. No migration, no lock (nothing to serialise), no HTTP. One `DoclingEngine`
+holds one converter for the whole run with `init_seconds` measured separately —
+per-file construction would make the "how much slower" number mostly model
+loading, in the direction that flatters pypdf.
+
+**"A rescued B" means B's verdict is not usable and A's is** — `usable` is
+`extracted` and nothing else, so `suspicious` and `needs_ocr` are both rescuable.
+Not "A read more characters", not "A disagreed": only that one case would change
+the choice of screen. The report counts both directions separately, because a
+single agreement percentage hides both inside it.
+
+**Adapter smoke, NOT the calibration** (two non-canonical fetched circulars,
+offline, 2026-08-15): Docling returns real native text and the same page counts as
+pypdf (2 and 14), and reads **more** of it — 1,272 vs 532 chars, 32,493 vs 28,500.
+But `devanagari_ratio` is 0.0 on both sides and `legacy_line_ratio` is 1.000/1.000
+and 0.9699/0.971, so both engines land on `suspicious/legacy_font_suspected` and
+neither rescues the other. Docling cost 4.6 s and 18.5 s against pypdf's 61 ms and
+328 ms (57–75×). Two files is an adapter check, not a finding; the finding needs
+the frozen 40, and the frozen 40 need Task 13's acquisition.
+
 ### Live evidence so far (scratch DB `local_ai_gateway_p4`, 2026-08-15)
 
 ```
@@ -1496,13 +1558,17 @@ for department RAG) and Docling is still never imported at module scope. Nothing
 
 ### Remaining tasks
 
-11 Docling calibration (pypdf vs Docling over the *same* quality metrics — not
-via `parse_to_chunks`, which would measure RAG filtering; the subset comes from
-`manifest.select_manifest_subset`, so it can only name files the screen already
-saw) · 13 the live profile, which needs the cohort **fetched** first · 14 docs.
+13 the live profile, which needs the cohort **fetched** first — and the
+calibration run over the frozen 40, which needs the same · 14 docs.
 
 Task 10 (the CLI) and Task 12 (Postgres integration tests) landed with Tasks 8–9
-rather than separately: the pass is not verifiable without both.
+rather than separately: the pass is not verifiable without both. The plan's Task
+11 (Docling calibration) landed as Task 10 of the follow-up sequence, extended
+with the frozen subset artifact and the deterministic comparison report;
+`manifest.select_manifest_subset` was **removed** in the process — two subset
+selectors that would draw two different 40s is a trap, and
+`calibration.select_calibration_entries` is the one that is bound to the parent
+fingerprint and restricted to PDFs.
 
 ### Evaluation & Improvement (Phase 6A)
 

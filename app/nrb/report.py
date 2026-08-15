@@ -41,6 +41,7 @@ __all__ = [
     "summarize_fetch", "render_fetch",
     "summarize_sample", "render_sample",
     "summarize_extraction", "render_extraction", "LEGACY_BANDS",
+    "summarize_calibration", "render_calibration", "PREVIEW_CHARS",
 ]
 
 SAMPLE_SIZE = 25   # bounded: a sample to inspect, not a second copy of the data
@@ -1262,6 +1263,385 @@ def render_extraction(summary: dict[str, Any]) -> str:
     if failures:
         total = summary["notes"].get("failure_count", len(failures))
         out.append(f"Failures (showing {len(failures)} of {total:,}):")
+        out += [f"  {item}" for item in failures]
+        out.append("")
+    return "\n".join(out)
+
+
+# --------------------------------------------------------------------------- #
+# The Docling calibration (Phase 6A, Task 10)
+# --------------------------------------------------------------------------- #
+# How much of a stored preview the report prints. The database contract is 300
+# characters (`extraction.PREVIEW_CHARS`) and this is never wider — a report is a
+# place to eyeball a disagreement, not a second store of extracted text.
+PREVIEW_CHARS = 160
+
+# Only disagreements are printed with previews, and only this many. Every
+# disagreement is still COUNTED; the cap is on the transcript, not the finding.
+DISAGREEMENT_SAMPLE = 25
+
+
+def _speed(durations_ms: Sequence[int]) -> dict[str, Any]:
+    """Total and per-document timings for one engine.
+
+    p95 as well as the median because the two engines fail slowly in different
+    ways: pypdf's worst case is a big file, Docling's is a page whose layout model
+    finds a great deal to do, and a median hides both.
+    """
+    ordered = sorted(int(v or 0) for v in durations_ms)
+    if not ordered:
+        return {"n": 0, "total_seconds": 0.0, "median_ms": None, "p95_ms": None}
+
+    def at(fraction: float) -> int:
+        return ordered[min(int(fraction * len(ordered)), len(ordered) - 1)]
+
+    return {
+        "n": len(ordered),
+        "total_seconds": round(sum(ordered) / 1000, 3),
+        "median_ms": at(0.50),
+        "p95_ms": at(0.95),
+    }
+
+
+def _engine_block(sides: Sequence[Any]) -> dict[str, Any]:
+    """One engine's own numbers, computed identically for both engines."""
+    return {
+        "by_status": _ordered(Counter(s.status for s in sides)),
+        "by_reason": _ordered(Counter(s.reason for s in sides)),
+        "warnings": _ordered(Counter(w for s in sides for w in s.warnings)),
+        "total_chars": sum(s.char_count or 0 for s in sides),
+        "char_count": _distribution([s.char_count for s in sides]),
+        "devanagari_ratio": _distribution(
+            [s.devanagari_ratio for s in sides if s.devanagari_ratio is not None]
+        ),
+        "legacy_line_ratio": _distribution(
+            [s.legacy_line_ratio for s in sides if s.legacy_line_ratio is not None]
+        ),
+        "text_page_coverage": _distribution(
+            [s.text_page_coverage for s in sides if s.text_page_coverage is not None]
+        ),
+        "legacy_bands": _legacy_bands(sides),
+        "speed": _speed([s.duration_ms for s in sides]),
+    }
+
+
+def _legacy_bands(sides: Sequence[Any]) -> dict[str, int]:
+    bands = {name: 0 for name, _, _ in LEGACY_BANDS}
+    for side in sides:
+        if side.legacy_line_ratio is not None:
+            bands[_band_for(side.legacy_line_ratio)] += 1
+    return bands
+
+
+def summarize_calibration(
+    result: Any, *, subset: Any = None, subset_path: str | None = None
+) -> dict[str, Any]:
+    """A JSON-ready profile of one pypdf-vs-Docling pass. Deterministic and pure.
+
+    `result` is an `app.nrb.calibrate.CalibrationResult`, `subset` an
+    `app.nrb.calibration.CalibrationSubset`; both typed loosely so this module
+    stays free of model and session imports.
+
+    DENOMINATORS, STATED
+      * `source` counts SUBSET FILES — the frozen 40. A file that was never
+        downloaded stays in that denominator instead of quietly leaving it and
+        flattering every rate above it.
+      * `blobs` counts unique `content_sha256`, which is what was actually
+        parsed. Two subset files with identical bytes are one comparison.
+      * every rate in `agreement` and `rescues` is over `comparisons_run` — the
+        blobs both engines actually read — and that number is printed next to
+        them so a 100% agreement over three files cannot be mistaken for one over
+        forty.
+
+    Nothing here depends on the order the comparisons arrive in: the counters are
+    ordered, the distributions sort their inputs, and the disagreement sample is
+    sorted by content hash.
+    """
+    comparisons = sorted(result.comparisons, key=lambda c: c.content_sha256)
+    counters = dict(result.counters)
+    accounting = dict(result.cohort or {})
+    source = dict(accounting.get("source") or {})
+    blob = dict(accounting.get("blob") or {})
+
+    native = [c.native for c in comparisons]
+    docling = [c.docling for c in comparisons]
+    compared = len(comparisons)
+    categories = Counter(c.category for c in comparisons)
+
+    def rate(count: int) -> float:
+        return round(count / compared, 4) if compared else 0.0
+
+    status_agreed = sum(1 for c in comparisons if c.status_agreement)
+    reason_agreed = sum(1 for c in comparisons if c.reason_agreement)
+
+    # Pairwise: only where the comparison means something. A blob pypdf read
+    # nothing from has no char ratio — 4100/0 is not "infinitely better", it is a
+    # rescue, and it is counted as one immediately below.
+    ratios = [
+        c.docling.char_count / c.native.char_count
+        for c in comparisons
+        if c.native.char_count
+    ]
+    native_zero = sum(1 for c in comparisons if not c.native.char_count)
+    docling_zero = sum(1 for c in comparisons if not c.docling.char_count)
+
+    def delta(name: str) -> list[float]:
+        return [
+            getattr(c.docling, name) - getattr(c.native, name)
+            for c in comparisons
+            if getattr(c.docling, name) is not None
+            and getattr(c.native, name) is not None
+        ]
+
+    pypdf_speed = _speed([s.duration_ms for s in native])
+    docling_speed = _speed([s.duration_ms for s in docling])
+    pypdf_seconds = pypdf_speed["total_seconds"]
+    docling_seconds = docling_speed["total_seconds"]
+
+    return {
+        "calibration": {
+            "status": result.status,
+            "dry_run": result.dry_run,
+            "purpose": getattr(subset, "purpose", None) or "docling-calibration",
+            "subset_path": subset_path or result.subset_path,
+            "subset_selection_sha256": result.subset_selection_sha256,
+            "parent_selection_sha256": result.parent_selection_sha256,
+            "subset_algorithm_version": getattr(
+                subset, "subset_algorithm_version", None
+            ),
+            "requested_size": getattr(subset, "requested_size", None),
+            "duration_seconds": round(result.duration_seconds, 1),
+            "engine": (result.notes or {}).get("engine"),
+        },
+        # SUBSET FILES.
+        "source": {
+            "subset_entries": counters.get("subset_entries", 0),
+            "in_catalog": source.get("in_catalog", counters.get(
+                "subset_files_in_catalog", 0)),
+            "missing_from_catalog": source.get("missing_from_catalog", 0),
+            "fetched": source.get("fetched", counters.get("subset_files_fetched", 0)),
+            "unfetched": source.get("unfetched", 0),
+            "by_fetch_status": source.get("by_fetch_status") or {},
+        },
+        # UNIQUE BLOBS.
+        "blobs": {
+            "unique_fetched": blob.get("unique_fetched", 0),
+            "duplicates_collapsed": blob.get("duplicates_collapsed", 0),
+            "selected": counters.get("blobs_selected", 0),
+            "compared": compared,
+            "subset_files_represented": len(
+                {key for c in comparisons for key in c.comparison_keys}
+            ),
+            "missing_on_disk": counters.get("blobs_missing_on_disk", 0),
+            "corrupt_on_disk": counters.get("blobs_corrupt_on_disk", 0),
+        },
+        "agreement": {
+            "compared": compared,
+            "status_agreed": status_agreed,
+            "status_agreement_rate": rate(status_agreed),
+            "reason_agreed": reason_agreed,
+            "reason_agreement_rate": rate(reason_agreed),
+            "by_category": _ordered(categories, CATEGORY_ORDER),
+        },
+        "pypdf": _engine_block(native),
+        "docling": _engine_block(docling),
+        "pairwise": {
+            "char_ratio": _distribution(ratios),
+            "pypdf_zero_chars": native_zero,
+            "docling_zero_chars": docling_zero,
+            "devanagari_ratio_delta": _distribution(delta("devanagari_ratio")),
+            "legacy_line_ratio_delta": _distribution(delta("legacy_line_ratio")),
+            "status_transitions": _transitions(comparisons, "status"),
+            "reason_transitions": _transitions(comparisons, "reason"),
+        },
+        "rescues": {
+            # "A rescued B" = B's verdict is not usable and A's is. See
+            # `calibrate.categorize`.
+            "docling_rescued_pypdf": categories.get("docling_rescued_pypdf", 0),
+            "pypdf_rescued_docling": categories.get("pypdf_rescued_docling", 0),
+            "both_extracted": categories.get("both_extracted", 0),
+            "both_suspicious": categories.get("both_suspicious", 0),
+            "both_failed": categories.get("both_failed", 0),
+            "disagreed_neither_usable": categories.get(
+                "disagreed_neither_usable", 0),
+            # The two explicit pairs, named because they are the ones a reader
+            # looks for first. Both are rescues by the definition above.
+            "docling_extracted_pypdf_suspicious": _pair_count(
+                comparisons, "suspicious", "extracted"),
+            "pypdf_extracted_docling_suspicious": _pair_count(
+                comparisons, "extracted", "suspicious"),
+            "docling_rescue_rate": rate(categories.get("docling_rescued_pypdf", 0)),
+        },
+        "speed": {
+            "pypdf_seconds": pypdf_seconds,
+            "docling_seconds": docling_seconds,
+            "docling_init_seconds": round(result.docling_init_seconds, 3),
+            "pypdf": pypdf_speed,
+            "docling": docling_speed,
+            # Init excluded: it is paid once for the whole pass, and folding it in
+            # would make the per-document ratio depend on the sample size.
+            "slowdown": (
+                round(docling_seconds / pypdf_seconds, 1) if pypdf_seconds else None
+            ),
+        },
+        "disagreements": [
+            c.as_dict(preview_chars=PREVIEW_CHARS)
+            for c in comparisons
+            if not c.status_agreement
+        ][:DISAGREEMENT_SAMPLE],
+        "disagreement_count": compared - status_agreed,
+        "notes": dict(result.notes or {}),
+    }
+
+
+# The order categories are printed in: agreement first, then the two asymmetric
+# cases the calibration exists to find.
+CATEGORY_ORDER = (
+    "both_extracted", "both_suspicious", "both_failed", "agreed_other",
+    "docling_rescued_pypdf", "pypdf_rescued_docling", "disagreed_neither_usable",
+)
+
+
+def _pair_count(comparisons: Sequence[Any], native: str, docling: str) -> int:
+    return sum(
+        1 for c in comparisons
+        if c.native.status == native and c.docling.status == docling
+    )
+
+
+def _transitions(comparisons: Sequence[Any], field: str) -> dict[str, int]:
+    """pypdf's answer -> Docling's answer, counted. Ordered, so two runs diff."""
+    counts = Counter(
+        f"{getattr(c.native, field)}->{getattr(c.docling, field)}"
+        for c in comparisons
+    )
+    return dict(sorted(counts.items()))
+
+
+def render_calibration(summary: dict[str, Any]) -> str:
+    """The operator's view of a calibration pass.
+
+    Leads with both fingerprints — a calibration of the wrong 40 files is worse
+    than none — and puts the two rescue counts where they cannot be missed. A
+    single agreement percentage would hide both inside it.
+    """
+    ident = summary["calibration"]
+    source = summary["source"]
+    blobs = summary["blobs"]
+    agree = summary["agreement"]
+    dry = "  (DRY RUN — neither parser ran)" if ident["dry_run"] else ""
+
+    out: list[str] = [
+        f"NRB pypdf-vs-Docling calibration — {ident['status']}{dry}",
+        "=" * 72,
+        f"Subset:               {ident['subset_path'] or '(none)'}",
+        f"Subset fingerprint:   {ident['subset_selection_sha256'] or '(none)'}",
+        f"Parent benchmark:     {ident['parent_selection_sha256'] or '(none)'}",
+        f"Docling pipeline:     {ident['engine'] or '(not opened)'}",
+        f"Duration:             {ident['duration_seconds']:,.1f}s",
+        "",
+        "Subset coverage (FILES — the frozen calibration slice)",
+        f"  subset entries:     {source['subset_entries']:>8,}",
+        f"  in the catalog:     {source['in_catalog']:>8,}",
+        f"  missing:            {source['missing_from_catalog']:>8,}",
+        f"  fetched:            {source['fetched']:>8,}",
+        f"  not fetched yet:    {source['unfetched']:>8,}"
+        "   (reported, never substituted)",
+        "",
+        "Blob coverage (UNIQUE content_sha256 — the comparison unit)",
+        f"  unique fetched:     {blobs['unique_fetched']:>8,}",
+        f"  duplicates:         {blobs['duplicates_collapsed']:>8,}"
+        "   (same bytes, two subset files — one comparison)",
+        f"  selected:           {blobs['selected']:>8,}",
+        f"  compared:           {blobs['compared']:>8,}",
+        f"  files represented:  {blobs['subset_files_represented']:>8,}",
+        f"  missing on disk:    {blobs['missing_on_disk']:>8,}",
+        f"  corrupt on disk:    {blobs['corrupt_on_disk']:>8,}",
+        "",
+        f"Agreement (over {agree['compared']:,} compared blobs)",
+    ]
+    if not agree["compared"]:
+        out.append("  (none)")
+    else:
+        out += [
+            f"  status agreement:   {agree['status_agreed']:>8,}"
+            f"   {agree['status_agreement_rate']:.1%}",
+            f"  reason agreement:   {agree['reason_agreed']:>8,}"
+            f"   {agree['reason_agreement_rate']:.1%}",
+        ]
+    out.append("")
+
+    rescues = summary["rescues"]
+    out += [
+        "Rescues  (A rescued B = B's verdict is not usable and A's is)",
+        f"  DOCLING RESCUED PYPDF {rescues['docling_rescued_pypdf']:>6,}"
+        "   <- the number that would invalidate the screen",
+        f"  pypdf rescued docling {rescues['pypdf_rescued_docling']:>6,}",
+        f"  both extracted        {rescues['both_extracted']:>6,}",
+        f"  both suspicious       {rescues['both_suspicious']:>6,}",
+        f"  both failed           {rescues['both_failed']:>6,}",
+        f"  disagreed, neither    {rescues['disagreed_neither_usable']:>6,}",
+        "",
+    ]
+
+    for engine in ("pypdf", "docling"):
+        block = summary[engine]
+        out.append(f"{engine} (per BLOB)")
+        if not block["char_count"]["n"]:
+            out.append("  (none)")
+        else:
+            out.append("  " + " ".join(
+                f"{status}={count}" for status, count in block["by_status"].items()
+            ))
+            out.append("  " + " ".join(
+                f"{reason}={count}" for reason, count in block["by_reason"].items()
+            ))
+            out.append(f"  total chars {block['total_chars']:,}   "
+                       f"time {block['speed']['total_seconds']}s   "
+                       f"median {block['speed']['median_ms']}ms   "
+                       f"p95 {block['speed']['p95_ms']}ms")
+            for name in ("char_count", "devanagari_ratio", "legacy_line_ratio",
+                         "text_page_coverage"):
+                dist = block[name]
+                if dist["n"]:
+                    out.append(
+                        f"    {name:<22} n={dist['n']:<5} min={dist['min']:<9} "
+                        f"median={dist['median']:<9} max={dist['max']}"
+                    )
+        out.append("")
+
+    speed = summary["speed"]
+    out += [
+        "Speed",
+        f"  pypdf total:        {speed['pypdf_seconds']:>10,.1f}s",
+        f"  docling init:       {speed['docling_init_seconds']:>10,.1f}s"
+        "   (paid once, excluded from the ratio)",
+        f"  docling total:      {speed['docling_seconds']:>10,.1f}s",
+        f"  slowdown:           {speed['slowdown'] if speed['slowdown'] else '-':>10}x",
+        "",
+    ]
+
+    if summary["disagreements"]:
+        out.append(f"Disagreements ({summary['disagreement_count']:,}, showing "
+                   f"{len(summary['disagreements'])}) — read every one:")
+        for row in summary["disagreements"]:
+            out.append(f"\n  {row['content_sha256'][:12]}  {row['category']}")
+            for engine in ("pypdf", "docling"):
+                side = row[engine]
+                out.append(
+                    f"    {engine:<8} {side['status']}/{side['reason']}  "
+                    f"chars={side['char_count']} "
+                    f"devanagari={side['devanagari_ratio']} "
+                    f"legacy={side['legacy_line_ratio']}"
+                )
+                out.append(f"             {side['preview']!r}")
+        out.append("")
+    else:
+        out += ["Disagreements", "  (none)", ""]
+
+    failures = (summary.get("notes") or {}).get("failures") or []
+    if failures:
+        out.append(f"Blobs not compared ({len(failures)}):")
         out += [f"  {item}" for item in failures]
         out.append("")
     return "\n".join(out)

@@ -4535,6 +4535,32 @@ git commit -m "feat(nrb): scripts/nrb_extract.py — scope-required extraction C
 
 Turns "pypdf is a fair proxy" from an assertion into a measurement. Worker-only dependency, imported inside the function.
 
+**AMENDED — what actually shipped (as follow-up Task 10).** The adapter is as
+drafted below (`docling_pipeline_is_native`, `_docling_pages`, `docling_extract`,
+reusing `parsing._docling_converter`), plus four things the draft did not have:
+
+* **The calibration subset is a FROZEN ARTIFACT**, not a `--limit` on a query:
+  `app/nrb/calibration.py` + `docs/nrb/phase6a-docling-calibration.json`, 40 PDFs
+  with their own `subset_selection_sha256` bound to the parent
+  `selection_sha256`. Ranked by `sha256(algorithm_version | parent_fingerprint |
+  comparison_key)` over the manifest's own entries, restricted to
+  `resource_type == pdf`. `manifest.select_manifest_subset` was **deleted**: two
+  selectors drawing two different 40s is a trap, and that one was neither bound
+  to the parent nor format-restricted.
+* **`extraction.result_from_pages`** is now the single scoring path both engines
+  use, so "the same classifier judged both" is structural rather than a promise.
+* **`extraction.DoclingEngine`** holds one converter for the whole run and times
+  its construction separately; per-file construction would make the slowdown
+  number mostly model loading.
+* **The pass and the report are separate modules** — `app/nrb/calibrate.py`
+  (`run_calibration`, read-only, writes nothing, dry-run builds no converter) and
+  `report.summarize_calibration` / `render_calibration` (agreement, both engines'
+  distributions, pairwise deltas, status/reason transitions, both rescue
+  directions, speed with p95). The command is `scripts/nrb_calibrate.py` with
+  three explicit modes (`--freeze`, `--verify`, `--subset`).
+
+Read those files as the specification; the code below is the earlier draft.
+
 **Files:**
 - Modify: `app/nrb/extraction.py` (append the Docling adapter)
 - Create: `scripts/nrb_calibrate.py`

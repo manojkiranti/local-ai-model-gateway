@@ -356,39 +356,6 @@ def test_writing_a_new_manifest_creates_missing_parent_directories(tmp_path):
 
 
 # --------------------------------------------------------------------------- #
-# Same-manifest calibration subset
-# --------------------------------------------------------------------------- #
-def test_a_calibration_subset_comes_only_from_the_manifest():
-    m = _drawn()
-    subset = manifest_module.select_manifest_subset(m, size=10, seed="cal-1")
-    assert len(subset) == 10
-    assert len(set(subset)) == 10
-    assert set(subset) <= set(m.keys())
-
-
-def test_a_calibration_subset_is_deterministic_and_seed_sensitive():
-    m = _drawn()
-    a = manifest_module.select_manifest_subset(m, size=10, seed="cal-1")
-    b = manifest_module.select_manifest_subset(m, size=10, seed="cal-1")
-    c = manifest_module.select_manifest_subset(m, size=10, seed="cal-2")
-    assert a == b
-    assert a != c
-
-
-def test_asking_for_more_than_the_manifest_holds_returns_all_of_it_once():
-    m = _drawn(size=12)
-    subset = manifest_module.select_manifest_subset(m, size=500, seed="cal-1")
-    assert sorted(subset) == sorted(m.keys())
-
-
-def test_the_purpose_namespaces_the_subset_ordering():
-    m = _drawn()
-    a = manifest_module.select_manifest_subset(m, size=10, seed="s", purpose="one")
-    b = manifest_module.select_manifest_subset(m, size=10, seed="s", purpose="two")
-    assert a != b
-
-
-# --------------------------------------------------------------------------- #
 # O. No network
 # --------------------------------------------------------------------------- #
 def test_drawing_and_writing_a_manifest_makes_no_http_request(tmp_path, monkeypatch):

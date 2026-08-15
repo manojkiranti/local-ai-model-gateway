@@ -67,7 +67,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Sequence
 
-from .sampling import Sample, rank_for
+from .sampling import Sample
 
 __all__ = [
     "MANIFEST_MAX_KEYS",
@@ -77,7 +77,6 @@ __all__ = [
     "build_manifest",
     "compute_selection_sha256",
     "read_manifest",
-    "select_manifest_subset",
     "verify_manifest",
     "write_manifest",
     "write_new_manifest",
@@ -364,30 +363,3 @@ def write_new_manifest(
     target.parent.mkdir(parents=True, exist_ok=True)
     write_manifest(manifest, target)
     return previous
-
-
-def select_manifest_subset(
-    manifest: Manifest,
-    *,
-    size: int,
-    seed: str,
-    purpose: str = "docling-calibration",
-) -> tuple[str, ...]:
-    """A deterministic sub-cohort drawn from a manifest and nothing else.
-
-    Phase 6A's Docling calibration runs over ~40 files, and they have to come from
-    the SAME cohort the pypdf screen ran over — comparing two engines on two
-    different file sets measures the file sets. So the candidate pool here is the
-    manifest's own entries: this function never queries the catalog, so there is
-    no path by which a key outside the benchmark can enter the subset.
-
-    Ranked by `sha256(purpose | seed | key)`. The purpose is part of the
-    pre-image so two different sub-cohorts drawn with the same seed are not the
-    same prefix of one ordering.
-
-    It imports nothing from Docling and runs no calibration; it only says which
-    files a calibration would use.
-    """
-    keys = manifest.keys()
-    ordered = sorted(keys, key=lambda key: (rank_for(purpose, seed, key), key))
-    return tuple(ordered[: max(size, 0)])

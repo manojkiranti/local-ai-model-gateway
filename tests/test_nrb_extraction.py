@@ -1,5 +1,8 @@
 """Format dispatch for NRB blobs. Local files only — no DB, no network."""
 
+import os
+import pathlib
+
 import openpyxl
 import pytest
 from docx import Document
@@ -215,3 +218,114 @@ def test_the_preview_cap_the_database_enforces_is_the_one_extraction_applies():
     from app.nrb import models
 
     assert models.EXTRACTION_PREVIEW_CHARS == extraction.PREVIEW_CHARS
+
+
+# --------------------------------------------------------------------------- #
+# The Docling calibration adapter (Task 10)
+#
+# Everything below that needs the engine itself is behind `importorskip`, so the
+# standard NRB suite never loads torch or a layout model. The import-boundary
+# test is NOT skipped — it is the one that protects the slim API image.
+# --------------------------------------------------------------------------- #
+# The real engine runs only when asked for. Docling fetches its layout models on
+# first use, so an unguarded test would make the standard NRB suite depend on the
+# network and on a multi-minute download — exactly what Phase 6A's "no live
+# network calls in tests" rule forbids. Enable with:
+#
+#     NRB_DOCLING_TESTS=1 .venv/bin/pytest tests/test_nrb_extraction.py -k docling
+_needs_docling = pytest.mark.skipif(
+    not os.environ.get("NRB_DOCLING_TESTS"),
+    reason="set NRB_DOCLING_TESTS=1 to run the real Docling smoke tests",
+)
+
+
+def test_docling_is_not_imported_when_the_nrb_extraction_module_loads():
+    """The calibration must not drag torch into anything that imports extraction.
+
+    A subprocess, because `sys.modules` is process-global — the same technique
+    `tests/test_rag_parsing_docling.py` uses on `app.rag.parsing`.
+    """
+    import subprocess
+    import sys
+
+    code = (
+        "import app.nrb.extraction, app.nrb.calibrate, sys; "
+        "assert not [m for m in sys.modules if m.startswith('docling')], "
+        "'docling imported at module scope'; "
+        "assert 'torch' not in sys.modules, 'torch imported at module scope'"
+    )
+    proc = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stderr
+
+
+def test_the_shared_docling_pipeline_is_still_cpu_and_ocr_off():
+    """The guard that makes the calibration trustworthy AND keeps Phase 6A honest.
+
+    The adapter reuses `app/rag/parsing`'s converter rather than building its own,
+    so if that pinning ever changes the calibration would quietly start OCRing —
+    which Phase 6A forbids outright. This fails loudly instead.
+    """
+    pytest.importorskip("docling")
+    ok, evidence = extraction.docling_pipeline_is_native()
+    assert ok, evidence
+
+
+def test_a_refused_pipeline_is_a_recorded_failure_not_an_exception(monkeypatch):
+    """No docling import needed: the refusal happens before the converter is built."""
+    monkeypatch.setattr(
+        extraction, "docling_pipeline_is_native", lambda: (False, "do_ocr=True")
+    )
+    result = extraction.docling_extract(pathlib.Path("/nonexistent.pdf"))
+    assert result.status == quality.STATUS_FAILED
+    assert "do_ocr=True" in (result.error or "")
+
+
+def test_the_engine_refuses_to_open_a_non_native_pipeline(monkeypatch):
+    monkeypatch.setattr(
+        extraction, "docling_pipeline_is_native", lambda: (False, "device=cuda")
+    )
+    engine = extraction.DoclingEngine()
+    ok, evidence = engine.open()
+    assert not ok and "device=cuda" in evidence
+    assert engine.init_seconds == 0.0
+
+
+@_needs_docling
+def test_docling_extract_returns_the_same_result_shape_as_pypdf(tmp_path):
+    pytest.importorskip("docling")
+    path = _pdf(tmp_path, ["Nepal Rastra Bank circular for all licensed banks"] * 2)
+    native = extraction.extract_file(path, family="pdf", extension="pdf")
+    docling = extraction.docling_extract(path)
+    assert docling.parser == "docling"
+    assert docling.status in quality.STATUSES
+    # Same fields, so the comparison is like with like.
+    assert set(docling.metrics) & set(native.metrics)
+    assert docling.char_count > 0
+
+
+@_needs_docling
+def test_a_corrupt_pdf_does_not_raise_out_of_docling_extract(tmp_path):
+    pytest.importorskip("docling")
+    path = tmp_path / "broken.pdf"
+    path.write_bytes(b"%PDF-1.4\ngarbage")
+    result = extraction.docling_extract(path)
+    assert result.status == quality.STATUS_FAILED
+    assert str(tmp_path) not in (result.error or "")
+
+
+@_needs_docling
+def test_one_converter_serves_a_whole_calibration_run(tmp_path):
+    """Init is measured separately, then every file is a like-for-like parse.
+
+    Rebuilding the converter per file would make the per-document duration mostly
+    model loading, and the "how much slower is Docling" number would be wrong in
+    the direction that flatters pypdf.
+    """
+    pytest.importorskip("docling")
+    first = _pdf(tmp_path, ["Nepal Rastra Bank circular one"], name="a.pdf")
+    second = _pdf(tmp_path, ["Nepal Rastra Bank circular two"], name="b.pdf")
+    with extraction.DoclingEngine() as engine:
+        assert engine.init_seconds >= 0.0
+        results = [engine.extract(first), engine.extract(second)]
+    assert [r.parser for r in results] == ["docling", "docling"]
+    assert all(r.status != quality.STATUS_FAILED for r in results)

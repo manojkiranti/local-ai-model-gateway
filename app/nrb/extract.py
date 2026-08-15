@@ -66,7 +66,14 @@ from .quality import STATUS_FAILED
 
 logger = logging.getLogger("app.nrb.extract")
 
-__all__ = ["COMMIT_EVERY", "ExtractResult", "run_extract"]
+__all__ = [
+    "COMMIT_EVERY",
+    "ExtractResult",
+    "manifest_rank",
+    "order_targets",
+    "run_extract",
+    "verify_blob",
+]
 
 # Results are written every N blobs, so an interrupted pass keeps its progress.
 # Matches `fetch.COMMIT_EVERY`'s intent: small enough that a Ctrl-C costs little,
@@ -123,7 +130,7 @@ def _counters() -> dict[str, int]:
     }
 
 
-def _verify_blob(path: Path, expected_sha256: str) -> str | None:
+def verify_blob(path: Path, expected_sha256: str) -> str | None:
     """Hash the file on disk and compare it with the sha in its own name.
 
     Returns None when the bytes are what they claim to be, or a short reason
@@ -238,7 +245,7 @@ def order_targets(
     )
 
 
-def _manifest_rank(cohort: profile.Cohort) -> dict[str, int]:
+def manifest_rank(cohort: profile.Cohort) -> dict[str, int]:
     """sha -> the position of the first cohort key that resolves to it.
 
     `cohort.keys` preserves the requested order, which for a benchmark is the
@@ -311,7 +318,7 @@ async def run_extract(
                 cohort = await profile.load_cohort(
                     session, keys=keys, extractor_version=extractor_version
                 )
-                rank = _manifest_rank(cohort)
+                rank = manifest_rank(cohort)
                 if cohort.missing:
                     logger.warning(
                         "NRB extraction: %d of %d cohort keys are not in the "
@@ -410,7 +417,7 @@ async def _extract_all(
         now = datetime.now(timezone.utc)
         try:
             path = filestore.resolve_path(target.storage_key, base_dir)
-            problem = _verify_blob(path, target.content_sha256)
+            problem = verify_blob(path, target.content_sha256)
             if problem is not None:
                 if "missing" in problem:
                     counters["blobs_missing_on_disk"] += 1

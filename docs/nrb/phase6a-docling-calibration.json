@@ -1,0 +1,574 @@
+{
+  "entries": [
+    {
+      "cohort": "2020-2022",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/12/Lagani-notice-1.pdf",
+      "document_type": "notice",
+      "owner": "fmd",
+      "owners": [
+        "fmd"
+      ],
+      "parent_rank": 130,
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/notice/pdf",
+      "subset_rank": 0,
+      "year": 2021
+    },
+    {
+      "cohort": "2020-2022",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/09/Parking-Shed.pdf",
+      "document_type": "notice",
+      "owner": "dhn",
+      "owners": [
+        "dhn"
+      ],
+      "parent_rank": 167,
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/notice/pdf",
+      "subset_rank": 1,
+      "year": 2021
+    },
+    {
+      "cohort": "2023-2026",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/07/Enforcement-Action-FY-2080.81-Q4.pdf",
+      "document_type": "enforcement_action",
+      "owner": "mlpsd",
+      "owners": [
+        "mlpsd"
+      ],
+      "parent_rank": 295,
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/enforcement_action/pdf",
+      "subset_rank": 2,
+      "year": 2025
+    },
+    {
+      "cohort": "2019",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Standing-list-notice-Birgunj.pdf",
+      "document_type": "notice",
+      "owner": "gsd",
+      "owners": [
+        "gsd"
+      ],
+      "parent_rank": 106,
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/notice/pdf",
+      "subset_rank": 3,
+      "year": 2019
+    },
+    {
+      "cohort": "2020-2022",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/08/11.1-TCSP-circular.pdf",
+      "document_type": "directive",
+      "owner": "fiu",
+      "owners": [
+        "fiu"
+      ],
+      "parent_rank": 146,
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/directive/pdf",
+      "subset_rank": 4,
+      "year": 2022
+    },
+    {
+      "cohort": "2019",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/StandingListNotice20180618.pdf",
+      "document_type": "notice",
+      "owner": "gsd",
+      "owners": [
+        "gsd"
+      ],
+      "parent_rank": 92,
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/notice/pdf",
+      "subset_rank": 5,
+      "year": 2019
+    },
+    {
+      "cohort": "2023-2026",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/12/Enforcement-Action-FY-2082.83-Q1.pdf",
+      "document_type": "enforcement_action",
+      "owner": "mlpsd",
+      "owners": [
+        "mlpsd"
+      ],
+      "parent_rank": 301,
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/enforcement_action/pdf",
+      "subset_rank": 6,
+      "year": 2025
+    },
+    {
+      "cohort": "2023-2026",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/01/EAR_Dhangadhi_FY__-2079__80-Final.pdf",
+      "document_type": "notice",
+      "owner": "dhn",
+      "owners": [
+        "dhn"
+      ],
+      "parent_rank": 192,
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/notice/pdf",
+      "subset_rank": 7,
+      "year": 2024
+    },
+    {
+      "cohort": "2020-2022",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/01/Resolution_of_union_fiannce_naxal_20720427.pdf",
+      "document_type": "enforcement_action",
+      "owner": "fis",
+      "owners": [
+        "fis"
+      ],
+      "parent_rank": 277,
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/enforcement_action/pdf",
+      "subset_rank": 8,
+      "year": 2020
+    },
+    {
+      "cohort": "2020-2022",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/09/engineer.pdf",
+      "document_type": "notice",
+      "owner": "hrm",
+      "owners": [
+        "hrm"
+      ],
+      "parent_rank": 173,
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/notice/pdf",
+      "subset_rank": 9,
+      "year": 2020
+    },
+    {
+      "cohort": "2023-2026",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/04/Press-Note-on-Real-State-Survey-1.pdf",
+      "document_type": "media",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "parent_rank": 135,
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/media/pdf",
+      "subset_rank": 10,
+      "year": 2026
+    },
+    {
+      "cohort": "<=2018",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Notice_about_loan_in_ic.pdf",
+      "document_type": "forex",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "parent_rank": 332,
+      "resource_type": "pdf",
+      "sampling_stratum": "<=2018/forex/pdf",
+      "subset_rank": 11,
+      "year": 2018
+    },
+    {
+      "cohort": "2019",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Ownership_Structure_of_Government_Securities-2066-11Falgun.pdf",
+      "document_type": "report",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "parent_rank": 86,
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/report/pdf",
+      "subset_rank": 12,
+      "year": 2019
+    },
+    {
+      "cohort": "2019",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/List-of-BFIs-Poush_2075_Nepali.pdf",
+      "document_type": "license_registry",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "parent_rank": 257,
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/license_registry/pdf",
+      "subset_rank": 13,
+      "year": 2019
+    },
+    {
+      "cohort": "2023-2026",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/02/List-of-BFIs-Poush-2081-English.pdf",
+      "document_type": "license_registry",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "parent_rank": 252,
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/license_registry/pdf",
+      "subset_rank": 14,
+      "year": 2025
+    },
+    {
+      "cohort": "2020-2022",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/07/Inflation-Expectation-Survey-Report.pdf",
+      "document_type": "research",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "parent_rank": 268,
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/research/pdf",
+      "subset_rank": 15,
+      "year": 2021
+    },
+    {
+      "cohort": "<=2018",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Current_Macroeconomic_Situation_English-2008-10-Text-Based-on-First-Month-data-of-2008-09.pdf",
+      "document_type": "statistics",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "parent_rank": 249,
+      "resource_type": "pdf",
+      "sampling_stratum": "<=2018/statistics/pdf",
+      "subset_rank": 16,
+      "year": 2008
+    },
+    {
+      "cohort": "2019",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Directives-Directives-to-Microfinance-FIs_2074.pdf",
+      "document_type": "directive",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "parent_rank": 112,
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/directive/pdf",
+      "subset_rank": 17,
+      "year": 2019
+    },
+    {
+      "cohort": "2020-2022",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/02/Overnight-Repo-Update-FY-2078-79-upto-2078-11-12.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "parent_rank": 180,
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/monetary_operations/pdf",
+      "subset_rank": 18,
+      "year": 2022
+    },
+    {
+      "cohort": "2023-2026",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/04/Tathyanka-Shastri-Interview-Schedule.pdf",
+      "document_type": "notice",
+      "owner": "hrm",
+      "owners": [
+        "hrm"
+      ],
+      "parent_rank": 198,
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/notice/pdf",
+      "subset_rank": 19,
+      "year": 2023
+    },
+    {
+      "cohort": "2023-2026",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/08/Special-Study-Pokhara-Final-Report-2080.04.31-2.pdf",
+      "document_type": "research",
+      "owner": "pkr",
+      "owners": [
+        "pkr"
+      ],
+      "parent_rank": 288,
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/research/pdf",
+      "subset_rank": 20,
+      "year": 2023
+    },
+    {
+      "cohort": "2019",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/Rastra_Rin_Niyamawali_2059_Dosro_Sansodhan_2067-1.pdf",
+      "document_type": "act",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "parent_rank": 244,
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/act/pdf",
+      "subset_rank": 21,
+      "year": 2019
+    },
+    {
+      "cohort": "2020-2022",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/03/Foreign-Loan.pdf",
+      "document_type": "forex",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "parent_rank": 393,
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/forex/pdf",
+      "subset_rank": 22,
+      "year": 2020
+    },
+    {
+      "cohort": "2023-2026",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/01/NIFRA-Unified-Directive.pdf",
+      "document_type": "directive",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "parent_rank": 247,
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/directive/pdf",
+      "subset_rank": 23,
+      "year": 2025
+    },
+    {
+      "cohort": "2023-2026",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/08/CSR-Guidelines-2082-Publish-1.pdf",
+      "document_type": "act",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "parent_rank": 291,
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/act/pdf",
+      "subset_rank": 24,
+      "year": 2025
+    },
+    {
+      "cohort": "2019",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Press_Release-Press-Release-about-the-Interaction-Program-with-Chairman-of-Commercial-banks-1.pdf",
+      "document_type": "media",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "parent_rank": 89,
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/media/pdf",
+      "subset_rank": 25,
+      "year": 2019
+    },
+    {
+      "cohort": "2023-2026",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/01/Monetary-Operation-Report-FY-2080-81_2080-09-24.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "parent_rank": 138,
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/monetary_operations/pdf",
+      "subset_rank": 26,
+      "year": 2024
+    },
+    {
+      "cohort": "2023-2026",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/08/Heavy-Duty-Racking-System-Bolpatra-Swikrit-Hune-Aashaya-ko-Suchana.pdf",
+      "document_type": "notice",
+      "owner": "gsd",
+      "owners": [
+        "gsd"
+      ],
+      "parent_rank": 127,
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/notice/pdf",
+      "subset_rank": 27,
+      "year": 2024
+    },
+    {
+      "cohort": "<=2018",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/CMEs_Three_-Months_-English.pdf",
+      "document_type": "statistics",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "parent_rank": 233,
+      "resource_type": "pdf",
+      "sampling_stratum": "<=2018/statistics/pdf",
+      "subset_rank": 28,
+      "year": 2015
+    },
+    {
+      "cohort": "2023-2026",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/01/Notice-15.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "parent_rank": 160,
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/circular/pdf",
+      "subset_rank": 29,
+      "year": 2026
+    },
+    {
+      "cohort": "2020-2022",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/03/Notekosh_Karobar-dba-2071.pdf",
+      "document_type": "directive",
+      "owner": "cmd",
+      "owners": [
+        "cmd"
+      ],
+      "parent_rank": 289,
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/directive/pdf",
+      "subset_rank": 30,
+      "year": 2020
+    },
+    {
+      "cohort": "2019",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/07/२४.वैयक्तिक-गोपनीयता-सम्बन्धी-ऐन-२०७५.pdf",
+      "document_type": "act",
+      "owner": "lgd",
+      "owners": [
+        "lgd"
+      ],
+      "parent_rank": 274,
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/act/pdf",
+      "subset_rank": 31,
+      "year": 2019
+    },
+    {
+      "cohort": "2019",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Interest_Rate_Structure_of_Commercial_Banks-2063-12_Mid-April_2007.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "parent_rank": 70,
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/untyped/pdf",
+      "subset_rank": 32,
+      "year": 2019
+    },
+    {
+      "cohort": "2020-2022",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/10/FIU-Nepal-Newsletter-2022.pdf",
+      "document_type": "publication",
+      "owner": "fiu",
+      "owners": [
+        "fiu"
+      ],
+      "parent_rank": 278,
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/publication/pdf",
+      "subset_rank": 33,
+      "year": 2022
+    },
+    {
+      "cohort": "2023-2026",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/12/Deposit-Collection-Result-Update-FY-2080-81-upto-2080-09.04.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "parent_rank": 158,
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/monetary_operations/pdf",
+      "subset_rank": 34,
+      "year": 2023
+    },
+    {
+      "cohort": "2023-2026",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/05/List-of-BFIs-Chaitra-2080-Nepali.pdf",
+      "document_type": "license_registry",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "parent_rank": 324,
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/license_registry/pdf",
+      "subset_rank": 35,
+      "year": 2024
+    },
+    {
+      "cohort": "2020-2022",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/12/Current-Macroeconomic-and-Financial-Situation-Nepali-Based-on-Four-Months-data-of-2078.79-1.pdf",
+      "document_type": "statistics",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "parent_rank": 251,
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/statistics/pdf",
+      "subset_rank": 36,
+      "year": 2021
+    },
+    {
+      "cohort": "2020-2022",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/07/११.सङ्गठित-अपराध-निवारण-ऐन-२०७०.pdf",
+      "document_type": "act",
+      "owner": "lgd",
+      "owners": [
+        "lgd"
+      ],
+      "parent_rank": 280,
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/act/pdf",
+      "subset_rank": 37,
+      "year": 2021
+    },
+    {
+      "cohort": "2019",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/List-of-BFIs-Asoj-2076-Nepali.pdf",
+      "document_type": "license_registry",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "parent_rank": 342,
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/license_registry/pdf",
+      "subset_rank": 38,
+      "year": 2019
+    },
+    {
+      "cohort": "2020-2022",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/12/News-CAMBODIA-Press-release.pdf",
+      "document_type": "media",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "parent_rank": 290,
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/media/pdf",
+      "subset_rank": 39,
+      "year": 2022
+    }
+  ],
+  "generated_at": "2026-08-15T06:33:32.106157+00:00",
+  "parent_manifest_path": "docs/nrb/phase6a-manifest.json",
+  "parent_selection_sha256": "1ae297dba1c33c7db9976f817806f6666371695a31e1f424d046993d581a1312",
+  "purpose": "docling-calibration",
+  "requested_size": 40,
+  "resource_type": "pdf",
+  "selected_size": 40,
+  "subset_algorithm_version": "docling-calibration-v1",
+  "subset_selection_sha256": "81d5979ffeee6fbede375917fa6e3de09cb8f0475a397a21b7ad52fa233d90f5",
+  "version": "calibration-1"
+}

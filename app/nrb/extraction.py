@@ -37,7 +37,7 @@ import logging
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Sequence
 
 from ..files import documents as file_documents
 from ..files import readers
@@ -47,12 +47,16 @@ from . import quality
 logger = logging.getLogger("app.nrb.extraction")
 
 __all__ = [
+    "DoclingEngine",
     "EXTRACTOR_VERSION",
     "ExtractionResult",
     "MAX_EXTRACT_BYTES",
     "MAX_SHEET_ROWS",
     "PREVIEW_CHARS",
+    "docling_extract",
+    "docling_pipeline_is_native",
     "extract_file",
+    "result_from_pages",
 ]
 
 # Bumped BY HAND when a parser or a classification rule changes. It is half of
@@ -209,23 +213,48 @@ def _no_parser(family: str, started: float) -> ExtractionResult:
     )
 
 
-def _extract_pdf(path: Path, family: str, started: float) -> ExtractionResult:
-    read = file_documents.read_pdf_pages(path)
-    text = "\n".join(read.pages)
+def result_from_pages(
+    pages: Sequence[str],
+    *,
+    parser: str,
+    family: str = "pdf",
+    started: float | None = None,
+    extra_metrics: dict[str, Any] | None = None,
+) -> ExtractionResult:
+    """Score a PDF's per-page text. THE shared path — pypdf and Docling both use it.
+
+    This exists so the calibration compares what the two engines *read*, never how
+    their output was judged. Both sides run the same `measure_text`,
+    `measure_pages` and `classify` at the same thresholds; `parser` is recorded as
+    a fact and is never branched on. If this ever grew an engine-specific rule the
+    agreement rate would stop meaning anything.
+    """
+    text = "\n".join(pages)
     return _result(
-        parser="pypdf",
+        parser=parser,
         family=family,
         evidence=quality.Evidence(
             family=family,
             parsed=True,
             error=None,
             text_metrics=quality.measure_text(text),
-            pages=quality.measure_pages(read.pages),
+            pages=quality.measure_pages(pages) if pages else None,
             sheets=None,
         ),
         text=text,
-        extra_metrics={"pages_skipped": read.skipped},
+        extra_metrics=extra_metrics,
+        started=time.monotonic() if started is None else started,
+    )
+
+
+def _extract_pdf(path: Path, family: str, started: float) -> ExtractionResult:
+    read = file_documents.read_pdf_pages(path)
+    return result_from_pages(
+        read.pages,
+        parser="pypdf",
+        family=family,
         started=started,
+        extra_metrics={"pages_skipped": read.skipped},
     )
 
 
@@ -371,3 +400,170 @@ def extract_file(
 
     # A family with no branch above. Honest rather than silent.
     return _no_parser(family, started)
+
+
+# --------------------------------------------------------------------------- #
+# Calibration: what the OTHER engine makes of the same bytes.
+#
+# Not part of the profiling path, and never written to `nrb_extractions`. This
+# exists so "pypdf is a fair proxy for the native-extraction question" is a
+# measured claim rather than an assertion — and so the phase question "is native
+# Docling sufficient?" has an answer.
+#
+# Docling and torch are imported INSIDE these functions, never at module scope:
+# the slim API image must not gain ~90 packages because something imported this
+# module. `test_docling_is_not_imported_when_the_nrb_extraction_module_loads`
+# holds that in a subprocess, since `sys.modules` is process-global.
+# --------------------------------------------------------------------------- #
+def docling_pipeline_is_native() -> tuple[bool, str]:
+    """Is the shared Docling pipeline still CPU-pinned with OCR off?
+
+    Two things depend on this. The calibration is only meaningful if both engines
+    read the same embedded text layer — Docling with OCR on would be answering a
+    different question. And Phase 6A forbids running OCR at all, so reusing
+    someone else's converter means checking what it is configured to do rather
+    than assuming.
+
+    Returns `(ok, evidence)` so a caller can print WHY it refused.
+    """
+    from ..rag.parsing import _pdf_pipeline_options
+
+    options = _pdf_pipeline_options()
+    device = getattr(getattr(options, "accelerator_options", None), "device", None)
+    device_name = str(getattr(device, "value", device)).lower()
+    ocr = bool(getattr(options, "do_ocr", False))
+    return (not ocr and device_name == "cpu"), f"do_ocr={ocr}, device={device_name}"
+
+
+def _docling_pages(document) -> list[str]:
+    """Docling's item stream, grouped into per-page text. NO RAG filtering.
+
+    Deliberately does NOT go through `parsing.parse_to_chunks`: that applies
+    `merge_blocks`, `drop_small_blocks`, front-matter skipping and chunking on top
+    of Docling, so a disagreement with pypdf could come from RAG's filter rather
+    than from what Docling read off the page. Every item's text is kept, in
+    document order, placed on the page `item.prov[0].page_no` reports — which is
+    what makes `quality.measure_pages` applicable to both engines and the
+    scanned-PDF rules comparable.
+    """
+    pages: dict[int, list[str]] = {}
+    ordered: list[str] = []
+    for item, _level in document.iterate_items():
+        label = getattr(getattr(item, "label", None), "value", "") or ""
+        if label == "table":
+            try:
+                text = item.export_to_markdown(document).strip()
+            except Exception:  # noqa: BLE001 - a malformed table is not fatal
+                text = ""
+        else:
+            text = (getattr(item, "text", "") or "").strip()
+        if not text:
+            continue
+        prov = getattr(item, "prov", None) or []
+        page = prov[0].page_no if prov else 0
+        pages.setdefault(page, []).append(text)
+        ordered.append(text)
+
+    try:
+        total = int(document.num_pages())
+    except Exception:  # noqa: BLE001 - not every docling version exposes it
+        total = max(pages) if pages else 0
+    if not total:
+        # No page metadata at all: one synthetic page, so the text metrics still
+        # apply and only the page rules are skipped.
+        return ["\n".join(ordered)] if ordered else []
+    # An empty entry for a page Docling found nothing on — that IS the scanned
+    # page signal, and dropping it would make coverage read as 100%.
+    return ["\n".join(pages.get(number, [])) for number in range(1, total + 1)]
+
+
+class DoclingEngine:
+    """One Docling converter, reused across a calibration run.
+
+    Constructing a `DocumentConverter` builds the layout pipeline and loads its
+    models; doing that per file would make the measured per-document duration
+    mostly startup, and the "how much slower is Docling" number would be wrong in
+    the direction that flatters pypdf. So the converter is built once, its
+    construction is timed SEPARATELY (`init_seconds`), and every file after that
+    is a like-for-like parse.
+
+    Not a module-level singleton and not cached: that would be global mutable
+    state in an import path the API also loads. The engine is created by the
+    calibration pass, used, and dropped.
+    """
+
+    def __init__(self) -> None:
+        self._converter: Any = None
+        self.init_seconds: float = 0.0
+        self.error: str | None = None
+
+    def open(self) -> tuple[bool, str]:
+        """Build the converter. Returns `(ok, evidence)`; never raises."""
+        ok, evidence = docling_pipeline_is_native()
+        if not ok:
+            self.error = f"docling pipeline is not native ({evidence})"
+            return False, self.error
+        started = time.monotonic()
+        try:
+            from ..rag.parsing import _docling_converter
+
+            self._converter = _docling_converter()
+        except ImportError:
+            self.error = "docling is not installed (worker deps only)"
+            return False, self.error
+        except Exception as exc:  # noqa: BLE001 - report, do not abort the pass
+            self.error = f"{type(exc).__name__} building the docling converter"
+            return False, self.error
+        self.init_seconds = time.monotonic() - started
+        return True, f"{evidence}, init {self.init_seconds:.1f}s"
+
+    def extract(self, path: Path) -> ExtractionResult:
+        return docling_extract(path, converter=self._converter)
+
+    def close(self) -> None:
+        """Drop the converter so its models can be collected."""
+        self._converter = None
+
+    def __enter__(self) -> "DoclingEngine":
+        self.open()
+        return self
+
+    def __exit__(self, *exc: Any) -> None:
+        self.close()
+
+
+def docling_extract(path: Path, *, converter: Any = None) -> ExtractionResult:
+    """Docling's native extraction, scored by the SAME rules as pypdf's.
+
+    Reuses `parsing._docling_converter()` — a private helper, and depended on
+    deliberately. Copying its three configuration lines here would create a second
+    pipeline configuration that could drift, and the way it would drift is by
+    silently enabling OCR. Reusing it means the calibration is pinned to whatever
+    department RAG actually runs, and `docling_pipeline_is_native` fails loudly if
+    that stops being CPU/no-OCR.
+
+    `app/rag/parsing.py` itself is NOT modified: its behaviour is load-bearing for
+    department RAG, and Phase 6A must not change department semantics to make NRB
+    convenient.
+
+    Never raises — the same contract as `extract_file`. A calibration that died on
+    file 12 of 40 would have measured nothing.
+    """
+    started = time.monotonic()
+    ok, evidence = docling_pipeline_is_native()
+    if not ok:
+        return _failed("pdf", f"docling pipeline is not native ({evidence})", started)
+    try:
+        if converter is None:
+            from ..rag.parsing import _docling_converter
+
+            converter = _docling_converter()
+        document = converter.convert(str(path)).document
+        pages = _docling_pages(document)
+    except ImportError:
+        return _failed("pdf", "docling is not installed (worker deps only)", started)
+    except Exception as exc:  # noqa: BLE001 - a calibration must not kill a batch
+        logger.warning("NRB calibrate: docling failed (%s)", type(exc).__name__)
+        return _failed("pdf", type(exc).__name__, started)
+
+    return result_from_pages(pages, parser="docling", family="pdf", started=started)
