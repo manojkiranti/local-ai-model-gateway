@@ -1,0 +1,218 @@
+================================================================================
+NRB PHASE 6A — pypdf vs DOCLING NATIVE EXTRACTION
+Plan Task 13, step 4.  The honesty check on using pypdf as the screen.
+================================================================================
+
+Run date            2026-08-15
+Database            local_ai_gateway_p4
+Command             scripts/nrb_calibrate.py \
+                        --subset docs/nrb/phase6a-docling-calibration.json
+Environment         HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1
+                    Docling's layout models were loaded from the local cache.
+                    ZERO network requests: the Phase 5 benchmark fetch was the
+                    one network operation of this phase, and the calibration was
+                    not allowed to become a second one.
+Pipeline guard      docling_pipeline_is_native() -> do_ocr=False, device=cpu
+                    (checked before the converter was built; the run would have
+                    refused otherwise, because Phase 6A does not run OCR)
+Converter           ONE DoclingEngine for the whole run; init 0.8s, timed
+                    separately and excluded from the slowdown ratio.
+
+Parent benchmark    1ae297dba1c33c7db9976f817806f6666371695a31e1f424d046993d581a1312
+Frozen subset       81d5979ffeee6fbede375917fa6e3de09cb8f0475a397a21b7ad52fa233d90f5
+                    40 PDFs, frozen at commit 8c26341 BEFORE any of them were
+                    acquired, and a strict subset of the frozen 400.  Both
+                    fingerprints verified before the run and unchanged after it.
+
+WHAT IS COMPARED: extraction against extraction.  Docling's own iterate_items()
+stream with no RAG chunk filtering — NOT parse_to_chunks, which would have
+measured merge_blocks / drop_small_blocks / front-matter skipping instead of
+what Docling read off the page.  Both engines' page lists go through the SAME
+extraction.result_from_pages, so quality.measure_text, quality.measure_pages and
+quality.classify are literally the same calls on both sides, at the same
+thresholds.  legacy_line_ratio >= 0.20 unchanged.
+
+"A RESCUED B" means B's verdict is not usable and A's is, where usable ==
+STATUS_EXTRACTED and nothing else.  Reading more characters is not a rescue.
+
+NOTHING WAS WRITTEN.  nrb_extractions holds 381 native-1 rows before and after;
+this comparison is experimental calibration data and does not enter the
+canonical screen.  No migration.
+
+--------------------------------------------------------------------------------
+NRB pypdf-vs-Docling calibration — completed
+========================================================================
+Subset:               docs/nrb/phase6a-docling-calibration.json
+Subset fingerprint:   81d5979ffeee6fbede375917fa6e3de09cb8f0475a397a21b7ad52fa233d90f5
+Parent benchmark:     1ae297dba1c33c7db9976f817806f6666371695a31e1f424d046993d581a1312
+Docling pipeline:     do_ocr=False, device=cpu, init 0.8s
+Duration:             2,387.2s
+
+Subset coverage (FILES — the frozen calibration slice)
+  subset entries:           40
+  in the catalog:           40
+  missing:                   0
+  fetched:                  37
+  not fetched yet:           3   (reported, never substituted)
+
+Blob coverage (UNIQUE content_sha256 — the comparison unit)
+  unique fetched:           37
+  duplicates:                0   (same bytes, two subset files — one comparison)
+  selected:                 37
+  compared:                 37
+  files represented:        37
+  missing on disk:           0
+  corrupt on disk:           0
+
+Agreement (over 37 compared blobs)
+  status agreement:         31   83.8%
+  reason agreement:         31   83.8%
+
+Rescues  (A rescued B = B's verdict is not usable and A's is)
+  DOCLING RESCUED PYPDF      6   <- the number that would invalidate the screen
+  pypdf rescued docling      0
+  both extracted             6
+  both suspicious           20
+  both failed                0
+  disagreed, neither         0
+
+pypdf (per BLOB)
+  suspicious=26 extracted=6 needs_ocr=5
+  legacy_font_suspected=26 clean=6 no_text_layer=5
+  total chars 1,463,990   time 30.892s   median 89ms   p95 4749ms
+    char_count             n=37    min=0.0       median=7569.0    max=599346.0
+    devanagari_ratio       n=37    min=0.0       median=0.0       max=0.9616
+    legacy_line_ratio      n=37    min=0.0       median=0.6185    max=1.0
+    text_page_coverage     n=37    min=0.0       median=1.0       max=1.0
+
+docling (per BLOB)
+  suspicious=20 extracted=12 needs_ocr=5
+  legacy_font_suspected=20 clean=12 no_text_layer=5
+  total chars 2,060,503   time 2354.907s   median 18562ms   p95 387811ms
+    char_count             n=37    min=0.0       median=16008.0   max=855633.0
+    devanagari_ratio       n=37    min=0.0       median=0.0       max=0.9691
+    legacy_line_ratio      n=37    min=0.0       median=0.5201    max=1.0
+    text_page_coverage     n=37    min=0.0       median=1.0       max=1.0
+
+Speed
+  pypdf total:              30.9s
+  docling init:              0.8s   (paid once, excluded from the ratio)
+  docling total:         2,354.9s
+  slowdown:                 76.2x
+
+Disagreements (6, showing 6) — read every one:
+
+  1ad95ea9f45c  docling_rescued_pypdf
+    pypdf    suspicious/legacy_font_suspected  chars=35719 devanagari=0.0 legacy=0.2182
+             'PUBLIC DEBT MANAGEMENT DEPT.,THAPATHALI, KATHMANDU OWNERSHIP STRUCTURE OF GOVERNMENT SECURITIES As of Falgun, 2066 ( Mid-March, 2010) Phone No.4221763,4257880,4'
+    docling  extracted/clean  chars=76927 devanagari=0.0 legacy=0.1675
+             '| CONTENTS | CONTENTS | CONTENTS | |------------|-------------------------------------------------------------------------|------------| | S.No. | Particular | '
+
+  38c6d43c3ed1  docling_rescued_pypdf
+    pypdf    suspicious/legacy_font_suspected  chars=2517 devanagari=0.0 legacy=0.2121
+             'Invitation for Quotations Nepal Rastra Bank, Dhangadhi office Invitation for Sealed Quotations for the: Construction of Parking Shed at NRB Premises Contract Id'
+    docling  extracted/clean  chars=2459 devanagari=0.0 legacy=0.125
+             'Invitation for Quotations Nepal Rastra Bank, Dhangadhi office Construction of Parking Shed at NRB Premises Invitation for Sealed Quotations for the: Contract Id'
+
+  46e0c17f27a1  docling_rescued_pypdf
+    pypdf    suspicious/legacy_font_suspected  chars=16061 devanagari=0.0 legacy=0.2381
+             "Current Macroeconomic Situation (Based on the First Month's Data of 2008/09) . Monetary Situation Money Supply 1. Broad money (M 2) expanded by 1.5 percent in t"
+    docling  extracted/clean  chars=16008 devanagari=0.0 legacy=0.1961
+             ". Current Macroeconomic Situation (Based on the First Month's Data of 2008/09) Monetary Situation Money Supply Broad money (M2) expanded by 1.5 percent in the f"
+
+  7e2257c289d2  docling_rescued_pypdf
+    pypdf    suspicious/legacy_font_suspected  chars=27444 devanagari=0.0136 legacy=0.2523
+             "Inside this issue Foreword FIU-Nepal's Workflow Reporting Stats goAML Integration Status Events & Programs Third Round Mutual Evaluation of Nepal, 2022-23 Publi"
+    docling  extracted/clean  chars=23420 devanagari=0.0141 legacy=0.1517
+             'FIU-Nepal Newsletter Inside this issue FIU-Nepal Employees 1 3 5 2 1 25 FIU-Head (Director): Deputy Directors: Assistant Directors: 11 Head Assistants: Assistan'
+
+  c807fe4e767e  docling_rescued_pypdf
+    pypdf    suspicious/legacy_font_suspected  chars=14004 devanagari=0.0 legacy=0.5787
+             '(As of Mid Jan 2025) S.No. Name Operation Date (A.D.) Head Office Paid up Capital Working Area 1 Nepal Bank Ltd. 1937/11/15 Dharmapath,Kathmandu 1,469.40 Nation'
+    docling  extracted/clean  chars=37204 devanagari=0.0 legacy=0.0214
+             '(As of Mid Jan 2025) List of Banks and Financial Institutions (Licensed by NRB) | S.No. Class: | Name "A" (Commercial Banks) | Operation Date (A.D.) | Head Offi'
+
+  e4961a48d3d2  docling_rescued_pypdf
+    pypdf    suspicious/legacy_font_suspected  chars=2193 devanagari=0.0 legacy=0.2632
+             'Liquidity Absorbing Instruments Times Offer Amount (Rs. in crore) Turnover (Rs. in crore) Outstanding (Rs. in crore) General Instruments 19 36,000.00 30,585.00 '
+    docling  extracted/clean  chars=2616 devanagari=0.0 legacy=0.1579
+             'Nepal Rastra Bank Monetary Management Department Monetary Operations in (F/Y 2080/81) | Liquidity Absorbing Instruments | Times | Offer Amount (Rs. in crore) | '
+
+--------------------------------------------------------------------------------
+STATUS TRANSITIONS (pypdf -> docling), all 37 accounted for
+  extracted   -> extracted     6
+  suspicious  -> suspicious   20
+  suspicious  -> extracted     6      <- every disagreement is this one cell
+  needs_ocr   -> needs_ocr     5
+Reason transitions mirror them exactly (legacy_font_suspected -> clean x6);
+reason agreement equals status agreement at 31/37.
+
+CHAR COUNTS
+  pypdf   total 1,463,990   median   7,569   max   599,346
+  docling total 2,060,503   median  16,008   max   855,633
+  Docling read 40.7% more text overall and about twice the median document.
+  Neither engine returned zero characters where the other returned text.
+
+DEVANAGARI
+  Both engines find the same single Unicode-Devanagari document (pypdf 0.9616,
+  docling 0.9691) and both return 0.0 on essentially everything else.
+  DOCLING DOES NOT RECOVER UNICODE NEPALI FROM A PREETI-ENCODED PDF.  It cannot:
+  the glyph-to-codepoint mapping is a property of the embedded font, not of the
+  parser, and no amount of better layout analysis reverses it.
+
+LEGACY-LINE RATIO
+  pypdf   median 0.6185      docling median 0.5201
+  Docling's ratio is systematically a little lower because it reconstructs
+  tables as markdown rows, which changes where lines break and therefore which
+  lines the per-line heuristic judges.  On genuinely Preeti-encoded documents
+  both engines stay far above the threshold and agree.
+
+================================================================================
+THE DECISION THE PLAN ASKS FOR
+================================================================================
+
+DOCLING RESCUED PYPDF: 6 of 37 (16.2%).  PYPDF RESCUED DOCLING: 0.
+
+The committed plan says: if this is more than a couple of files, say plainly
+that the "pypdf is a fair proxy" claim is NOT established.  Six is more than a
+couple.  SO: ON THIS EVIDENCE THE PROXY CLAIM IS NOT ESTABLISHED, and the
+profile's `suspicious` count must be read as an UPPER BOUND on unusable
+documents, not as a measurement of them.
+
+But every one of the six was read, as the plan requires, and they say something
+more specific than "Docling is better".  All six are English STATISTICAL TABLES
+or table-heavy notices, and in all six:
+
+  * both engines extracted substantially the same English text;
+  * pypdf's legacy_line_ratio lands just above the threshold
+    (0.2182, 0.2121, 0.2381, 0.2523, 0.2632 — and one at 0.5787);
+  * docling's lands just below it
+    (0.1675, 0.1250, 0.1961, 0.1517, 0.1579 — and 0.0214);
+  * neither engine found any Devanagari.
+
+That is not Docling rescuing an unreadable document.  It is the SAME false
+positive found by hand in Step 5 of the profile: a numeric table whose formatted
+numbers ("2,123,180.00") and dash-filled cells trip the intra-word-symbol rule,
+tipping a readable English table over 0.20.  Docling escapes it only because its
+markdown table rows break lines differently.  Case c807fe4e767e is the clearest:
+the "List of Banks and Financial Institutions" table, pypdf 0.5787 vs docling
+0.0214 on the same readable English content.
+
+So the correct reading of the six is:
+
+  Docling did NOT rescue a single legacy-font Nepali document — on all 20
+  `both_suspicious` files the two engines agree the text is Preeti garbage.
+  What the six show is that PYPDF'S TABLE FALSE-POSITIVE RATE IS REAL AND
+  MEASURABLE: at least 6 of 37 PDFs (16.2%) in this slice are readable English
+  that native-1 called suspicious.
+
+Both statements go in the record.  The screening-proxy claim is not established
+by this calibration; the reason it is not established is a classifier weakness
+on tables, not a parser weakness in pypdf.  No threshold was tuned, the subset
+was not changed, and no favourable example was cherry-picked — all six
+disagreements are printed above in full.
+
+SPEED, for the record: 76.2x.  pypdf did the same 37 files in 30.9s that Docling
+took 2,354.9s over, and Docling's p95 is 387.8s for a single document.  Whatever
+is done about the table false positives, running Docling as the corpus-wide
+screen is not the answer to it.

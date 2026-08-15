@@ -1,0 +1,386 @@
+================================================================================
+NRB PHASE 6A — LIVE EXTRACTION PROFILE OVER THE FROZEN BENCHMARK
+Plan Task 13, steps 2, 3, 3B, 5 and 6.
+================================================================================
+
+Run date            2026-08-15
+Database            local_ai_gateway_p4  (the NRB scratch DB; never local_ai_gateway)
+Extractor version   native-1
+Benchmark           docs/nrb/phase6a-manifest.json
+  selection_sha256  1ae297dba1c33c7db9976f817806f6666371695a31e1f424d046993d581a1312
+                    frozen at commit 1ccd945, 400 unique comparison_keys, verified
+                    ok before and after this run — byte-unchanged.
+Calibration slice   docs/nrb/phase6a-docling-calibration.json
+  subset_sha256     81d5979ffeee6fbede375917fa6e3de09cb8f0475a397a21b7ad52fa233d90f5
+                    frozen at commit 8c26341, 40 PDFs, a strict subset of the 400.
+                    Results in docs/nrb/phase6a-calibration.txt.
+
+NOTHING WAS RESAMPLED. 19 benchmark files and 3 calibration files failed to
+download. They are reported as gaps below; no substitute file was selected, no
+scope was re-run to replace them, and neither frozen artifact was touched.
+
+================================================================================
+STEP 2 — THE ONE LIVE FETCH   (the only network operation in Phase 6A)
+================================================================================
+
+  scripts/nrb_fetch.py --manifest docs/nrb/phase6a-manifest.json \
+      --max-bytes 500000000 -v
+
+Run id 315.  Duration 142.1s.  Exit: partial (19 failures).
+Phase 5 protections all applied unchanged: comparison_key resolution against the
+catalog, trusted-host guard, HTTPS requirement, redirect re-checking, pacing
+(NRB_CRAWL_DELAY_SECONDS=0.25), byte cap, magic-byte sniffing, HTML-as-document
+rejection, truncated-transfer rejection, content-addressed storage, advisory
+lock, resumability.  ONE pass; no retry pass was run.
+
+SOURCE ACCOUNTING (manifest FILES)
+  requested                        400
+  unique requested                 400   (0 duplicate entries)
+  missing from the catalog           0
+  already fetched before the pass    3
+  pending before the pass          397
+  selected this pass               397
+  fetched this pass                378
+  failed this pass                  19   (all HTTP 404)
+  blocked (host guard)               0
+  deduplicated (same bytes, other URL)  0
+  TOTAL FETCHED AFTER THE PASS     381   (95.25% of the benchmark)
+  still unfetched                   19   (4.75% — a stated gap, not a silent one)
+
+BYTES
+  NRB-reported size of the selection   300.3 MB (a floor; 3 files report no size)
+  downloaded this pass                 302.3 MB
+  newly stored this pass               302.3 MB
+  benchmark footprint on disk          303.9 MB over 381 blobs
+      pdf          284    248.0 MB
+      spreadsheet   60     46.4 MB
+      image         22      7.8 MB
+      document      15      1.6 MB
+  whole nrb_files store after the pass 330.3 MB / 427 distinct blobs
+
+CALIBRATION COVERAGE (see the calibration report for the comparison itself)
+  calibration entries                40
+  fetched after the pass             37
+  failed / unavailable                3
+  --> THE CALIBRATION IS 37 FILES, NOT 40, AND IS REPORTED AS SUCH.
+
+THE 19 FETCH FAILURES — all HTTP 404, i.e. files NRB has moved or withdrawn
+since the catalog sync.  17 of the 19 are 2019 sources (NRB's CMS-migration
+cohort), which is where the corpus is known to be least stable.  By stratum:
+  2019 untyped pdf            12
+  2019 guideline_manual pdf    1
+  2019 notice pdf              1
+  2019 statistics pdf          1
+  2019 media pdf               1
+  2019 license_registry pdf    1
+  2020 notice pdf              1
+  2014 circular pdf            1
+12 of the 12 "untyped" ones are Account-Block/Release enforcement notices under
+/contents/uploads/2019/12/.  A cluster this shaped means NRB moved files, not
+that the fetcher is broken; per the plan it is recorded, not retried.
+
+One TYPE DISAGREEMENT was recorded (bytes stored, both values kept):
+  .../Circular_22-Checklist_to_Guideline_on_Environmental__Social_Risk_...xls
+  NRB claimed spreadsheet; the bytes are office_legacy (OLE2 header).
+
+================================================================================
+STEP 3 — CANONICAL NATIVE EXTRACTION   (first canonical benchmark extraction)
+================================================================================
+
+  scripts/nrb_extract.py --manifest docs/nrb/phase6a-manifest.json -v
+
+Identity is (content_sha256, extractor_version); 400 manifest files did NOT
+have to be 400 rows.  In this cohort no two fetched files share bytes, so
+381 fetched files == 381 unique blobs == 381 persisted rows.
+
+The pass was run in two parts: the first was interrupted by an external
+10-minute command timeout after 250 blobs, and the second resumed and completed
+the remaining 131.  That is the documented resumable behaviour (selection is
+"fetched blobs with no extraction at this version", committed every 25) and it
+changed no result — Step 3B below re-ran the identical command and selected 0.
+
+--------------------------------------------------------------------------------
+NRB native extraction — completed
+========================================================================
+Extractor version:    native-1
+Manifest:             docs/nrb/phase6a-manifest.json
+Cohort fingerprint:   1ae297dba1c33c7db9976f817806f6666371695a31e1f424d046993d581a1312
+Duration:             474.5s
+
+Source coverage (MANIFEST FILES — the frozen benchmark)
+  requested:               400
+  in the catalog:          400
+  missing:                   0   (a stale manifest; the only real defect here)
+  fetched:                 381
+  not fetched yet:          19   (reported, never substituted)
+    failed                 19
+    fetched               381
+
+Blob coverage (UNIQUE content_sha256 — the extraction unit)
+  unique fetched:          381
+  duplicates:                0   (same bytes, two cohort files — one extraction)
+  already extracted:       381   (at this exact extractor version)
+  pending:                   0
+  selected this pass:      131
+  attempted:               131
+  persisted:               131
+  failed:                    0
+  missing on disk:           0
+  corrupt on disk:           0
+
+Verdicts (per BLOB):
+  suspicious       179   47.0%
+  extracted        126   33.1%
+  needs_ocr         51   13.4%
+  unsupported       23    6.0%
+  failed             2    0.5%
+
+Reasons (per BLOB):
+  legacy_font_suspected      179   47.0%
+  clean                      126   33.1%
+  no_text_layer               28    7.3%
+  no_native_parser            23    6.0%
+  image_file                  22    5.8%
+  parser_error                 2    0.5%
+  sparse_text_layer            1    0.3%
+
+Warnings:
+  insufficient_text           30
+  partial_text_coverage        1
+
+Metric distributions (per BLOB)
+  char_count                   n=381    min=0.0       median=4418.0    p90=164109.0  max=31441360.0
+  devanagari_ratio             n=334    min=0.0       median=0.0       p90=0.0       max=0.9768
+  legacy_line_ratio            n=334    min=0.0       median=0.25      p90=1.0       max=1.0
+  text_page_coverage           n=282    min=0.0       median=1.0       p90=1.0       max=1.0
+  median_chars_per_text_page   n=282    min=0.0       median=1914.5    p90=3728.0    max=14128.0
+
+Pages
+  documents with pages:      282
+  total pages:             4,285
+  pages with text:         4,136
+  pages without text:        149
+  no native text at all:      28
+
+Legacy-font severity (legacy_line_ratio, threshold 0.2)
+  legacy_font_suspected:     179
+    0                    42
+    >0-<0.20            107
+    0.20-<0.50           41
+    0.50-<0.80           17
+    >=0.80              127
+
+Year cohort (manifest / fetched / blobs / extracted)
+  2023-2026                131 /   131 /   131 /   131   extracted=56 needs_ocr=17 suspicious=57 unsupported=1
+  2019                     120 /   103 /   103 /   103   extracted=24 failed=2 needs_ocr=11 suspicious=57 unsupported=9
+  2020-2022                109 /   108 /   108 /   108   extracted=43 needs_ocr=15 suspicious=44 unsupported=6
+  <=2018                    40 /    39 /    39 /    39   extracted=3 needs_ocr=8 suspicious=21 unsupported=7
+
+File format (manifest / fetched / blobs / extracted)
+  pdf                      303 /   284 /   284 /   284   extracted=81 failed=2 needs_ocr=29 suspicious=172
+  spreadsheet               60 /    60 /    60 /    60   extracted=44 unsupported=16
+  image                     22 /    22 /    22 /    22   needs_ocr=22
+  document                  15 /    15 /    15 /    15   extracted=1 suspicious=7 unsupported=7
+
+Document type (manifest / fetched / blobs / extracted)
+  notice                    67 /    65 /    65 /    65   extracted=20 failed=1 needs_ocr=20 suspicious=22 unsupported=2
+  statistics                60 /    59 /    59 /    59   extracted=33 suspicious=16 unsupported=10
+  untyped                   35 /    23 /    23 /    23   extracted=12 failed=1 needs_ocr=2 suspicious=5 unsupported=3
+  monetary_operations       33 /    33 /    33 /    33   extracted=16 suspicious=17
+  circular                  27 /    26 /    26 /    26   extracted=1 needs_ocr=5 suspicious=19 unsupported=1
+  report                    27 /    27 /    27 /    27   extracted=10 suspicious=14 unsupported=3
+  media                     26 /    25 /    25 /    25   extracted=2 needs_ocr=7 suspicious=16
+  research                  16 /    16 /    16 /    16   extracted=10 suspicious=6
+  publication               15 /    15 /    15 /    15   extracted=9 suspicious=6
+  enforcement_action        12 /    12 /    12 /    12   suspicious=12
+  license_registry          12 /    11 /    11 /    11   suspicious=8 unsupported=3
+  procurement               12 /    12 /    12 /    12   extracted=2 needs_ocr=6 suspicious=4
+  directive                  9 /     9 /     9 /     9   extracted=2 needs_ocr=2 suspicious=5
+  guideline_manual           9 /     8 /     8 /     8   extracted=3 suspicious=4 unsupported=1
+  act                        8 /     8 /     8 /     8   extracted=2 needs_ocr=1 suspicious=5
+  career                     8 /     8 /     8 /     8   needs_ocr=5 suspicious=3
+  monetary_policy            8 /     8 /     8 /     8   extracted=2 suspicious=6
+  rule_bylaw                 8 /     8 /     8 /     8   needs_ocr=1 suspicious=7
+  forex                      6 /     6 /     6 /     6   needs_ocr=2 suspicious=4
+  faq                        2 /     2 /     2 /     2   extracted=2
+
+--------------------------------------------------------------------------------
+NOTES ON THE NUMBERS ABOVE
+
+* 185 blobs have legacy_line_ratio >= 0.20 but only 179 are flagged
+  `legacy_font_suspected`.  The 6 others are `clean`, for two documented and
+  correct reasons: `classify` tests `> 0.20` strictly (5 of them sit exactly at
+  0.200), and `looks_like_legacy_font` requires token_count >= 50 (1 of them has
+  42 tokens and carries the `insufficient_text` warning).  One of the 6 is a
+  genuine miss and is written up in Step 5.
+
+* Devanagari, over the 334 blobs that produced measurable text:
+      devanagari_ratio > 0.5      6   (1.8%)  real Unicode Nepali
+      0 < ratio <= 0.5            7   (2.1%)
+      ratio == 0.0              321  (96.1%)
+  This is the phase's central finding, now measured on a stratified benchmark
+  rather than on 49 circulars: NRB's PDF corpus almost never yields Unicode
+  Devanagari.  Where the document IS Nepali, the text comes out as latin
+  codepoints carrying Devanagari glyphs.
+
+* 27 of the 126 `extracted` blobs sit at legacy_line_ratio >= 0.15, i.e. within
+  25% of the threshold.  The margin on the safe side of the line is not large.
+
+================================================================================
+STEP 3B — RESUMABILITY / IDEMPOTENCY CHECK
+================================================================================
+
+The identical command was re-run immediately:
+
+  scripts/nrb_extract.py --manifest docs/nrb/phase6a-manifest.json --json
+
+  unique fetched            381
+  already extracted         381
+  PENDING EXTRACTION          0     <-- the acceptance criterion
+  selected this pass          0
+  attempted / persisted     0 / 0
+  source coverage           400 requested, 381 fetched, 19 unfetched, 0 missing
+
+PASS.  No --force was used and nothing was hidden.
+
+================================================================================
+STEP 5 — MANUAL VALIDATION, BY EYE
+================================================================================
+
+Five documents per status, chosen deterministically (lowest content_sha256
+within each status, restricted to the benchmark), so the sample is reproducible.
+Each was opened and compared with what was extracted.
+
+--- 5 x extracted ------------------------------------------------------------
+1. 020f7e0ab207  pdf 2022 research/cmd  "Central Bank Digital Currency (CBDC)..."
+   clean, 175,547 chars, 87/87 pages, dev 0.0, legacy 0.0711 (156/2193)
+   Real English policy report.  CORRECT.
+2. 02bf4d910263  pdf 2021 report/fiu  "Annual Report 2072/73 (2015/16)"
+   clean, 53,706 chars, 34/34 pages, legacy 0.1476 (106/718)
+   Real English annual report.  CORRECT, but 0.148 is close to the line.
+3. 034adda33660  pdf 2021 notice/pdm  Treasury Bills auction notice
+   clean, 1,602 chars, 1/1 page, legacy 0.1538 (4/26)
+   Real English notice.  CORRECT; only 26 judged lines.
+4. 05ee46b60eb8  pdf 2019 media/ofg  Governor's keynote speech
+   clean, 8,693 chars, 3/3 pages, legacy 0.0 (0/105).  CORRECT.
+5. 075bf12eb087  pdf 2022 directive/fiu  TCSP AML/CFT directive
+   clean, 5,054 chars, dev 0.9616, legacy 0.0 (0/48)
+   REAL UNICODE DEVANAGARI, correctly left alone by the legacy detector.  CORRECT.
+   -> 0 false negatives in this group.
+
+--- 5 x suspicious -----------------------------------------------------------
+1. 041902065a1d  pdf 2004 rule_bylaw/lgd  Akhtiyar Pratyayojan Biniyamawali 2065
+   legacy_font_suspected, legacy 0.8697 (367/422), dev 0.0
+   Preview is unmistakable Preeti ("g]kfn /fi6« a}+s" = नेपाल राष्ट्र बैंक).  TRUE POSITIVE.
+2. 04223ef87fef  pdf 2023 publication/ofg  NRB Samachar 47/12
+   legacy 0.9222 (593/643).  Preeti.  TRUE POSITIVE.
+3. 0503f02d7d8c  pdf 2015 enforcement_action/dbs  Prompt Corrective Action
+   legacy 1.0 (15/15).  Preeti.  TRUE POSITIVE.
+4. 05ee0bc8b653  pdf 2020 monetary_policy/ofg  2076-77 Third Quarter Review
+   legacy 0.884 (358/405).  Preeti — and this is an operative monetary-policy
+   document that would be unusable if indexed.  TRUE POSITIVE.
+5. 05fa82badf94  pdf 2025 monetary_operations/pdm  Monetary Operation Summary
+   legacy 0.2632 (5/19), 2,078 chars.
+   *** FALSE POSITIVE. ***  The full extracted text was read: it is a clean,
+   entirely readable ENGLISH statistical table ("Liquidity Absorbing
+   Instruments | Times | Offer Amount (Rs. in crore) ...").  Only 19 lines were
+   long enough to judge and 5 of them tripped the intra-word-symbol rule on
+   formatted numbers such as `2,123,180.00` and dash-filled rows.
+   -> 1 false positive in 5.
+
+--- 5 x needs_ocr ------------------------------------------------------------
+1. 06aeb5fc7837  pdf 2024 notice/nep  building-dismantling auction notice
+   no_text_layer, 1 page, 0 pages with text.  A genuine scan.  CORRECT — this
+   one genuinely needs OCR.
+2. 072d90ec5368  image 2021 circular/psd  amendment to Directive 3/078  (.jpg)
+3. 07a653c11c09  image 2021 notice/jnp  procurement notice  (.jpeg)
+4. 0873cc4cd1e7  image 2025 media/mlpsd  compliance-officer interaction  (.jpg)
+5. 0a64993874c1  image 2015 notice/fxm  IC 500/1000 exchange notice  (.jpg)
+   All four are image files whose text is pixels; `image_file` is correct by
+   construction and they are not opened.  CORRECT.  All 5 genuinely need OCR.
+
+--- 5 x unsupported (a fourth group, added because 23 blobs land here) --------
+007d8f7bc03a / 122490737cea / 17889228c0a3 / 261d44ebc589 / 345de5f8027d
+   All five are legacy `.doc` (OLE2) files: Current Macroeconomic Situation,
+   two auction/investment notices, an FIU information-request form, and a bank
+   self-assessment questionnaire.  `no_native_parser` is correct — nothing in
+   this dependency set reads legacy Word.  These need a PARSER (antiword/xlrd),
+   not OCR.  23 of 381 blobs (6.0%).
+
+--- 2 x failed (the whole population) ----------------------------------------
+d78292915488  pdf 2019 notice/hrm  exam-centre notice   -> PdfReadError
+1ffb3c85bfe0  pdf 2019 (bfr)  Banking & Financial Statistics No.56 -> PdfStreamError
+   Genuine pypdf failures on malformed PDFs.  Neither error carries a path.
+   Whether another engine can open them is a Phase 6B question; note that
+   Docling failed on 0 of the 37 files it was given, so it is worth testing.
+
+FALSE POSITIVES FOUND   1 of 5 reviewed `suspicious`  (a numeric English table)
+FALSE NEGATIVES FOUND   1, discovered outside the sample — see below.
+
+*** THE FALSE NEGATIVE, AND IT IS SYSTEMATIC ***
+8df7b02f8a13 is a SPREADSHEET (236,905 chars) whose content is Preeti-encoded
+Nepali ("Plss[t jflif{s cfly{s ultljlw @)&^/&&"), legacy_line_ratio 0.2204 over
+345/1565 judged lines — and it is classified `extracted` / `clean`.
+Cause: `quality.classify` judges spreadsheets STRUCTURALLY (are there cells?)
+and returns before any linguistic rule is consulted, by design, because prose
+rules misfire on statistical tables.  The consequence is that legacy-font
+Nepali inside a workbook is invisible to the detector.  60 of the 400 benchmark
+files are spreadsheets; 44 of them were parsed and all 44 came back `clean`.
+This is the dangerous direction, and it is a rule gap, not a threshold.
+
+NO THRESHOLD WAS CHANGED.  legacy_line_ratio >= 0.20 is untouched, and no
+classifier edit was made from this benchmark.  Per the plan, a real change
+requires bumping EXTRACTOR_VERSION to native-2, re-running over this same frozen
+manifest, and reporting native-1 and native-2 side by side.  The two findings
+above are the evidence for such a proposal; making it is a separate, reviewed
+decision and is deliberately NOT part of this run.
+
+================================================================================
+STEP 6 — THROUGHPUT (MEASURED) AND EXTRAPOLATION (NOT MEASURED)
+================================================================================
+
+MEASURED — native extraction, summed nrb_extractions.duration_ms over 381 blobs
+
+  family/parser        blobs  total_s  mean_ms  median_ms   p95_ms   max_ms  pages
+  spreadsheet/openpyxl    44    808.3    18371       1159    71400   262629      0
+  pdf/pypdf              282    211.6      750         72     3761    19575  4,285
+  pdf/none (failed)        2      0.2       81         41      120      120      0
+  document/python-docx     8      0.1       17         10       47       47      0
+  image/none              22      0.0        0          0        0        0      0
+  office_legacy/none      23      0.0        0          0        0        0      0
+  ALL                    381   1020.2                                       4,285
+
+  PDF native extraction     4,285 pages in 211.6s  =  20.3 pages/s
+                              282 files in 211.6s  =  80 files/minute
+  Whole cohort              381 blobs in 1,020.2s  =  22.4 blobs/minute
+  Wall clock (two parts)    ~1,075s, i.e. parse time dominates; DB and I/O do not.
+
+  THE HEADLINE IS NOT THE PDFs.  Spreadsheets are 11.5% of the blobs and 79.2%
+  of the CPU time.  One 8.6 MB workbook took 262.6s on its own; the openpyxl
+  median is 1.16s against pypdf's 0.072s.  Any corpus-wide estimate is driven by
+  how many spreadsheets it contains, not by page count.
+
+MEASURED — Docling, over the 37-file calibration slice (details in the
+calibration report)
+  735 pages, 2,354.9s of processing + 0.8s of one-off init
+  0.31 pages/s, median 18.6s per file, p95 387.8s
+  pypdf over the same 37 files: 30.9s  ->  76.2x slowdown
+
+EXTRAPOLATED — clearly marked, and NOT measured
+  Corpus: 18,263 catalogued files.  The benchmark is a stratified sample of 400
+  drawn from it, so a rate scales only as well as that sample represents the
+  corpus, and two cells of it are weak (see the manifest's own diagnostics).
+
+  Native extraction of the whole corpus, at this cohort's blended 22.4
+  blobs/minute:  ~13.6 hours single-threaded.  Treat as an order of magnitude,
+  not a schedule: the estimate is dominated by the spreadsheet share (15.0% of
+  the benchmark) and by workbook size, which varies far more than page count.
+
+  Docling over the whole corpus, at 0.31 pages/s: NOT ESTIMATED HERE, and
+  deliberately.  The calibration measured 37 PDFs and nothing else.  It says
+  nothing about Docling on spreadsheets, .docx or images — three formats that
+  are 24.3% of the benchmark and which Docling would route through entirely
+  different pipelines.  Extrapolating a PDF rate onto them would be inventing a
+  measurement.  What can be said: at the measured PDF rate, Docling over the
+  benchmark's 284 PDFs alone would be roughly 4-5 hours against pypdf's 3.5
+  minutes.
