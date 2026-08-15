@@ -39,6 +39,7 @@ __all__ = [
     "summarize_documents", "render_documents",
     "summarize_sync", "render_sync",
     "summarize_fetch", "render_fetch",
+    "summarize_sample", "render_sample",
 ]
 
 SAMPLE_SIZE = 25   # bounded: a sample to inspect, not a second copy of the data
@@ -777,4 +778,122 @@ def render_fetch(summary: dict[str, Any]) -> str:
             out += [f"  {item}" for item in items]
             out.append("")
 
+    return "\n".join(out)
+
+
+# --------------------------------------------------------------------------- #
+# The benchmark cohort (Phase 6A, Task 7)
+# --------------------------------------------------------------------------- #
+def summarize_sample(manifest: Any) -> dict[str, Any]:
+    """A JSON-ready summary of one drawn benchmark cohort.
+
+    `manifest` is an `app.nrb.manifest.Manifest`; typed loosely for the same
+    reason as the other summarizers — this module stays free of model/session
+    imports. Everything here is already in the manifest; this only chooses what an
+    operator reads first.
+    """
+    diagnostics = dict(manifest.diagnostics or {})
+    by_year: Counter[str] = Counter()
+    by_type: Counter[str] = Counter()
+    by_resource: Counter[str] = Counter()
+    by_owner: Counter[str] = Counter()
+    for entry in manifest.entries:
+        by_year[str(entry.get("year") or "unknown")] += 1
+        by_type[entry.get("document_type") or "untyped"] += 1
+        by_resource[entry.get("resource_type") or "unknown"] += 1
+        by_owner[entry.get("owner") or "unknown"] += 1
+
+    selected_strata = [s for s in manifest.strata if s.get("selected")]
+    return {
+        "algorithm_version": manifest.algorithm_version,
+        "seed": manifest.seed,
+        "drawn_at": manifest.drawn_at,
+        "selection_sha256": manifest.selection_sha256,
+        "requested": manifest.requested,
+        "selected": manifest.selected or len(manifest.entries),
+        "shortfall": manifest.shortfall,
+        "sampler": dict(manifest.sampler or {}),
+        "diagnostics": diagnostics,
+        "catalog_counts": dict(manifest.catalog_counts or {}),
+        "strata_total": len(manifest.strata),
+        "strata_selected": len(selected_strata),
+        "strata_weak": len([s for s in selected_strata if s.get("weak")]),
+        "by_year": _ordered(by_year),
+        "by_cohort": diagnostics.get("allocation_by_cohort", {}),
+        "by_document_type": _ordered(by_type, SECTIONS),
+        "by_resource_type": _ordered(by_resource),
+        "by_owner": _ordered(by_owner),
+        "notes": list(manifest.notes),
+    }
+
+
+def render_sample(summary: dict[str, Any]) -> str:
+    """The operator's view of a drawn cohort.
+
+    Leads with the fingerprint and the requested-vs-selected pair, because those
+    are the two facts that decide whether this cohort is the one every later step
+    is talking about. The allocation block exists so a short cohort explains
+    itself: a reader should never have to re-run the sampler to find out which
+    constraint bound.
+    """
+    diagnostics = summary.get("diagnostics") or {}
+    sampler = summary.get("sampler") or {}
+    selected = summary["selected"]
+    out: list[str] = [
+        "NRB Phase 6A benchmark cohort",
+        "=" * 72,
+        f"Algorithm:            {summary['algorithm_version']}",
+        f"Seed:                 {summary['seed']}",
+        f"Drawn at:             {summary['drawn_at'] or '(unset)'}",
+        f"Selection sha256:     {summary['selection_sha256'] or '(none)'}",
+        "",
+        f"Requested:            {summary['requested']:>8,}",
+        f"Selected:             {selected:>8,}",
+        f"Shortfall:            {summary['shortfall']:>8,}",
+        "",
+        "Sampler",
+        f"  floor:              {sampler.get('floor')}",
+        f"  max cohort share:   {sampler.get('max_cohort_share')}",
+        f"  explicit caps:      {sampler.get('cohort_caps') or '(none)'}",
+        "",
+        "Allocation",
+        f"  candidates:         {diagnostics.get('candidates', 0):>8,}",
+        f"  strata:             {summary['strata_total']:>8,}"
+        f"   ({summary['strata_selected']} selected from,"
+        f" {summary['strata_weak']} weak n<10)",
+        f"  floor slots wanted: {diagnostics.get('floor_requested_slots', 0):>8,}",
+        f"  floor slots given:  {diagnostics.get('floor_allocated_slots', 0):>8,}",
+        f"  floor short by:     {diagnostics.get('floor_shortfall_slots', 0):>8,}"
+        f"   (in {diagnostics.get('floor_short_strata_count', 0)} strata)",
+        f"  removed by caps:    {diagnostics.get('slots_removed_by_cap', 0):>8,}",
+        f"  redistributed:      {diagnostics.get('slots_redistributed', 0):>8,}"
+        f"   (in {diagnostics.get('redistribution_rounds', 0)} rounds)",
+        f"  unfillable:         {diagnostics.get('unfillable_slots', 0):>8,}"
+        f"   {diagnostics.get('incomplete_reason') or ''}",
+        "",
+    ]
+    caps = diagnostics.get("cohort_caps") or {}
+    cohort_counts = summary.get("by_cohort") or {}
+    candidates_by_cohort = diagnostics.get("candidates_by_cohort") or {}
+    if cohort_counts or caps:
+        out.append("Year cohorts (selected / cap / candidates)")
+        for cohort in sorted(set(caps) | set(cohort_counts)):
+            flag = "  AT CAP" if cohort in (diagnostics.get("capped_cohorts") or ()) else ""
+            out.append(
+                f"  {cohort:<12} {cohort_counts.get(cohort, 0):>5,} /"
+                f" {caps.get(cohort, 0):>5,} /"
+                f" {candidates_by_cohort.get(cohort, 0):>7,}{flag}"
+            )
+        out.append("")
+
+    out += _block("Document types", summary["by_document_type"], selected or None)
+    out += _block("File formats", summary["by_resource_type"], selected or None)
+    owners = summary["by_owner"]
+    out += _block(f"Owners ({len(owners)} codes)",
+                  dict(list(owners.items())[:15]), selected or None)
+
+    if summary["notes"]:
+        out.append("Notes:")
+        out += [f"  {note}" for note in summary["notes"]]
+        out.append("")
     return "\n".join(out)

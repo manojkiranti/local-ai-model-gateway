@@ -2220,6 +2220,34 @@ git commit -m "feat(nrb): extraction target selection + --year fetch scope (Phas
 
 ### Task 7: Deterministic stratified sampling (`app/nrb/sampling.py`)
 
+**AMENDED — what shipped is a superset of the sketch below.** Read
+`app/nrb/sampling.py` and `tests/test_nrb_sampling.py` as the specification; the
+code block in this task is the earlier draft and four things about it are now
+wrong:
+
+1. **There is an explicit `seed` and an explicit `algorithm_version`**
+   (`nrb-stratified-v1`). Ranking is `sha256(algorithm_version ␟ seed ␟ key)`, not
+   `sha256(key)`, so the same catalog can be drawn from twice without producing
+   the same cohort, and the algorithm version is bound into the manifest
+   fingerprint.
+2. **Candidates are canonicalized explicitly.** `catalog.load_sample_rows` now
+   returns one row per (file, active source) rather than pre-collapsing on
+   `min(source_id)` — that is REST paging order, and it decided the stratum of the
+   41 multiply-referenced files. `build_candidates` collapses by stated rule
+   (earliest year, `classify.SECTIONS` priority, all owners kept).
+3. **Allocation returns structured `Diagnostics`**, not just `strata` + `notes`:
+   pre-cap allocation, slots removed by cap, slots redistributed, redistribution
+   rounds, floor requested/allocated/short, exhausted strata, capped cohorts, and
+   an `incomplete_reason`. A short cohort has to explain itself.
+4. **The floor pass and redistribution iterate in seeded-hash stratum order**, not
+   `(-available, key)`. Round-robin alone fixes who gets a slot; it does not fix
+   who gets the *last* slot of a partial round, which under a lexical order is
+   always the alphabetically early strata.
+
+Per-cohort caps can also be set absolutely (`cohort_caps={"2019": 80}`) as well as
+by share, and the share is read as an exact `Fraction` so `int(size * share)` is
+not a float coin flip at the boundary.
+
 **Files:**
 - Create: `app/nrb/sampling.py`
 - Test: `tests/test_nrb_sampling.py`
@@ -2755,12 +2783,30 @@ git commit -m "feat(nrb): deterministic stratified corpus sampling (Phase 6A)"
 The sample is drawn **once**, from the full catalog, and written down. Everything
 downstream names that file.
 
-**AMENDED** — `app/nrb/manifest.py` and its format tests shipped in **Task 6**
-(the fetch path must read a manifest before anything can draw one). What is left
-here is the DRAW: `build_manifest`, which needs the sampler, and the command that
-writes the file. Add `build_manifest` to the existing module and `from .sampling
-import Sample, year_cohort` to its imports; take the format tests below as
-already written, and add only the `build_manifest` ones.
+**AMENDED TWICE.** First: `app/nrb/manifest.py` and its format tests shipped in
+**Task 6** (the fetch path must read a manifest before anything can draw one), so
+only the DRAW landed here. Second, and what actually shipped:
+
+* **`build_manifest(sample, *, drawn_at, catalog_counts)`** — it takes the
+  `Sample` only. The draft threaded `rows` through as well and looked each key up
+  again; the sample already carries its selected `Candidate`s, and one path in is
+  one path by which a key can enter a manifest.
+* **The format is `manifest-2`**, adding `algorithm_version`, `seed`, `selected`,
+  `diagnostics` and **`selection_sha256`** — the fingerprint over schema version,
+  algorithm version, seed, sampler parameters and the ordered keys, and over
+  nothing volatile. No `manifest-1` file was ever written.
+* **Entries are in canonical rank order**, not stratum order.
+* **`verify_manifest`** recomputes the fingerprint from a manifest's own contents
+  (no catalog, no network), and **`select_manifest_subset`** draws the later
+  Docling calibration subset from the manifest's own keys — so the calibration
+  cannot silently run over files the screen never saw.
+* **The command is `scripts/nrb_sample.py`** (the name the design doc §11 already
+  used) and it refuses to overwrite an existing manifest without `--overwrite`,
+  printing both fingerprints when told to anyway.
+
+Read `app/nrb/manifest.py`, `scripts/nrb_sample.py` and
+`tests/test_nrb_manifest.py` as the specification; the code blocks below are the
+earlier draft.
 
 **Files:**
 - Modify: `app/nrb/manifest.py` (add `build_manifest`)

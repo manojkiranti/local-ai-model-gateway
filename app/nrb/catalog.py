@@ -1204,15 +1204,19 @@ async def load_sample_rows(
 ) -> list[dict[str, Any]]:
     """Every fetchable file with its stratification keys. Read-only.
 
-    Returns FILE-level rows (one per `nrb_files` row, joined to its primary source)
-    because sampling happens BEFORE anything is fetched, when `content_sha256` is
-    still NULL — so the sample is keyed on `comparison_key` and the fetch is scoped
-    from it.
+    The sampling unit is `comparison_key` — sampling happens BEFORE anything is
+    fetched, when `content_sha256` is still NULL — but this returns one row per
+    (file, ACTIVE SOURCE) association, not one per file, and the collapse to one
+    candidate per key is `sampling.build_candidates`'s job.
 
-    A file referenced by several sources is attributed to the FIRST by source id,
-    which is deterministic but is an approximation: 42 files really are published
-    by more than one source. The report says so rather than implying each file has
-    one owner.
+    That split is deliberate. 42 files really are published by more than one
+    source, and those sources can disagree about year, document type and owner.
+    Resolving the disagreement in SQL means resolving it by `min(source_id)` —
+    which is deterministic, but source id order is the order REST paged the post
+    types, so a shared file's stratum would be decided by NRB's paging. The
+    sampler resolves it by stated rule instead (earliest year; `classify.SECTIONS`
+    priority for the type; every owner kept), and it can only do that if it can
+    see all of the rows.
     """
     stmt = (
         select(
@@ -1220,30 +1224,18 @@ async def load_sample_rows(
             NRBFile.resource_type,
             NRBFile.fetch_status,
             NRBFile.content_sha256,
-            func.min(NRBSource.id).label("source_id"),
+            NRBSource.document_type,
+            NRBSource.owner,
+            func.extract("year", NRBSource.published_at).label("year"),
         )
         .join(NRBSourceFile, NRBSourceFile.file_id == NRBFile.id)
         .join(NRBSource, NRBSource.id == NRBSourceFile.source_id)
         .where(NRBSource.is_active.is_(True))
-        .group_by(
-            NRBFile.comparison_key, NRBFile.resource_type,
-            NRBFile.fetch_status, NRBFile.content_sha256,
-        )
     )
     if resource_types:
         stmt = stmt.where(NRBFile.resource_type.in_(list(resource_types)))
     if sections:
         stmt = stmt.where(NRBSource.document_type.in_(list(sections)))
-    base = stmt.subquery()
-    detailed = select(
-        base.c.comparison_key,
-        base.c.resource_type,
-        base.c.fetch_status,
-        base.c.content_sha256,
-        NRBSource.document_type,
-        NRBSource.owner,
-        func.extract("year", NRBSource.published_at).label("year"),
-    ).join(NRBSource, NRBSource.id == base.c.source_id)
     return [
         {
             "comparison_key": row[0],
@@ -1254,5 +1246,5 @@ async def load_sample_rows(
             "owner": row[5],
             "year": int(row[6]) if row[6] is not None else None,
         }
-        for row in (await session.execute(detailed)).all()
+        for row in (await session.execute(stmt)).all()
     ]

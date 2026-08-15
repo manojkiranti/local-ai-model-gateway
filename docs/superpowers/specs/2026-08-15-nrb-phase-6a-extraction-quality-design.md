@@ -313,9 +313,21 @@ single-digit cells). Year cohorts, chosen from the measured distribution:
 `≤2018` (886 files), **`2019` (9,182)**, `2020–2022` (3,095), `2023–2026`
 (5,109).
 
-Selection within a stratum is `sha256(comparison_key)` order — deterministic,
-reproducible across runs and machines, and uncorrelated with insertion order,
-publication date or department, which id-order selection is not.
+Selection within a stratum is `sha256(algorithm_version ␟ seed ␟ comparison_key)`
+order — deterministic, reproducible across runs and machines, and uncorrelated
+with insertion order, publication date or department, which id-order selection is
+not. **As built** the version and seed are part of the pre-image (they were not in
+this paragraph's first draft): the algorithm version so a change to what a stratum
+means cannot be confused with the cohort it produced, and the seed so the same
+catalog can be drawn from twice. Both are recorded in the manifest and bound into
+its `selection_sha256`.
+
+**As built,** the sampling unit is canonicalized before allocation.
+`catalog.load_sample_rows` returns one row per (file, active source), and
+`sampling.build_candidates` collapses them by stated rule — earliest year,
+`classify.SECTIONS` priority for the type, every owner kept — because the
+alternative, collapsing on `min(source_id)` in SQL, decides a shared file's
+stratum by the order REST paged the post types. 41 live files are affected.
 
 Allocation follows the direction given: **representation over equal counts.**
 Four passes, in order:

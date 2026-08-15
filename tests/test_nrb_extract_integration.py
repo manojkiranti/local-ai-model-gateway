@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from app.nrb import catalog
+from app.nrb import catalog, sampling
 from app.nrb.models import FETCH_BLOCKED_HOST, FETCH_FAILED, FETCH_FETCHED
 from tests.test_nrb_fetch_integration import UPLOADS, _seed
 from tests.test_nrb_sync_integration import _run
@@ -293,9 +293,16 @@ def test_sample_rows_carry_the_stratification_keys_for_unfetched_files():
     assert row["fetch_status"] == "pending"
 
 
-def test_a_file_published_by_two_sources_appears_once_in_the_sample():
+def test_a_file_published_by_two_sources_is_one_sampling_candidate():
     """Otherwise the 42 multiply-referenced files would be twice as likely to be
-    drawn as any other."""
+    drawn as any other.
+
+    The loader returns one row per (file, active source) — the two sources here
+    disagree about the owner, and both disagreeing values have to reach the
+    sampler for it to resolve them by rule. Collapsing in SQL would mean
+    collapsing by `min(source_id)`, i.e. by the order REST paged the post types.
+    `sampling.build_candidates` is what makes it one candidate.
+    """
     async def go(session):
         from sqlalchemy import text
 
@@ -315,10 +322,13 @@ def test_a_file_published_by_two_sources_appears_once_in_the_sample():
         return await catalog.load_sample_rows(session)
 
     rows = _run(go)
-    assert len(rows) == 1
-    # Attributed to the first source by id — deterministic, and an approximation
-    # the report states rather than implying every file has one owner.
-    assert rows[0]["owner"] == "bfr"
+    assert len(rows) == 2                     # one per (file, source) association
+    assert {row["comparison_key"] for row in rows} == {f"{UPLOADS}/shared.pdf"}
+
+    candidates = sampling.build_candidates(rows)
+    assert len(candidates) == 1               # …but ONE candidate, one download
+    assert candidates[0].source_rows == 2
+    assert candidates[0].owners == ("bfr", "psd")   # every owner kept, none guessed
 
 
 def test_a_file_only_reachable_from_a_deactivated_source_is_not_sampled():

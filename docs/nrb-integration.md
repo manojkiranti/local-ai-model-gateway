@@ -188,8 +188,15 @@ the window is set. Raising context buys time; truncation is the durable fix.
 # Phase 6A suites (quality metrics, format dispatch, manifest format, and the
 # catalog queries around extraction — the last needs Postgres and rolls back)
 .venv/bin/pytest tests/test_nrb_quality.py tests/test_nrb_extraction.py \
-    tests/test_nrb_manifest.py tests/test_nrb_extract_integration.py \
-    tests/test_files_documents_pdf_pages.py
+    tests/test_nrb_manifest.py tests/test_nrb_sampling.py \
+    tests/test_nrb_extract_integration.py tests/test_files_documents_pdf_pages.py
+
+# drawing the benchmark cohort. Catalog-only: no HTTP, and no file is written
+# without --out. A cohort is drawn ONCE — an existing --out is refused.
+.venv/bin/python scripts/nrb_sample.py --size 400 --seed phase6a-v1 --dry-run
+.venv/bin/python scripts/nrb_sample.py --size 400 --seed phase6a-v1 \
+    --floor 5 --max-cohort-share 0.30 --out docs/nrb/phase6a-manifest.json
+.venv/bin/python scripts/nrb_sample.py --verify docs/nrb/phase6a-manifest.json
 
 # the exact benchmark cohort, and one publication year. Both dry, both zero HTTP.
 .venv/bin/python scripts/nrb_fetch.py --manifest <path> --dry-run
@@ -1191,9 +1198,11 @@ legacy-font detection and an OCR fallback. What Phase 5 leaves it:
 **Design:** `docs/superpowers/specs/2026-08-15-nrb-phase-6a-extraction-quality-design.md`
 **Plan:** `docs/superpowers/plans/2026-08-15-nrb-phase-6a-extraction-quality.md` (14 tasks)
 
-**State as of 2026-08-15: Tasks 1–6 of 14 are built and unit/integration tested.
-No NRB document has been extracted yet** — the pass that would do it is Task 8,
-and the cohort it runs over is drawn in Task 7A and fetched in Task 13. The live
+**State as of 2026-08-15: Tasks 1–7A of 14 are built and unit/integration tested.
+No NRB document has been extracted yet, and the official benchmark cohort has not
+been frozen** — the pass that would extract is Task 8, the cohort is fetched in
+Task 13, and the sampler that draws it now exists but has only been run in dry
+mode (see *The sampler* below: two policy values still need a decision). The live
 numbers in this section are therefore about the *catalog*, not about extraction
 quality; the quality numbers arrive with Task 13 and this section gets rewritten
 then.
@@ -1208,7 +1217,7 @@ glyphs onto ASCII codepoints. A pipeline that only checks "did extraction raise"
 would index all of them as English gibberish. So 6A measures the text and says
 what is wrong with it, and only then does 6B decide what to do about it.
 
-### What shipped (Tasks 1–6)
+### What shipped (Tasks 1–7A)
 
 | Task | File | What it is |
 |---|---|---|
@@ -1217,6 +1226,8 @@ what is wrong with it, and only then does 6B decide what to do about it.
 | 4 | `app/nrb/extraction.py` | Format dispatch: pypdf / python-docx / openpyxl (`data_only=True`, formulas never evaluated) / text. **Never raises** — every failure is a recorded result. `.xls`/`.doc` are `unsupported`, not opened. |
 | 5 | `app/nrb/models.py`, `alembic/…b1bea6ac36c5` | The `nrb_extractions` table. |
 | 6 | `app/nrb/{manifest,catalog,fetch,report}.py`, `scripts/nrb_fetch.py` | The exact-cohort (benchmark manifest) fetch scope, `--year`, and extraction target selection. |
+| 7 | `app/nrb/sampling.py` | The deterministic stratified sampler: candidate canonicalization, seeded ranking, four-pass allocation with cap redistribution, allocation diagnostics. Pure. |
+| 7A | `app/nrb/manifest.py`, `app/nrb/report.py`, `scripts/nrb_sample.py` | `build_manifest`, the `selection_sha256` fingerprint, the freeze/verify guard, and the command that writes a cohort. |
 
 ### The legacy-font detector, and the measurement that rebuilt it
 
@@ -1301,6 +1312,77 @@ therefore accounts for **requested / already fetched / pending / previously fail
 / blocked / fetched this pass / failed this pass / not in the catalog**, in the dry
 run as well as a real one. `--manifest --dry-run` makes **zero HTTP requests**.
 
+### The sampler (Task 7) — and the two values still to decide
+
+`app/nrb/sampling.py`, pure. Algorithm version **`nrb-stratified-v1`**, bound into
+the manifest fingerprint, so changing what a stratum means or how slots are
+allocated cannot silently redefine an existing benchmark.
+
+**The unit is `comparison_key`**, canonicalized once per key before anything is
+allocated. `catalog.load_sample_rows` returns one row per (file, *active source*)
+association, so a file NRB publishes from two pages arrives as two rows that can
+disagree about year, type and owner — 41 files in the live catalog do. Resolving
+that in SQL means resolving it by `min(source_id)`, and source id order is REST
+paging order, so a shared file's stratum would be decided by NRB's paging. The
+rules instead: **earliest** year, `classify.SECTIONS` priority for the document
+type (the catalog's own regulatory-first order, the one `Taxonomy.section_for`
+already uses), every owner kept and the sorted-first reported. One key, one
+candidate, one download, one extraction.
+
+**Ranking is `sha256(algorithm_version ␟ seed ␟ comparison_key)`** — never
+Python's `hash()`, which is salted per process, and never SQL order. The same
+inputs in any order produce the same cohort; the tests shuffle the rows and assert
+the keys, the per-stratum allocation and the fingerprint are all identical.
+
+**Allocation is four passes, and the cap must not shrink the sample.** Floor
+(round-robin, one slot at a time, in seeded-hash stratum order so a partial round
+is not handed out alphabetically) → proportional (largest remainder, integer
+arithmetic) → cohort cap → **redistribution, repeated**. The naive version —
+allocate 400, trim 2019, return 350 — reads downstream as "we profiled 400 files".
+Every slot a cap removes goes back into the pool and is handed out again, round
+after round, dropping strata as they exhaust. **If 400 are requested and 400 can
+legally be selected, exactly 400 come back**; if they cannot, the shortfall, the
+constraint that bound it and every intermediate figure are in the diagnostics. A
+cap is never breached to reach the number, and a floor is a preference the cap
+outranks.
+
+`selection_sha256` binds the schema version, the algorithm version, the seed,
+every sampler parameter and the ordered keys — and nothing volatile, so the same
+cohort drawn on another machine tomorrow hashes the same and one edited key does
+not. `scripts/nrb_sample.py --verify <path>` recomputes it without a database or
+a network.
+
+**Live dry runs (scratch DB, 2026-08-15, no manifest written, zero HTTP):**
+
+```
+candidates (unique comparison_key)   18,266   (41 with >1 source association)
+strata (cohort x type x format)         106   15 singletons, 30 with n<10, median 25
+document types / formats / owners     20 / 4 / 33
+largest stratum        2019/untyped/pdf  4,809
+size=400 seed=phase6a-v1 share=0.30, by floor:
+  floor=5   400 selected · floor short 59 · cap removed 0   · redistributed 0
+  floor=3   400 selected · floor short  0 · cap removed 21  · redistributed 21
+  floor=2   400 selected · floor short  0 · cap removed 39  · redistributed 39
+  floor=1   400 selected · floor short  0 · cap removed 60  · redistributed 60
+2019 lands at 119-120 of 400 under the 30% share cap in every configuration.
+```
+
+**Two values are NOT decided and must be approved before the cohort is frozen:**
+
+1. **The floor.** At 106 strata a floor of 5 wants 459 slots of a 400 budget, so
+   the floor pass consumes the whole budget and passes 2–4 never run: the draw
+   becomes near-uniform across strata rather than proportional, and the 30% that
+   2019 receives is an accident of how many strata it has. A floor of 2–3 leaves
+   room for proportional weighting and actually exercises the cap. Neither is
+   wrong — uniform coverage is defensible for a *parser*-quality benchmark — but
+   it is a choice, not a default.
+2. **The 2019 ceiling.** `--max-cohort-share 0.30` (120 of 400) or an explicit
+   `--year-2019-cap`. 2019 is 9,181 of 18,266 candidates.
+
+Also worth knowing before reading any per-stratum number: with 400 files over 106
+strata, **every stratum is below the n<10 weak threshold**. Conclusions come from
+the cohort / document-type / format breakdowns (n = 13–120), never from a cell.
+
 ### Live evidence so far (scratch DB `local_ai_gateway_p4`, 2026-08-15)
 
 ```
@@ -1329,7 +1411,6 @@ for department RAG) and Docling is still never imported at module scope. Nothing
 
 ### Remaining tasks
 
-7 sampler (four-pass allocation with cap redistribution) · 7A the manifest draw ·
 8 the extraction pass (advisory lock `NRB_XTRC`, batched, resumable) · 9 the
 profile + report · 10 the CLI · 11 Docling calibration (pypdf vs Docling over the
 *same* quality metrics — not via `parse_to_chunks`, which would measure RAG

@@ -1,10 +1,16 @@
-"""The benchmark manifest FILE FORMAT — read, write, round-trip, refuse.
+"""The benchmark manifest — the format, the draw, the fingerprint, the freeze.
 
-Only the format lives here. Drawing a cohort (`build_manifest`) needs the sampler
-and arrives with it in Task 7A; the fetch path needs to *read* a manifest before
-anything can draw one, which is why the two halves land separately.
+Three groups, in the order they were built:
 
-No database, no network: a manifest is a JSON file naming catalog keys.
+* the FILE FORMAT (read, write, round-trip, refuse) — shipped with the fetch
+  path, which had to be able to *read* a manifest before anything could draw one;
+* the DRAW — `build_manifest`, the canonical entry order and `selection_sha256`,
+  the fingerprint that says whether two people are profiling the same 400 files;
+* the FREEZE — `scripts/nrb_sample.py`, which refuses to overwrite a cohort that
+  already exists and prints both fingerprints when it is told to anyway.
+
+No database, no network: a manifest is a JSON file naming catalog keys, and the
+tests assert that by making any HTTP call explode.
 """
 
 from __future__ import annotations
@@ -139,3 +145,422 @@ def test_the_cap_matches_the_one_the_catalog_enforces():
     from app.nrb import catalog
 
     assert manifest_module.MANIFEST_MAX_KEYS == catalog.MANIFEST_MAX_KEYS
+
+
+# --------------------------------------------------------------------------- #
+# Drawing a manifest — the cohort is frozen here, before anything is fetched
+# --------------------------------------------------------------------------- #
+from app.nrb import sampling  # noqa: E402
+
+ROWS = [
+    {
+        "comparison_key": f"https://www.nrb.org.np/uploads/doc-{i}.pdf",
+        "resource_type": "pdf" if i % 3 else "spreadsheet",
+        "fetch_status": "pending",
+        "content_sha256": None,
+        "document_type": "circular" if i % 2 else "directive",
+        "owner": "bfr" if i % 4 else "red",
+        # All four year cohorts, so a 40-file draw is feasible under the default
+        # 30% cohort cap (4 x 12 = 48). 2019 is deliberately the largest.
+        "year": (2019, 2024, 2019, 2021, 2015)[i % 5],
+    }
+    for i in range(200)
+]
+
+
+def _drawn(size=40, rows=None, **kwargs):
+    rows = ROWS if rows is None else rows
+    sample = sampling.stratified_sample(rows, size=size, **kwargs)
+    return manifest_module.build_manifest(
+        sample,
+        drawn_at="2026-08-15T00:00:00+00:00",
+        catalog_counts={"files": len(rows), "fetched": 0},
+    )
+
+
+def test_every_entry_carries_the_exact_key_and_its_stratum():
+    entry = _drawn().entries[0]
+    assert entry["comparison_key"].startswith("https://")
+    for field in ("year", "document_type", "resource_type", "owner",
+                  "sampling_stratum"):
+        assert field in entry
+
+
+def test_the_manifest_records_exactly_how_it_was_drawn():
+    m = _drawn(seed="phase6a-v1", floor=5)
+    assert m.requested == 40
+    assert m.selected == len(m.entries) == 40
+    assert m.algorithm_version == sampling.ALGORITHM_VERSION
+    assert m.seed == "phase6a-v1"
+    assert m.sampler["floor"] == 5
+    assert m.sampler["max_cohort_share"] == "3/10"
+    assert m.sampler["algorithm_version"] == sampling.ALGORITHM_VERSION
+    assert m.drawn_at == "2026-08-15T00:00:00+00:00"
+    assert m.catalog_counts["files"] == 200
+    assert m.diagnostics["selected"] == 40
+
+
+def test_the_entries_are_written_in_canonical_rank_order():
+    """Not database order, not stratum order. The order the fingerprint is taken
+    over has to be a property of the cohort itself."""
+    m = _drawn()
+    ranks = [
+        sampling.rank_for(m.algorithm_version, m.seed, key) for key in m.keys()
+    ]
+    assert ranks == sorted(ranks)
+
+
+def test_a_drawn_manifest_round_trips_through_disk_unchanged(tmp_path):
+    """Test M. Keys, parameters, strata and fingerprint all survive."""
+    original = _drawn()
+    path = tmp_path / "manifest.json"
+    manifest_module.write_manifest(original, path)
+    loaded = manifest_module.read_manifest(path)
+    assert loaded == original
+    assert loaded.keys() == original.keys()
+    assert loaded.sampler == original.sampler
+    assert loaded.strata == original.strata
+    assert loaded.selection_sha256 == original.selection_sha256
+    assert manifest_module.verify_manifest(loaded).ok
+
+
+def test_a_drawn_manifest_over_the_cap_is_refused():
+    rows = [
+        {"comparison_key": f"https://www.nrb.org.np/uploads/{i}.pdf",
+         "resource_type": "pdf", "document_type": "circular",
+         "owner": "bfr", "year": 2024}
+        for i in range(manifest_module.MANIFEST_MAX_KEYS + 10)
+    ]
+    sample = sampling.stratified_sample(
+        rows, size=manifest_module.MANIFEST_MAX_KEYS + 10, max_cohort_share=1.0
+    )
+    with pytest.raises(ValueError, match="cap"):
+        manifest_module.build_manifest(sample, drawn_at="x", catalog_counts={})
+
+
+def test_a_shortfall_and_its_notes_are_carried_into_the_manifest():
+    m = _drawn(size=5000)
+    assert m.shortfall > 0
+    assert m.notes
+    assert m.diagnostics["incomplete_reason"]
+
+
+def test_devanagari_keys_survive_a_drawn_manifest(tmp_path):
+    rows = [{
+        "comparison_key": "https://www.nrb.org.np/uploads/आगलागी-२०७४.pdf",
+        "resource_type": "pdf", "document_type": "circular",
+        "owner": "bfr", "year": 2024,
+    }]
+    m = _drawn(size=1, rows=rows)
+    path = tmp_path / "m.json"
+    manifest_module.write_manifest(m, path)
+    assert "आगलागी" in path.read_text(encoding="utf-8")
+    reloaded = manifest_module.read_manifest(path)
+    assert reloaded.keys() == m.keys()
+    assert manifest_module.verify_manifest(reloaded).ok
+
+
+# --------------------------------------------------------------------------- #
+# L. Fingerprint stability
+# --------------------------------------------------------------------------- #
+def test_the_same_logical_sample_fingerprints_identically():
+    assert _drawn().selection_sha256 == _drawn().selection_sha256
+
+
+def test_shuffled_input_rows_fingerprint_identically():
+    import random
+
+    shuffled = list(ROWS)
+    random.Random(3).shuffle(shuffled)
+    assert _drawn().selection_sha256 == _drawn(rows=shuffled).selection_sha256
+
+
+def test_changing_one_comparison_key_changes_the_fingerprint():
+    original = _drawn()
+    keys = list(original.keys())
+    keys[0] = keys[0] + "-edited"
+    tampered = manifest_module.compute_selection_sha256(
+        manifest_version=original.version,
+        algorithm_version=original.algorithm_version,
+        seed=original.seed,
+        parameters=original.sampler,
+        keys=keys,
+    )
+    assert tampered != original.selection_sha256
+
+
+def test_the_fingerprint_ignores_the_timestamp_and_the_catalog_counts():
+    a = _drawn()
+    b = manifest_module.build_manifest(
+        sampling.stratified_sample(ROWS, size=40),
+        drawn_at="2099-01-01T00:00:00+00:00",
+        catalog_counts={"files": 999999},
+    )
+    assert a.selection_sha256 == b.selection_sha256
+
+
+def test_a_different_seed_fingerprints_differently():
+    assert _drawn(seed="a").selection_sha256 != _drawn(seed="b").selection_sha256
+
+
+def test_a_different_sampler_parameter_fingerprints_differently():
+    assert _drawn(floor=5).selection_sha256 != _drawn(floor=1).selection_sha256
+
+
+def test_an_edited_manifest_fails_verification(tmp_path):
+    m = _drawn()
+    path = tmp_path / "m.json"
+    manifest_module.write_manifest(m, path)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["entries"][0]["comparison_key"] += "-tampered"
+    path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    result = manifest_module.verify_manifest(manifest_module.read_manifest(path))
+    assert result.ok is False
+    assert result.reason == "fingerprint_mismatch"
+
+
+def test_a_manifest_with_no_recorded_fingerprint_says_so_rather_than_passing():
+    result = manifest_module.verify_manifest(_manifest())
+    assert result.ok is False
+    assert result.reason == "no_fingerprint_recorded"
+
+
+# --------------------------------------------------------------------------- #
+# N. The freeze guard
+# --------------------------------------------------------------------------- #
+def test_writing_over_an_existing_manifest_is_refused(tmp_path):
+    path = tmp_path / "frozen.json"
+    first = _drawn(seed="a")
+    manifest_module.write_new_manifest(first, path)
+    before = path.read_text(encoding="utf-8")
+    with pytest.raises(FileExistsError, match="ONCE"):
+        manifest_module.write_new_manifest(_drawn(seed="b"), path)
+    assert path.read_text(encoding="utf-8") == before      # untouched
+
+
+def test_overwriting_deliberately_reports_the_fingerprint_it_replaced(tmp_path):
+    path = tmp_path / "frozen.json"
+    first = _drawn(seed="a")
+    manifest_module.write_new_manifest(first, path)
+    second = _drawn(seed="b")
+    previous = manifest_module.write_new_manifest(second, path, overwrite=True)
+    assert previous == first.selection_sha256
+    assert manifest_module.read_manifest(path).selection_sha256 == \
+        second.selection_sha256
+
+
+def test_writing_a_new_manifest_creates_missing_parent_directories(tmp_path):
+    path = tmp_path / "nested" / "dir" / "m.json"
+    assert manifest_module.write_new_manifest(_drawn(), path) is None
+    assert path.exists()
+
+
+# --------------------------------------------------------------------------- #
+# Same-manifest calibration subset
+# --------------------------------------------------------------------------- #
+def test_a_calibration_subset_comes_only_from_the_manifest():
+    m = _drawn()
+    subset = manifest_module.select_manifest_subset(m, size=10, seed="cal-1")
+    assert len(subset) == 10
+    assert len(set(subset)) == 10
+    assert set(subset) <= set(m.keys())
+
+
+def test_a_calibration_subset_is_deterministic_and_seed_sensitive():
+    m = _drawn()
+    a = manifest_module.select_manifest_subset(m, size=10, seed="cal-1")
+    b = manifest_module.select_manifest_subset(m, size=10, seed="cal-1")
+    c = manifest_module.select_manifest_subset(m, size=10, seed="cal-2")
+    assert a == b
+    assert a != c
+
+
+def test_asking_for_more_than_the_manifest_holds_returns_all_of_it_once():
+    m = _drawn(size=12)
+    subset = manifest_module.select_manifest_subset(m, size=500, seed="cal-1")
+    assert sorted(subset) == sorted(m.keys())
+
+
+def test_the_purpose_namespaces_the_subset_ordering():
+    m = _drawn()
+    a = manifest_module.select_manifest_subset(m, size=10, seed="s", purpose="one")
+    b = manifest_module.select_manifest_subset(m, size=10, seed="s", purpose="two")
+    assert a != b
+
+
+# --------------------------------------------------------------------------- #
+# O. No network
+# --------------------------------------------------------------------------- #
+def test_drawing_and_writing_a_manifest_makes_no_http_request(tmp_path, monkeypatch):
+    """Task 7 is catalog-only. Nothing here may reach NRB — the cohort is frozen
+    BEFORE a single byte is downloaded, which is the whole point of drawing it
+    from the catalog rather than from what happens to be on disk."""
+    import httpx
+
+    def explode(*args, **kwargs):    # pragma: no cover - must never run
+        raise AssertionError("Task 7 made an HTTP request")
+
+    monkeypatch.setattr(httpx, "AsyncClient", explode)
+    monkeypatch.setattr(httpx, "Client", explode)
+    monkeypatch.setattr(httpx, "get", explode)
+    monkeypatch.setattr(httpx, "request", explode)
+
+    m = _drawn()
+    path = tmp_path / "m.json"
+    manifest_module.write_new_manifest(m, path)
+    assert manifest_module.verify_manifest(
+        manifest_module.read_manifest(path)
+    ).ok
+
+
+# --------------------------------------------------------------------------- #
+# The command that freezes a cohort
+# --------------------------------------------------------------------------- #
+def _script():
+    import importlib.util
+    import pathlib
+
+    path = pathlib.Path(__file__).resolve().parents[1] / "scripts" / "nrb_sample.py"
+    spec = importlib.util.spec_from_file_location("nrb_sample_script", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _run_cli(module, argv, monkeypatch, rows=None):
+    """Drive `main` with the catalog stubbed out. The database is not this
+    command's subject — the allocation and the freeze guard are."""
+    import asyncio
+
+    async def fake_load(args):
+        return (ROWS if rows is None else rows), {"files": 200}
+
+    monkeypatch.setattr(module, "_load_catalog", fake_load)
+    return asyncio.run(module.main(argv))
+
+
+def test_the_defaults_are_the_documented_provisional_policy():
+    args = _script()._parse_args([])
+    assert args.size == 400
+    assert args.seed == sampling.DEFAULT_SEED
+    assert args.floor == sampling.DEFAULT_FLOOR
+    assert args.max_cohort_share == "0.30"
+    assert args.year_2019_cap is None
+
+
+def test_the_2019_cap_and_the_generic_cohort_cap_both_reach_the_sampler():
+    script = _script()
+    args = script._parse_args(["--year-2019-cap", "80", "--cohort-cap", "<=2018=40"])
+    assert script._cohort_caps(args) == {"2019": 80, "<=2018": 40}
+
+
+def test_a_malformed_cohort_cap_is_refused_rather_than_ignored():
+    script = _script()
+    args = script._parse_args(["--cohort-cap", "2019"])
+    with pytest.raises(ValueError, match="COHORT=N"):
+        script._cohort_caps(args)
+
+
+def test_the_command_refuses_to_run_without_somewhere_to_write(monkeypatch):
+    assert _run_cli(_script(), ["--size", "20"], monkeypatch) == 2
+
+
+def test_a_dry_run_draws_and_writes_nothing(tmp_path, monkeypatch, capsys):
+    module = _script()
+    assert _run_cli(module, ["--size", "20", "--dry-run"], monkeypatch) == 0
+    assert list(tmp_path.iterdir()) == []
+    assert "benchmark cohort" in capsys.readouterr().out
+
+
+def test_writing_a_cohort_freezes_it_and_a_second_run_is_refused(tmp_path, monkeypatch):
+    """Test N. The existing manifest must survive the refused run byte-for-byte."""
+    module = _script()
+    out = tmp_path / "cohort.json"
+    assert _run_cli(module, ["--size", "20", "--out", str(out)], monkeypatch) == 0
+    frozen = out.read_text(encoding="utf-8")
+
+    assert _run_cli(
+        module, ["--size", "20", "--seed", "other", "--out", str(out)], monkeypatch
+    ) == 2
+    assert out.read_text(encoding="utf-8") == frozen
+
+
+def test_overwriting_is_possible_but_never_silent(tmp_path, monkeypatch, capsys):
+    module = _script()
+    out = tmp_path / "cohort.json"
+    _run_cli(module, ["--size", "20", "--out", str(out)], monkeypatch)
+    first = manifest_module.read_manifest(out).selection_sha256
+    capsys.readouterr()
+
+    assert _run_cli(
+        module,
+        ["--size", "20", "--seed", "other", "--out", str(out), "--overwrite"],
+        monkeypatch,
+    ) == 0
+    second = manifest_module.read_manifest(out).selection_sha256
+    err = capsys.readouterr().err
+    assert first != second
+    assert first in err and second in err          # both printed, side by side
+
+
+def test_a_written_cohort_verifies_and_a_tampered_one_does_not(tmp_path, monkeypatch):
+    module = _script()
+    out = tmp_path / "cohort.json"
+    _run_cli(module, ["--size", "20", "--out", str(out)], monkeypatch)
+
+    import asyncio
+
+    assert asyncio.run(module.main(["--verify", str(out)])) == 0
+
+    payload = json.loads(out.read_text(encoding="utf-8"))
+    payload["entries"] = payload["entries"][:-1]
+    out.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    assert asyncio.run(module.main(["--verify", str(out)])) == 1
+
+
+def test_verification_needs_no_catalog_and_no_network(tmp_path, monkeypatch):
+    """`--verify` answers "is this file internally consistent", which is a
+    question about the file. It must not resample, so it must not need a
+    database — that is what makes it runnable in CI."""
+    import asyncio
+
+    import httpx
+
+    module = _script()
+    out = tmp_path / "cohort.json"
+    _run_cli(module, ["--size", "20", "--out", str(out)], monkeypatch)
+
+    def explode(*args, **kwargs):    # pragma: no cover - must never run
+        raise AssertionError("verification touched the network")
+
+    monkeypatch.setattr(httpx, "AsyncClient", explode)
+    monkeypatch.setattr(httpx, "Client", explode)
+
+    async def no_catalog(args):      # pragma: no cover - must never run
+        raise AssertionError("verification read the catalog")
+
+    monkeypatch.setattr(module, "_load_catalog", no_catalog)
+    assert asyncio.run(module.main(["--verify", str(out)])) == 0
+
+
+def test_a_short_cohort_exits_nonzero_so_it_cannot_pass_unnoticed(tmp_path,
+                                                                 monkeypatch):
+    module = _script()
+    out = tmp_path / "cohort.json"
+    assert _run_cli(module, ["--size", "5000", "--out", str(out)], monkeypatch) == 1
+    assert manifest_module.read_manifest(out).shortfall > 0
+
+
+def test_the_cli_makes_no_http_request_at_all(tmp_path, monkeypatch):
+    import httpx
+
+    def explode(*args, **kwargs):    # pragma: no cover - must never run
+        raise AssertionError("nrb_sample.py made an HTTP request")
+
+    for name in ("AsyncClient", "Client", "get", "request", "stream"):
+        monkeypatch.setattr(httpx, name, explode)
+
+    module = _script()
+    out = tmp_path / "cohort.json"
+    assert _run_cli(module, ["--size", "20", "--out", str(out)], monkeypatch) == 0
+    assert manifest_module.read_manifest(out).selected == 20
