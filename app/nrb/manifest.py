@@ -116,6 +116,12 @@ class Manifest:
     selected: int = 0
     selection_sha256: str = ""
     diagnostics: dict[str, Any] = field(default_factory=dict)
+    # Descriptive, NOT fingerprinted: where a derived cohort came from — e.g. the
+    # Phase 6A manifest a holdout excluded, by path and cohort fingerprint. Absent
+    # on an ordinary draw (defaults to {}), so existing manifests read and
+    # re-verify unchanged. The exclusion itself is bound cryptographically in
+    # `sampler.exclude_keys_sha256`; this only names its human provenance.
+    provenance: dict[str, Any] = field(default_factory=dict)
 
     def keys(self) -> tuple[str, ...]:
         """The exact `comparison_key` values this cohort consists of.
@@ -153,6 +159,7 @@ def write_manifest(manifest: Manifest, path: str | Path) -> None:
         "shortfall": manifest.shortfall,
         "selection_sha256": manifest.selection_sha256,
         "sampler": manifest.sampler,
+        "provenance": manifest.provenance,
         "diagnostics": manifest.diagnostics,
         "catalog_counts": manifest.catalog_counts,
         "strata": list(manifest.strata),
@@ -209,6 +216,7 @@ def read_manifest(path: str | Path) -> Manifest:
         selected=int(payload.get("selected", 0)),
         selection_sha256=payload.get("selection_sha256", ""),
         diagnostics=payload.get("diagnostics") or {},
+        provenance=payload.get("provenance") or {},
     )
 
 
@@ -294,6 +302,7 @@ def build_manifest(
     *,
     drawn_at: str,
     catalog_counts: dict[str, Any] | None = None,
+    provenance: dict[str, Any] | None = None,
 ) -> Manifest:
     """Freeze a drawn `Sample` into a durable cohort definition.
 
@@ -329,6 +338,7 @@ def build_manifest(
         sampler=sampler,
         diagnostics=sample.diagnostics.as_dict(),
         catalog_counts=dict(catalog_counts or {}),
+        provenance=dict(provenance or {}),
         strata=tuple(stratum.as_dict() for stratum in sample.strata),
         notes=tuple(sample.notes),
         entries=tuple(entry.as_entry() for entry in sample.entries),

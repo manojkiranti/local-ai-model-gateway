@@ -1,0 +1,2725 @@
+{
+  "algorithm_version": "nrb-stratified-v1",
+  "catalog_counts": {
+    "active_sources": 18577,
+    "blocked_files": 450,
+    "duplicate_comparison_keys": 0,
+    "duplicate_source_identities": 0,
+    "files": 18266,
+    "inactive_sources": 0,
+    "relationships": 18308,
+    "rest_sources": 18380,
+    "sitemap_only_sources": 197,
+    "sources": 18577,
+    "untyped_sources": 5418
+  },
+  "diagnostics": {
+    "allocation_by_cohort": {
+      "2019": 45,
+      "2020-2022": 45,
+      "2023-2026": 45,
+      "<=2018": 15
+    },
+    "allocation_by_stratum": {
+      "2019/act/pdf": 1,
+      "2019/career/pdf": 1,
+      "2019/circular/pdf": 3,
+      "2019/directive/pdf": 1,
+      "2019/enforcement_action/pdf": 1,
+      "2019/forex/pdf": 1,
+      "2019/guideline_manual/pdf": 1,
+      "2019/license_registry/pdf": 1,
+      "2019/media/image": 1,
+      "2019/media/pdf": 4,
+      "2019/monetary_policy/pdf": 1,
+      "2019/notice/image": 1,
+      "2019/notice/pdf": 3,
+      "2019/notice/spreadsheet": 1,
+      "2019/procurement/image": 1,
+      "2019/procurement/pdf": 2,
+      "2019/publication/pdf": 2,
+      "2019/report/pdf": 2,
+      "2019/report/spreadsheet": 1,
+      "2019/research/pdf": 2,
+      "2019/rule_bylaw/pdf": 1,
+      "2019/statistics/document": 1,
+      "2019/statistics/pdf": 4,
+      "2019/statistics/spreadsheet": 2,
+      "2019/untyped/image": 1,
+      "2019/untyped/pdf": 5,
+      "2020-2022/act/pdf": 1,
+      "2020-2022/career/pdf": 1,
+      "2020-2022/circular/pdf": 2,
+      "2020-2022/directive/pdf": 1,
+      "2020-2022/enforcement_action/pdf": 1,
+      "2020-2022/guideline_manual/pdf": 2,
+      "2020-2022/license_registry/pdf": 1,
+      "2020-2022/license_registry/spreadsheet": 2,
+      "2020-2022/media/pdf": 1,
+      "2020-2022/monetary_operations/pdf": 4,
+      "2020-2022/monetary_policy/pdf": 1,
+      "2020-2022/notice/document": 1,
+      "2020-2022/notice/image": 1,
+      "2020-2022/notice/pdf": 6,
+      "2020-2022/notice/spreadsheet": 1,
+      "2020-2022/procurement/pdf": 1,
+      "2020-2022/publication/pdf": 1,
+      "2020-2022/publication/spreadsheet": 2,
+      "2020-2022/report/pdf": 2,
+      "2020-2022/report/spreadsheet": 2,
+      "2020-2022/research/pdf": 1,
+      "2020-2022/research/spreadsheet": 2,
+      "2020-2022/rule_bylaw/pdf": 2,
+      "2020-2022/statistics/pdf": 2,
+      "2020-2022/statistics/spreadsheet": 2,
+      "2020-2022/untyped/pdf": 2,
+      "2023-2026/act/pdf": 1,
+      "2023-2026/career/pdf": 1,
+      "2023-2026/circular/pdf": 2,
+      "2023-2026/directive/pdf": 1,
+      "2023-2026/enforcement_action/pdf": 1,
+      "2023-2026/faq/pdf": 1,
+      "2023-2026/guideline_manual/pdf": 1,
+      "2023-2026/license_registry/pdf": 1,
+      "2023-2026/media/image": 1,
+      "2023-2026/media/pdf": 1,
+      "2023-2026/monetary_operations/pdf": 6,
+      "2023-2026/monetary_policy/pdf": 1,
+      "2023-2026/notice/image": 1,
+      "2023-2026/notice/pdf": 6,
+      "2023-2026/notice/spreadsheet": 1,
+      "2023-2026/procurement/pdf": 1,
+      "2023-2026/publication/pdf": 1,
+      "2023-2026/publication/spreadsheet": 1,
+      "2023-2026/report/pdf": 2,
+      "2023-2026/report/spreadsheet": 1,
+      "2023-2026/research/pdf": 1,
+      "2023-2026/research/spreadsheet": 1,
+      "2023-2026/rule_bylaw/pdf": 1,
+      "2023-2026/statistics/pdf": 2,
+      "2023-2026/statistics/spreadsheet": 4,
+      "2023-2026/untyped/document": 1,
+      "2023-2026/untyped/pdf": 2,
+      "2023-2026/untyped/spreadsheet": 1,
+      "<=2018/circular/pdf": 3,
+      "<=2018/enforcement_action/pdf": 1,
+      "<=2018/forex/pdf": 2,
+      "<=2018/notice/pdf": 2,
+      "<=2018/report/pdf": 2,
+      "<=2018/rule_bylaw/pdf": 1,
+      "<=2018/statistics/pdf": 2,
+      "<=2018/statistics/spreadsheet": 2
+    },
+    "candidates": 17866,
+    "candidates_by_cohort": {
+      "2019": 9061,
+      "2020-2022": 2982,
+      "2023-2026": 4977,
+      "<=2018": 846
+    },
+    "capped_cohort": "2019",
+    "capped_cohort_candidates": 9061,
+    "capped_cohort_selected": 45,
+    "capped_cohorts": [
+      "2019",
+      "2020-2022",
+      "2023-2026"
+    ],
+    "cohort_caps": {
+      "2019": 45,
+      "2020-2022": 45,
+      "2023-2026": 45,
+      "<=2018": 45
+    },
+    "complete": true,
+    "exhausted_strata": [
+      "2020-2022/license_registry/spreadsheet",
+      "2020-2022/research/spreadsheet",
+      "2023-2026/faq/pdf"
+    ],
+    "floor": 1,
+    "floor_allocated_slots": 88,
+    "floor_requested_slots": 88,
+    "floor_short_strata": [],
+    "floor_short_strata_count": 0,
+    "floor_shortfall_slots": 0,
+    "incomplete_reason": null,
+    "pre_cap_allocation_by_cohort": {
+      "2019": 58,
+      "2020-2022": 36,
+      "2023-2026": 45,
+      "<=2018": 11
+    },
+    "redistribution_rounds": 1,
+    "requested": 150,
+    "selected": 150,
+    "slots_redistributed": 13,
+    "slots_removed_by_cap": 13,
+    "strata": 88,
+    "unfillable_slots": 0
+  },
+  "drawn_at": "2026-08-16T03:27:24.282337+00:00",
+  "entries": [
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/08/2082.04.27-NRB-Summarized-Balance-Sheet.xlsx",
+      "document_type": "statistics",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "spreadsheet",
+      "sampling_stratum": "2023-2026/statistics/spreadsheet",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/01/Mangshir_2080_Publish.pdf",
+      "document_type": "statistics",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/statistics/pdf",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/11/Ownership-Structure-of-Government-Securities-2078-06Asoj.pdf",
+      "document_type": "report",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/report/pdf",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2074_75_Account-Block-l-Release-l-Information-473-Bivanta-Dental-Pvt-Ltd-TSO-Battisputali.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/untyped/pdf",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/05/FXMD-Circular-No.-14_DD-TT-for-Oxygen-1.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/circular/pdf",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Current_Macroeconomic_Situation_Nepali-2069-06_Text_Based_on_First-Month_Data_of_2069-70-1.pdf",
+      "document_type": "statistics",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/statistics/pdf",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2072_73_Account-Block-l-Release-l-Information-50-Surya-Bahadur-Limbu.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/untyped/pdf",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2074_75_Account-Block-l-Release-l-Information-067-Dinesh-Thapa-Others.NCB-Koteswar.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/untyped/pdf",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/08/9.-DC_Notice-2082.05.04.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/monetary_operations/pdf",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/rs.100_new_note_circulation_notice.pdf",
+      "document_type": "notice",
+      "owner": "cmd",
+      "owners": [
+        "cmd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/notice/pdf",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/SID_Asayako_Suchana20750204.pdf",
+      "document_type": "notice",
+      "owner": "gsd",
+      "owners": [
+        "gsd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/notice/pdf",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Current_Macroeconomic_Situation_English-2068-11_Table_Based_on_Six_Months_Data_of_2068-69.xls",
+      "document_type": "statistics",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "spreadsheet",
+      "sampling_stratum": "<=2018/statistics/spreadsheet",
+      "year": 2012
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/02/FY-2078-079-upto78-11-12.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/monetary_operations/pdf",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2069_70_Account-Block-l-Release-l-Information-123-Univision-Company-Pvt.-Ltd.-related.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/untyped/pdf",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/05/Deposit-Collection-Result-Update-FY-2080-81-upto-2081-01.27.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/monetary_operations/pdf",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/02/result_engineer.pdf",
+      "document_type": "notice",
+      "owner": "hrm",
+      "owners": [
+        "hrm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/notice/pdf",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/2076_77_For_A__B__C_Class-Circular_12-Gold_Deposit_related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/circular/pdf",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/07/exam-schedule-contract.pdf",
+      "document_type": "notice",
+      "owner": "hrm",
+      "owners": [
+        "hrm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/notice/pdf",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2075_76_Account-Block-l-Release-l-Information-734-Magenta-Advertising-Others-IRO-Hariharbhawan-Lalitpur.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/untyped/pdf",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/NRB_samachar_61st_anniversary_20730216.pdf",
+      "document_type": "publication",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/publication/pdf",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/05/2083.01.29-NRB-Summarized-Balance-Sheet.xlsx",
+      "document_type": "statistics",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "spreadsheet",
+      "sampling_stratum": "2023-2026/statistics/spreadsheet",
+      "year": 2026
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/06/Overnight-Repo-Update-FY-2078-79-upto-2079-02-23.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/monetary_operations/pdf",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/04/Annual-Report-2077_07.pdf",
+      "document_type": "report",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/report/pdf",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/08/2082.05.02-NRB-Summarized-Balance-Sheet.xlsx",
+      "document_type": "statistics",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "spreadsheet",
+      "sampling_stratum": "2023-2026/statistics/spreadsheet",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/09/Shrawan_2079_PublishV1.xlsx",
+      "document_type": "statistics",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "spreadsheet",
+      "sampling_stratum": "2020-2022/statistics/spreadsheet",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Annual_Report-2063-64.pdf",
+      "document_type": "report",
+      "owner": "fis",
+      "owners": [
+        "fis"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/report/pdf",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/07/2081.03.28–-NRB-Summarized-Balance-Sheet-2.xlsx",
+      "document_type": "statistics",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "spreadsheet",
+      "sampling_stratum": "2023-2026/statistics/spreadsheet",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/02/IRC-Procedure-2076-3rd-amendment-2077-.pdf",
+      "document_type": "act",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/act/pdf",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Inauguration-Governor_Dr._Khatiwada_innagurates_Samabridhi_Bikas_Ban.pdf",
+      "document_type": "media",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/media/pdf",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/01/Auction_Notices-2079-09-25.pdf",
+      "document_type": "notice",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/notice/pdf",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/06/Current-Macroeconomic-and-Financial-Situation-English-Based-on-Ten-Months-data-of-2022.23.pdf",
+      "document_type": "statistics",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/statistics/pdf",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/05/Hirepurchase-AML-CFT.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/circular/pdf",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/12/FY-2079-080-upto79-09-07.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/monetary_operations/pdf",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/UNCDF-Unnat.pdf",
+      "document_type": "media",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/media/pdf",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Current_Macroeconomic_Situation_Nepali-2071-12_Text_Based_on_Seven_Months_Data_of_2071-72-new-2.pdf",
+      "document_type": "statistics",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "<=2018/statistics/pdf",
+      "year": 2015
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/12/NRB-Bond_2083_Kha_Notice.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/monetary_operations/pdf",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/PaintingNotice_NPJ20180125.pdf",
+      "document_type": "procurement",
+      "owner": "gsd",
+      "owners": [
+        "gsd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/procurement/pdf",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/08/Deposit-Collection-Result-Update-FY-2082-83-upto-2082-05-01-1.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/monetary_operations/pdf",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/07/FY-2079-080-upto79-04-09.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/monetary_operations/pdf",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/CMEs-Nine-Months-Nepali-2074-75-1.pdf",
+      "document_type": "statistics",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/statistics/pdf",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Press_Release-Governors_Presentation_at_UNDP_Global_MDG_Conference_27-28_February_Bogota_Colombia.pdf",
+      "document_type": "media",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/media/pdf",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Media_Release-Governor-Vice_Chairman_ADB_Meet.pdf",
+      "document_type": "media",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/media/pdf",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/09/MOhar_License-Cancelation-.pdf",
+      "document_type": "notice",
+      "owner": "psd",
+      "owners": [
+        "psd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/notice/pdf",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/List_of_Circular-397.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "<=2018/circular/pdf",
+      "year": 2007
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/07/NRB-Samachar_Jeth-20770317.pdf",
+      "document_type": "publication",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/publication/pdf",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/01/Standing-Deposit-facility-upto2081.09.21.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/monetary_operations/pdf",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/06/Standing-List-2080.81-NRB-BRT.pdf",
+      "document_type": "notice",
+      "owner": "brt",
+      "owners": [
+        "brt"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/notice/pdf",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/12/OFFICER-LEGAL.pdf",
+      "document_type": "career",
+      "owner": "hrm",
+      "owners": [
+        "hrm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/career/pdf",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/List_of_Circular-497.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "<=2018/circular/pdf",
+      "year": 2009
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/10/Press-Release-20770705.pdf",
+      "document_type": "media",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/media/pdf",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2066_67-Circular_37-Amendment-in-Unified-Directive-no.12-and-20.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/circular/pdf",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/03/Interest-Rate-Structure-as-of-MFIs-poush-2077-mid-jan2021.xlsx",
+      "document_type": "statistics",
+      "owner": "mfd",
+      "owners": [
+        "mfd"
+      ],
+      "resource_type": "spreadsheet",
+      "sampling_stratum": "2020-2022/statistics/spreadsheet",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/7-Notice-of-TES.pdf",
+      "document_type": "procurement",
+      "owner": "gsd",
+      "owners": [
+        "gsd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/procurement/pdf",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/butwal-exam-center-1.pdf",
+      "document_type": "notice",
+      "owner": "hrm",
+      "owners": [
+        "hrm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/notice/pdf",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/05/2083.02.08-Sealed-Quotation-Re-Bid-Notice-to-NRB-Website.pdf",
+      "document_type": "notice",
+      "owner": "brg",
+      "owners": [
+        "brg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/notice/pdf",
+      "year": 2026
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/08/20.-Price-Bid-Notice.pdf",
+      "document_type": "notice",
+      "owner": "gsd",
+      "owners": [
+        "gsd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/notice/pdf",
+      "year": 2026
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/02/Auction_Notices-2078-11-16-ed-1.pdf",
+      "document_type": "notice",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/notice/pdf",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/06/Progress-Report-Chaitra-2078-2.xlsx",
+      "document_type": "notice",
+      "owner": "mfd",
+      "owners": [
+        "mfd"
+      ],
+      "resource_type": "spreadsheet",
+      "sampling_stratum": "2020-2022/notice/spreadsheet",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/03/Press-note-FIU-Annual-Report-_Final...pdf",
+      "document_type": "media",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/media/pdf",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/09/Subsidised-Loan-as-on-end-of-Shrawan2078-.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/untyped/pdf",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/CMEs-Two-Months-Tables-Final-Compilation-2076-77-2.xlsx",
+      "document_type": "statistics",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "spreadsheet",
+      "sampling_stratum": "2019/statistics/spreadsheet",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Monetary_Policy_in_Nepali-2063-64_Full_Text.pdf",
+      "document_type": "monetary_policy",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/monetary_policy/pdf",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/09/in_Nepali-2073-74.pdf",
+      "document_type": "report",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "<=2018/report/pdf",
+      "year": 2018
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/04/Monetary-Operation-Summary-Data-upto-2082.01.03.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/monetary_operations/pdf",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Special_Publications-Sixty_Years_Of_Nepal_Rastra_Bank-new.pdf",
+      "document_type": "publication",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/publication/pdf",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/CMES_-Annual_-2072-73-Nepali-1.pdf",
+      "document_type": "statistics",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/statistics/pdf",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Current_Macroeconomic_Situation_English-2004-07-Mid_July-2.pdf",
+      "document_type": "statistics",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/statistics/pdf",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2069_70-Circular_14-Amendment-in-KYC-Anusuchi-19.1.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/circular/pdf",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/03/Lagani-Notice-2078.12.10-2.pdf",
+      "document_type": "notice",
+      "owner": "fmd",
+      "owners": [
+        "fmd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/notice/pdf",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/07/Situation-of-Microfinance-Institutions-publishedChaitra-2076-1.pdf",
+      "document_type": "statistics",
+      "owner": "mfd",
+      "owners": [
+        "mfd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/statistics/pdf",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Current_Macroeconomic_Situation_Nepali-2066-07_Text_Based-on-First-two-Months-data-of-2066-67.pdf",
+      "document_type": "statistics",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "<=2018/statistics/pdf",
+      "year": 2009
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/11/Eco.Activities-Study-2078.79-Annual.-FINAL-2079-07-06.pdf",
+      "document_type": "notice",
+      "owner": "dhn",
+      "owners": [
+        "dhn"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/notice/pdf",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2062_63-Circular_10.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "<=2018/circular/pdf",
+      "year": 2010
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Current_Macroeconomic_Situation_English-2007-09_Tables_Based-on-First-Twelve-Month-data-of-2006-07-1.xls",
+      "document_type": "statistics",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "spreadsheet",
+      "sampling_stratum": "2019/statistics/spreadsheet",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/06/Monthly-Statistics-_-2077_01-May-2020-1.pdf",
+      "document_type": "statistics",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/statistics/pdf",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/03/Calander_Accepted.pdf",
+      "document_type": "notice",
+      "owner": "gsd",
+      "owners": [
+        "gsd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/notice/pdf",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/06/Pickup-078.3.1.pdf",
+      "document_type": "notice",
+      "owner": "gsd",
+      "owners": [
+        "gsd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/notice/pdf",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Annual_Reports-Annual_Bank_Supervision_Report_2005-2006.pdf",
+      "document_type": "report",
+      "owner": "bsd",
+      "owners": [
+        "bsd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/report/pdf",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/6.pdf",
+      "document_type": "research",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/research/pdf",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/04/Strategic-Analysis-Report-of-FIU-2022-new-design.pdf",
+      "document_type": "research",
+      "owner": "fiu",
+      "owners": [
+        "fiu"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/research/pdf",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2069_70-Circular_16-Attachment-Anusuchi-19.1.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/circular/pdf",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/05/NRB-Samachar_Jeth_2083.pdf",
+      "document_type": "publication",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/publication/pdf",
+      "year": 2026
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/02/55Fewa.pdf",
+      "document_type": "license_registry",
+      "owner": "fis",
+      "owners": [
+        "fis"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/license_registry/pdf",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/12/nrb-wp-56-2023-12-2.pdf",
+      "document_type": "research",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/research/pdf",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/Sources-and-Uses-of-Microfinance-Financial-Institutions-Asoj-2076.xlsx",
+      "document_type": "report",
+      "owner": "mfd",
+      "owners": [
+        "mfd"
+      ],
+      "resource_type": "spreadsheet",
+      "sampling_stratum": "2019/report/spreadsheet",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/4.Estimation20180206.pdf",
+      "document_type": "research",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/research/pdf",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/12/Interest-subsidized-loan-to-be-published-Kartik-2081.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/untyped/pdf",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/09/2080.04-monthly-final-upload-1.pdf",
+      "document_type": "report",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/report/pdf",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/02/7_2080-81_Foreign-Investment-Loan-Bylaw-2.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/circular/pdf",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Current_Macroeconomic_Situation_English-2008-09-Tables-Based-on-Annual-data-of-2007-08-2.xls",
+      "document_type": "statistics",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "spreadsheet",
+      "sampling_stratum": "<=2018/statistics/spreadsheet",
+      "year": 2008
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/02/List-of-BFIs-Poush-2081-Nepali.pdf",
+      "document_type": "license_registry",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/license_registry/pdf",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/09/Sources-and-Uses-Report-of-Microfinance-Institurions-Asar-End-20781.xlsx",
+      "document_type": "report",
+      "owner": "mfd",
+      "owners": [
+        "mfd"
+      ],
+      "resource_type": "spreadsheet",
+      "sampling_stratum": "2020-2022/report/spreadsheet",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/11/Fact-Sheet-BOOK-FINAL.pdf",
+      "document_type": "guideline_manual",
+      "owner": "ficpd",
+      "owners": [
+        "ficpd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/guideline_manual/pdf",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/07/Sources-and-Uses-of-Microfinance-Institutions-2077.12.31.xlsx",
+      "document_type": "report",
+      "owner": "mfd",
+      "owners": [
+        "mfd"
+      ],
+      "resource_type": "spreadsheet",
+      "sampling_stratum": "2020-2022/report/spreadsheet",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/03/form_format_travel_tour.pdf",
+      "document_type": "notice",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "<=2018/notice/pdf",
+      "year": 2015
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Profile_National_level.pdf",
+      "document_type": "license_registry",
+      "owner": "dbs",
+      "owners": [
+        "dbs"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/license_registry/pdf",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/09/Sources-and-Uses-2082-Asar.xlsx",
+      "document_type": "report",
+      "owner": "mfd",
+      "owners": [
+        "mfd"
+      ],
+      "resource_type": "spreadsheet",
+      "sampling_stratum": "2023-2026/report/spreadsheet",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/06/Monthly-Balance-Sheet-Baisakh-2081.pdf",
+      "document_type": "report",
+      "owner": "fmd",
+      "owners": [
+        "fmd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/report/pdf",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/hundi.gif",
+      "document_type": "media",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "image",
+      "sampling_stratum": "2019/media/image",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/11/सम्पत्ति-शुद्धीकरण-मनी-लाउन्डरिङ्ग-निवारण-नियमावली-२०८१.pdf",
+      "document_type": "act",
+      "owner": "fiu",
+      "owners": [
+        "fiu"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/act/pdf",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/02/Weekly-Auction-Details-2080-11-06-1.pdf",
+      "document_type": "untyped",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/untyped/pdf",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/notice.jpg",
+      "document_type": "notice",
+      "owner": "gsd",
+      "owners": [
+        "gsd"
+      ],
+      "resource_type": "image",
+      "sampling_stratum": "2019/notice/image",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/visakhapatnam_port.pdf",
+      "document_type": "notice",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "<=2018/notice/pdf",
+      "year": 2016
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/Prompt_Corrective_Action-_to_Corporate_Development_Bank.pdf",
+      "document_type": "enforcement_action",
+      "owner": "dbs",
+      "owners": [
+        "dbs"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "<=2018/enforcement_action/pdf",
+      "year": 2015
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/dhn_notice20191015-scaled.jpg",
+      "document_type": "procurement",
+      "owner": "gsd",
+      "owners": [
+        "gsd"
+      ],
+      "resource_type": "image",
+      "sampling_stratum": "2019/procurement/image",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/07/Program-Details.jpg",
+      "document_type": "media",
+      "owner": "mlpsd",
+      "owners": [
+        "mlpsd"
+      ],
+      "resource_type": "image",
+      "sampling_stratum": "2023-2026/media/image",
+      "year": 2026
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/01/NRB-3x8-1.jpg",
+      "document_type": "notice",
+      "owner": "gsd",
+      "owners": [
+        "gsd"
+      ],
+      "resource_type": "image",
+      "sampling_stratum": "2023-2026/notice/image",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/05/Auction_Notices-2079-02-16.docx",
+      "document_type": "notice",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "document",
+      "sampling_stratum": "2020-2022/notice/document",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/11/भूकम्प-प्रभावित-घरपरिवारलाई-आवासीय-घर-पुनर्निमाणका-२०७२.pdf",
+      "document_type": "guideline_manual",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/guideline_manual/pdf",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/01/karbahi_release_20690328.pdf",
+      "document_type": "enforcement_action",
+      "owner": "fis",
+      "owners": [
+        "fis"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/enforcement_action/pdf",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/License_and_Ins_Bylaw.pdf",
+      "document_type": "rule_bylaw",
+      "owner": "lgd",
+      "owners": [
+        "lgd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/rule_bylaw/pdf",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Current_Macroeconomic_Situation_English-2006-08_Eecutive_SummaryBased_on_first_one_month_data-1.doc",
+      "document_type": "statistics",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "document",
+      "sampling_stratum": "2019/statistics/document",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/09/RTI_NRB-Report_2078-Asar.pdf",
+      "document_type": "untyped",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/untyped/pdf",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/01/MFI-Unified-Directive-2082.pdf",
+      "document_type": "directive",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/directive/pdf",
+      "year": 2026
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/fxm_notice20750720.pdf",
+      "document_type": "forex",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "<=2018/forex/pdf",
+      "year": 2018
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/03/Clean_Note_Policy_2070-71_Circular.pdf",
+      "document_type": "directive",
+      "owner": "cmd",
+      "owners": [
+        "cmd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/directive/pdf",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/01/Invitationforbid20770919.pdf",
+      "document_type": "procurement",
+      "owner": "cmd",
+      "owners": [
+        "cmd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/procurement/pdf",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/02/Enforcement-Action-FY-208283-Second-Quarter.pdf",
+      "document_type": "enforcement_action",
+      "owner": "bsd",
+      "owners": [
+        "bsd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/enforcement_action/pdf",
+      "year": 2026
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/07/Notice27-scaled.jpg",
+      "document_type": "notice",
+      "owner": "gsd",
+      "owners": [
+        "gsd"
+      ],
+      "resource_type": "image",
+      "sampling_stratum": "2020-2022/notice/image",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/2_Procedure-Procedure.pdf",
+      "document_type": "act",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/act/pdf",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/07/QEB-2024-JAN.xls",
+      "document_type": "publication",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "spreadsheet",
+      "sampling_stratum": "2023-2026/publication/spreadsheet",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/09/in_Nepali-2067-68.pdf",
+      "document_type": "report",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "<=2018/report/pdf",
+      "year": 2012
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Guidelines-CEOs_Remuneration_for_B_C_and_D_Class_Institutions_Guidelines_2068.pdf",
+      "document_type": "guideline_manual",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/guideline_manual/pdf",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/07/AML_CFT_Supervision_Bylaw_2083-1.pdf",
+      "document_type": "rule_bylaw",
+      "owner": "mlpsd",
+      "owners": [
+        "mlpsd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/rule_bylaw/pdf",
+      "year": 2026
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/05/Interest-subsidized-loan-to-be-published-Chaitra-2081.xlsx",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "spreadsheet",
+      "sampling_stratum": "2023-2026/untyped/spreadsheet",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/12/QEB-2021-July.xlsx",
+      "document_type": "publication",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "spreadsheet",
+      "sampling_stratum": "2020-2022/publication/spreadsheet",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Gold-and-silver-Purchase-and-sale-Karyabidhi-2075-update-2077.02.16-Final.pdf",
+      "document_type": "rule_bylaw",
+      "owner": "lgd",
+      "owners": [
+        "lgd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/rule_bylaw/pdf",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/bylaws-of-the-notes-and-coin-printing.pdf",
+      "document_type": "rule_bylaw",
+      "owner": "lgd",
+      "owners": [
+        "lgd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "<=2018/rule_bylaw/pdf",
+      "year": 2009
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/FXM_notice_20190131.pdf",
+      "document_type": "forex",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/forex/pdf",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/07/STR_Guideline_2076-1.pdf",
+      "document_type": "guideline_manual",
+      "owner": "fiu",
+      "owners": [
+        "fiu"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/guideline_manual/pdf",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Dipendra_Bd_Chhatri_20120730101400.jpg",
+      "document_type": "untyped",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "image",
+      "sampling_stratum": "2019/untyped/image",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Final-name-list-CA-1.xlsx",
+      "document_type": "notice",
+      "owner": "hrm",
+      "owners": [
+        "hrm"
+      ],
+      "resource_type": "spreadsheet",
+      "sampling_stratum": "2019/notice/spreadsheet",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/11/NRB-Information-Communication-Policy-2078-with-1st-Amd-1.pdf",
+      "document_type": "rule_bylaw",
+      "owner": "lgd",
+      "owners": [
+        "lgd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/rule_bylaw/pdf",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/03/Assistant-Questions-2079.pdf",
+      "document_type": "career",
+      "owner": "hrm",
+      "owners": [
+        "hrm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/career/pdf",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Monetary_Policy_Collection_of_Monetary_Policy-Collection_of_Monetary_Policy_Part_1-new.pdf",
+      "document_type": "monetary_policy",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2020-2022/monetary_policy/pdf",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Directives-Unified-Directives-2071.pdf",
+      "document_type": "directive",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/directive/pdf",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/11/Macroeconomic-Indicators-of-Nepal-2022-July.xlsx",
+      "document_type": "publication",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "spreadsheet",
+      "sampling_stratum": "2020-2022/publication/spreadsheet",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/02/Midterm-Review-of-MP-2081-82.pdf",
+      "document_type": "monetary_policy",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/monetary_policy/pdf",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Indian-Currency-Loan-by-Commercial-Bank_notice20181225.pdf",
+      "document_type": "forex",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "<=2018/forex/pdf",
+      "year": 2018
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Enforcement_Action-2070-71_2013-14.pdf",
+      "document_type": "enforcement_action",
+      "owner": "bsd",
+      "owners": [
+        "bsd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/enforcement_action/pdf",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/03/goAML-related-FAQs-FIU-2025.pdf",
+      "document_type": "faq",
+      "owner": "fiu",
+      "owners": [
+        "fiu"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/faq/pdf",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/07/Integrated-EAR-Half-Yearly-table_2081.82-2.xlsx",
+      "document_type": "research",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "spreadsheet",
+      "sampling_stratum": "2023-2026/research/spreadsheet",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/01/2080.09.29–-NRB-Summarized-Balance-Sheet.xlsx",
+      "document_type": "notice",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "spreadsheet",
+      "sampling_stratum": "2023-2026/notice/spreadsheet",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/11/3.-EGMONT-Request-Form_request-to-Froreign-FIUs.doc",
+      "document_type": "untyped",
+      "owner": "fiu",
+      "owners": [
+        "fiu"
+      ],
+      "resource_type": "document",
+      "sampling_stratum": "2023-2026/untyped/document",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/07/Letter-of-Intent_Rs.5_CBPM.pdf",
+      "document_type": "procurement",
+      "owner": "cmd",
+      "owners": [
+        "cmd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2023-2026/procurement/pdf",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/Study_Reports-Economic_Activities_Study_Report_2075-76_TableAnnual-new.xlsx",
+      "document_type": "research",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "spreadsheet",
+      "sampling_stratum": "2020-2022/research/spreadsheet",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/01/Integrated_Tables_Final_Publish.xlsx",
+      "document_type": "research",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "spreadsheet",
+      "sampling_stratum": "2020-2022/research/spreadsheet",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/officer-open-74.4.-9-10-11.pdf",
+      "document_type": "career",
+      "owner": "hrm",
+      "owners": [
+        "hrm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "2019/career/pdf",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/02/Finance-Company-2065-03-Asadh.xls",
+      "document_type": "license_registry",
+      "owner": "fis",
+      "owners": [
+        "fis"
+      ],
+      "resource_type": "spreadsheet",
+      "sampling_stratum": "2020-2022/license_registry/spreadsheet",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/02/Finance-Company-2064-03-Asadh.xls",
+      "document_type": "license_registry",
+      "owner": "fis",
+      "owners": [
+        "fis"
+      ],
+      "resource_type": "spreadsheet",
+      "sampling_stratum": "2020-2022/license_registry/spreadsheet",
+      "year": 2020
+    }
+  ],
+  "notes": [],
+  "provenance": {
+    "excluded_manifests": [
+      {
+        "keys": 400,
+        "path": "docs/nrb/phase6a-manifest.json",
+        "selection_sha256": "1ae297dba1c33c7db9976f817806f6666371695a31e1f424d046993d581a1312"
+      }
+    ]
+  },
+  "requested": 150,
+  "sampler": {
+    "algorithm_version": "nrb-stratified-v1",
+    "cohort_caps": {
+      "2019": 45
+    },
+    "exclude_count": 400,
+    "exclude_keys_sha256": "c20b039601e883ca162c2bfbb0937b1330d4dbbb164b927e246c064ca2000e76",
+    "floor": 1,
+    "max_cohort_share": "3/10",
+    "seed": "phase6b-routing-holdout-v1",
+    "size": 150,
+    "weak_threshold": 10
+  },
+  "seed": "phase6b-routing-holdout-v1",
+  "selected": 150,
+  "selection_sha256": "6344e674f788808ab02f46218e59a76c215c0644cb95abbbf8212d45d400a970",
+  "shortfall": 0,
+  "strata": [
+    {
+      "allocated": 1,
+      "available": 26,
+      "cohort": "2019",
+      "document_type": "act",
+      "resource_type": "pdf",
+      "selected": 1,
+      "stratum": "2019/act/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 5,
+      "cohort": "2019",
+      "document_type": "career",
+      "resource_type": "pdf",
+      "selected": 1,
+      "stratum": "2019/career/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 3,
+      "available": 680,
+      "cohort": "2019",
+      "document_type": "circular",
+      "resource_type": "pdf",
+      "selected": 3,
+      "stratum": "2019/circular/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 33,
+      "cohort": "2019",
+      "document_type": "directive",
+      "resource_type": "pdf",
+      "selected": 1,
+      "stratum": "2019/directive/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 9,
+      "cohort": "2019",
+      "document_type": "enforcement_action",
+      "resource_type": "pdf",
+      "selected": 1,
+      "stratum": "2019/enforcement_action/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 4,
+      "cohort": "2019",
+      "document_type": "forex",
+      "resource_type": "pdf",
+      "selected": 1,
+      "stratum": "2019/forex/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 36,
+      "cohort": "2019",
+      "document_type": "guideline_manual",
+      "resource_type": "pdf",
+      "selected": 1,
+      "stratum": "2019/guideline_manual/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 21,
+      "cohort": "2019",
+      "document_type": "license_registry",
+      "resource_type": "pdf",
+      "selected": 1,
+      "stratum": "2019/license_registry/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 9,
+      "cohort": "2019",
+      "document_type": "media",
+      "resource_type": "image",
+      "selected": 1,
+      "stratum": "2019/media/image",
+      "weak": true
+    },
+    {
+      "allocated": 4,
+      "available": 746,
+      "cohort": "2019",
+      "document_type": "media",
+      "resource_type": "pdf",
+      "selected": 4,
+      "stratum": "2019/media/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 88,
+      "cohort": "2019",
+      "document_type": "monetary_policy",
+      "resource_type": "pdf",
+      "selected": 1,
+      "stratum": "2019/monetary_policy/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 20,
+      "cohort": "2019",
+      "document_type": "notice",
+      "resource_type": "image",
+      "selected": 1,
+      "stratum": "2019/notice/image",
+      "weak": true
+    },
+    {
+      "allocated": 3,
+      "available": 452,
+      "cohort": "2019",
+      "document_type": "notice",
+      "resource_type": "pdf",
+      "selected": 3,
+      "stratum": "2019/notice/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 10,
+      "cohort": "2019",
+      "document_type": "notice",
+      "resource_type": "spreadsheet",
+      "selected": 1,
+      "stratum": "2019/notice/spreadsheet",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 11,
+      "cohort": "2019",
+      "document_type": "procurement",
+      "resource_type": "image",
+      "selected": 1,
+      "stratum": "2019/procurement/image",
+      "weak": true
+    },
+    {
+      "allocated": 2,
+      "available": 276,
+      "cohort": "2019",
+      "document_type": "procurement",
+      "resource_type": "pdf",
+      "selected": 2,
+      "stratum": "2019/procurement/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 2,
+      "available": 168,
+      "cohort": "2019",
+      "document_type": "publication",
+      "resource_type": "pdf",
+      "selected": 2,
+      "stratum": "2019/publication/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 2,
+      "available": 260,
+      "cohort": "2019",
+      "document_type": "report",
+      "resource_type": "pdf",
+      "selected": 2,
+      "stratum": "2019/report/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 33,
+      "cohort": "2019",
+      "document_type": "report",
+      "resource_type": "spreadsheet",
+      "selected": 1,
+      "stratum": "2019/report/spreadsheet",
+      "weak": true
+    },
+    {
+      "allocated": 2,
+      "available": 183,
+      "cohort": "2019",
+      "document_type": "research",
+      "resource_type": "pdf",
+      "selected": 2,
+      "stratum": "2019/research/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 23,
+      "cohort": "2019",
+      "document_type": "rule_bylaw",
+      "resource_type": "pdf",
+      "selected": 1,
+      "stratum": "2019/rule_bylaw/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 12,
+      "cohort": "2019",
+      "document_type": "statistics",
+      "resource_type": "document",
+      "selected": 1,
+      "stratum": "2019/statistics/document",
+      "weak": true
+    },
+    {
+      "allocated": 4,
+      "available": 972,
+      "cohort": "2019",
+      "document_type": "statistics",
+      "resource_type": "pdf",
+      "selected": 4,
+      "stratum": "2019/statistics/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 2,
+      "available": 178,
+      "cohort": "2019",
+      "document_type": "statistics",
+      "resource_type": "spreadsheet",
+      "selected": 2,
+      "stratum": "2019/statistics/spreadsheet",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 14,
+      "cohort": "2019",
+      "document_type": "untyped",
+      "resource_type": "image",
+      "selected": 1,
+      "stratum": "2019/untyped/image",
+      "weak": true
+    },
+    {
+      "allocated": 5,
+      "available": 4792,
+      "cohort": "2019",
+      "document_type": "untyped",
+      "resource_type": "pdf",
+      "selected": 5,
+      "stratum": "2019/untyped/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 30,
+      "cohort": "2020-2022",
+      "document_type": "act",
+      "resource_type": "pdf",
+      "selected": 1,
+      "stratum": "2020-2022/act/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 3,
+      "cohort": "2020-2022",
+      "document_type": "career",
+      "resource_type": "pdf",
+      "selected": 1,
+      "stratum": "2020-2022/career/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 2,
+      "available": 148,
+      "cohort": "2020-2022",
+      "document_type": "circular",
+      "resource_type": "pdf",
+      "selected": 2,
+      "stratum": "2020-2022/circular/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 32,
+      "cohort": "2020-2022",
+      "document_type": "directive",
+      "resource_type": "pdf",
+      "selected": 1,
+      "stratum": "2020-2022/directive/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 16,
+      "cohort": "2020-2022",
+      "document_type": "enforcement_action",
+      "resource_type": "pdf",
+      "selected": 1,
+      "stratum": "2020-2022/enforcement_action/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 2,
+      "available": 30,
+      "cohort": "2020-2022",
+      "document_type": "guideline_manual",
+      "resource_type": "pdf",
+      "selected": 2,
+      "stratum": "2020-2022/guideline_manual/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 82,
+      "cohort": "2020-2022",
+      "document_type": "license_registry",
+      "resource_type": "pdf",
+      "selected": 1,
+      "stratum": "2020-2022/license_registry/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 2,
+      "available": 2,
+      "cohort": "2020-2022",
+      "document_type": "license_registry",
+      "resource_type": "spreadsheet",
+      "selected": 2,
+      "stratum": "2020-2022/license_registry/spreadsheet",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 82,
+      "cohort": "2020-2022",
+      "document_type": "media",
+      "resource_type": "pdf",
+      "selected": 1,
+      "stratum": "2020-2022/media/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 4,
+      "available": 762,
+      "cohort": "2020-2022",
+      "document_type": "monetary_operations",
+      "resource_type": "pdf",
+      "selected": 4,
+      "stratum": "2020-2022/monetary_operations/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 15,
+      "cohort": "2020-2022",
+      "document_type": "monetary_policy",
+      "resource_type": "pdf",
+      "selected": 1,
+      "stratum": "2020-2022/monetary_policy/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 5,
+      "cohort": "2020-2022",
+      "document_type": "notice",
+      "resource_type": "document",
+      "selected": 1,
+      "stratum": "2020-2022/notice/document",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 23,
+      "cohort": "2020-2022",
+      "document_type": "notice",
+      "resource_type": "image",
+      "selected": 1,
+      "stratum": "2020-2022/notice/image",
+      "weak": true
+    },
+    {
+      "allocated": 6,
+      "available": 1058,
+      "cohort": "2020-2022",
+      "document_type": "notice",
+      "resource_type": "pdf",
+      "selected": 6,
+      "stratum": "2020-2022/notice/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 12,
+      "cohort": "2020-2022",
+      "document_type": "notice",
+      "resource_type": "spreadsheet",
+      "selected": 1,
+      "stratum": "2020-2022/notice/spreadsheet",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 11,
+      "cohort": "2020-2022",
+      "document_type": "procurement",
+      "resource_type": "pdf",
+      "selected": 1,
+      "stratum": "2020-2022/procurement/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 74,
+      "cohort": "2020-2022",
+      "document_type": "publication",
+      "resource_type": "pdf",
+      "selected": 1,
+      "stratum": "2020-2022/publication/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 2,
+      "available": 11,
+      "cohort": "2020-2022",
+      "document_type": "publication",
+      "resource_type": "spreadsheet",
+      "selected": 2,
+      "stratum": "2020-2022/publication/spreadsheet",
+      "weak": true
+    },
+    {
+      "allocated": 2,
+      "available": 130,
+      "cohort": "2020-2022",
+      "document_type": "report",
+      "resource_type": "pdf",
+      "selected": 2,
+      "stratum": "2020-2022/report/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 2,
+      "available": 16,
+      "cohort": "2020-2022",
+      "document_type": "report",
+      "resource_type": "spreadsheet",
+      "selected": 2,
+      "stratum": "2020-2022/report/spreadsheet",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 36,
+      "cohort": "2020-2022",
+      "document_type": "research",
+      "resource_type": "pdf",
+      "selected": 1,
+      "stratum": "2020-2022/research/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 2,
+      "available": 2,
+      "cohort": "2020-2022",
+      "document_type": "research",
+      "resource_type": "spreadsheet",
+      "selected": 2,
+      "stratum": "2020-2022/research/spreadsheet",
+      "weak": true
+    },
+    {
+      "allocated": 2,
+      "available": 15,
+      "cohort": "2020-2022",
+      "document_type": "rule_bylaw",
+      "resource_type": "pdf",
+      "selected": 2,
+      "stratum": "2020-2022/rule_bylaw/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 2,
+      "available": 232,
+      "cohort": "2020-2022",
+      "document_type": "statistics",
+      "resource_type": "pdf",
+      "selected": 2,
+      "stratum": "2020-2022/statistics/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 2,
+      "available": 72,
+      "cohort": "2020-2022",
+      "document_type": "statistics",
+      "resource_type": "spreadsheet",
+      "selected": 2,
+      "stratum": "2020-2022/statistics/spreadsheet",
+      "weak": true
+    },
+    {
+      "allocated": 2,
+      "available": 83,
+      "cohort": "2020-2022",
+      "document_type": "untyped",
+      "resource_type": "pdf",
+      "selected": 2,
+      "stratum": "2020-2022/untyped/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 26,
+      "cohort": "2023-2026",
+      "document_type": "act",
+      "resource_type": "pdf",
+      "selected": 1,
+      "stratum": "2023-2026/act/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 8,
+      "cohort": "2023-2026",
+      "document_type": "career",
+      "resource_type": "pdf",
+      "selected": 1,
+      "stratum": "2023-2026/career/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 2,
+      "available": 153,
+      "cohort": "2023-2026",
+      "document_type": "circular",
+      "resource_type": "pdf",
+      "selected": 2,
+      "stratum": "2023-2026/circular/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 22,
+      "cohort": "2023-2026",
+      "document_type": "directive",
+      "resource_type": "pdf",
+      "selected": 1,
+      "stratum": "2023-2026/directive/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 48,
+      "cohort": "2023-2026",
+      "document_type": "enforcement_action",
+      "resource_type": "pdf",
+      "selected": 1,
+      "stratum": "2023-2026/enforcement_action/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 1,
+      "cohort": "2023-2026",
+      "document_type": "faq",
+      "resource_type": "pdf",
+      "selected": 1,
+      "stratum": "2023-2026/faq/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 40,
+      "cohort": "2023-2026",
+      "document_type": "guideline_manual",
+      "resource_type": "pdf",
+      "selected": 1,
+      "stratum": "2023-2026/guideline_manual/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 65,
+      "cohort": "2023-2026",
+      "document_type": "license_registry",
+      "resource_type": "pdf",
+      "selected": 1,
+      "stratum": "2023-2026/license_registry/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 4,
+      "cohort": "2023-2026",
+      "document_type": "media",
+      "resource_type": "image",
+      "selected": 1,
+      "stratum": "2023-2026/media/image",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 119,
+      "cohort": "2023-2026",
+      "document_type": "media",
+      "resource_type": "pdf",
+      "selected": 1,
+      "stratum": "2023-2026/media/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 6,
+      "available": 1525,
+      "cohort": "2023-2026",
+      "document_type": "monetary_operations",
+      "resource_type": "pdf",
+      "selected": 6,
+      "stratum": "2023-2026/monetary_operations/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 18,
+      "cohort": "2023-2026",
+      "document_type": "monetary_policy",
+      "resource_type": "pdf",
+      "selected": 1,
+      "stratum": "2023-2026/monetary_policy/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 12,
+      "cohort": "2023-2026",
+      "document_type": "notice",
+      "resource_type": "image",
+      "selected": 1,
+      "stratum": "2023-2026/notice/image",
+      "weak": true
+    },
+    {
+      "allocated": 6,
+      "available": 1355,
+      "cohort": "2023-2026",
+      "document_type": "notice",
+      "resource_type": "pdf",
+      "selected": 6,
+      "stratum": "2023-2026/notice/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 3,
+      "cohort": "2023-2026",
+      "document_type": "notice",
+      "resource_type": "spreadsheet",
+      "selected": 1,
+      "stratum": "2023-2026/notice/spreadsheet",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 4,
+      "cohort": "2023-2026",
+      "document_type": "procurement",
+      "resource_type": "pdf",
+      "selected": 1,
+      "stratum": "2023-2026/procurement/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 56,
+      "cohort": "2023-2026",
+      "document_type": "publication",
+      "resource_type": "pdf",
+      "selected": 1,
+      "stratum": "2023-2026/publication/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 14,
+      "cohort": "2023-2026",
+      "document_type": "publication",
+      "resource_type": "spreadsheet",
+      "selected": 1,
+      "stratum": "2023-2026/publication/spreadsheet",
+      "weak": true
+    },
+    {
+      "allocated": 2,
+      "available": 126,
+      "cohort": "2023-2026",
+      "document_type": "report",
+      "resource_type": "pdf",
+      "selected": 2,
+      "stratum": "2023-2026/report/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 27,
+      "cohort": "2023-2026",
+      "document_type": "report",
+      "resource_type": "spreadsheet",
+      "selected": 1,
+      "stratum": "2023-2026/report/spreadsheet",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 25,
+      "cohort": "2023-2026",
+      "document_type": "research",
+      "resource_type": "pdf",
+      "selected": 1,
+      "stratum": "2023-2026/research/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 3,
+      "cohort": "2023-2026",
+      "document_type": "research",
+      "resource_type": "spreadsheet",
+      "selected": 1,
+      "stratum": "2023-2026/research/spreadsheet",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 13,
+      "cohort": "2023-2026",
+      "document_type": "rule_bylaw",
+      "resource_type": "pdf",
+      "selected": 1,
+      "stratum": "2023-2026/rule_bylaw/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 2,
+      "available": 240,
+      "cohort": "2023-2026",
+      "document_type": "statistics",
+      "resource_type": "pdf",
+      "selected": 2,
+      "stratum": "2023-2026/statistics/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 4,
+      "available": 929,
+      "cohort": "2023-2026",
+      "document_type": "statistics",
+      "resource_type": "spreadsheet",
+      "selected": 4,
+      "stratum": "2023-2026/statistics/spreadsheet",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 2,
+      "cohort": "2023-2026",
+      "document_type": "untyped",
+      "resource_type": "document",
+      "selected": 1,
+      "stratum": "2023-2026/untyped/document",
+      "weak": true
+    },
+    {
+      "allocated": 2,
+      "available": 126,
+      "cohort": "2023-2026",
+      "document_type": "untyped",
+      "resource_type": "pdf",
+      "selected": 2,
+      "stratum": "2023-2026/untyped/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 13,
+      "cohort": "2023-2026",
+      "document_type": "untyped",
+      "resource_type": "spreadsheet",
+      "selected": 1,
+      "stratum": "2023-2026/untyped/spreadsheet",
+      "weak": true
+    },
+    {
+      "allocated": 3,
+      "available": 286,
+      "cohort": "<=2018",
+      "document_type": "circular",
+      "resource_type": "pdf",
+      "selected": 3,
+      "stratum": "<=2018/circular/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 15,
+      "cohort": "<=2018",
+      "document_type": "enforcement_action",
+      "resource_type": "pdf",
+      "selected": 1,
+      "stratum": "<=2018/enforcement_action/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 2,
+      "available": 9,
+      "cohort": "<=2018",
+      "document_type": "forex",
+      "resource_type": "pdf",
+      "selected": 2,
+      "stratum": "<=2018/forex/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 2,
+      "available": 47,
+      "cohort": "<=2018",
+      "document_type": "notice",
+      "resource_type": "pdf",
+      "selected": 2,
+      "stratum": "<=2018/notice/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 2,
+      "available": 31,
+      "cohort": "<=2018",
+      "document_type": "report",
+      "resource_type": "pdf",
+      "selected": 2,
+      "stratum": "<=2018/report/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 1,
+      "available": 23,
+      "cohort": "<=2018",
+      "document_type": "rule_bylaw",
+      "resource_type": "pdf",
+      "selected": 1,
+      "stratum": "<=2018/rule_bylaw/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 2,
+      "available": 266,
+      "cohort": "<=2018",
+      "document_type": "statistics",
+      "resource_type": "pdf",
+      "selected": 2,
+      "stratum": "<=2018/statistics/pdf",
+      "weak": true
+    },
+    {
+      "allocated": 2,
+      "available": 169,
+      "cohort": "<=2018",
+      "document_type": "statistics",
+      "resource_type": "spreadsheet",
+      "selected": 2,
+      "stratum": "<=2018/statistics/spreadsheet",
+      "weak": true
+    }
+  ],
+  "version": "manifest-2"
+}

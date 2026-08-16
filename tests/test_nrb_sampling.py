@@ -529,6 +529,69 @@ def test_the_seed_is_recorded_on_the_sample():
 
 
 # --------------------------------------------------------------------------- #
+# L. Key exclusion — the Phase 6B holdout's contract
+#
+# A holdout is only independent evidence if no file it contains ever influenced
+# the thing it is validating. The Phase 6A cohort influenced native-1, native-2
+# and every threshold, so it must be excluded from the population BEFORE the draw
+# — not filtered out afterwards, which would shrink the cohort and skew its strata.
+# --------------------------------------------------------------------------- #
+def test_excluded_keys_never_appear_in_the_sample():
+    excluded = {r["comparison_key"] for r in CORPUS if r["document_type"] == "circular"}
+    sample = sampling.stratified_sample(CORPUS, size=400, exclude_keys=excluded,
+                                        max_cohort_share=1.0)
+    assert excluded, "sanity: the corpus really has circulars to exclude"
+    assert set(sample.keys).isdisjoint(excluded)
+
+
+def test_exclusion_removes_from_the_population_not_from_the_result():
+    """Excluding then drawing 40 must still return 40 (drawn from what remains),
+    not draw 40 and then delete the excluded ones down to fewer."""
+    excluded = {r["comparison_key"] for r in CORPUS[:50]}
+    sample = sampling.stratified_sample(CORPUS, size=40, exclude_keys=excluded,
+                                        max_cohort_share=1.0)
+    assert len(sample.keys) == 40
+    assert set(sample.keys).isdisjoint(excluded)
+
+
+def test_exclusion_is_recorded_and_bound_into_the_fingerprint():
+    a = sampling.stratified_sample(CORPUS, size=40, exclude_keys={"k-2019-circular-pdf-0"})
+    b = sampling.stratified_sample(CORPUS, size=40, exclude_keys={"k-2021-circular-pdf-0"})
+    assert a.parameters["exclude_count"] == 1
+    assert "exclude_keys_sha256" in a.parameters
+    # Different excluded SET -> different fingerprint payload, even at the same
+    # seed and size. The fingerprint proves *what* was excluded, not just how many.
+    assert a.parameters["exclude_keys_sha256"] != b.parameters["exclude_keys_sha256"]
+    assert a.fingerprint_payload() != b.fingerprint_payload()
+
+
+def test_no_exclusion_leaves_the_parameters_byte_identical_to_before():
+    """Backward compatibility: an un-excluded draw must carry NO exclusion keys in
+    its parameters, so every already-committed manifest (Phase 6A) re-verifies to
+    the same fingerprint it was frozen with."""
+    params = sampling.stratified_sample(CORPUS, size=40).parameters
+    assert "exclude_count" not in params
+    assert "exclude_keys_sha256" not in params
+
+
+def test_the_excluded_set_is_bound_by_content_not_by_count():
+    """Two different single-key exclusions have the same count but must not share
+    a fingerprint — otherwise 'excluded 400 files' could hide swapping which 400."""
+    a = sampling.stratified_sample(CORPUS, size=40, exclude_keys={"k-2019-circular-pdf-0"})
+    b = sampling.stratified_sample(CORPUS, size=40, exclude_keys={"k-2019-circular-pdf-1"})
+    assert a.parameters["exclude_count"] == b.parameters["exclude_count"] == 1
+    assert a.parameters["exclude_keys_sha256"] != b.parameters["exclude_keys_sha256"]
+
+
+def test_exclusion_is_order_independent_and_deterministic():
+    excluded = [r["comparison_key"] for r in CORPUS[:30]]
+    a = sampling.stratified_sample(CORPUS, size=40, exclude_keys=excluded)
+    b = sampling.stratified_sample(CORPUS, size=40, exclude_keys=list(reversed(excluded)))
+    assert a.keys == b.keys
+    assert a.parameters["exclude_keys_sha256"] == b.parameters["exclude_keys_sha256"]
+
+
+# --------------------------------------------------------------------------- #
 # Canonical ordering
 # --------------------------------------------------------------------------- #
 def test_entries_are_written_in_canonical_rank_order_not_database_order():

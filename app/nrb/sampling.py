@@ -435,6 +435,17 @@ def _cap_for(
     return min(share_cap, named) if named is not None else share_cap
 
 
+def _exclude_fingerprint(keys: frozenset[str]) -> str:
+    """A stable digest of the exact set of keys removed from the population.
+
+    Sorted, `_SEP`-joined, sha256. Bound into the sampler parameters (and thus the
+    selection fingerprint) so the manifest proves not just HOW MANY files were
+    withheld but WHICH — swapping which 400 keys were excluded, at the same count,
+    changes the cohort and must change its fingerprint.
+    """
+    return hashlib.sha256(_SEP.join(sorted(keys)).encode("utf-8")).hexdigest()
+
+
 def stratified_sample(
     rows: Sequence[Mapping[str, Any]] | Sequence[Candidate],
     *,
@@ -443,6 +454,7 @@ def stratified_sample(
     floor: int = DEFAULT_FLOOR,
     max_cohort_share: Fraction | float | int = DEFAULT_MAX_COHORT_SHARE,
     cohort_caps: Mapping[str, int] | None = None,
+    exclude_keys: Iterable[str] | None = None,
     algorithm_version: str = ALGORITHM_VERSION,
 ) -> Sample:
     """A reproducible, representative sample of `size` files.
@@ -478,12 +490,20 @@ def stratified_sample(
     `incomplete_reason` and a note naming the constraint that bound. It is never
     silently rounded down, and a cap is never breached to reach the number.
 
+    `exclude_keys`, when given, are removed from the candidate population before
+    stratification — the mechanism a holdout uses to withhold every file that
+    influenced what it is validating (the Phase 6A cohort). The excluded set is
+    fingerprinted into the parameters, so the manifest proves which files were
+    withheld, not merely how many; an un-excluded draw carries no such key and
+    hashes exactly as it did before this parameter existed.
+
     Strata are `(year cohort, document type, resource type)`. Owner is carried
     through for the report but is not a stratification key — 33 codes crossed
     with the rest shatters into single-digit cells.
     """
     share = _as_fraction(max_cohort_share)
     explicit_caps = dict(cohort_caps or {})
+    excluded = frozenset(exclude_keys or ())
     parameters = {
         "size": size,
         "floor": floor,
@@ -491,11 +511,23 @@ def stratified_sample(
         "cohort_caps": dict(sorted(explicit_caps.items())),
         "weak_threshold": WEAK_THRESHOLD,
     }
+    # Recorded ONLY when something is actually excluded, so an ordinary draw's
+    # parameters stay byte-identical to what they were before exclusion existed —
+    # every already-committed manifest re-verifies to its frozen fingerprint.
+    if excluded:
+        parameters["exclude_count"] = len(excluded)
+        parameters["exclude_keys_sha256"] = _exclude_fingerprint(excluded)
 
     if rows and isinstance(rows[0], Candidate):
         candidates: tuple[Candidate, ...] = tuple(rows)  # type: ignore[arg-type]
     else:
         candidates = build_candidates(rows)  # type: ignore[arg-type]
+
+    # The population filter. Applied to CANDIDATES (one per comparison_key), before
+    # any stratum is formed, so the excluded files never influence allocation,
+    # strata sizes or the draw — as if they were never in the corpus.
+    if excluded:
+        candidates = tuple(c for c in candidates if c.comparison_key not in excluded)
 
     size = max(size, 0)
     if not candidates or size == 0:

@@ -43,6 +43,7 @@ import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -96,6 +97,16 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--type", action="append", default=None, metavar="KIND", dest="resource_type",
         help="restrict the DRAW to these resource types; repeatable",
     )
+    draw.add_argument(
+        "--exclude-manifest", action="append", default=None, metavar="PATH",
+        help="withhold every comparison_key named by this manifest from the "
+             "candidate population BEFORE the draw; repeatable. The mechanism a "
+             "holdout uses to exclude the cohort it validates (Phase 6A), so no "
+             "file that shaped native-2 can enter its own validation set. The "
+             "excluded set is fingerprinted into the sampler parameters; the "
+             "source manifest's path and cohort fingerprint are recorded as "
+             "provenance.",
+    )
 
     output = parser.add_argument_group("output")
     output.add_argument(
@@ -140,6 +151,33 @@ def _cohort_caps(args: argparse.Namespace) -> dict[str, int]:
     if args.year_2019_cap is not None:
         caps[sampling.CAPPED_COHORT] = args.year_2019_cap
     return caps
+
+
+def _load_exclusions(
+    args: argparse.Namespace,
+) -> tuple[set[str], dict[str, Any]]:
+    """The union of comparison_keys named by every `--exclude-manifest`, plus the
+    provenance the output manifest records about them.
+
+    Reads each source manifest through `read_manifest` (so an unknown version or a
+    keyless entry is refused, not silently skipped — a leaky exclusion is worse
+    than none) and records each one's path, cohort fingerprint and key count. The
+    union is what the sampler withholds; the provenance is what a later reader uses
+    to see exactly which cohorts were held out.
+    """
+    excluded: set[str] = set()
+    sources: list[dict[str, Any]] = []
+    for path in args.exclude_manifest or []:
+        manifest = read_manifest(path)
+        keys = manifest.keys()
+        excluded.update(keys)
+        sources.append({
+            "path": str(path),
+            "selection_sha256": manifest.selection_sha256,
+            "keys": len(keys),
+        })
+    provenance = {"excluded_manifests": sources} if sources else {}
+    return excluded, provenance
 
 
 async def _load_catalog(args: argparse.Namespace):
@@ -219,6 +257,13 @@ async def main(argv: list[str] | None = None) -> int:
         )
         return 2
 
+    try:
+        exclude_keys, provenance = _load_exclusions(args)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        print(f"refusing to start: unreadable --exclude-manifest — {exc}",
+              file=sys.stderr)
+        return 2
+
     rows, counts = await _load_catalog(args)
     sample = sampling.stratified_sample(
         rows,
@@ -227,12 +272,20 @@ async def main(argv: list[str] | None = None) -> int:
         floor=args.floor,
         max_cohort_share=args.max_cohort_share,
         cohort_caps=caps or None,
+        exclude_keys=exclude_keys or None,
     )
     manifest = build_manifest(
         sample,
         drawn_at=datetime.now(timezone.utc).isoformat(),
         catalog_counts=counts,
+        provenance=provenance or None,
     )
+    if exclude_keys:
+        print(
+            f"excluded {len(exclude_keys)} keys from "
+            f"{len(provenance['excluded_manifests'])} manifest(s) before drawing",
+            file=sys.stderr,
+        )
 
     summary = summarize_sample(manifest)
     print(json.dumps(summary, indent=2, ensure_ascii=False, default=str)
