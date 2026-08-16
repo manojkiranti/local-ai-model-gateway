@@ -104,6 +104,11 @@ async def replace_chunks(
             "page_number": chunk.page_number,
             "section": chunk.section,
             "element_type": chunk.element_type,
+            # `{}` for every generic path, matching the column's server default.
+            # Carries the NRB extraction route (native/legacy_conversion/ocr) and
+            # its converter or OCR provenance, so a citation can state where the
+            # text came from. Never consulted by retrieval or ranking.
+            "metadata": chunk.meta or {},
         }
         for chunk, vec in zip(chunks, embeddings)
     ]

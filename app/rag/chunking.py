@@ -26,6 +26,12 @@ class Chunk:
     section: str | None = None          # heading path
     element_type: str | None = None     # text|heading|table|list
     token_count: int | None = None
+    # Free-form provenance for `document_chunks.metadata`. None for every
+    # generic path — a plain upload has nothing to say here and stores `{}`,
+    # which is the column default. It exists because NRB text can reach a chunk
+    # by three different routes (native, legacy_conversion, ocr) and a citation
+    # has to be able to say which. Never read by chunking, retrieval or ranking.
+    meta: dict | None = None
 
 
 @dataclass(frozen=True)

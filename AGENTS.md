@@ -209,6 +209,12 @@ record, and re-deriving state from code or chat history has gone wrong before.
   pass. Font provenance (`app/nrb/provenance.py`, pypdf — no subprocess) chooses
   between the converter and OCR *inside* an already-eligible document; it never
   makes a document eligible. The `unit_legacy_ratio >= 0.80` gate is unchanged.
+- NRB text reaches department RAG through ONE branch:
+  `documents.metadata.origin == "nrb"` in `worker._load_chunks_sync` →
+  `app/nrb/rag.parse_nrb_to_chunks`. Everything else parses generically and
+  unchanged. Chunks are per PAGE (page identity is the citation) and carry the
+  route in `document_chunks.metadata`; no migration was needed and none should be
+  added for this. Route is provenance, never a ranking weight.
 - Recovery fails CLOSED in both directions. A page routed to OCR is never handed
   to the converter, and a conversion that does not succeed — npttf2utf absent, a
   broken backend, a rejected unit — withholds its glyph-mapped INPUT instead of

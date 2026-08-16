@@ -40,14 +40,24 @@ REPO = pathlib.Path(__file__).resolve().parents[1]
 # --------------------------------------------------------------------------- #
 # Fixtures: PDFs whose provenance is written out in full.
 # --------------------------------------------------------------------------- #
+def _escape(text: str) -> str:
+    """PDF literal-string escaping — backslash first, then the delimiters."""
+    return text.replace("\\", r"\\").replace("(", r"\(").replace(")", r"\)")
+
+
 def _pdf_bytes(pages: Sequence[dict]) -> bytes:
     """A minimal, valid PDF whose pages declare exactly the resources asked for.
 
     Hand-assembled rather than produced by a library because the thing under test
     IS the resource dictionary: `{"font": "Preeti", "embedded": True}` has to mean
     a `/FontDescriptor` with a `/FontFile2`, visibly, in the test that relies on
-    it. Nothing here draws anything — page TEXT is supplied to `recover()`
-    separately, so text and provenance stay independent variables.
+    it.
+
+    `{"lines": [...]}` writes a real content stream, which pypdf extracts
+    verbatim — that is not a trick, it is what a Preeti PDF genuinely is: latin
+    bytes drawn with a Devanagari font. Tests that only care about routing pass
+    their page text to `recover(pages=...)` instead, keeping text and provenance
+    independent; tests that must run the CLASSIFIER need it in the file.
     """
     objects: list[str] = ["", ""]  # 1 = catalog, 2 = page tree; filled at the end
 
@@ -79,7 +89,15 @@ def _pdf_bytes(pages: Sequence[dict]) -> bytes:
                 "stream\n0000\nendstream"
             )
             resources.append(f"/XObject << /Im0 {image} 0 R >>")
-        contents = add("<< /Length 0 >>\nstream\n\nendstream")
+        lines = spec.get("lines") or []
+        if lines:
+            drawn = " ".join(
+                f"({_escape(line)}) Tj 0 -14 Td" for line in lines
+            )
+            body = f"BT /F1 12 Tf 72 700 Td {drawn} ET"
+        else:
+            body = ""
+        contents = add(f"<< /Length {len(body)} >>\nstream\n{body}\nendstream")
         kids.append(
             add(
                 "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "

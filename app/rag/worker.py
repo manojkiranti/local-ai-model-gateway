@@ -25,7 +25,7 @@ import asyncio
 import logging
 import signal
 from contextlib import suppress
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
@@ -63,6 +63,11 @@ class DocSnapshot:
     file_type: str
     storage_key: str | None
     status: str
+    # The document's own `metadata`. Read for ONE thing: `origin == "nrb"`, which
+    # sends the blob through NRB's page-level extraction routing instead of the
+    # generic parser. Snapshotted with the rest so the branch costs no extra
+    # query and no open transaction.
+    meta: dict = field(default_factory=dict)
 
 
 async def preflight(client, settings: Settings) -> None:
@@ -114,6 +119,7 @@ async def _snapshot_document(Session, document_id: str) -> DocSnapshot | None:
                 file_type=doc.file_type,
                 storage_key=doc.storage_key,
                 status=doc.status,
+                meta=dict(doc.meta or {}),
             )
         )
         await session.rollback()  # read-only: end the transaction immediately
@@ -131,6 +137,26 @@ def _load_chunks_sync(snap: DocSnapshot, settings: Settings):
     path: Path = resolve_storage_path(snap.storage_key, settings.rag_docs_dir)
     if not path.exists():
         raise ParseError(f"stored file is missing: {snap.storage_key}")
+
+    # THE NRB branch, and the only one. An NRB blob is routed per PAGE — native
+    # text kept, an embedded legacy font converted, a scan OCR'd — because its
+    # text layer may be untrustworthy in ways the generic parser has no way to
+    # see. Everything else parses exactly as it always did; the import is local
+    # so `app.rag` acquires no dependency on `app.nrb`.
+    if snap.meta.get("origin") == "nrb":
+        from ..nrb.rag import NrbParseError, parse_nrb_to_chunks
+
+        try:
+            return parse_nrb_to_chunks(
+                path,
+                max_chars=settings.rag_chunk_max_chars,
+                overlap_chars=settings.rag_chunk_overlap_chars,
+            )
+        except NrbParseError as exc:
+            # Same outcome as any other parse failure — a failed job and an
+            # untouched document — but the message names the routing outcome.
+            raise ParseError(str(exc)) from exc
+
     return parse_to_chunks(
         path,
         snap.file_type,

@@ -82,11 +82,19 @@ orthography — halant/Devanagari char 0.0042 and mean word length 24.7 vs v5's
 to native text, the guarded converter or OCR, and reconstruct in page order —
 verified live on `e08988860534` (p1 OCR'd, p2-50 converted). The `>=0.80` gate is
 unchanged and font provenance is consulted only INSIDE an eligible document.
-**NRB documents are now parsed, classified and routable, but still NOT chunked,
-embedded or searchable** — nothing is persisted (no recovery table, no
-migration), no corpus pass was run; 7 (chunk+embed) and 8
-(`search_nrb_documents`) are not started; the 6B gate and its recommendations are
-§11.9, §12.10, §13.11, §14.7, §15.9 and §16.10. The roadmap was renumbered when Phase 4 was scoped down to
+**Phase 6B Task 5 (NRB text in department RAG) is DONE for a SMALL SAMPLE
+(2026-08-16, §17)**: 8 named blobs → 250 chunks in the SCRATCH db, routes
+`legacy_conversion` 239 / `ocr` 7 / `native` 4, all 8 jobs succeeded, and 7
+retrieval queries returned the expected document (6 at rank 1) with page + route
+intact. **No migration** — `document_chunks.page_number` + `metadata` JSONB
+already carried citation provenance. It found a FOURTH text-trust failure mode
+(§17.6): `075bf12eb087`'s own text layer is corrupt at the codepoint level
+(`कार्ाालर्` for कार्यालय — a broken ToUnicode CMap), which native-2 calls clean
+because it asks "is this Devanagari", not "is it spelled right". Recorded, not
+fixed (that is a native-3 + new cohort).
+**The NRB CORPUS is still not ingested and `search_nrb_documents` (Phase 8) does
+not exist** — the 6B gate and its recommendations are §11.9, §12.10, §13.11,
+§14.7, §15.9, §16.10 and §17.8. The roadmap was renumbered when Phase 4 was scoped down to
 persistence; read that doc before touching anything NRB-related instead of
 re-deriving status from chat history.
 
@@ -135,8 +143,11 @@ production extraction routing (`provenance` reads per-page fonts/images from the
 PDF with **pypdf, no subprocess**; `ocr` is the ONLY file that knows docling's OCR
 stage exists — PP-OCRv5/onnxruntime, lazy import, `requirements-worker.txt`;
 `recovery` routes each page to native/legacy_conversion/ocr and rebuilds in page
-order, persisting NOTHING, run via `scripts/nrb_recover.py`);
-`report` = all of them — everything but `client` is
+order, persisting NOTHING, run via `scripts/nrb_recover.py`); `rag` = the ONLY
+seam between NRB and department RAG (`parse_nrb_to_chunks`, reached from
+`worker._load_chunks_sync` via `documents.metadata.origin == "nrb"`; chunks per
+PAGE, route in `document_chunks.metadata`, exercised by
+`scripts/nrb_rag_ingest.py`); `report` = all of them — everything but `client` is
 **not** model-facing, run via
 `scripts/nrb_{sitemap_inventory,document_inventory,sync,fetch,sample,extract,calibrate,build_lexicon,legacy_eval,native2_compare,holdout_validate,holdout_evidence}.py`), `tools/` (`registry.py` = engine; `local/` package = one module
 per in-process tool, each exporting a `SPEC`, aggregated in `local/__init__.py`'s

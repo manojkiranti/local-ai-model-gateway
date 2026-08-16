@@ -2896,3 +2896,188 @@ distribution gate remains open.**
 The next step is a SMALL scratch-DB exercise against `local_ai_gateway_p4` — a
 handful of named blobs through route → chunk → embed → retrieve — to find out
 what Phase 7 has to store. Not a corpus ingest.
+
+## 17. Phase 6B Task 5 — NRB text in department RAG (8 documents, scratch DB)
+
+**Date:** 2026-08-16. **Continues** `3ba1185` (routing) and `8bf703f` (the
+fail-closed conversion fix). **Scope:** eight named blobs into
+`local_ai_gateway_p4`, end to end, to find out whether recovered NRB text
+survives chunking, embedding, storage and retrieval **with its page and route
+intact**. It is a smoke test. Eight documents cannot measure retrieval quality
+and nothing here computes an accuracy figure.
+
+### 17.1 Where the two pipelines meet
+
+One function and one branch:
+
+```
+worker._load_chunks_sync
+  └─ documents.metadata.origin == "nrb"  →  app/nrb/rag.parse_nrb_to_chunks
+                                             sniff → native-2 → recovery → chunk per page
+     anything else                       →  rag.parsing.parse_to_chunks   (unchanged)
+```
+
+`app/nrb/rag.py` is the whole NRB side. The import inside the branch is local, so
+`app.rag` acquires no dependency on `app.nrb`, and a document without the marker
+takes a byte-identical path to the one it took before. Chunking itself is the
+generic `chunk_text` — the paragraph/sentence/word boundary logic is shared, not
+reimplemented.
+
+**Classification is re-run rather than read from `nrb_extractions`.** A chunk must
+be a function of the bytes on disk, not of a catalog row that an older extractor
+version may have written. It is the same pypdf parse, and it is cheap next to
+embedding.
+
+### 17.2 The schema already carried it — no migration
+
+Checked before writing anything. `document_chunks` has **`page_number`** (a real
+column, already populated by the Docling path) and **`metadata` JSONB**;
+`documents` has its own `metadata` JSONB. That is enough for citation provenance,
+so no Alembic revision was created and the deferred lineage (§9.10) was not
+touched.
+
+| what | where | example |
+|---|---|---|
+| document identity | `documents.metadata` | `{"origin":"nrb","blob_sha256":"e0898886…","source_url":…,"comparison_key":…}` |
+| page | `document_chunks.page_number` | `1` |
+| sheet | `document_chunks.section` | `T1.1` |
+| route | `document_chunks.metadata.route` | `native` \| `legacy_conversion` \| `ocr` |
+| conversion provenance | same | `{"converter":"npttf2utf 0.3.7","mapping":"Preeti","converted_units":11,"unresolved_units":0}` |
+| OCR provenance | same | `{"ocr_model":"PP-OCRv5","ocr_version":"docling 2.118.1; rapidocr 3.9.2; onnxruntime 1.23.2","authoritative":false}` |
+
+Three small generic-side edits, all additive: `Chunk.meta` (None on every generic
+path), `replace_chunks` writing `chunk.meta or {}` (which is the column's own
+default), and `DocSnapshot.meta` so the worker can read the marker without an
+extra query.
+
+`authoritative: false` rides on **every OCR chunk**, not just in the docs, so a
+future citation renderer can carry the caveat without re-deriving it.
+
+### 17.3 A chunk never spans two pages
+
+Page identity is the citation, so chunking runs per page and every NRB chunk
+carries a `page_number`. Chunk indices are still contiguous across the document —
+`document_chunks` has `UNIQUE (document_id, chunk_index)` — and page 1's chunks
+all precede page 2's. A chunk merged across a page boundary could not be cited to
+either page.
+
+No route-based ranking. The route is provenance and a quality caveat, not a
+calibrated relevance penalty; OCR'd and converted chunks entered retrieval on
+identical terms. Nothing in top-k, RRF, HNSW or reranking was changed.
+
+### 17.4 The sample, and what it did
+
+Eight blobs, one distinct routing outcome each, all with behaviour Phase 6B had
+already established.
+
+| blob | what it is | chunks | ingest |
+|---|---|---:|---:|
+| `075bf12eb087` | clean native Unicode PDF, 2 pages | 4 | 12 s |
+| `1a9b6321aa61` | embedded Preeti+Bishall, recovered | 1 | 1 s |
+| `268bcfe86d03` | embedded Preeti circular 2007, partial | 1 | 1 s |
+| `3d2eca8b9f95` | 300 dpi scan, no embedded font | 2 | 32 s |
+| `c298efaf1f16` | no text layer at all, 3 pages | 4 | 21 s |
+| `e08988860534` | the mixed document, 50 pages | 75 | 266 s |
+| `7820b1f49fc1` | stripped font names, 4 pages | 9 | 32 s |
+| `8df7b02f8a13` | Preeti-encoded workbook, per CELL | 154 | 522 s |
+| **total** | | **250** | **897 s** |
+
+Routes actually stored: **legacy_conversion 239** chunks (4 documents),
+**ocr 7** (3 documents), **native 4** (1 document). Every job succeeded; no
+document failed, and nothing was withheld — the four converted documents
+resolved every candidate unit they attempted except one line in
+`268bcfe86d03`, which was dropped rather than indexed.
+
+**OCR cost**, the number this exercise existed to get: 5 OCR'd pages across 3
+documents, and the two OCR-only documents took 32 s and 21 s wall clock
+**including** model load, embedding and storage. Per page OCR is ~2–3 s, as the
+spike measured. It is not the bottleneck here — **embedding is**: the 154-chunk
+workbook spent ~8 of its 8.7 minutes embedding, and the 75-chunk mixed document
+~4 minutes. So **no second OCR queue.** The existing worker is already
+asynchronous and one job at a time; the operational question a corpus pass raises
+is embedding throughput, not OCR.
+
+### 17.5 Retrieval: seven queries, every route came back
+
+Queries were taken from text visible in the selected documents, per route. Top
+hits, with page and route as stored:
+
+| query | top hit | page | route | expected doc? |
+|---|---|---|---|---|
+| विदेशी विनिमय व्यवस्थापन विभाग | `3d2eca8b9f95` | p1 | ocr | yes |
+| सम्पत्ति शुद्धीकरण निवारण | `e08988860534` | p5 | legacy_conversion | **at rank 3** |
+| विदेशी लगानी … विनियमावली | `e08988860534` | p3 | legacy_conversion | yes |
+| इजाजतपत्रप्राप्त बैंक तथा वित्तीय संस्था | `7820b1f49fc1` | p4 | legacy_conversion | yes |
+| लगानी सम्बन्धी सूचना | `c298efaf1f16` | p1 | ocr | yes |
+| प्रमुख कृषि बालीले ढाकेको भू–क्षेत्र | `8df7b02f8a13` | p3 (T1.1) | legacy_conversion | yes |
+| कारवाही फुकुवा भएका वित्त कम्पनी | `1a9b6321aa61` | p1 | legacy_conversion | yes |
+
+Six of seven put the expected document first; the seventh retrieved it at rank 3.
+Notably the mixed document's **OCR'd page 1 and its converted page 3 both surface
+for the same query**, which is the case the whole page-level design exists for.
+With 250 chunks from 8 documents and 75+154 of them from two files, rank order
+here is a smoke signal and nothing more.
+
+### 17.6 What the exercise found — a fourth text-trust failure mode
+
+The one query that did not rank its expected document first is the interesting
+result, and the reason is not ranking. `075bf12eb087` is the **native** document,
+and its own text layer is corrupt at the codepoint level:
+
+```
+extracted : कम्पनी रजिष्ट्र ारको कार्ाालर् जिपुरेश्वर … जनदेशन , २०७९
+should be : कम्पनी रजिष्ट्रारको कार्यालय … निर्देशन, २०७९
+```
+
+This is pypdf reading a broken `ToUnicode` CMap, and **the recovery path never
+touched it** — the native route is passthrough by definition. Native-2 calls the
+document `extracted`/`clean` because its rules ask *is this Devanagari*, and it
+is; they cannot ask *is it spelled correctly*. So this is a genuinely new failure
+class beside the three Phase 6B already names (glyph-mapped legacy text, scanner
+junk, no text layer): **Unicode Devanagari that is systematically wrong**.
+
+Recorded, **not fixed**. A detector for it is a classifier change — a `native-3`
+and a new cohort (§15.9), not an edit here — and it needs a Nepali reader to
+confirm the extent. Its practical effect today is a document that indexes and
+retrieves but whose text a reader would find garbled.
+
+Second, smaller observation: workbook chunks carry long runs of empty `|`
+separators from sparse spreadsheet rows, which dilutes their embeddings. The
+generic spreadsheet parser repeats a header row per chunk for exactly this kind
+of reason; the NRB path does not yet. Not a correctness problem — the converted
+Nepali is in there and retrieves — but it is the obvious first improvement if
+workbook recall matters.
+
+### 17.7 Evaluation & Improvement (Phase 6B Task 5)
+
+**Success metric.** Share of ingested NRB pages that retrieve with a correct page
+number and route. Proxy today: 7 of 7 queries returned a chunk whose stored page
+and route matched the document it came from, and 6 of 7 ranked the expected
+document first — on 8 documents, which is a smoke signal, not a rate.
+
+**Eval.** 9 committed tests in `tests/test_nrb_rag_ingest.py` (currently 9/9)
+covering the boundary rather than the corpus: route metadata on the chunk,
+contiguous indices with no cross-page chunk, an unresolved conversion
+contributing nothing, a missing converter raising with the routing outcome named,
+a failed OCR page contributing nothing, a generic chunk carrying no metadata, and
+the worker branch asserted in **both** directions. Plus the seven queries above,
+reproducible with `scripts/nrb_rag_ingest.py --search`.
+
+**Feedback capture.** `scripts/nrb_rag_ingest.py` reports per-document status,
+route counts and timings, and the retrieval output prints page + route per hit. A
+bad retrieval is attributable to a document, a page and an instrument from stored
+data alone. Reader verdicts on the text itself continue to land in the §15 pack.
+
+**Review loop.** Before any larger ingest, and on every extractor-version change.
+The §17.6 finding is the first item for that review: it needs a reader's judgement
+on how much of the corpus is affected before a `native-3` is worth drawing a
+cohort for.
+
+### 17.8 The gate
+
+**Recovered NRB text ingests and retrieves with page and route provenance
+intact, over 8 documents in the scratch database. No migration was needed, the
+generic RAG path is unchanged, and no corpus ingest was run.** Still open, and
+all of them predate this task: conversion and OCR correctness await Nepali
+review (§15), the npttf2utf GPL-3.0 distribution gate is unresolved (§12), and
+§17.6 names a new text-trust failure mode that no classifier currently detects.
