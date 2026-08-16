@@ -1,0 +1,39 @@
+# NRB scratch-database overlay.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.p4.yml up --build
+#
+# WHY THIS FILE EXISTS. The base stack reads `.env.docker`, whose DATABASE_URL
+# names the REAL database, and `migrate` runs `alembic upgrade head` against
+# whatever it is handed. NRB work must never touch `local_ai_gateway`
+# (CLAUDE.md), and "remember to edit the env file first" is not a control — it
+# is a thing you forget once. This overlay makes the scratch target explicit and
+# reviewable: it swaps the env file for `.env.docker.p4` on ALL THREE services,
+# so migrate, gateway and worker cannot disagree about which database they mean.
+#
+# `.env.docker.p4` is untracked (`.env.*` is gitignored). Create it from
+# `.env.docker.example` with:
+#   DATABASE_URL=postgresql+asyncpg://gateway:<pw>@host.docker.internal:5432/local_ai_gateway_p4
+#   AGENT_MODEL=qwen3.5:35b-a3b          # on the GPU box
+#   RAG_EMBED_MODEL=qwen3-embedding:4b-q8_0
+#   RAG_EMBED_DIM=1536
+#
+# Verify the target BEFORE bringing anything up — this prints the resolved value:
+#   docker compose -f docker-compose.yml -f docker-compose.p4.yml config | grep -A2 DATABASE_URL
+#
+# The worker is built WITH npttf2utf here (GPL-3, see Dockerfile.worker). That
+# is the point of an NRB deployment: without it every legacy-font page is
+# recorded `conversion_unavailable` and withheld, and four of the eight Phase 6B
+# sample documents ingest to nothing.
+
+services:
+  migrate:
+    env_file: .env.docker.p4
+
+  gateway:
+    env_file: .env.docker.p4
+
+  worker:
+    build:
+      args:
+        INSTALL_LEGACY_FONT: "true"
+    env_file: .env.docker.p4

@@ -323,6 +323,15 @@ async def main() -> int:
     ap.add_argument("--ingest", action="store_true")
     ap.add_argument("--search", action="store_true")
     ap.add_argument("--reset", action="store_true", help="clear the scratch department first")
+    ap.add_argument(
+        "--enqueue-only",
+        action="store_true",
+        help="queue the jobs and stop, instead of draining them in this process. "
+             "Use when a DEPLOYED worker should do the parsing — otherwise this "
+             "script and that worker race for the same rows (SKIP LOCKED means "
+             "they split the sample rather than collide, which quietly measures "
+             "neither one).",
+    )
     ap.add_argument("--blob", action="append", default=[], help="restrict the sample")
     ap.add_argument("--limit", type=int, default=5, help="hits per query")
     ap.add_argument("--json", help="write the ingest report here")
@@ -345,6 +354,10 @@ async def main() -> int:
             started = time.perf_counter()
             result = await do_ingest(Session, settings, reset=args.reset, blobs=args.blob)
             dept_id = result["department_id"]
+            if args.enqueue_only:
+                print(f"\nqueued {len(result['created'])} jobs; a deployed worker "
+                      f"must drain them. Not waiting.")
+                return 0
             print(f"\ndraining {len(result['created'])} jobs ...")
             timings = await do_drain(Session, engine, settings)
             elapsed = round(time.perf_counter() - started, 1)

@@ -3081,3 +3081,176 @@ generic RAG path is unchanged, and no corpus ingest was run.** Still open, and
 all of them predate this task: conversion and OCR correctness await Nepali
 review (§15), the npttf2utf GPL-3.0 distribution gate is unresolved (§12), and
 §17.6 names a new text-trust failure mode that no classifier currently detects.
+
+## 18. Deployment readiness — container validation (NOT the GPU server)
+
+**Date:** 2026-08-16. **Scope:** the pre-deployment inspection and container
+build/run validation for a first NRB deployment. **What this is not: the GPU
+server was never reached.** No SSH key, no SSH config, no remote Docker context
+and no server address exists in this working environment — every host in `.env`
+and `.env.docker` is `localhost`/`host.docker.internal`, and `AGENT_MODEL` is the
+laptop's `qwen2.5:latest`. So `nic_ollama`, `nic_postgres`, the A40s, and
+`OLLAMA_CONTEXT_LENGTH` on that box are all **unverified**. Everything below was
+measured against the real container images on a laptop.
+
+That still mattered: the inspection found **four** things that would each have
+broken or silently degraded a server deployment, three of them invisible until
+the images actually ran.
+
+### 18.1 What was wrong
+
+| # | Defect | Effect on a server deploy | Fix |
+|---|---|---|---|
+| 1 | `LEXICON_PATH` was CWD-relative | worker's CWD is `/app`; lexicon not found → no converter → **every** legacy page unresolved | resolve from `__file__` |
+| 2 | lexicon not in the worker image (`.dockerignore` drops `docs/`) | same as #1, even with the path fixed | `COPY` it + a `.dockerignore` exception |
+| 3 | `npttf2utf` in neither requirements file the worker installs | same as #1, even with #1 and #2 fixed | opt-in build ARG (GPL-3 gate) |
+| 4 | RapidOCR model dir root-owned; worker runs as uid 10001 | re-downloads ~5 MB **per page**, never persists, returns nothing → readable scans recorded `needs_ocr` | `chown` it |
+| 5 | docling's layout model calls `torch.compile`; no C++ compiler in the slim runtime | OCR pages produce no text — same symptom as #4 | `TORCHDYNAMO_DISABLE=1` |
+
+Defects 1–3 all produce the *same* outcome and each masks the next, which is why
+they are listed separately: fixing any one alone changes nothing observable.
+
+**None of them could produce bad text.** Every one of them ends in
+`conversion_unavailable` or `needs_ocr` with the input withheld — the fail-closed
+rule from `8bf703f` holding under conditions it was never written for. The cost
+of the whole class is a silent recall hole, not a corrupted corpus. That is the
+design working, and it is also why these were invisible: a deployment with all
+five defects boots clean, reports success, and indexes a quarter of the sample.
+
+### 18.2 The GPL-3 gate is now a build flag
+
+`Dockerfile.worker` takes `INSTALL_LEGACY_FONT` (default **false**). A default
+build carries no GPL-3 code and is distributable; an NRB deployment opts in:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.p4.yml build worker
+```
+
+Measured on `7820b1f49fc1` in a worker image built **without** it: 4 pages routed
+`legacy_conversion`, **0 indexable**, every page `conversion_unavailable`, no page
+text non-empty, and `parse_nrb_to_chunks` refusing with the routing outcome
+named. The omission is safe and it is loud in the log — but it is silent in the
+*corpus*, which is why `DOCKER.md` now states the chunk cost (239 of 250).
+
+### 18.3 `docker-compose.p4.yml`
+
+The base stack reads `.env.docker`, which names the real database, and `migrate`
+runs `alembic upgrade head` against whatever it is handed. "Remember to edit the
+env file" is not a control. The overlay repoints **all three** services at
+`.env.docker.p4` so migrate, gateway and worker cannot disagree, and turns the
+GPL flag on. `p4` is at `b1bea6ac36c5` = this branch's head, so that upgrade is a
+verified no-op.
+
+### 18.4 What the containers proved
+
+| Check | Result |
+|---|---|
+| API image free of docling / rapidocr / onnxruntime / npttf2utf / torch / cv2 | **all absent**, 471 MB |
+| worker image has pypdf, docling, rapidocr, onnxruntime, npttf2utf, lexicon | **all present**, 673 MB |
+| gateway boots, `/health`, reaches Ollama | ok, container `healthy` |
+| worker preflight | `qwen3-embedding:4b-q8_0 -> 2560 native dims, storing 1536` |
+| conversion in-container (`7820b1f49fc1`) | 4/4 pages converted, 9 chunks, clean Devanagari |
+| OCR in-container (`c298efaf1f16`) | 3 pages → 4 chunks, `route=ocr`, `authoritative=false` |
+| generic (non-NRB) docling parse | unchanged, 4 chunks with the dynamo flag either way |
+
+The last row is the one that keeps #5 honest: an ordinary text-layer PDF is fine
+without the fix because docling falls back to the embedded text. Only
+`force_full_page_ocr=True` has no fallback, so only OCR broke.
+
+### 18.5 What is still unverified, and cannot be verified from here
+
+- **The GPU box entirely** — `docker ps`, `nic_ollama`, `nic_postgres`,
+  `nvidia-smi`, disk, and whether `local_ai_gateway_p4` exists *there* (it exists
+  on the laptop). `OLLAMA_CONTEXT_LENGTH=32768` is confirmed on the **laptop's**
+  systemd unit; the server's compose stack was not read and **must not be edited
+  without authorisation**.
+- **Tool calling — not validated, on any model.** `qwen3.5:35b-a3b` is not
+  present locally, and the laptop could not stand in: `qwen2.5:latest` (4.7 GB)
+  plus a 32k KV cache does not fit a 6 GB RTX 4050, so `llama-server` spent 43
+  minutes at ~500% CPU without returning, and every turn hit `OLLAMA_TIMEOUT`.
+  That is the exact spill `docs/server-and-models.md` §3 warns about ("step down
+  to 16384 if so") and it is a laptop capacity limit, not a gateway defect — but
+  it means **no turn completed**, so tool selection, argument validity,
+  `tool_call_id` correlation and multi-tool behaviour are all still unverified.
+  What the attempt *did* show is the error path behaving: the loop logged
+  `iteration 1: model stream failed: Model server request timed out`, the
+  endpoint returned **200 with `stop_reason: "error"`**, and neither container
+  crashed or leaked a 500. Retrieval itself was validated directly instead
+  (§18.7), which needs no chat model.
+- **Embedding throughput.** The laptop's RTX 4050 holds 4.62 GB of a 10.6 GB
+  model — **44% GPU, 56% CPU spill** — so local embedding timings are a floor
+  artefact and say nothing about two A40s. Do not carry them over.
+- **`search_nrb_documents` does not exist.** It is Phase 8. Retrieval is reached
+  through `search_department_docs` against a department the NRB blobs were
+  ingested into.
+
+### 18.6 Evaluation & Improvement
+
+**Success metric.** A deployment either recovers the sample's legacy and scanned
+pages or it does not: `legacy_conversion` + `ocr` chunk counts matching the
+known-good figures, with zero `conversion_unavailable` pages. Proxy for SQLs at
+this stage; nothing here is user-facing yet.
+
+**Eval.** The eight named Phase 6B blobs, re-run through the deployed worker and
+compared per document against §17's chunk counts and route split. Current
+agreement is reported in §18.7. Two negative controls carry their own weight: a
+worker built without npttf2utf must produce 0 indexable pages on a legacy blob,
+and the API image must import none of the five parser packages.
+
+**Feedback capture.** `scripts/nrb_rag_ingest.py --ingest --enqueue-only` leaves
+the drain to the deployed worker, so the worker's own log is the record; per-job
+status, chunk totals and errors persist in `ingest_jobs`. Route and page land in
+`document_chunks.metadata` as before.
+
+**Review loop.** On every image rebuild and before any larger ingest. The five
+defects above share a signature — silent recall loss with a healthy-looking
+deployment — so the check that matters is the route split, never job success.
+
+### 18.7 The containerised run (laptop, `local_ai_gateway_p4`)
+
+`migrate` → `gateway` → `worker` from the repository images, all three on
+`.env.docker.p4`. `alembic upgrade head` was a verified no-op. Gateway reported
+`healthy`; worker preflight logged
+`qwen3-embedding:4b-q8_0 -> 2560 native dims, storing 1536`. The eight Phase 6B
+blobs were enqueued with `--enqueue-only` and drained **by the deployed worker**.
+
+**8/8 succeeded, 250 chunks — every per-document count identical to §17.**
+
+| blob | chunks | s | route |
+|---|---:|---:|---|
+| `075bf12eb087` | 4 | 18.1 | native p1–2 |
+| `1a9b6321aa61` | 1 | 3.1 | legacy p1 |
+| `268bcfe86d03` | 1 | 3.0 | legacy p1 |
+| `3d2eca8b9f95` | 2 | 31.4 | ocr p1 |
+| `c298efaf1f16` | 4 | 24.4 | ocr p1–3 |
+| `e08988860534` | 75 | 279.0 | **ocr p1 + legacy p2–50** |
+| `7820b1f49fc1` | 9 | 32.2 | legacy p1–4 |
+| `8df7b02f8a13` | 154 | 325.4 | legacy p1–46 |
+
+Totals `legacy_conversion` 239 / `ocr` 7 / `native` 4. The mixed document keeping
+its OCR page 1 and its 49 converted pages, through a container, is the
+page-level routing claim surviving deployment.
+
+**Embedding dominates, and the reason is local.** Batch size 32; the workbook's
+batches took 120 s, 110 s, 36 s, 33 s. The worker container sat at 0.01–0.30%
+CPU throughout — all of it is in Ollama — the embed model stayed resident (no
+reload per batch), and requests were not serialized unexpectedly. The cost is
+VRAM: `qwen3-embedding:4b-q8_0` is 10.6 GB and the RTX 4050 held **4.62 GB, 44%
+GPU / 56% CPU spill**. On two A40s it fits entirely. **Do not carry these
+timings to the server, and do not build a second OCR queue** — OCR was ~2–4 s
+per page and the two OCR-only documents finished in 31 s and 24 s *including*
+model load.
+
+**Retrieval** (5 scripted queries, `--limit 3`): 4 of 5 returned the expected
+document at rank 1 — `3d2eca8b9f95` p1 `ocr`, `e08988860534` p3
+`legacy_conversion` (with its own OCR'd p1 at rank 3), `7820b1f49fc1` p4
+`legacy_conversion`, `c298efaf1f16` p1 `ocr`. The fifth,
+`सम्पत्ति शुद्धीकरण निवारण`, put `075bf12eb087` p2 `native` at **rank 3** —
+the same rank as §17, and §17.6 is visible in the hit itself
+(`सम्पजि शुद्धीकरण`, `त्तनवारण`). Recorded, not fixed.
+
+**Route is stored but not retrievable.** `document_chunks.metadata.route` is
+correct on all 250 chunks, but `RetrievedChunk` (`app/rag/retrieval.py`) carries
+no metadata field, so `search_department_docs` cites title + page + doc id and
+**cannot cite the extraction route**. Nothing was changed here — surfacing it is
+a retrieval-layer decision that belongs with Phase 8's citation format.

@@ -64,7 +64,15 @@ NRB_ORIGIN = "nrb"
 # and the same one the Phase 6B evaluation used — a different lexicon would make
 # `is_confidently_english` a different veto and the recovered text a different
 # thing from what was measured.
-LEXICON_PATH = "docs/nrb/phase6b-lexicon.json"
+#
+# Resolved from THIS FILE's location, never from the working directory. The
+# scripts can afford a CWD-relative default because a human runs them from the
+# repo root; the worker cannot — it is a long-lived process whose CWD is set by
+# whoever launched it (`/app` in the container, anything at all under systemd).
+# A CWD-relative path there does not raise: it degrades to "no lexicon", which
+# degrades to "no converter", which fails every legacy page closed. The
+# deployment would look healthy and silently recover nothing.
+LEXICON_PATH = Path(__file__).resolve().parents[2] / "docs/nrb/phase6b-lexicon.json"
 
 # The mapping Phase 6B validated on this corpus. Kantipur and Sagarmatha agree
 # with it almost everywhere; FONTASY and PCS NEPALI are wrong on every document
@@ -94,7 +102,13 @@ def default_lexicon():
     try:
         return lexicon_mod.load_lexicon(LEXICON_PATH)
     except Exception as exc:  # noqa: BLE001 - missing/unreadable is not fatal
-        logger.warning("NRB rag: lexicon unavailable (%s)", type(exc).__name__)
+        # The path is in the message on purpose: this is the failure a container
+        # build produces when the lexicon was not copied in, and "lexicon
+        # unavailable" alone sends you looking at the converter instead.
+        logger.warning(
+            "NRB rag: lexicon unavailable at %s (%s) — legacy pages will be "
+            "recorded unresolved, not indexed", LEXICON_PATH, type(exc).__name__,
+        )
         return None
 
 

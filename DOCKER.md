@@ -90,6 +90,50 @@ the wrong dimension. Pull it on the Ollama host before bringing the stack up:
 ollama pull qwen3-embedding:4b-q8_0
 ```
 
+## NRB corpus deployment (the scratch database)
+
+NRB work runs against the **scratch** database `local_ai_gateway_p4`, never
+`local_ai_gateway` — see `CLAUDE.md`. Two things about this stack make that
+worth stating out loud rather than assuming:
+
+**1. `migrate` runs `alembic upgrade head` against whatever `DATABASE_URL`
+names.** All three services read the same `.env.docker`, so a stack brought up
+with the default file migrates and writes the REAL database. There is no
+per-service override and there should not be — gateway and worker must agree on
+the schema. Point the one variable at the scratch DB:
+```
+DATABASE_URL=postgresql+asyncpg://gateway:<pw>@host.docker.internal:5432/local_ai_gateway_p4
+```
+`local_ai_gateway_p4` is at `b1bea6ac36c5` = this branch's head, so that upgrade
+is a no-op today. Verify before trusting that: `alembic current` against p4.
+
+**2. The worker needs npttf2utf, and it is OFF by default.**
+```bash
+INSTALL_LEGACY_FONT=true docker compose build worker
+```
+The default build omits it because it is **GPL-3.0** and the obligations attach
+to distribution (`requirements-nrb.txt`). The omission is safe but silent: every
+legacy-font page is recorded `conversion_unavailable` and withheld rather than
+indexed — on the Phase 6B sample that is 239 of 250 chunks, and four of eight
+documents ingest to nothing at all. Check which build you have:
+```bash
+docker compose run --rm worker python -c "import npttf2utf; print(npttf2utf.__name__)"
+```
+
+Also set, for the GPU box:
+```
+AGENT_MODEL=qwen3.5:35b-a3b          # .env.docker.example still ships the laptop's qwen2.5
+RAG_EMBED_MODEL=qwen3-embedding:4b-q8_0
+RAG_EMBED_DIM=1536                    # must match the schema's vector(1536)
+```
+and set `OLLAMA_CONTEXT_LENGTH: 32768` on the **Ollama service**, not here —
+different process, different config home (`docs/server-and-models.md` §3).
+
+Nothing in this stack ingests a corpus on boot. The worker polls `ingest_jobs`
+and does nothing until a row appears; `scripts/nrb_rag_ingest.py` is what
+enqueues the Phase 6B sample, and it refuses to run unless `DATABASE_URL` names
+`local_ai_gateway_p4`.
+
 ## Still TODO (deferred)
 - **`generated_files/`** — with `docker run` it's a dir inside the container
   (lost on restart); compose already mounts the `gateway_files` volume.

@@ -521,6 +521,26 @@ events (`token`/`tool_call`/`tool_result`/`done`) + the new id in the
   fallback and not the default. `rapidocr`+`onnxruntime` live in
   `requirements-worker.txt` only — `Dockerfile` installs `requirements.txt`
   alone, so the API image cannot acquire an OCR stack by accident.
+- **Every way an NRB deployment breaks looks like a clean deployment.** Five
+  defects found by actually running the images (§18, 2026-08-16) — a CWD-relative
+  `LEXICON_PATH`, the lexicon absent from the worker image, `npttf2utf` absent
+  from it, RapidOCR's model dir root-owned against a uid-10001 worker, and
+  docling's layout model calling `torch.compile` with no C++ compiler in the slim
+  runtime — produce the **same** outcome: pages recorded
+  `conversion_unavailable`/`needs_ocr`, input withheld, job **succeeded**,
+  corpus quietly a quarter ingested. The fail-closed rule holds throughout, so
+  none of them can emit bad text; that is exactly why none of them are visible
+  from job status. **Verify a worker image by its route split on a known blob,
+  never by whether ingestion succeeded.** `TORCHDYNAMO_DISABLE=1` and the
+  `chown` of `site-packages/rapidocr` are in `Dockerfile.worker` for this;
+  `npttf2utf` is the opt-in `INSTALL_LEGACY_FONT` build ARG, default false,
+  because it is GPL-3 and a default build must stay distributable.
+- **`docker-compose.p4.yml` is the NRB overlay, and `migrate` is the reason it
+  exists.** The base stack reads `.env.docker`, whose `DATABASE_URL` names the
+  REAL database, and `migrate` runs `alembic upgrade head` against whatever it is
+  handed. The overlay repoints **all three** services at `.env.docker.p4` so they
+  cannot disagree about which database they mean, and flips the GPL flag on.
+  Never bring the base stack up for NRB work.
 - **`app/nrb/catalog.py` uses Core statements, never `update(Model)`, and that is
   load-bearing.** `nrb_sources` maps the attribute `meta` onto the column named
   `metadata` (declarative reserves `metadata`). A Core insert wants the key

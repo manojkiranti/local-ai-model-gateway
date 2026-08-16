@@ -24,15 +24,53 @@ ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install --upgrade pip \
     && pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision
 
-COPY requirements-worker.txt requirements.txt ./
+COPY requirements-worker.txt requirements.txt requirements-nrb.txt ./
 RUN pip install -r requirements-worker.txt
+
+# --- npttf2utf: OPT-IN, because it is GPL-3.0 -----------------------------
+#
+# Without it, NRB legacy-font pages do not fail loudly — they fail CLOSED, which
+# is correct but silent: `recovery` records `conversion_unavailable`, withholds
+# the glyph-mapped original, and the document ingests with those pages missing
+# (or fails outright if it has no other pages). On the Phase 6B sample that is
+# 239 of 250 chunks. So an NRB deployment needs this; a build we ship does not.
+#
+# A build ARG rather than a line in requirements-worker.txt: GPL-3 obligations
+# attach to DISTRIBUTION, so acquiring it must be a deliberate act by whoever
+# builds the image, not a default they inherit. Default false keeps every
+# unattended build distributable.
+#     docker compose build --build-arg INSTALL_LEGACY_FONT=true worker
+# See requirements-nrb.txt and docs/nrb-integration.md §12.
+ARG INSTALL_LEGACY_FONT=false
+RUN if [ "$INSTALL_LEGACY_FONT" = "true" ]; then \
+        pip install -r requirements-nrb.txt; \
+    else \
+        echo "npttf2utf OMITTED (GPL-3 gate) — NRB legacy pages will not convert"; \
+    fi
 
 # ---- Stage 2: runtime ----------------------------------------------------
 FROM python:3.10-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PATH="/opt/venv/bin:$PATH"
+    PATH="/opt/venv/bin:$PATH" \
+    # Docling's layout model (rt_detr_v2, via transformers) calls torch.compile.
+    # Inductor generates C++ and shells out to a compiler — and build-essential
+    # lives only in the builder stage, so in THIS image it raises
+    # `InvalidCxxCompiler: No working C++ compiler found`.
+    #
+    # It breaks the OCR path SPECIFICALLY. An ordinary text-layer PDF is fine
+    # either way (measured: same 4 chunks with the flag on or off) because
+    # docling still has the embedded text to fall back on. Under
+    # `force_full_page_ocr=True` there is no fallback — the pipeline IS the text
+    # source — so the compile failure yields an empty parse, which native-2 then
+    # records as `needs_ocr/no_text_layer`: a perfectly readable scan, reported
+    # as unreadable.
+    #
+    # Eager mode is the fix, not a compiler: we run CPU inference a few pages at
+    # a time, where compilation costs more than it saves. Measured in-container
+    # 2026-08-16 — a 3-page scan went from 0 chunks to 4.
+    TORCHDYNAMO_DISABLE=1
 
 # Native libraries OpenCV links against. Docling depends on `opencv-python`
 # (the FULL build, not headless), whose `cv2.abi3.so` is dynamically linked to
@@ -62,11 +100,30 @@ COPY --from=builder /opt/venv /opt/venv
 # App code only — the worker never migrates (the `migrate` service owns schema).
 COPY app ./app
 
+# The frozen Phase 6B lexicon is DATA THE WORKER NEEDS, not documentation — it
+# is the vocabulary `is_confidently_english` vetoes on, and without it the
+# converter is never constructed at all (see app/nrb/rag.py). It lives under
+# docs/ because it is also frozen evidence, and .dockerignore excludes docs/
+# wholesale, so it is named explicitly here and re-admitted there.
+COPY docs/nrb/phase6b-lexicon.json ./docs/nrb/phase6b-lexicon.json
+
 # Mount points must exist and be appuser-owned BEFORE the named volumes mount,
 # or Docker initializes the volumes root-owned and the non-root worker can't
 # write. rag_documents = shared corpus; ~/.cache = Docling model downloads.
 RUN mkdir -p /app/rag_documents /home/appuser/.cache \
     && chown -R appuser:appuser /app /home/appuser/.cache
+
+# RapidOCR downloads its PP-OCRv5 ONNX weights on FIRST USE, into its own
+# package directory — not into $HOME/.cache like docling, so the worker_cache
+# volume does not cover it. That directory is root-owned, and the worker runs as
+# appuser, so the write fails.
+#
+# It fails SILENTLY AND EXPENSIVELY: rapidocr re-downloads on every page, never
+# persists, and returns no text — so OCR pages come back empty and the document
+# is recorded `needs_ocr/no_text_layer` with nothing indexed. Correct
+# (fail-closed) but indistinguishable from a genuinely unreadable scan, and it
+# re-fetches ~5 MB per page forever. Measured in-container 2026-08-16.
+RUN chown -R appuser:appuser /opt/venv/lib/python3.10/site-packages/rapidocr
 
 USER appuser
 

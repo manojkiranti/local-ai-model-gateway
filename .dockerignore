@@ -38,6 +38,10 @@ rag_documents/
 # Docs and project notes — not needed at runtime
 docs/
 *.md
+# ...except the frozen NRB lexicon, which the WORKER loads at runtime (it is
+# data that happens to live under docs/ because it is also frozen evidence).
+# Dockerfile.worker COPYs it; the slim API image never asks for it.
+!docs/nrb/phase6b-lexicon.json
 
 # Version control
 .git/

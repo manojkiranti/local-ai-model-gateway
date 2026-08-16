@@ -112,8 +112,11 @@ tests/                  unit, contract, integration, live, and evaluation tests
 docs/                   environment, transport, reasoning, and frontend notes
 Dockerfile              lightweight API image
 Dockerfile.worker       heavy Docling ingest-worker image
+docker-compose.yml      migrate -> gateway + worker
+docker-compose.p4.yml   NRB overlay: scratch DB + the GPL-3 build flag
 requirements.txt        API and test dependencies
 requirements-worker.txt API dependencies plus Docling
+requirements-nrb.txt    npttf2utf (GPL-3, opt-in build ARG only)
 ```
 
 ## Core contracts
@@ -226,6 +229,16 @@ record, and re-deriving state from code or chat history has gone wrong before.
   the rejected PP-OCRv4 through torch). Worker-side only —
   `requirements-worker.txt`, never `requirements.txt`. Its output is retrieval
   text, **not** authoritative for figures, dates or contact details.
+- **An NRB worker image is verified by its route split, not by job success.**
+  The five ways a deployment loses NRB text (missing lexicon, CWD-relative
+  lexicon path, missing `npttf2utf`, RapidOCR's root-owned model dir, docling's
+  `torch.compile` without a C++ compiler) all end in withheld input and a job
+  that reports **succeeded** — the fail-closed rule doing its job, and the reason
+  none of them show up in a health check. Run a known blob and read the routes.
+  `INSTALL_LEGACY_FONT=true` is required for conversion and is off by default
+  because npttf2utf is GPL-3; `docker-compose.p4.yml` is the only supported way
+  to point the stack at the scratch database, because `migrate` will otherwise
+  upgrade the real one.
 - **Frozen evidence is frozen.** The Phase 6A benchmark and the Phase 6B routing
   holdout are committed manifests with self-verifying fingerprints, and the
   holdout was committed before any network access precisely so it could validate

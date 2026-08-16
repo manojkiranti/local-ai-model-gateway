@@ -46,6 +46,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.worker
+      args:
+        # GPL-3 gate, default OFF (see Dockerfile.worker). An NRB deployment
+        # sets INSTALL_LEGACY_FONT=true in the shell or .env; without it every
+        # legacy-font page is recorded unresolved instead of converted, which is
+        # safe but recovers nothing.
+        INSTALL_LEGACY_FONT: ${INSTALL_LEGACY_FONT:-false}
     env_file: .env.docker
     depends_on:
       migrate:
