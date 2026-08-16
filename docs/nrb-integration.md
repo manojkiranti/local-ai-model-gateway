@@ -2746,11 +2746,36 @@ passes every validation rule the converter has (§12.2 measured exactly that on
 an English table).
 
 So when OCR is unavailable or fails, the page yields **empty text**, `ok=False`
-and the reason — not the junk layer, and not a conversion. When the converter is
-unavailable (it is GPL-3 and may legitimately be absent), the page keeps its
-**original** bytes and says so. When provenance cannot be read at all, the page
-keeps its native text: an unopenable resource dictionary is not evidence of a
-scan, and both alternatives act on a guess.
+and the reason — not the junk layer, and not a conversion. When provenance cannot
+be read at all, the page keeps its native text: an unopenable resource dictionary
+is not evidence of a scan, and both alternatives act on a guess.
+
+**A conversion that does not succeed withholds its input.** The original of a
+unit this router itself called a high-confidence legacy candidate is glyph-mapped
+ASCII; indexed, it is unsearchable noise that a citation would present as the
+text of a circular. Four failures, one answer:
+
+| what happened | page reason | `ok` | text |
+|---|---|---|---|
+| npttf2utf absent (the GPL-3 gate) | `conversion_unavailable` | false | empty |
+| the backend broke the page | `conversion_failed` | false | empty |
+| every candidate rejected/failed | `conversion_unresolved` | false | guard-kept only |
+| *some* candidates unresolved | the route reason | true | those units blanked |
+
+The withholding is per UNIT and lives in `recovery._withhold`, not in
+`legacy_convert` — that module's `LineOutcome.text` deliberately returns the
+original, which is what makes its negative controls byte-exact, and changing it
+would weaken the controls to fix a consumer's problem. Only units that were
+CANDIDATES are withheld: a line kept by the Unicode guard, the English guard or
+the detector was never legacy text, so a mixed page keeps its readable half and
+loses only the line that stayed glyph-mapped. The line terminator survives, so an
+unresolved unit becomes a blank line rather than fusing its neighbours.
+
+**A failed conversion is never re-routed to OCR.** PP-OCRv5 measured worse than
+deterministic conversion on exactly this class — embedded-font pages, where it
+renders `कारवाही` as `शदक` (§16.6) — so the substitution would trade a recorded
+gap for unvalidated text. `PageText.indexable` (`ok` and non-empty) is the single
+question an ingestion boundary should ask.
 
 ### 16.5 Provenance for citations
 

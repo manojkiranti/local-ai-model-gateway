@@ -209,6 +209,12 @@ record, and re-deriving state from code or chat history has gone wrong before.
   pass. Font provenance (`app/nrb/provenance.py`, pypdf — no subprocess) chooses
   between the converter and OCR *inside* an already-eligible document; it never
   makes a document eligible. The `unit_legacy_ratio >= 0.80` gate is unchanged.
+- Recovery fails CLOSED in both directions. A page routed to OCR is never handed
+  to the converter, and a conversion that does not succeed — npttf2utf absent, a
+  broken backend, a rejected unit — withholds its glyph-mapped INPUT instead of
+  publishing it. Only `PageText.indexable` text may be chunked, embedded or
+  cited. Omitting npttf2utf in a deployment must produce an explicit unresolved
+  extraction, never silent garbage in the index.
 - OCR is the narrow fallback for pages with no embedded font: PP-OCRv5
   Devanagari via docling/RapidOCR on the **onnxruntime** backend (docling reaches
   the rejected PP-OCRv4 through torch). Worker-side only —

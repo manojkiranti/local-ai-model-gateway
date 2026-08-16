@@ -481,7 +481,15 @@ events (`token`/`tool_call`/`tool_result`/`done`) + the new id in the
   (3) **a page routed to OCR is never handed to npttf2utf** — its hidden text
   layer is a scanner's latin guess, and the converter would turn it into fluent
   nonsense that passes every validation rule (§12.2 measured that on an English
-  table), so OCR failure yields EMPTY text + `ok=False`, never the junk layer;
+  table), so OCR failure yields EMPTY text + `ok=False`, never the junk layer —
+  and symmetrically **a conversion that does not succeed withholds its INPUT**
+  (`recovery._withhold`): a missing npttf2utf (the GPL-3 gate), a broken backend
+  and a rejected unit all end `ok=False`/blanked, never the glyph-mapped original
+  published as recovered text, and such a page is NOT re-routed to OCR (v5 is
+  worse than conversion on embedded-font pages). Withholding is per UNIT and
+  lives in `recovery`, NOT in `legacy_convert` — that module's byte-exact
+  reconstruction is what its negative controls assert on. `PageText.indexable`
+  is the one question an ingestion boundary should ask;
   (4) the unjudged-unit gate uses the DOCUMENT's `unit_legacy_ratio`, not a
   per-page recomputation (`nrb_holdout_validate._doc_ratio`); (5) pages are
   re-read with `read_pdf_pages`, never recovered by splitting `result.text` —

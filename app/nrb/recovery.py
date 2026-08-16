@@ -47,6 +47,17 @@ converter has. The two routes are exclusive per page, and when OCR is
 unavailable or fails the page fails CLOSED — empty text, `ok=False`, the reason
 recorded — rather than falling back to the junk text layer or to the converter.
 
+**5. A conversion that does not succeed withholds its input.** The original of a
+unit this router itself called a high-confidence legacy candidate is
+glyph-mapped ASCII. A missing converter (npttf2utf is GPL-3 and a deployment may
+legitimately omit it), a converter that raises, and a unit whose conversion was
+rejected all end the same way: `ok=False` or the unit blanked, never the
+untrusted original published as recovered text. Omitting the dependency must
+produce an explicit unresolved extraction, not silent garbage in the index. Such
+a page is **not** re-routed to OCR either — PP-OCRv5 measured worse than
+deterministic conversion on embedded-font pages (§16.6), so that substitution
+would trade a recorded gap for unvalidated text.
+
 WHAT THIS MODULE DOES NOT DO
 ----------------------------
 It does not classify (that is `routing.py`), does not persist (there is no
@@ -66,7 +77,7 @@ from typing import Any, Sequence
 from ..files import documents as file_documents
 from ..files import readers
 from . import extraction, legacy_convert, provenance, quality
-from .legacy_font import ConverterUnavailable, LegacyFontConverter
+from .legacy_font import LegacyFontConverter
 from .lexicon import Lexicon
 from .ocr import OcrUnavailable, PageOcrEngine
 
@@ -125,6 +136,19 @@ CONVERSION_GATE = 0.80
 # router cannot disagree with the classifier that sent the document here.
 MIN_PAGE_TEXT_CHARS = quality.MIN_CHARS_PER_PAGE
 
+# Dispositions where the converter ATTEMPTED a unit and the result was not
+# applied. `legacy_convert` keeps the original for these; this pipeline must not
+# publish it (see `_withhold`). `ambiguous_held` cannot occur above the gate —
+# it needs a document ratio below 0.80 — and is listed so the set is complete
+# rather than incidentally correct.
+_UNRESOLVED_DISPOSITIONS = frozenset(
+    {
+        legacy_convert.REJECTED_LINE,
+        legacy_convert.FAILED_LINE,
+        legacy_convert.AMBIGUOUS_HELD,
+    }
+)
+
 
 @dataclass(frozen=True)
 class DocumentPlan:
@@ -157,6 +181,18 @@ class PageText:
     error: str | None = None
     detail: dict[str, Any] = field(default_factory=dict)
 
+    @property
+    def indexable(self) -> bool:
+        """May this page's text be chunked, embedded and served as a citation?
+
+        The single question a consumer should ask. `ok=False` means the route did
+        not produce trustworthy text — the converter was missing, OCR failed, no
+        conversion candidate resolved — and in every one of those cases the
+        untrusted original has already been withheld, so the page carries no
+        indexable text even where it carries *some* text.
+        """
+        return self.ok and bool(self.text.strip())
+
     def as_dict(self) -> dict[str, Any]:
         return {
             "page_number": self.page_number,
@@ -164,6 +200,7 @@ class PageText:
             "route": self.route,
             "reason": self.reason,
             "ok": self.ok,
+            "indexable": self.indexable,
             "chars": len(self.text),
             "error": self.error,
             "detail": self.detail,
@@ -196,6 +233,16 @@ class RecoveredDocument:
     @property
     def ok(self) -> bool:
         return all(page.ok for page in self.pages)
+
+    @property
+    def indexable_pages(self) -> tuple[PageText, ...]:
+        """The pages a consumer may chunk, embed and cite.
+
+        THE ingestion boundary. A page that failed its route carries no
+        trustworthy text — the untrusted original was withheld upstream — so
+        filtering here is a statement about provenance, not a quality heuristic.
+        """
+        return tuple(page for page in self.pages if page.indexable)
 
     @property
     def route_counts(self) -> dict[str, int]:
@@ -328,6 +375,48 @@ def route_page(
 # --------------------------------------------------------------------------- #
 # Execution.
 # --------------------------------------------------------------------------- #
+def _withhold(outcome: legacy_convert.LineOutcome) -> str:
+    """The text of ONE converted unit, with unresolved legacy withheld.
+
+    `legacy_convert.LineOutcome.text` returns the ORIGINAL for a unit whose
+    conversion was rejected, failed or held. That is right for the evaluation it
+    was written for — the preservation guarantee its negative controls assert on
+    — and wrong for an indexing pipeline: the original of a unit the router
+    itself classified as a high-confidence legacy candidate is glyph-mapped
+    ASCII. Indexed, it is unsearchable noise that a citation would present as the
+    text of a circular.
+
+    So the withholding lives HERE rather than in `legacy_convert`: that module
+    stays byte-exact and its controls keep meaning, and the consumer that must
+    not publish junk is the one that drops it. The line's terminator survives, so
+    an unresolved unit becomes a blank line rather than joining its neighbours.
+
+    Only units that were CANDIDATES are withheld. A unit kept by the Unicode
+    guard, the English guard or the detector was never legacy text, and dropping
+    those would delete the readable half of a mixed document.
+    """
+    return "" if outcome.disposition in _UNRESOLVED_DISPOSITIONS else outcome.text
+
+
+def _conversion_detail(
+    conversion: legacy_convert.DocumentConversion,
+) -> tuple[dict[str, Any], int, int]:
+    """`(detail, resolved, unresolved)` for one converted page or sheet."""
+    resolved = conversion.converted_lines
+    unresolved = sum(
+        1 for line in conversion.lines
+        if line.disposition in _UNRESOLVED_DISPOSITIONS
+    )
+    detail = {
+        "converted_units": resolved,
+        "unresolved_units": unresolved,
+        "mapping": conversion.mapping,
+        "converter": f"{conversion.converter_name} {conversion.converter_version}",
+        "counts": conversion.counts,
+    }
+    return detail, resolved, unresolved
+
+
 def _converted_page(
     number: int,
     text: str,
@@ -337,7 +426,7 @@ def _converted_page(
     lexicon: Lexicon | None,
     document_legacy_ratio: float,
 ) -> PageText:
-    """Run the guarded converter over one page's LINES.
+    """Run the guarded converter over one page's LINES, and FAIL CLOSED.
 
     `document_legacy_ratio` is the DOCUMENT's `unit_legacy_ratio`, never a
     per-page recomputation. That is the validated semantic (§14, and
@@ -345,36 +434,48 @@ def _converted_page(
     decides whether an unjudged unit — a heading, a date, a table cell — may be
     converted, and re-deriving it per page would gate page 1 of a 1.0-ratio
     document on its own three headings.
+
+    Three failures, one answer. The converter being absent (it is GPL-3 and a
+    deployment may legitimately omit it), the converter raising, and the
+    converter producing nothing acceptable all end as `ok=False` with the
+    untrusted original withheld — never as text that reads like a recovered
+    circular. **The page is NOT re-routed to OCR**: PP-OCRv5 measured worse than
+    deterministic conversion on exactly this class (embedded-font pages, §16.6),
+    so substituting it would trade a recorded gap for unvalidated text.
     """
     if converter is None or lexicon is None:
         return PageText(
-            number, ROUTE_LEGACY, reason, text, ok=False,
+            number, ROUTE_LEGACY, "conversion_unavailable", "", ok=False,
             error="legacy font converter unavailable",
-            detail={"converted_units": 0},
+            detail={"converted_units": 0, "route_reason": reason},
         )
     try:
         conversion = legacy_convert.convert_document(
             text, converter, lexicon, document_legacy_ratio=document_legacy_ratio
         )
-    except ConverterUnavailable as exc:
-        # The original survives. A converter that failed must never be
-        # indistinguishable from one that no-oped.
+    except Exception as exc:  # noqa: BLE001 - ConverterUnavailable, or a backend bug
+        # A converter that failed must never be indistinguishable from one that
+        # no-oped, and the input must not be published as if it were output.
         return PageText(
-            number, ROUTE_LEGACY, reason, text, ok=False, error=str(exc),
-            detail={"converted_units": 0},
+            number, ROUTE_LEGACY, "conversion_failed", "", ok=False,
+            error=f"{type(exc).__name__}: {exc}",
+            detail={"converted_units": 0, "route_reason": reason},
         )
-    return PageText(
-        number,
-        ROUTE_LEGACY,
-        reason,
-        conversion.text,
-        detail={
-            "converted_units": conversion.converted_lines,
-            "mapping": conversion.mapping,
-            "converter": f"{conversion.converter_name} {conversion.converter_version}",
-            "counts": conversion.counts,
-        },
+
+    detail, resolved, unresolved = _conversion_detail(conversion)
+    recovered = "".join(
+        _withhold(line) + line.ending for line in conversion.lines
     )
+    if unresolved and not resolved:
+        # Every candidate on this page came back rejected or failed. There is no
+        # recovered Nepali here, only whatever the guards kept, and calling that
+        # a converted page would misdescribe it.
+        return PageText(
+            number, ROUTE_LEGACY, "conversion_unresolved", recovered, ok=False,
+            error=f"no unit converted; {unresolved} unresolved",
+            detail=detail | {"route_reason": reason},
+        )
+    return PageText(number, ROUTE_LEGACY, reason, recovered, detail=detail)
 
 
 def _ocr_page(
@@ -471,7 +572,7 @@ def _recover_spreadsheet(
         return (
             (
                 PageText(
-                    1, ROUTE_LEGACY, plan.reason, "", ok=False,
+                    1, ROUTE_LEGACY, "conversion_unavailable", "", ok=False,
                     error="legacy font converter unavailable",
                 ),
             ),
@@ -494,33 +595,45 @@ def _recover_spreadsheet(
                 if any(str(c).strip() for c in row):
                     rows.append(tuple(str(c) for c in row))
         try:
-            conversion, grid = legacy_convert.convert_cells(
+            conversion, _grid = legacy_convert.convert_cells(
                 rows, converter, lexicon,
                 document_legacy_ratio=plan.gate_ratio or 0.0,
             )
-        except ConverterUnavailable as exc:
+        except Exception as exc:  # noqa: BLE001 - fail closed, never publish input
             out.append(
                 PageText(
-                    number, ROUTE_LEGACY, plan.reason,
-                    "\n".join(" | ".join(r) for r in rows),
-                    ok=False, label=name, error=str(exc),
+                    number, ROUTE_LEGACY, "conversion_failed", "",
+                    ok=False, label=name, error=f"{type(exc).__name__}: {exc}",
+                )
+            )
+            continue
+
+        # The grid is rebuilt here rather than taken from `convert_cells`, for the
+        # same reason `_withhold` exists: its grid keeps the ORIGINAL of an
+        # unresolved cell, and a glyph-mapped cell must not be indexed. Row
+        # widths are preserved so column identity survives — an unresolved cell
+        # becomes empty, not absent.
+        detail, resolved, unresolved = _conversion_detail(conversion)
+        detail["cells"] = sum(len(r) for r in rows)
+        safe: list[tuple[str, ...]] = []
+        cursor = 0
+        for row in rows:
+            safe.append(
+                tuple(_withhold(conversion.lines[cursor + i]) for i in range(len(row)))
+            )
+            cursor += len(row)
+        text = "\n".join(" | ".join(r) for r in safe)
+        if unresolved and not resolved:
+            out.append(
+                PageText(
+                    number, ROUTE_LEGACY, "conversion_unresolved", text, ok=False,
+                    label=name, error=f"no cell converted; {unresolved} unresolved",
+                    detail=detail,
                 )
             )
             continue
         out.append(
-            PageText(
-                number,
-                ROUTE_LEGACY,
-                plan.reason,
-                "\n".join(" | ".join(r) for r in grid),
-                label=name,
-                detail={
-                    "converted_units": conversion.converted_lines,
-                    "mapping": conversion.mapping,
-                    "cells": sum(len(r) for r in rows),
-                    "counts": conversion.counts,
-                },
-            )
+            PageText(number, ROUTE_LEGACY, plan.reason, text, label=name, detail=detail)
         )
     return tuple(out), plan.warnings
 

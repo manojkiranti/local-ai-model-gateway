@@ -32,6 +32,7 @@ from typing import Sequence
 import pytest
 
 from app.nrb import extraction, lexicon as LX, provenance, quality, recovery
+from app.nrb.legacy_font import ConverterUnavailable
 from app.nrb.ocr import OcrUnavailable
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
@@ -537,17 +538,164 @@ def test_a_missing_ocr_engine_is_a_recorded_failure_not_a_crash(tmp_path, lexico
     assert "ocr engine unavailable" in (recovered.pages[0].error or "")
 
 
-def test_a_missing_converter_keeps_the_original_text(tmp_path, lexicon):
-    """npttf2utf is GPL-3 and may legitimately be absent. The page keeps its
-    original bytes and says so, rather than emptying itself."""
+# --------------------------------------------------------------------------- #
+# 4b. Conversion failure is UNRESOLVED, never the original text.
+#
+# The three ways a conversion can fail to produce trustworthy Unicode, and the
+# one answer to all of them. The shared risk is specific: npttf2utf is GPL-3, so
+# a deployment can legitimately ship without it — and the failure mode that must
+# not exist is a build where every Preeti circular indexes its glyph-mapped ASCII
+# and a citation shows `g]kfn /fi6« a}+s` as the text of a directive.
+# --------------------------------------------------------------------------- #
+class RaisingConverter(StubConverter):
+    """A converter whose backend throws `ConverterUnavailable` — a missing map
+    file, a mapping the installed version dropped. `legacy_convert` isolates this
+    PER UNIT (that is deliberate: one bad line must not lose a page), so it
+    surfaces as an unresolved unit rather than a dead call."""
+
+    def convert(self, text: str) -> str:
+        self.calls.append(text)
+        raise ConverterUnavailable("npttf2utf failed on mapping 'Preeti'")
+
+
+class BrokenConverter(StubConverter):
+    """A converter that breaks in a way the conversion layer does not isolate —
+    a backend bug rather than an unavailable mapping. It takes the whole page."""
+
+    def convert(self, text: str) -> str:
+        self.calls.append(text)
+        raise RuntimeError("backend segfaulted")
+
+
+class UselessConverter(StubConverter):
+    """A converter that RUNS and produces something `validate_conversion`
+    refuses. Empty output is the bluntest form; the rejection path is the same
+    one a wrong mapping takes."""
+
+    def convert(self, text: str) -> str:
+        self.calls.append(text)
+        return ""
+
+
+def test_a_missing_converter_withholds_the_original_legacy_text(tmp_path, lexicon):
+    """npttf2utf is GPL-3 and may legitimately be absent. That must produce an
+    explicit unresolved extraction — never the glyph-mapped input, presented as
+    recovered text."""
     path = _write_pdf(tmp_path, "preeti.pdf", [{"font": "ABCDEE+Preeti", "embedded": True}])
     recovered = recovery.recover(
         path, _result(text=PREETI), converter=None, lexicon=None, ocr=StubOcr(),
         pages=[PREETI],
     )
     page = recovered.pages[0]
-    assert page.route == recovery.ROUTE_LEGACY and page.ok is False
-    assert page.text == PREETI
+    assert page.route == recovery.ROUTE_LEGACY
+    assert page.ok is False and page.indexable is False
+    assert page.reason == "conversion_unavailable"
+    assert PREETI not in page.text and PREETI not in recovered.text
+    assert recovered.indexable_pages == ()
+
+
+def test_a_converter_that_raises_withholds_the_original_legacy_text(tmp_path, lexicon):
+    path = _write_pdf(tmp_path, "preeti.pdf", [{"font": "ABCDEE+Preeti", "embedded": True}])
+    converter = RaisingConverter()
+    recovered = recovery.recover(
+        path, _result(text=PREETI), converter=converter, lexicon=lexicon,
+        ocr=StubOcr(), pages=[PREETI],
+    )
+    page = recovered.pages[0]
+    assert converter.calls == [PREETI]            # it really was attempted
+    assert page.ok is False and page.indexable is False
+    assert page.reason == "conversion_unresolved"
+    assert page.detail["counts"]["failed"] == 1   # the converter, not the validator
+    assert PREETI not in page.text
+
+
+def test_a_converter_that_breaks_the_page_withholds_the_original_too(tmp_path, lexicon):
+    """A backend bug the conversion layer does not isolate. The page fails as a
+    whole, and the input is still not published as output."""
+    path = _write_pdf(tmp_path, "preeti.pdf", [{"font": "ABCDEE+Preeti", "embedded": True}])
+    recovered = recovery.recover(
+        path, _result(text=PREETI), converter=BrokenConverter(), lexicon=lexicon,
+        ocr=StubOcr(), pages=[PREETI],
+    )
+    page = recovered.pages[0]
+    assert page.ok is False and page.indexable is False
+    assert page.reason == "conversion_failed"
+    assert "RuntimeError" in (page.error or "")
+    assert page.text == "" and PREETI not in recovered.text
+
+
+def test_a_rejected_conversion_withholds_the_original_legacy_text(tmp_path, lexicon):
+    """The conversion ran and `validate_conversion` refused it. The unit is
+    unresolved: its original is glyph-mapped ASCII and must not be indexed."""
+    path = _write_pdf(tmp_path, "preeti.pdf", [{"font": "ABCDEE+Preeti", "embedded": True}])
+    converter = UselessConverter()
+    recovered = recovery.recover(
+        path, _result(text=PREETI), converter=converter, lexicon=lexicon,
+        ocr=StubOcr(), pages=[PREETI],
+    )
+    page = recovered.pages[0]
+    assert converter.calls == [PREETI]
+    assert page.ok is False and page.indexable is False
+    assert page.reason == "conversion_unresolved"
+    assert page.detail["converted_units"] == 0 and page.detail["unresolved_units"] == 1
+    assert PREETI not in page.text
+
+
+def test_a_failed_conversion_is_never_re_routed_to_ocr(tmp_path, lexicon):
+    """PP-OCRv5 measured WORSE than deterministic conversion on embedded-font
+    pages (`कारवाही` → `शदक`), so substituting it for a failed conversion would
+    trade a recorded gap for unvalidated text."""
+    path = _write_pdf(tmp_path, "preeti.pdf", [{"font": "ABCDEE+Preeti", "embedded": True}])
+    ocr = StubOcr()
+    recovered = recovery.recover(
+        path, _result(text=PREETI), converter=UselessConverter(), lexicon=lexicon,
+        ocr=ocr, pages=[PREETI],
+    )
+    assert ocr.pages == []
+    assert recovered.pages[0].route == recovery.ROUTE_LEGACY
+
+
+def test_one_unresolved_unit_does_not_discard_the_readable_rest(tmp_path, lexicon):
+    """Withholding is per UNIT, not per page. A mixed page keeps its English and
+    its converted Nepali, and loses only the line that stayed glyph-mapped."""
+
+    class Fussy(StubConverter):
+        def convert(self, text: str) -> str:
+            self.calls.append(text)
+            if text == PREETI:
+                return ""                     # rejected → unresolved
+            return "".join(c if c.isspace() else "क" for c in text)
+
+    page_text = "\n".join([ENGLISH, PREETI, "g]kfn /fi6« a}+ssf] nflu dfq xf]"])
+    path = _write_pdf(tmp_path, "mixed-page.pdf", [{"font": "ABCDEE+Preeti", "embedded": True}])
+    recovered = recovery.recover(
+        path, _result(text=page_text), converter=Fussy(), lexicon=lexicon,
+        ocr=StubOcr(), pages=[page_text],
+    )
+    page = recovered.pages[0]
+    assert page.ok is True and page.indexable is True     # something converted
+    assert page.detail["unresolved_units"] == 1
+    assert PREETI not in page.text                        # the failed line is gone
+    assert ENGLISH in page.text                           # the guard-kept line stays
+    # The line structure survives: the withheld unit is a blank line, not a
+    # deletion that would fuse its neighbours.
+    assert len(page.text.splitlines()) == 3
+
+
+def test_an_unresolved_spreadsheet_cell_is_withheld_too(tmp_path, lexicon):
+    openpyxl = pytest.importorskip("openpyxl")
+    path = tmp_path / "legacy.xlsx"
+    book = openpyxl.Workbook()
+    book.active.append(["g]kfn /fi6« a}+s", "Reporting Stats"])
+    book.save(path)
+
+    recovered = recovery.recover(
+        path, _result(family="spreadsheet", text=""), converter=UselessConverter(),
+        lexicon=lexicon, ocr=StubOcr(),
+    )
+    page = recovered.pages[0]
+    assert page.ok is False and page.reason == "conversion_unresolved"
+    assert "g]kfn" not in page.text
 
 
 # --------------------------------------------------------------------------- #
