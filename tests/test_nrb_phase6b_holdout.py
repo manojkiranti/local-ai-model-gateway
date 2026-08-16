@@ -163,3 +163,96 @@ def test_phase6a_manifest_is_unchanged():
     assert manifest.selection_sha256 == PHASE6A_FINGERPRINT
     assert verify_manifest(manifest).ok
     assert len(manifest.keys()) == 400
+
+
+# --------------------------------------------------------------------------- #
+# The manual-review pack — the evidence a Nepali reader adjudicates.
+#
+# These guard the pack's HONESTY, not the classifier: that it accounts for all
+# 150 frozen entries rather than only the ones that worked, that it never awards
+# itself a semantic verdict, and that it does not quietly narrow the queue it
+# claims to cover. Pure file reads, like everything above.
+# --------------------------------------------------------------------------- #
+EVIDENCE = _ROOT / "docs" / "nrb" / "phase6b-routing-holdout-evidence.json"
+PROFILE = _ROOT / "docs" / "nrb" / "phase6b-routing-holdout-profile.json"
+CONVERSION_GATE = 0.80
+
+
+def _evidence() -> dict:
+    return json.loads(EVIDENCE.read_text(encoding="utf-8"))
+
+
+def _english_share(item: dict) -> float:
+    seen = item["legacy_units_seen"]
+    return item["legacy_units_reading_as_english"] / seen if seen else 0.0
+
+
+def test_the_acquisition_accounting_reconciles_to_exactly_150():
+    """Every frozen entry lands in exactly one bucket. The failure this prevents
+    is the quiet one: reporting 142 as though it were the cohort, with the eight
+    absences neither named nor counted."""
+    acct = _evidence()["acquisition"]
+    assert acct["requested"] == HOLDOUT_SIZE
+    assert sum(acct["counts"].values()) == HOLDOUT_SIZE
+    accounted = [e["comparison_key"]
+                 for rows in acct["buckets"].values() for e in rows]
+    assert len(accounted) == HOLDOUT_SIZE
+    assert set(accounted) == set(_keys(HOLDOUT))
+
+
+def test_no_holdout_key_was_substituted_or_resampled():
+    """The keys the pack accounts for are the frozen keys — not a re-draw, not a
+    superset, not the fetchable subset."""
+    acct = _evidence()["acquisition"]
+    accounted = {e["comparison_key"]
+                 for rows in acct["buckets"].values() for e in rows}
+    assert accounted == set(_keys(HOLDOUT))
+    assert acct["buckets"].get("no_catalog_row", []) == []
+
+
+def test_the_pack_never_awards_itself_a_nepali_verdict():
+    """`confirmed_correct` is a human's word. A generator that could write it
+    would eventually write it by accident, and the whole review would be
+    circular."""
+    payload = _evidence()
+    forbidden = {"confirmed_correct", "confirmed_wrong"}
+    for item in payload["items"]:
+        assert item["semantic_verdict"] == "awaiting_nepali_review"
+        for unit in item["evidence"]:
+            assert unit["semantic_verdict"] not in forbidden
+
+
+def test_the_pack_covers_the_whole_high_confidence_queue():
+    """All 56, not a hand-picked sample — and the same 56 the Task 3 profile
+    counted, so the two documents cannot drift apart."""
+    profile = json.loads(PROFILE.read_text(encoding="utf-8"))
+    high = [i for i in _evidence()["items"]
+            if i["band"] == ">=0.80" and i["reason"] == "legacy_font_suspected"]
+    assert len(high) == profile["candidate_queue"]["routed"]
+    assert all(i["evidence"] for i in high)
+
+
+def test_the_english_false_positive_class_sits_outside_the_conversion_gate():
+    """The defect is real and is reported unfixed. What makes that safe is that
+    every instance is below `unit_legacy_ratio >= 0.80` — if one ever climbs into
+    the queue this stops being a caveat and becomes a blocker."""
+    routed = [i for i in _evidence()["items"]
+              if i["reason"] == "legacy_font_suspected"]
+    mis_routed = [i for i in routed if _english_share(i) >= 0.50]
+    assert mis_routed, "the known template false positives should still be found"
+    assert all(i["unit_legacy_ratio"] < CONVERSION_GATE for i in mis_routed)
+    # And nothing in the queue is anywhere near the definition.
+    queue = [i for i in routed if i["unit_legacy_ratio"] >= CONVERSION_GATE]
+    assert max(_english_share(i) for i in queue) < 0.50
+
+
+def test_spreadsheet_evidence_is_cells_never_rendered_rows():
+    """`|` is a Preeti codepoint that maps to `्र`, so a `" | "`-joined row is
+    unsafe to judge, convert or show. Every workbook unit in the pack must carry
+    a real sheet/cell coordinate and must not be a rendered row."""
+    for item in _evidence()["items"]:
+        if item["family"] != "spreadsheet":
+            continue
+        for unit in item["evidence"]:
+            assert "!" in unit["where"], unit["where"]
+            assert " | " not in unit["original"], unit["original"]

@@ -2450,3 +2450,195 @@ still not installed by `Dockerfile`.
 
 **Not done, deliberately:** no conversion is wired, no `converted` status exists,
 no extracted text was mutated, and no OCR was run.
+
+## 15. Phase 6B Task 3B — holdout evidence closure + the review pack
+
+Task 3 produced numbers. This produced the thing a Nepali reader can actually
+sit down with, and closed the two accounting gaps §14 left open: what happened
+to all 150 frozen entries (not just the 142 that were evaluated), and *where on
+the page* each flagged unit came from.
+
+Nothing here changes a classifier, a threshold, a guard or an extractor version.
+`app/nrb/{units,routing,quality,extraction,legacy_*,lexicon,devanagari}.py` are
+byte-identical to commit `2a6b498`. No migration, no OCR, no chunking, no
+embedding, no pgvector write, no production conversion.
+
+Command: `scripts/nrb_holdout_evidence.py` (read-only, offline). Artifacts:
+`docs/nrb/phase6b-routing-holdout-manual-review.md`,
+`docs/nrb/phase6b-routing-holdout-evidence.json`, and 61 rendered source pages
+under `docs/nrb/holdout-pages/`.
+
+### 15.1 All 150 entries reconcile, and none was substituted
+
+| outcome | n |
+| --- | ---: |
+| `suspicious` (native-2 flagged legacy) | 67 |
+| `extracted` (clean) | 49 |
+| `needs_ocr` | 17 |
+| `unsupported` (no parser) | 8 |
+| `failed` (parser error) | 1 |
+| never fetched — HTTP 404 | 8 |
+| **total** | **150** |
+
+Every frozen key resolves to exactly one `nrb_files` row (**0** keys with no
+catalog row), the 142 fetched blobs are 142 *distinct* `content_sha256` (no two
+holdout keys share bytes), and all 150 rows carry `last_fetch_run_id = 436` — one
+pass, so nothing was already on disk and nothing was re-fetched after the
+outcomes were visible. The manifest's fingerprint still verifies, so the cohort
+committed at `ddc5f2d` before any network access is the cohort that was measured.
+
+The eight absences are genuine: HTTP 404, one attempt each, and NRB's own ACF
+metadata reports `filesize = 0` for all eight. Seven `.pdf` and one `.jpg`, all
+from `/uploads/2019/12/` — the CMS-migration cohort §7 already found to be the
+corpus's damaged quarter. **They stay in the denominator.**
+
+Also worth recording: the holdout's 142 blobs share **zero bytes** with Phase
+6A's 381. Independence was enforced on URL identity; it happens to hold on
+content too.
+
+### 15.2 The `unsupported` bucket is 8 OLE2 files, not 6 `.xls`
+
+§14 said six legacy `.xls`. The full accounting says **eight pre-2007 Office
+binaries**: 6 `.xls` and **2 `.doc`**, every one sniffed
+`application/x-ole-storage`. `extraction.extract_file` refuses them by extension
+*before* the sniffed family is consulted, which is why an OLE2 blob never reaches
+openpyxl and never produces a misleading partial parse. NRB's `resource_type`
+calls all 26 spreadsheet-typed files spreadsheets; only 20 are xlsx that openpyxl
+can open, and one of those 20 is the single `parser_error`. A corpus/format gap,
+reported, not fixed.
+
+### 15.3 Location, and why it needed re-parsing
+
+`nrb_extractions` persists no text (`preview` is capped at 300 chars), and the
+text native-2 scored is flat — a PDF's pages are joined with `"\n"` and a
+workbook's cells are rendered `" | "`-joined. Neither can say where a unit came
+from. So the pack re-parses each blob with structure retained and **verifies the
+reconstruction against the stored `unit_total`** before publishing a coordinate;
+70 of 70 items verified.
+
+Two traps, both hit:
+
+1. **`str.splitlines()` is not the inverse of `"\n".join(pages)`.** It also breaks
+   on form feeds and lone `\r`, which a PDF text layer really contains — nine
+   holdout PDFs did. Counting lines per page and accumulating drifts, and a page
+   ending in a form feed produces a line that belongs to neither page. The pack
+   therefore recovers lines *with character offsets* (`_LINE_BOUNDARY`, the exact
+   boundary set) and maps each offset back to a page, asserting the result equals
+   `text.splitlines()`. With that, all nine attribute correctly.
+2. **Cell boundaries must come from the workbook.** Task 3's validator recovered
+   cells by splitting the rendered row back on `" | "` — a faithful inverse only
+   while no cell contains that sequence. The pack re-reads the workbook, so a
+   coordinate is a real `Sheet!B27`. Row/column origins come from openpyxl's
+   `min_row`/`min_column`, because `iter_rows()` starts at the first populated
+   cell, not at A1.
+
+### 15.4 Three questions, still three answers
+
+| question | evidence | result |
+| --- | --- | --- |
+| **Routing precision** — is the routed *input* legacy Nepali? | script-independent: are the units native-2 flagged readable English? | **56/56**, 0 false routes; highest English share in the band **8.9%** |
+| **Conversion recovery** — did npttf2utf produce usable Unicode? | structural: acceptance rate + native-1 flag cleared | **52/56** (36 clean, 16 partial), 4 unresolved |
+| **Conversion correctness** — is it *correct Nepali*? | a reader comparing the pack against the rendered page | **no result — 0 of 56 adjudicated** |
+
+`52/56` is a recovery figure and the pack says so in as many words. It is not
+confirmed semantic success and must not be quoted as one.
+
+### 15.5 The English false-positive class, narrowed to four
+
+Restricted to documents native-2 actually **routed** — a clean document that
+merely contains English-looking units was not routed and is not a false positive.
+That leaves exactly the four §14.3 named: `690c193dc4a9` (0.5385),
+`971aa739f844` (0.5185), `c38524fc9404` (0.5185), `ed3bd543c54a` (0.4828), four
+copies of one NRB *Sources and Uses of Microfinance* template, 14 of 14 flagged
+units readable English, every instance below the `0.80` gate.
+
+The pack now names the cells: `Sources & Uses!B39` = `Profit & Loss A/c`,
+`!B27` = `5.2.Pension & Gratuity Fund`, `!B44` = `2.2.in "A"Class Licensed
+Institution`. The mechanism is two typographic habits defeating §13.2's own
+corrections — a `<digit>.<digit>.<Word>` outline label is a single token with an
+intra-word symbol and is not a letter-bearing compound like `FIU-Nepal`, and
+`A/c` is a two-letter vowel-less token carrying a symbol. Every other cell on the
+sheet is numeric and therefore `unjudged`, so the denominator shrinks until 14
+labels reach ~0.5.
+
+**Still unfixed, deliberately.** This holdout has now exposed the defect and may
+not be reused as independent validation for a classifier modified to correct it.
+That fix is `native-3` plus a new cohort, drawn with `exclude_keys` covering
+**both** Phase 6A and this holdout.
+
+### 15.6 Only one of the three false-negative candidates survives
+
+§14.5 listed three clean documents carrying long legacy runs. Asking whether
+their flagged units are English — decidable without Nepali — settles two of them:
+
+| blob | flagged units | reading as English | verdict |
+| --- | ---: | ---: | --- |
+| `7425cbd1d9ee` | 31 | 31 (100%) | **not a miss** — `(y-o-y)`, `91-day T-bills Rate`, `Broad Money (M2)` |
+| `d74b592c894a` | 59 | 37 (63%) | **not a miss** — `2.1 Why are Banks Supervised?`, `Supervision By-laws 2002` |
+| `a2077aa9b24d` | 14 | 1 (7%) | **genuine candidate miss** — real Preeti |
+
+So the same defect that produces §15.5's false positives also produces most of
+what looked like false negatives, and in those two cases native-2's *document*
+call was right for the wrong reason.
+
+`a2077aa9b24d` is the real one, and it missed by exactly one condition. The
+minority-region rule needs all three of `legacy >= 10` (14 ✓),
+`max_legacy_run >= 3` (10 ✓) and `contested_legacy_ratio >= 0.50` (**0.2857 ✗**).
+Its `Summary` sheet carries a genuine Preeti block — `Summary!C16`
+`Joj;flos s[lif tyf kz'kG5L shf{` → `व्यवसायिक कृषि तथा पशुपन्छी कर्जा` — inside
+a workbook that is otherwise clean English and numbers. **Diagnostic only. Do not
+lower `MINORITY_MIN_CONTESTED_RATIO` on the strength of one holdout document** —
+that is the tuning-against-the-holdout move §14.7 forbids, and it belongs to
+`native-3` with a new cohort.
+
+### 15.7 What the reader has to do
+
+All 56 queue items are in the pack with their flagged units (up to 10 in the
+Markdown, 40 in the JSON, always in document order, with the true total stated),
+the converted Unicode, the converter's disposition per unit, and — for the 53
+PDFs — a rendered page at 90 dpi so the comparison needs no network. Every
+semantic verdict reads `awaiting_nepali_review`; a test asserts the generator can
+never write `confirmed_correct` itself.
+
+What does **not** need a reader, because it is script-independent and already
+settled: the four English false positives, the six input-guard controls, the
+zero images and zero docx routed, and the `a2077aa9b24d` diagnosis above.
+
+Development-set reviews (the five Task 2 spreadsheet cases, the Preeti reading of
+`8df7b02f8a13`) are appended to the same pack under a heading that marks them
+`development evidence — not Phase 6B holdout`, so one sitting clears the backlog
+without contaminating the holdout statistics.
+
+### 15.8 Evaluation & Improvement
+
+**Success metric.** Share of `>=0.80`-routed blobs a Nepali reader marks
+`confirmed_correct`. Proxy until reviews land: routing precision on unseen files,
+currently 56/56.
+
+**Eval.** The pack is the labelled set: 56 items, each with the flagged unit, the
+converted output and the rendered page. Scored by reader verdict per item.
+Current agreement rate **not yet measurable** — 0 of 56 adjudicated. Six
+committed tests guard the pack itself (accounting reconciles to 150, no
+substitution, no auto-confirmed verdict, whole queue covered, false positives
+outside the gate, spreadsheet units are cells not rendered rows).
+
+**Feedback capture.** The reader edits the verdict column in §3 and the per-item
+line in §4 of the pack, in place, under version control. Routing disagreements
+(the English column) and conversion disagreements are logged separately because
+they have different fixes.
+
+**Review loop.** On reader return, and at every extractor-version change. A
+`native-3` addressing §15.5 or §15.6 invalidates this cohort as validation
+evidence and requires a fresh draw.
+
+### 15.9 The gate
+
+Unchanged from §14.7, with two refinements: the false-positive class is four
+routed documents rather than six candidates, and only one of the three
+false-negative candidates is real.
+
+**Independent holdout evidence strongly supports the native-2 `>=0.80`
+high-confidence routing candidate, but semantic conversion correctness remains
+pending Nepali human review. Native-2 also exposed a real lower-band English
+false-positive class. No classifier change or production converter integration is
+made in this task.**
