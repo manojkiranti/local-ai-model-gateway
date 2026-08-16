@@ -112,6 +112,52 @@ def test_the_holdout_seed_is_independent_of_phase6a():
 # --------------------------------------------------------------------------- #
 # Phase 6A must not have been touched to make room for the holdout
 # --------------------------------------------------------------------------- #
+# --------------------------------------------------------------------------- #
+# What the holdout actually validated — the classifier must not drift away from
+# the values the independent evidence was collected at
+# --------------------------------------------------------------------------- #
+def test_native2_was_validated_at_these_exact_thresholds():
+    """The holdout validates the classifier committed at 2a6b498. If any of these
+    move, the holdout stops being evidence for the shipped behaviour and the change
+    needs a new extractor version and a NEW cohort (§29) — not a re-run here."""
+    from app.nrb import quality, routing
+
+    assert routing.EXTRACTOR_VERSION_V2 == "native-2"
+    assert quality.LEGACY_LINE_RATIO == 0.20        # never lowered for the minority case
+    assert routing.MIN_JUDGED_FOR_RATIO == 8
+    assert routing.MIN_LEGACY_ABSOLUTE == 4
+    assert routing.MINORITY_MIN_LEGACY_UNITS == 10
+    assert routing.MINORITY_MIN_RUN == 3
+    assert routing.MINORITY_MIN_CONTESTED_RATIO == 0.50
+
+
+def test_the_conversion_gate_reads_the_unit_metric_not_the_line_metric():
+    """The candidate gate is `unit_legacy_ratio >= 0.80` — native-2's OWN metric.
+    Substituting native-1's document-level `legacy_line_ratio` would route a
+    different population entirely, which is exactly the confusion §12 of the task
+    warns about. This asserts the two are genuinely different quantities on a shape
+    the holdout contains: a workbook whose Preeti sits in a minority of cells."""
+    from app.nrb import quality, routing, units
+
+    # A spreadsheet-like text: mostly numeric rows (unjudged as UNITS, but counted
+    # as clean LINES by native-1), plus a few glyph-mapped labels.
+    legacy_cells = ["sfo{If]q ePsf] lhNnf ;+Vof", "s'n shf{ ljt/0f", "k|d'v s[lif afnL"]
+    numeric = [f"{i},234.00 | {i}00.00 | {i}.5" for i in range(1, 12)]
+    text = "\n".join(legacy_cells + numeric)
+
+    line_ratio = quality.measure_text(text).legacy_line_ratio
+    cells = tuple(legacy_cells) + tuple(
+        c.strip() for row in numeric for c in row.split(" | ")
+    )
+    profile = units.profile_units([units.assess_unit(c) for c in cells])
+
+    # The unit view discounts the numeric filler; the line view does not. They must
+    # not be interchangeable — if they ever coincide, this test has stopped testing.
+    assert profile.legacy_unit_ratio != line_ratio
+    assert profile.legacy_unit_ratio > line_ratio
+    assert routing.unit_metrics(profile)["unit_legacy_ratio"] == profile.legacy_unit_ratio
+
+
 def test_phase6a_manifest_is_unchanged():
     manifest = read_manifest(PHASE6A)
     assert manifest.selection_sha256 == PHASE6A_FINGERPRINT

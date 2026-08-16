@@ -1,0 +1,216 @@
+================================================================================
+NRB PHASE 6B TASK 3 — MANUAL REVIEW OF THE ROUTING HOLDOUT
+================================================================================
+
+Hand-checkable evidence for the independent holdout. Sampling is
+deterministic (lowest content_sha256 per band). STATUS labels:
+  confirmed_correct     — script-independent (English/numeric/Unicode); verified here
+  confirmed_wrong       — a false route or destroyed control, verified here
+  awaiting_nepali_review — recovered Nepali; needs a competent reader
+  ambiguous / unresolved — the validator could not vouch and neither can I
+
+--------------------------------------------------------------------------------
+HIGH BAND >=0.80 — candidate conversion queue (up to 10)
+--------------------------------------------------------------------------------
+  08c2960b46a8  pdf  rule_bylaw/2021
+    unit_legacy_ratio=1.0  legacy_line_ratio=1.0  dev 0.0->0.9441  english_share=0.0
+    attempted=331 accepted=208 ambiguous=120 rejected=3 guarded(en/uni)=0/0
+    recovery=recovered  verdict=legacy_recovered
+    STATUS: awaiting_nepali_review (glyph-mapped; converter produced Unicode)
+
+  1879b70a12c4  pdf  license_registry/2025
+    unit_legacy_ratio=1.0  legacy_line_ratio=1.0  dev 0.0->0.9423  english_share=0.0
+    attempted=182 accepted=80 ambiguous=102 rejected=0 guarded(en/uni)=0/0
+    recovery=recovered  verdict=legacy_recovered
+    STATUS: awaiting_nepali_review (glyph-mapped; converter produced Unicode)
+
+  18bacb44dc58  pdf  publication/2026
+    unit_legacy_ratio=0.9172  legacy_line_ratio=0.9121  dev 0.0->0.4779  english_share=0.0707
+    attempted=767 accepted=215 ambiguous=216 rejected=336 guarded(en/uni)=63/0
+    recovery=partial  verdict=legacy_recovered
+    STATUS: awaiting_nepali_review (glyph-mapped; converter produced Unicode)
+
+  1a9b6321aa61  pdf  enforcement_action/2020
+    unit_legacy_ratio=1.0  legacy_line_ratio=1.0  dev 0.0->0.9209  english_share=0.0
+    attempted=10 accepted=7 ambiguous=2 rejected=1 guarded(en/uni)=0/0
+    recovery=recovered  verdict=legacy_recovered
+    STATUS: awaiting_nepali_review (glyph-mapped; converter produced Unicode)
+
+  225eb5fb2491  pdf  enforcement_action/2019
+    unit_legacy_ratio=1.0  legacy_line_ratio=0.9286  dev 0.0->0.711  english_share=0.0
+    attempted=55 accepted=10 ambiguous=36 rejected=9 guarded(en/uni)=0/0
+    recovery=recovered  verdict=legacy_recovered
+    STATUS: awaiting_nepali_review (glyph-mapped; converter produced Unicode)
+
+  268bcfe86d03  pdf  circular/2007
+    unit_legacy_ratio=1.0  legacy_line_ratio=1.0  dev 0.0->0.4209  english_share=0.0
+    attempted=21 accepted=5 ambiguous=7 rejected=9 guarded(en/uni)=0/0
+    recovery=partial  verdict=legacy_recovered
+    STATUS: awaiting_nepali_review (glyph-mapped; converter produced Unicode)
+
+  29f0b4cefe1e  pdf  rule_bylaw/2020
+    unit_legacy_ratio=0.9431  legacy_line_ratio=0.9313  dev 0.0->0.8796  english_share=0.0619
+    attempted=482 accepted=329 ambiguous=143 rejected=10 guarded(en/uni)=61/0
+    recovery=recovered  verdict=legacy_recovered
+    STATUS: awaiting_nepali_review (glyph-mapped; converter produced Unicode)
+
+  2e65dadfffa3  pdf  notice/2016
+    unit_legacy_ratio=1.0  legacy_line_ratio=1.0  dev 0.0->0.1996  english_share=0.0
+    attempted=30 accepted=0 ambiguous=9 rejected=21 guarded(en/uni)=1/0
+    recovery=partial  verdict=legacy_recovered
+    STATUS: awaiting_nepali_review (glyph-mapped; converter produced Unicode)
+
+  32898ddf7317  pdf  statistics/2020
+    unit_legacy_ratio=0.995  legacy_line_ratio=0.7148  dev 0.0->0.732  english_share=0.0
+    attempted=362 accepted=137 ambiguous=221 rejected=4 guarded(en/uni)=0/0
+    recovery=recovered  verdict=legacy_recovered
+    STATUS: awaiting_nepali_review (glyph-mapped; converter produced Unicode)
+
+  360eaafd44bd  pdf  circular/2020
+    unit_legacy_ratio=0.9875  legacy_line_ratio=0.9875  dev 0.0->0.0972  english_share=0.0808
+    attempted=149 accepted=2 ambiguous=31 rejected=116 guarded(en/uni)=9/0
+    recovery=partial  verdict=legacy_recovered
+    STATUS: awaiting_nepali_review (glyph-mapped; converter produced Unicode)
+
+--------------------------------------------------------------------------------
+MIDDLE BAND 0.50-0.80 (up to 5)
+--------------------------------------------------------------------------------
+  323d055b887c  pdf  publication/2019
+    unit_legacy_ratio=0.5468  legacy_line_ratio=0.5591  dev 0.0->0.3396  english_share=0.4513
+    attempted=9757 accepted=6350 ambiguous=3319 rejected=88 guarded(en/uni)=9216/0
+    recovery=partial  verdict=legacy_recovered
+    STATUS: awaiting_nepali_review (glyph-mapped; converter produced Unicode)
+
+  39127ef55d0f  pdf  report/2018
+    unit_legacy_ratio=0.6686  legacy_line_ratio=0.5939  dev 0.0->0.4025  english_share=0.2934
+    attempted=3553 accepted=2367 ambiguous=1133 rejected=53 guarded(en/uni)=2444/0
+    recovery=partial  verdict=legacy_recovered
+    STATUS: awaiting_nepali_review (glyph-mapped; converter produced Unicode)
+
+  690c193dc4a9  spreadsheet  report/2019
+    unit_legacy_ratio=0.5385  legacy_line_ratio=0.0  dev 0.0->0.0  english_share=0.9625
+    attempted=0 accepted=0 ambiguous=0 rejected=0 guarded(en/uni)=140/0
+    recovery=unresolved  verdict=false_route_english
+    STATUS: confirmed_wrong (English routed as legacy)
+
+  8ea1a832c648  pdf  directive/2026
+    unit_legacy_ratio=0.7421  legacy_line_ratio=0.7714  dev 0.0->0.5921  english_share=0.2729
+    attempted=4209 accepted=3106 ambiguous=962 rejected=141 guarded(en/uni)=2550/0
+    recovery=partial  verdict=legacy_recovered
+    STATUS: awaiting_nepali_review (glyph-mapped; converter produced Unicode)
+
+  90bf28238c3b  pdf  report/2021
+    unit_legacy_ratio=0.5986  legacy_line_ratio=0.5377  dev 0.0->0.3437  english_share=0.351
+    attempted=2769 accepted=1776 ambiguous=957 rejected=36 guarded(en/uni)=2737/0
+    recovery=partial  verdict=legacy_recovered
+    STATUS: awaiting_nepali_review (glyph-mapped; converter produced Unicode)
+
+--------------------------------------------------------------------------------
+LOW BAND 0.20-0.50 (up to 5)
+--------------------------------------------------------------------------------
+  ed3bd543c54a  spreadsheet  report/2021
+    unit_legacy_ratio=0.4828  legacy_line_ratio=0.0  dev 0.0->0.0  english_share=0.9286
+    attempted=1 accepted=0 ambiguous=1 rejected=0 guarded(en/uni)=139/0
+    recovery=partial  verdict=false_route_english
+    STATUS: confirmed_wrong (English routed as legacy)
+
+--------------------------------------------------------------------------------
+MINORITY-REGION ROUTED (up to 5)
+--------------------------------------------------------------------------------
+  da0c680d072d  pdf  untyped/2024
+    unit_legacy_ratio=0.0089  legacy_line_ratio=0.0807  dev 0.0->0.0093  english_share=0.9793
+    attempted=12 accepted=7 ambiguous=5 rejected=0 guarded(en/uni)=1228/0
+    recovery=recovered  verdict=legacy_recovered
+    STATUS: awaiting_nepali_review (glyph-mapped; converter produced Unicode)
+
+--------------------------------------------------------------------------------
+SPREADSHEET LEGACY CASES (up to 5)
+--------------------------------------------------------------------------------
+  43ae9e7df5c8  spreadsheet  research/2020
+    unit_legacy_ratio=0.9931  legacy_line_ratio=0.1941  dev 0.0->0.2799  english_share=0.0051
+    attempted=14428 accepted=467 ambiguous=13946 rejected=15 guarded(en/uni)=78/0
+    recovery=recovered  verdict=legacy_recovered
+    STATUS: awaiting_nepali_review (glyph-mapped; converter produced Unicode)
+
+  634596dc4eda  spreadsheet  research/2022
+    unit_legacy_ratio=0.971  legacy_line_ratio=0.1834  dev 0.0->0.2061  english_share=0.0027
+    attempted=2455 accepted=64 ambiguous=2386 rejected=5 guarded(en/uni)=8/0
+    recovery=recovered  verdict=legacy_recovered
+    STATUS: awaiting_nepali_review (glyph-mapped; converter produced Unicode)
+
+  690c193dc4a9  spreadsheet  report/2019
+    unit_legacy_ratio=0.5385  legacy_line_ratio=0.0  dev 0.0->0.0  english_share=0.9625
+    attempted=0 accepted=0 ambiguous=0 rejected=0 guarded(en/uni)=140/0
+    recovery=unresolved  verdict=false_route_english
+    STATUS: confirmed_wrong (English routed as legacy)
+
+  8cdf6363a8d2  spreadsheet  research/2025
+    unit_legacy_ratio=0.9688  legacy_line_ratio=0.1524  dev 0.0->0.1791  english_share=0.0021
+    attempted=2340 accepted=62 ambiguous=2271 rejected=7 guarded(en/uni)=7/0
+    recovery=recovered  verdict=legacy_recovered
+    STATUS: awaiting_nepali_review (glyph-mapped; converter produced Unicode)
+
+  971aa739f844  spreadsheet  report/2025
+    unit_legacy_ratio=0.5185  legacy_line_ratio=0.0  dev 0.0->0.0  english_share=0.963
+    attempted=0 accepted=0 ambiguous=0 rejected=0 guarded(en/uni)=126/0
+    recovery=unresolved  verdict=false_route_english
+    STATUS: confirmed_wrong (English routed as legacy)
+
+--------------------------------------------------------------------------------
+FALSE POSITIVES — flagged units that are readable English (confirmed here)
+--------------------------------------------------------------------------------
+  690c193dc4a9 spreadsheet band=0.50-0.80  unit_ratio=0.5385  14/14 flagged units are English
+    STATUS: confirmed_wrong (English routed as legacy — script-independent)
+  971aa739f844 spreadsheet band=0.50-0.80  unit_ratio=0.5185  14/14 flagged units are English
+    STATUS: confirmed_wrong (English routed as legacy — script-independent)
+  c38524fc9404 spreadsheet band=0.50-0.80  unit_ratio=0.5185  14/14 flagged units are English
+    STATUS: confirmed_wrong (English routed as legacy — script-independent)
+  ed3bd543c54a spreadsheet band=0.20-0.50  unit_ratio=0.4828  14/14 flagged units are English
+    STATUS: confirmed_wrong (English routed as legacy — script-independent)
+  IN THE HIGH BAND (candidate conversion queue): 0
+
+--------------------------------------------------------------------------------
+INPUT-GUARD CONTROLS — native-2 clean, ZERO legacy units, must be untouched
+--------------------------------------------------------------------------------
+  1edd82c6c430 english_numeric_clean  dev=0.0 converted=0
+    STATUS: confirmed_correct (converter touched nothing)
+  6181952b868e english_numeric_clean  dev=0.0 converted=0
+    STATUS: confirmed_correct (converter touched nothing)
+  747522f45151 english_numeric_clean  dev=0.0 converted=0
+    STATUS: confirmed_correct (converter touched nothing)
+  a9204333929c english_numeric_clean  dev=0.0 converted=0
+    STATUS: confirmed_correct (converter touched nothing)
+  d449d6ffc79e english_numeric_clean  dev=0.0 converted=0
+    STATUS: confirmed_correct (converter touched nothing)
+  842ab02fb3fa genuine_unicode        dev=0.8439 converted=0
+    STATUS: confirmed_correct (converter touched nothing)
+
+--------------------------------------------------------------------------------
+FALSE-NEGATIVE CANDIDATES — native-2 CLEAN docs carrying legacy units (up to 8)
+--------------------------------------------------------------------------------
+  01b0c99276be pdf         legacy_units=10 judged=427 max_run=2 converted=0
+    STATUS: awaiting_nepali_review (scattered legacy unit(s) — likely noise)
+  121b0de258ad pdf         legacy_units=13 judged=87 max_run=3 converted=1
+    STATUS: awaiting_nepali_review (likely missed legacy region)
+  1b0beb646790 pdf         legacy_units=1 judged=2 max_run=1 converted=0
+    STATUS: awaiting_nepali_review (scattered legacy unit(s) — likely noise)
+  2d2603f958cf spreadsheet legacy_units=1 judged=25 max_run=1 converted=0
+    STATUS: awaiting_nepali_review (scattered legacy unit(s) — likely noise)
+  3fdd3d571824 spreadsheet legacy_units=1 judged=25 max_run=1 converted=0
+    STATUS: awaiting_nepali_review (scattered legacy unit(s) — likely noise)
+  42733f3ea850 pdf         legacy_units=1 judged=23 max_run=1 converted=0
+    STATUS: awaiting_nepali_review (scattered legacy unit(s) — likely noise)
+  439d98316cb1 pdf         legacy_units=54 judged=456 max_run=2 converted=0
+    STATUS: awaiting_nepali_review (scattered legacy unit(s) — likely noise)
+  48f4e170e1bc spreadsheet legacy_units=1 judged=19 max_run=1 converted=0
+    STATUS: awaiting_nepali_review (scattered legacy unit(s) — likely noise)
+
+================================================================================
+SUMMARY OF WHAT NEEDS A NEPALI READER
+================================================================================
+Every HIGH/MIDDLE/LOW/MINORITY/SPREADSHEET case marked
+awaiting_nepali_review is a glyph-mapped input the converter turned into
+Unicode; whether that Unicode is CORRECT Nepali is not asserted here. The
+English/numeric/Unicode controls and any false_route_english case are
+script-independent and are labelled confirmed above.
+

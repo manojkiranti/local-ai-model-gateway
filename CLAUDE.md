@@ -48,10 +48,21 @@ false positives corrected, spreadsheets judged per CELL for the first time
 (0 → 11 flagged), and 4 minority Preeti regions found inside Unicode-majority
 documents — with `legacy_line_ratio >= 0.20` **unchanged**. Classification only:
 it never invokes the converter.
-**NRB documents are now parsed
+**Phase 6B Task 3 (independent holdout validation) is DONE and native-2 is
+VALIDATED (2026-08-16, §14)**: a frozen 150-file cohort
+(`docs/nrb/phase6b-routing-holdout.json`, `6344e674…`) drawn with **zero
+intersection** with Phase 6A, committed before any network access; 142 fetched
+(8 honest 404s kept in the denominator), 142 native-2 rows, second pass 0 pending.
+On files that never influenced it, native-2 flagged 67/142 — circular 9/9,
+rule_bylaw 5/5, enforcement 4/4 — and the candidate gate `unit_legacy_ratio >= 0.80`
+routed **56 blobs with 0 English false positives**, 52 recovering usable Unicode.
+One new false-positive class was found (English accounting templates, 4 blobs) and
+**reported, not fixed** — it sits at 0.48–0.54, entirely outside the gate, and its
+fix is a `native-3` change needing a new cohort. **NRB documents are now parsed
 and classified, but still NOT chunked, embedded or searchable** — the rest of 6B
 (OCR strategy), 7 (chunk+embed) and 8 (`search_nrb_documents`) are
-not started; the 6B gate and its recommendations are §11.9, §12.10 and §13.11. The roadmap was renumbered when Phase 4 was scoped down to
+not started; the 6B gate and its recommendations are §11.9, §12.10, §13.11 and
+§14.7. The roadmap was renumbered when Phase 4 was scoped down to
 persistence; read that doc before touching anything NRB-related instead of
 re-deriving status from chat history.
 
@@ -97,7 +108,7 @@ routing classifier; imports NOTHING from `legacy_font`, run via
 `scripts/nrb_extract.py --extractor-version native-2` and compared by
 `scripts/nrb_native2_compare.py`); `report` = all of them — everything but `client` is
 **not** model-facing, run via
-`scripts/nrb_{sitemap_inventory,document_inventory,sync,fetch,sample,extract,calibrate,build_lexicon,legacy_eval,native2_compare}.py`), `tools/` (`registry.py` = engine; `local/` package = one module
+`scripts/nrb_{sitemap_inventory,document_inventory,sync,fetch,sample,extract,calibrate,build_lexicon,legacy_eval,native2_compare,holdout_validate}.py`), `tools/` (`registry.py` = engine; `local/` package = one module
 per in-process tool, each exporting a `SPEC`, aggregated in `local/__init__.py`'s
 `LOCAL_TOOLS`), `agent/` (hand-rolled loop; `loop.stream_turn` = async event
 generator, `loop.run_turn` = collect for non-stream, `schemas` = trace types —
@@ -383,6 +394,29 @@ events (`token`/`tool_call`/`tool_result`/`done`) + the new id in the
   break a run. `routing.py`/`units.py` import nothing from `legacy_font`: the
   converter is GPL-3, and a classifier that needed it would drag the licence gate
   into every deployment.
+- **The Phase 6B holdout is SPENT EVIDENCE — never tune against it.** Every number
+  in §14 is worth having only because `docs/nrb/phase6b-routing-holdout.json`
+  (`6344e674…`) contains no file that shaped native-2. Independence is enforced by
+  the sampler, not by hand: `sampling.stratified_sample(exclude_keys=…)` drops
+  candidates **before stratification** (so they never touch allocation or strata)
+  and hashes the excluded SET into the parameters as `exclude_keys_sha256` — a
+  count alone would let someone swap which 400 keys were withheld. Two consequences
+  a rewrite must not lose: (1) **an un-excluded draw records no exclusion key at
+  all**, which is why Phase 6A's `1ae297db…` still re-verifies byte-identically;
+  (2) **the moment the classifier changes in response to a holdout finding, that
+  holdout becomes development evidence** — the change needs a new extractor version
+  (`native-3`) and a NEW cohort. That is exactly why §14.3's English-accounting-
+  template false positive (`Profit & Loss A/c`, `5.2.Pension & Gratuity Fund` — 14
+  of 14 flagged units readable English, in four copies of one NRB template) is
+  written down and left unfixed. It sits at unit ratio 0.48–0.54, and the
+  conversion gate is 0.80, so it is a caveat rather than a blocker.
+- **The conversion gate is `unit_legacy_ratio`, NOT `legacy_line_ratio`.** They are
+  different quantities and the difference is the whole point of native-2: the three
+  large research workbooks the holdout caught sit at unit ratio 0.969–0.993 while
+  their `legacy_line_ratio` is 0.15–0.19, i.e. native-1 called them clean.
+  Substituting the line metric in a future conversion router would route a
+  different population and silently undo §13.4.
+  `test_the_conversion_gate_reads_the_unit_metric_not_the_line_metric` locks it.
 - **`app/nrb/catalog.py` uses Core statements, never `update(Model)`, and that is
   load-bearing.** `nrb_sources` maps the attribute `meta` onto the column named
   `metadata` (declarative reserves `metadata`). A Core insert wants the key

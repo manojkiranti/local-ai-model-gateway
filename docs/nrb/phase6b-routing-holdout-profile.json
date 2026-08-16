@@ -1,0 +1,2450 @@
+{
+  "identity": {
+    "holdout_fingerprint": "6344e674f788808ab02f46218e59a76c215c0644cb95abbbf8212d45d400a970",
+    "phase6a_fingerprint": "1ae297dba1c33c7db9976f817806f6666371695a31e1f424d046993d581a1312",
+    "holdout_keys": 150,
+    "phase6a_exclusion_verified_empty_intersection": true,
+    "extractor_version": "native-2",
+    "lexicon_fingerprint": "cc1fec3f2808a0a6ecfa2b5d90490f9cb9381ec878ffabe8be2efd503d7cf797",
+    "converter_name": "npttf2utf",
+    "converter_version": "0.3.7",
+    "converter_licence": "GPL-3.0 — distribution gate, see requirements-nrb.txt",
+    "mappings_available": [
+      "Preeti",
+      "Kantipur",
+      "Sagarmatha",
+      "FONTASY_HIMALI_TT",
+      "PCS NEPALI"
+    ],
+    "unique_blobs": 142
+  },
+  "coverage": {
+    "requested": 150,
+    "fetched_unique_blobs": 142,
+    "not_extracted_keys": 8
+  },
+  "status_distribution": {
+    "extracted": 49,
+    "failed": 1,
+    "needs_ocr": 17,
+    "suspicious": 67,
+    "unsupported": 8
+  },
+  "reason_distribution": {
+    "clean": 49,
+    "image_file": 6,
+    "legacy_font_suspected": 67,
+    "no_native_parser": 8,
+    "no_text_layer": 11,
+    "parser_error": 1
+  },
+  "legacy_bands": {
+    ">=0.80": 56,
+    "0.50-0.80": 9,
+    "minority-region-only": 1,
+    "0.20-0.50": 1
+  },
+  "minority_region_total": 66,
+  "minority_region_only": [
+    "da0c680d072d6b266ee040068419df705755752d91663e2b8439ec4201ff0ee8"
+  ],
+  "by_cohort": {
+    "2019": {
+      "total": 37,
+      "legacy": 20
+    },
+    "2020-2022": {
+      "total": 45,
+      "legacy": 18
+    },
+    "2023-2026": {
+      "total": 45,
+      "legacy": 17
+    },
+    "<=2018": {
+      "total": 15,
+      "legacy": 12
+    }
+  },
+  "by_year": {
+    "2007": {
+      "total": 1,
+      "legacy": 1
+    },
+    "2008": {
+      "total": 1,
+      "legacy": 0
+    },
+    "2009": {
+      "total": 3,
+      "legacy": 3
+    },
+    "2010": {
+      "total": 1,
+      "legacy": 1
+    },
+    "2012": {
+      "total": 2,
+      "legacy": 1
+    },
+    "2015": {
+      "total": 3,
+      "legacy": 2
+    },
+    "2016": {
+      "total": 1,
+      "legacy": 1
+    },
+    "2018": {
+      "total": 3,
+      "legacy": 3
+    },
+    "2019": {
+      "total": 37,
+      "legacy": 20
+    },
+    "2020": {
+      "total": 15,
+      "legacy": 8
+    },
+    "2021": {
+      "total": 16,
+      "legacy": 8
+    },
+    "2022": {
+      "total": 14,
+      "legacy": 2
+    },
+    "2023": {
+      "total": 8,
+      "legacy": 2
+    },
+    "2024": {
+      "total": 15,
+      "legacy": 3
+    },
+    "2025": {
+      "total": 14,
+      "legacy": 7
+    },
+    "2026": {
+      "total": 8,
+      "legacy": 5
+    }
+  },
+  "by_document_type": {
+    "act": {
+      "total": 3,
+      "legacy": 2
+    },
+    "career": {
+      "total": 3,
+      "legacy": 0
+    },
+    "circular": {
+      "total": 9,
+      "legacy": 9
+    },
+    "directive": {
+      "total": 3,
+      "legacy": 2
+    },
+    "enforcement_action": {
+      "total": 4,
+      "legacy": 4
+    },
+    "faq": {
+      "total": 1,
+      "legacy": 0
+    },
+    "forex": {
+      "total": 3,
+      "legacy": 3
+    },
+    "guideline_manual": {
+      "total": 4,
+      "legacy": 3
+    },
+    "license_registry": {
+      "total": 5,
+      "legacy": 2
+    },
+    "media": {
+      "total": 8,
+      "legacy": 4
+    },
+    "monetary_operations": {
+      "total": 10,
+      "legacy": 2
+    },
+    "monetary_policy": {
+      "total": 3,
+      "legacy": 3
+    },
+    "notice": {
+      "total": 23,
+      "legacy": 6
+    },
+    "procurement": {
+      "total": 5,
+      "legacy": 1
+    },
+    "publication": {
+      "total": 7,
+      "legacy": 3
+    },
+    "report": {
+      "total": 12,
+      "legacy": 8
+    },
+    "research": {
+      "total": 7,
+      "legacy": 3
+    },
+    "rule_bylaw": {
+      "total": 5,
+      "legacy": 5
+    },
+    "statistics": {
+      "total": 20,
+      "legacy": 5
+    },
+    "untyped": {
+      "total": 7,
+      "legacy": 2
+    }
+  },
+  "by_resource_type": {
+    "document": {
+      "total": 3,
+      "legacy": 0
+    },
+    "image": {
+      "total": 6,
+      "legacy": 0
+    },
+    "pdf": {
+      "total": 107,
+      "legacy": 60
+    },
+    "spreadsheet": {
+      "total": 26,
+      "legacy": 7
+    }
+  },
+  "spreadsheets": {
+    "total": 20,
+    "legacy": 7,
+    "flagged": [
+      "43ae9e7df5c80e5fe76c0453dcec33f2ab006a14cfdb2913a87384eea194dd49",
+      "634596dc4eda5f8d951f5d3f8054bb2e31b65c2f7f5ad60805fe7e9e2f35c220",
+      "690c193dc4a98849b91ed4d38585b66f29d14b9136849bbffa16e8163bb72127",
+      "8cdf6363a8d2c4ef9b8462dba700a7fbc28bdf50f0987da641185691d389ba71",
+      "971aa739f8441e2b18c428c3c990158e419406ba89fa6597697532d474fa4daa",
+      "c38524fc94040d4406f04a681ecda3d06b1e13d3558166068174322dec9ce3a7",
+      "ed3bd543c54a2d1ed958d5401bdf75ed5b8be8ec75a59e5a5f70cccc2a9795dd"
+    ]
+  },
+  "conversion_documents": [
+    {
+      "content_sha256": "08c2960b46a81c9546682e00d6c104bf921d2e06ef933d98185766faa62d1380",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2021/11/NRB-Information-Communication-Policy-2078-with-1st-Amd-1.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 1.0,
+      "legacy_line_ratio": 1.0,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.9441,
+      "legacy_after": 0.0,
+      "english_share": 0.0,
+      "legacy_units": 257,
+      "legacy_units_english": 0,
+      "legacy_units_english_share": 0.0,
+      "attempted": 331,
+      "accepted": 208,
+      "ambiguous": 120,
+      "rejected": 3,
+      "guarded_english": 0,
+      "guarded_unicode": 0,
+      "recovery": "recovered",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "1879b70a12c483d1c6a13230b195328a0bd5dfecb3818b72a53a91b8c599bc89",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2025/02/List-of-BFIs-Poush-2081-Nepali.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 1.0,
+      "legacy_line_ratio": 1.0,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.9423,
+      "legacy_after": 0.0,
+      "english_share": 0.0,
+      "legacy_units": 141,
+      "legacy_units_english": 0,
+      "legacy_units_english_share": 0.0,
+      "attempted": 182,
+      "accepted": 80,
+      "ambiguous": 102,
+      "rejected": 0,
+      "guarded_english": 0,
+      "guarded_unicode": 0,
+      "recovery": "recovered",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "18bacb44dc58ebcf0389e471cb08b48cb3f83e0ace34e351131a57ebca5a3d5b",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2026/05/NRB-Samachar_Jeth_2083.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 0.9172,
+      "legacy_line_ratio": 0.9121,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.4779,
+      "legacy_after": 0.4396,
+      "english_share": 0.0707,
+      "legacy_units": 731,
+      "legacy_units_english": 3,
+      "legacy_units_english_share": 0.0041,
+      "attempted": 767,
+      "accepted": 215,
+      "ambiguous": 216,
+      "rejected": 336,
+      "guarded_english": 63,
+      "guarded_unicode": 0,
+      "recovery": "partial",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "1a9b6321aa6124efdd618348ef1184f9dd5e57549c5ff0f7479b09226e986866",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2020/01/karbahi_release_20690328.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 1.0,
+      "legacy_line_ratio": 1.0,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.9209,
+      "legacy_after": 0.1,
+      "english_share": 0.0,
+      "legacy_units": 10,
+      "legacy_units_english": 0,
+      "legacy_units_english_share": 0.0,
+      "attempted": 10,
+      "accepted": 7,
+      "ambiguous": 2,
+      "rejected": 1,
+      "guarded_english": 0,
+      "guarded_unicode": 0,
+      "recovery": "recovered",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "225eb5fb24919446b66a11ad7c44636530ee25ee19dc32a4ac4edb0b4e457ca1",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2019/12/Enforcement_Action-2070-71_2013-14.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 1.0,
+      "legacy_line_ratio": 0.9286,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.711,
+      "legacy_after": 0.1429,
+      "english_share": 0.0,
+      "legacy_units": 25,
+      "legacy_units_english": 0,
+      "legacy_units_english_share": 0.0,
+      "attempted": 55,
+      "accepted": 10,
+      "ambiguous": 36,
+      "rejected": 9,
+      "guarded_english": 0,
+      "guarded_unicode": 0,
+      "recovery": "recovered",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "268bcfe86d03e9ef684b47f17345a5c0b8e072cdc92f71efca45d6c9e29937b2",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2019/12/List_of_Circular-397.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 1.0,
+      "legacy_line_ratio": 1.0,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.4209,
+      "legacy_after": 0.4667,
+      "english_share": 0.0,
+      "legacy_units": 15,
+      "legacy_units_english": 0,
+      "legacy_units_english_share": 0.0,
+      "attempted": 21,
+      "accepted": 5,
+      "ambiguous": 7,
+      "rejected": 9,
+      "guarded_english": 0,
+      "guarded_unicode": 0,
+      "recovery": "partial",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "29f0b4cefe1ee382589c0ff553feb1467a3d2be3db791c202137324e704ce5d9",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2019/12/License_and_Ins_Bylaw.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 0.9431,
+      "legacy_line_ratio": 0.9313,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.8796,
+      "legacy_after": 0.0193,
+      "english_share": 0.0619,
+      "legacy_units": 431,
+      "legacy_units_english": 1,
+      "legacy_units_english_share": 0.0023,
+      "attempted": 482,
+      "accepted": 329,
+      "ambiguous": 143,
+      "rejected": 10,
+      "guarded_english": 61,
+      "guarded_unicode": 0,
+      "recovery": "recovered",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "2e65dadfffa3e740eb0292c2c96524ba6ae5642d016f20d557dfa8228f100969",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2020/04/visakhapatnam_port.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 1.0,
+      "legacy_line_ratio": 1.0,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.1996,
+      "legacy_after": 0.8462,
+      "english_share": 0.0,
+      "legacy_units": 13,
+      "legacy_units_english": 0,
+      "legacy_units_english_share": 0.0,
+      "attempted": 30,
+      "accepted": 0,
+      "ambiguous": 9,
+      "rejected": 21,
+      "guarded_english": 1,
+      "guarded_unicode": 0,
+      "recovery": "partial",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "323d055b887c1fe1d9db96ba23ffb763a6e62d3b9ebbd50d8f8d970a9d79d0db",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2019/12/NRB_samachar_61st_anniversary_20730216.pdf"
+      ],
+      "band": "0.50-0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 0.5468,
+      "legacy_line_ratio": 0.5591,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.3396,
+      "legacy_after": 0.2151,
+      "english_share": 0.4513,
+      "legacy_units": 9955,
+      "legacy_units_english": 221,
+      "legacy_units_english_share": 0.0222,
+      "attempted": 9757,
+      "accepted": 6350,
+      "ambiguous": 3319,
+      "rejected": 88,
+      "guarded_english": 9216,
+      "guarded_unicode": 0,
+      "recovery": "partial",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "32898ddf7317d384254557bd74eb44086b19e15db6a74234f29867e335bec174",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2020/07/Situation-of-Microfinance-Institutions-publishedChaitra-2076-1.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 0.995,
+      "legacy_line_ratio": 0.7148,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.732,
+      "legacy_after": 0.007,
+      "english_share": 0.0,
+      "legacy_units": 198,
+      "legacy_units_english": 0,
+      "legacy_units_english_share": 0.0,
+      "attempted": 362,
+      "accepted": 137,
+      "ambiguous": 221,
+      "rejected": 4,
+      "guarded_english": 0,
+      "guarded_unicode": 0,
+      "recovery": "recovered",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "360eaafd44bdf4addde8bfc2b4582e687a5e1f846498e8541811cda7c4504707",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2020/04/2076_77_For_A__B__C_Class-Circular_12-Gold_Deposit_related.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 0.9875,
+      "legacy_line_ratio": 0.9875,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.0972,
+      "legacy_after": 0.925,
+      "english_share": 0.0808,
+      "legacy_units": 79,
+      "legacy_units_english": 7,
+      "legacy_units_english_share": 0.0886,
+      "attempted": 149,
+      "accepted": 2,
+      "ambiguous": 31,
+      "rejected": 116,
+      "guarded_english": 9,
+      "guarded_unicode": 0,
+      "recovery": "partial",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "36e118bdc2e342a4dcc82962193978cf82b0b84aa5a36306546c87318fc5e648",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2021/11/भूकम्प-प्रभावित-घरपरिवारलाई-आवासीय-घर-पुनर्निमाणका-२०७२.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 0.9623,
+      "legacy_line_ratio": 0.913,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.8956,
+      "legacy_after": 0.0,
+      "english_share": 0.0078,
+      "legacy_units": 102,
+      "legacy_units_english": 0,
+      "legacy_units_english_share": 0.0,
+      "attempted": 196,
+      "accepted": 80,
+      "ambiguous": 116,
+      "rejected": 0,
+      "guarded_english": 3,
+      "guarded_unicode": 0,
+      "recovery": "recovered",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "39127ef55d0fa22098ea0d2b557a9f272c44f5dfe53ba15e3a0ba10ac655f17e",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2020/09/in_Nepali-2073-74.pdf"
+      ],
+      "band": "0.50-0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 0.6686,
+      "legacy_line_ratio": 0.5939,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.4025,
+      "legacy_after": 0.2375,
+      "english_share": 0.2934,
+      "legacy_units": 3422,
+      "legacy_units_english": 27,
+      "legacy_units_english_share": 0.0079,
+      "attempted": 3553,
+      "accepted": 2367,
+      "ambiguous": 1133,
+      "rejected": 53,
+      "guarded_english": 2444,
+      "guarded_unicode": 0,
+      "recovery": "partial",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "39709be0011851802841f1cac174fdac8319108a77406389f286331bbb99f3e4",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2019/12/Gold-and-silver-Purchase-and-sale-Karyabidhi-2075-update-2077.02.16-Final.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 0.9958,
+      "legacy_line_ratio": 1.0,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.9604,
+      "legacy_after": 0.0,
+      "english_share": 0.0,
+      "legacy_units": 237,
+      "legacy_units_english": 0,
+      "legacy_units_english_share": 0.0,
+      "attempted": 252,
+      "accepted": 200,
+      "ambiguous": 52,
+      "rejected": 0,
+      "guarded_english": 0,
+      "guarded_unicode": 0,
+      "recovery": "recovered",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "3d2eca8b9f951ecda27129f3fc7e90c503eb1e84802797d6e9833fdae6d39e39",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2019/12/Indian-Currency-Loan-by-Commercial-Bank_notice20181225.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 1.0,
+      "legacy_line_ratio": 1.0,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.0656,
+      "legacy_after": 0.9583,
+      "english_share": 0.0,
+      "legacy_units": 24,
+      "legacy_units_english": 0,
+      "legacy_units_english_share": 0.0,
+      "attempted": 31,
+      "accepted": 0,
+      "ambiguous": 4,
+      "rejected": 27,
+      "guarded_english": 0,
+      "guarded_unicode": 0,
+      "recovery": "unresolved",
+      "routing_verdict": "unresolved"
+    },
+    {
+      "content_sha256": "43ae9e7df5c80e5fe76c0453dcec33f2ab006a14cfdb2913a87384eea194dd49",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2020/04/Study_Reports-Economic_Activities_Study_Report_2075-76_TableAnnual-new.xlsx"
+      ],
+      "band": ">=0.80",
+      "family": "spreadsheet",
+      "unit_legacy_ratio": 0.9931,
+      "legacy_line_ratio": 0.1941,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.2799,
+      "legacy_after": 0.0,
+      "english_share": 0.0051,
+      "legacy_units": 1905,
+      "legacy_units_english": 0,
+      "legacy_units_english_share": 0.0,
+      "attempted": 14428,
+      "accepted": 467,
+      "ambiguous": 13946,
+      "rejected": 15,
+      "guarded_english": 78,
+      "guarded_unicode": 0,
+      "recovery": "recovered",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "4d2fbf18046e6bb2f43b534e4d3f6cd1fcbdfba48c192af38e22dc79bc66266f",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2021/02/IRC-Procedure-2076-3rd-amendment-2077-.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 1.0,
+      "legacy_line_ratio": 0.9667,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.8798,
+      "legacy_after": 0.075,
+      "english_share": 0.0,
+      "legacy_units": 116,
+      "legacy_units_english": 0,
+      "legacy_units_english_share": 0.0,
+      "attempted": 131,
+      "accepted": 86,
+      "ambiguous": 33,
+      "rejected": 12,
+      "guarded_english": 0,
+      "guarded_unicode": 0,
+      "recovery": "recovered",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "5065622c67e7574bd729455eca30a6323611eb96b4d6926664b2856abbad6f0d",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2019/12/7-Notice-of-TES.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 1.0,
+      "legacy_line_ratio": 1.0,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.6653,
+      "legacy_after": 0.3421,
+      "english_share": 0.0476,
+      "legacy_units": 38,
+      "legacy_units_english": 1,
+      "legacy_units_english_share": 0.0263,
+      "attempted": 44,
+      "accepted": 19,
+      "ambiguous": 9,
+      "rejected": 16,
+      "guarded_english": 3,
+      "guarded_unicode": 0,
+      "recovery": "partial",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "50bf8744f3f053c4db995139f3acd066befa607169f3fa119e14eeeff4a3eea3",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2019/12/2069_70-Circular_14-Amendment-in-KYC-Anusuchi-19.1.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 1.0,
+      "legacy_line_ratio": 1.0,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.7166,
+      "legacy_after": 0.2143,
+      "english_share": 0.0909,
+      "legacy_units": 28,
+      "legacy_units_english": 2,
+      "legacy_units_english_share": 0.0714,
+      "attempted": 36,
+      "accepted": 21,
+      "ambiguous": 9,
+      "rejected": 6,
+      "guarded_english": 3,
+      "guarded_unicode": 0,
+      "recovery": "partial",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "5236846730c263a24b430d109a9bf886934a5fdfb0401c038c3cdf0767471c11",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2026/07/AML_CFT_Supervision_Bylaw_2083-1.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 0.9979,
+      "legacy_line_ratio": 0.9979,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.9598,
+      "legacy_after": 0.0021,
+      "english_share": 0.0,
+      "legacy_units": 467,
+      "legacy_units_english": 0,
+      "legacy_units_english_share": 0.0,
+      "attempted": 520,
+      "accepted": 406,
+      "ambiguous": 113,
+      "rejected": 1,
+      "guarded_english": 0,
+      "guarded_unicode": 0,
+      "recovery": "recovered",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "529cd17c324957561abd41e86eae9f40fe7b4062d37839d35793c62dade20925",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2025/12/NRB-Bond_2083_Kha_Notice.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 1.0,
+      "legacy_line_ratio": 1.0,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.972,
+      "legacy_after": 0.0,
+      "english_share": 0.0,
+      "legacy_units": 41,
+      "legacy_units_english": 0,
+      "legacy_units_english_share": 0.0,
+      "attempted": 45,
+      "accepted": 33,
+      "ambiguous": 12,
+      "rejected": 0,
+      "guarded_english": 0,
+      "guarded_unicode": 0,
+      "recovery": "recovered",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "5745a10c54ffa1d77387ab8d5253e6e1ab80f56d0d0cee6b8eb3012569295b9e",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2024/05/Hirepurchase-AML-CFT.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 0.991,
+      "legacy_line_ratio": 0.988,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.941,
+      "legacy_after": 0.018,
+      "english_share": 0.0112,
+      "legacy_units": 329,
+      "legacy_units_english": 3,
+      "legacy_units_english_share": 0.0091,
+      "attempted": 375,
+      "accepted": 256,
+      "ambiguous": 116,
+      "rejected": 3,
+      "guarded_english": 5,
+      "guarded_unicode": 0,
+      "recovery": "recovered",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "5bde86326e10630b7f6f0f01b85c53d9d56f9de1235400637195a574a2d65433",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2019/12/Monetary_Policy_in_Nepali-2063-64_Full_Text.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 0.9792,
+      "legacy_line_ratio": 0.7881,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.4403,
+      "legacy_after": 0.3736,
+      "english_share": 0.0135,
+      "legacy_units": 1836,
+      "legacy_units_english": 3,
+      "legacy_units_english_share": 0.0016,
+      "attempted": 2356,
+      "accepted": 643,
+      "ambiguous": 816,
+      "rejected": 897,
+      "guarded_english": 35,
+      "guarded_unicode": 0,
+      "recovery": "partial",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "5d1b06d3c5d7319e818d2f7785a6c3aa4760f761d309d5ee9c86d956df5ee937",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2019/12/List_of_Circular-497.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 0.9655,
+      "legacy_line_ratio": 0.9333,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.7715,
+      "legacy_after": 0.1333,
+      "english_share": 0.0,
+      "legacy_units": 28,
+      "legacy_units_english": 0,
+      "legacy_units_english_share": 0.0,
+      "attempted": 33,
+      "accepted": 19,
+      "ambiguous": 9,
+      "rejected": 5,
+      "guarded_english": 0,
+      "guarded_unicode": 0,
+      "recovery": "recovered",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "5f33a63407bd120496ac43aa4d733865f992efa464acf849fb9dfa72f5e9560b",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2019/12/Guidelines-CEOs_Remuneration_for_B_C_and_D_Class_Institutions_Guidelines_2068.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 1.0,
+      "legacy_line_ratio": 1.0,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.6769,
+      "legacy_after": 0.2667,
+      "english_share": 0.0845,
+      "legacy_units": 60,
+      "legacy_units_english": 4,
+      "legacy_units_english_share": 0.0667,
+      "attempted": 75,
+      "accepted": 34,
+      "ambiguous": 23,
+      "rejected": 18,
+      "guarded_english": 6,
+      "guarded_unicode": 0,
+      "recovery": "partial",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "5f4a1d85822577322b1eef4f85d5f053c48c01a0c3af64feeb548bcd25a72d6b",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2019/12/Profile_National_level.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 1.0,
+      "legacy_line_ratio": 0.9855,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.7654,
+      "legacy_after": 0.1304,
+      "english_share": 0.0,
+      "legacy_units": 67,
+      "legacy_units_english": 0,
+      "legacy_units_english_share": 0.0,
+      "attempted": 299,
+      "accepted": 8,
+      "ambiguous": 267,
+      "rejected": 24,
+      "guarded_english": 3,
+      "guarded_unicode": 0,
+      "recovery": "recovered",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "611e3b7afd94cfc60f1361ab06c4da5be1d9288067bad66abd4b5967cf9a1cdd",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2019/12/Media_Release-Governor-Vice_Chairman_ADB_Meet.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 0.9429,
+      "legacy_line_ratio": 0.9429,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.3213,
+      "legacy_after": 0.6571,
+      "english_share": 0.0,
+      "legacy_units": 33,
+      "legacy_units_english": 0,
+      "legacy_units_english_share": 0.0,
+      "attempted": 37,
+      "accepted": 7,
+      "ambiguous": 7,
+      "rejected": 23,
+      "guarded_english": 0,
+      "guarded_unicode": 0,
+      "recovery": "partial",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "634596dc4eda5f8d951f5d3f8054bb2e31b65c2f7f5ad60805fe7e9e2f35c220",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2022/01/Integrated_Tables_Final_Publish.xlsx"
+      ],
+      "band": ">=0.80",
+      "family": "spreadsheet",
+      "unit_legacy_ratio": 0.971,
+      "legacy_line_ratio": 0.1834,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.2061,
+      "legacy_after": 0.0023,
+      "english_share": 0.0027,
+      "legacy_units": 426,
+      "legacy_units_english": 0,
+      "legacy_units_english_share": 0.0,
+      "attempted": 2455,
+      "accepted": 64,
+      "ambiguous": 2386,
+      "rejected": 5,
+      "guarded_english": 8,
+      "guarded_unicode": 0,
+      "recovery": "recovered",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "6716d7c454df26294ec949f4ae947336610ebe10a47b2d3a11217da844997d7c",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2019/12/rs.100_new_note_circulation_notice.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 1.0,
+      "legacy_line_ratio": 0.963,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.8897,
+      "legacy_after": 0.037,
+      "english_share": 0.0,
+      "legacy_units": 27,
+      "legacy_units_english": 0,
+      "legacy_units_english_share": 0.0,
+      "attempted": 34,
+      "accepted": 16,
+      "ambiguous": 17,
+      "rejected": 1,
+      "guarded_english": 0,
+      "guarded_unicode": 0,
+      "recovery": "recovered",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "690c193dc4a98849b91ed4d38585b66f29d14b9136849bbffa16e8163bb72127",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2020/04/Sources-and-Uses-of-Microfinance-Financial-Institutions-Asoj-2076.xlsx"
+      ],
+      "band": "0.50-0.80",
+      "family": "spreadsheet",
+      "unit_legacy_ratio": 0.5385,
+      "legacy_line_ratio": 0.0,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.0,
+      "legacy_after": 0.7308,
+      "english_share": 0.9625,
+      "legacy_units": 14,
+      "legacy_units_english": 14,
+      "legacy_units_english_share": 1.0,
+      "attempted": 0,
+      "accepted": 0,
+      "ambiguous": 0,
+      "rejected": 0,
+      "guarded_english": 140,
+      "guarded_unicode": 0,
+      "recovery": "unresolved",
+      "routing_verdict": "false_route_english"
+    },
+    {
+      "content_sha256": "692c4028a35add84e05d2f770bf5d1cc0fb352be0a03ac8d8cdc855c7a03508f",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2019/12/2069_70-Circular_16-Attachment-Anusuchi-19.1.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 1.0,
+      "legacy_line_ratio": 0.97,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.7726,
+      "legacy_after": 0.145,
+      "english_share": 0.0,
+      "legacy_units": 194,
+      "legacy_units_english": 0,
+      "legacy_units_english_share": 0.0,
+      "attempted": 253,
+      "accepted": 125,
+      "ambiguous": 97,
+      "rejected": 31,
+      "guarded_english": 0,
+      "guarded_unicode": 0,
+      "recovery": "recovered",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "70b0d415dcf306bc6640027aa64dbfd236418611b1806477fcdd232430af4fc3",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2020/04/2_Procedure-Procedure.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 0.9836,
+      "legacy_line_ratio": 0.9836,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.1078,
+      "legacy_after": 0.9016,
+      "english_share": 0.0132,
+      "legacy_units": 60,
+      "legacy_units_english": 1,
+      "legacy_units_english_share": 0.0167,
+      "attempted": 94,
+      "accepted": 1,
+      "ambiguous": 15,
+      "rejected": 78,
+      "guarded_english": 6,
+      "guarded_unicode": 0,
+      "recovery": "unresolved",
+      "routing_verdict": "unresolved"
+    },
+    {
+      "content_sha256": "7820b1f49fc13cf44b5b89ed6f6dfda0cb10af4fa2c043d64d2c181082888bec",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2020/07/NRB-Samachar_Jeth-20770317.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 1.0,
+      "legacy_line_ratio": 1.0,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.9783,
+      "legacy_after": 0.0112,
+      "english_share": 0.0103,
+      "legacy_units": 179,
+      "legacy_units_english": 2,
+      "legacy_units_english_share": 0.0112,
+      "attempted": 201,
+      "accepted": 93,
+      "ambiguous": 108,
+      "rejected": 0,
+      "guarded_english": 2,
+      "guarded_unicode": 0,
+      "recovery": "recovered",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "796bb59c34434e9e6bc5480e30a821cf11e333a93a709e075f26bbd52d5005b7",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2019/12/SID_Asayako_Suchana20750204.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 1.0,
+      "legacy_line_ratio": 1.0,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.0219,
+      "legacy_after": 1.0,
+      "english_share": 0.0556,
+      "legacy_units": 14,
+      "legacy_units_english": 1,
+      "legacy_units_english_share": 0.0714,
+      "attempted": 20,
+      "accepted": 0,
+      "ambiguous": 2,
+      "rejected": 18,
+      "guarded_english": 1,
+      "guarded_unicode": 0,
+      "recovery": "unresolved",
+      "routing_verdict": "unresolved"
+    },
+    {
+      "content_sha256": "7aafd03091f2f18bfb9bbef35d0f44bb335102f24fb6f69cea8f78d5641710f2",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2026/02/Enforcement-Action-FY-208283-Second-Quarter.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 1.0,
+      "legacy_line_ratio": 1.0,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.9448,
+      "legacy_after": 0.0227,
+      "english_share": 0.0,
+      "legacy_units": 44,
+      "legacy_units_english": 0,
+      "legacy_units_english_share": 0.0,
+      "attempted": 80,
+      "accepted": 34,
+      "ambiguous": 45,
+      "rejected": 1,
+      "guarded_english": 0,
+      "guarded_unicode": 0,
+      "recovery": "recovered",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "89f76a8e10371a64ba8c1ea1d2f769cb28dc08fc40a9bd3e63ea86be9c4de0bb",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2019/12/Current_Macroeconomic_Situation_Nepali-2071-12_Text_Based_on_Seven_Months_Data_of_2071-72-new-2.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 1.0,
+      "legacy_line_ratio": 0.994,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.9616,
+      "legacy_after": 0.018,
+      "english_share": 0.0,
+      "legacy_units": 332,
+      "legacy_units_english": 0,
+      "legacy_units_english_share": 0.0,
+      "attempted": 357,
+      "accepted": 223,
+      "ambiguous": 128,
+      "rejected": 6,
+      "guarded_english": 0,
+      "guarded_unicode": 0,
+      "recovery": "recovered",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "8cdf6363a8d2c4ef9b8462dba700a7fbc28bdf50f0987da641185691d389ba71",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2025/07/Integrated-EAR-Half-Yearly-table_2081.82-2.xlsx"
+      ],
+      "band": ">=0.80",
+      "family": "spreadsheet",
+      "unit_legacy_ratio": 0.9688,
+      "legacy_line_ratio": 0.1524,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.1791,
+      "legacy_after": 0.0025,
+      "english_share": 0.0021,
+      "legacy_units": 392,
+      "legacy_units_english": 0,
+      "legacy_units_english_share": 0.0,
+      "attempted": 2340,
+      "accepted": 62,
+      "ambiguous": 2271,
+      "rejected": 7,
+      "guarded_english": 7,
+      "guarded_unicode": 0,
+      "recovery": "recovered",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "8d5bb247d4acd57c75d1ff59067f5c4abe65a0c792c1a2ca5c2d6b613f02b3be",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2023/11/Fact-Sheet-BOOK-FINAL.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 0.9869,
+      "legacy_line_ratio": 0.9757,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.9565,
+      "legacy_after": 0.0086,
+      "english_share": 0.0123,
+      "legacy_units": 680,
+      "legacy_units_english": 1,
+      "legacy_units_english_share": 0.0015,
+      "attempted": 743,
+      "accepted": 548,
+      "ambiguous": 193,
+      "rejected": 2,
+      "guarded_english": 9,
+      "guarded_unicode": 0,
+      "recovery": "recovered",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "8e8467f74f84713299c43d05a18261ffd23c2a6de35af71413c4699823518e66",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2019/12/fxm_notice20750720.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 0.9032,
+      "legacy_line_ratio": 0.9032,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.1878,
+      "legacy_after": 0.7097,
+      "english_share": 0.0,
+      "legacy_units": 28,
+      "legacy_units_english": 0,
+      "legacy_units_english_share": 0.0,
+      "attempted": 34,
+      "accepted": 1,
+      "ambiguous": 7,
+      "rejected": 26,
+      "guarded_english": 0,
+      "guarded_unicode": 0,
+      "recovery": "partial",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "8ea1a832c648ead28ea0d57fc416a27f06885ee91cf1b236b159d23f6a33dbc5",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2026/01/MFI-Unified-Directive-2082.pdf"
+      ],
+      "band": "0.50-0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 0.7421,
+      "legacy_line_ratio": 0.7714,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.5921,
+      "legacy_after": 0.2372,
+      "english_share": 0.2729,
+      "legacy_units": 4270,
+      "legacy_units_english": 47,
+      "legacy_units_english_share": 0.011,
+      "attempted": 4209,
+      "accepted": 3106,
+      "ambiguous": 962,
+      "rejected": 141,
+      "guarded_english": 2550,
+      "guarded_unicode": 0,
+      "recovery": "partial",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "90bf28238c3bfe45c2854fd1cc8a85e4ebb52ac9e0b1e4a65235362fc2b34a9c",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2021/04/Annual-Report-2077_07.pdf"
+      ],
+      "band": "0.50-0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 0.5986,
+      "legacy_line_ratio": 0.5377,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.3437,
+      "legacy_after": 0.2456,
+      "english_share": 0.351,
+      "legacy_units": 2648,
+      "legacy_units_english": 27,
+      "legacy_units_english_share": 0.0102,
+      "attempted": 2769,
+      "accepted": 1776,
+      "ambiguous": 957,
+      "rejected": 36,
+      "guarded_english": 2737,
+      "guarded_unicode": 0,
+      "recovery": "partial",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "90f9f361dacd90dacf7a29d0a70eefa604245b69199d3ee82f59b25347ad3c45",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2020/04/Prompt_Corrective_Action-_to_Corporate_Development_Bank.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 1.0,
+      "legacy_line_ratio": 1.0,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.9764,
+      "legacy_after": 0.0,
+      "english_share": 0.0,
+      "legacy_units": 19,
+      "legacy_units_english": 0,
+      "legacy_units_english_share": 0.0,
+      "attempted": 19,
+      "accepted": 15,
+      "ambiguous": 4,
+      "rejected": 0,
+      "guarded_english": 0,
+      "guarded_unicode": 0,
+      "recovery": "recovered",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "95c6384bfb9ca099d977a95c389922d8efd17d8a0a1879fbe2bf3ede48f45c9c",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2019/12/Current_Macroeconomic_Situation_Nepali-2069-06_Text_Based_on_First-Month_Data_of_2069-70-1.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 1.0,
+      "legacy_line_ratio": 0.9966,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.9689,
+      "legacy_after": 0.0067,
+      "english_share": 0.0,
+      "legacy_units": 297,
+      "legacy_units_english": 0,
+      "legacy_units_english_share": 0.0,
+      "attempted": 315,
+      "accepted": 221,
+      "ambiguous": 92,
+      "rejected": 2,
+      "guarded_english": 0,
+      "guarded_unicode": 0,
+      "recovery": "recovered",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "971aa739f8441e2b18c428c3c990158e419406ba89fa6597697532d474fa4daa",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2025/09/Sources-and-Uses-2082-Asar.xlsx"
+      ],
+      "band": "0.50-0.80",
+      "family": "spreadsheet",
+      "unit_legacy_ratio": 0.5185,
+      "legacy_line_ratio": 0.0,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.0,
+      "legacy_after": 0.7037,
+      "english_share": 0.963,
+      "legacy_units": 14,
+      "legacy_units_english": 14,
+      "legacy_units_english_share": 1.0,
+      "attempted": 0,
+      "accepted": 0,
+      "ambiguous": 0,
+      "rejected": 0,
+      "guarded_english": 126,
+      "guarded_unicode": 0,
+      "recovery": "unresolved",
+      "routing_verdict": "false_route_english"
+    },
+    {
+      "content_sha256": "9c86f977ba047c3091bb3933aee894c792218bdb646e85f36e5bc367da0c2b36",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2019/12/Inauguration-Governor_Dr._Khatiwada_innagurates_Samabridhi_Bikas_Ban.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 1.0,
+      "legacy_line_ratio": 1.0,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.6765,
+      "legacy_after": 0.3158,
+      "english_share": 0.0,
+      "legacy_units": 19,
+      "legacy_units_english": 0,
+      "legacy_units_english_share": 0.0,
+      "attempted": 22,
+      "accepted": 10,
+      "ambiguous": 6,
+      "rejected": 6,
+      "guarded_english": 0,
+      "guarded_unicode": 0,
+      "recovery": "partial",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "a17fa322b81a2ff7a7b7181d4564a742510c69536965d71a768d1396f09b9d02",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2021/05/FXMD-Circular-No.-14_DD-TT-for-Oxygen-1.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 0.9333,
+      "legacy_line_ratio": 0.9333,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.2079,
+      "legacy_after": 0.7667,
+      "english_share": 0.0,
+      "legacy_units": 56,
+      "legacy_units_english": 0,
+      "legacy_units_english_share": 0.0,
+      "attempted": 92,
+      "accepted": 3,
+      "ambiguous": 22,
+      "rejected": 67,
+      "guarded_english": 0,
+      "guarded_unicode": 0,
+      "recovery": "partial",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "a3ea81a01577b3d5ac57f3b36b30e8a0700ab8c909a51d00c9b9462aee63ee23",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2025/08/9.-DC_Notice-2082.05.04.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 1.0,
+      "legacy_line_ratio": 1.0,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.92,
+      "legacy_after": 0.0588,
+      "english_share": 0.0,
+      "legacy_units": 34,
+      "legacy_units_english": 0,
+      "legacy_units_english_share": 0.0,
+      "attempted": 39,
+      "accepted": 22,
+      "ambiguous": 15,
+      "rejected": 2,
+      "guarded_english": 0,
+      "guarded_unicode": 0,
+      "recovery": "recovered",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "aab9ec900470e9c0dc694c69f5afe37edc6e7a2ee92a2c4b17ad9ae4c6781747",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2019/12/Monetary_Policy_Collection_of_Monetary_Policy-Collection_of_Monetary_Policy_Part_1-new.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 0.9993,
+      "legacy_line_ratio": 0.999,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.9731,
+      "legacy_after": 0.0146,
+      "english_share": 0.0006,
+      "legacy_units": 11424,
+      "legacy_units_english": 3,
+      "legacy_units_english_share": 0.0003,
+      "attempted": 11812,
+      "accepted": 9895,
+      "ambiguous": 1753,
+      "rejected": 164,
+      "guarded_english": 8,
+      "guarded_unicode": 0,
+      "recovery": "recovered",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "abc1ace6f1b2a489f3f541f7f57b826741d5a852c2f2bcbfe7260485b32ecaf3",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2022/11/Eco.Activities-Study-2078.79-Annual.-FINAL-2079-07-06.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 0.9991,
+      "legacy_line_ratio": 0.8608,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.8538,
+      "legacy_after": 0.0038,
+      "english_share": 0.0029,
+      "legacy_units": 1110,
+      "legacy_units_english": 1,
+      "legacy_units_english_share": 0.0009,
+      "attempted": 1394,
+      "accepted": 796,
+      "ambiguous": 594,
+      "rejected": 4,
+      "guarded_english": 5,
+      "guarded_unicode": 0,
+      "recovery": "recovered",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "b08b8b1b6528abc439d4719c4f938ed06fbbecf64345bbd87f152a0a33be9653",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2019/12/Annual_Report-2063-64.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 0.9329,
+      "legacy_line_ratio": 0.7839,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.5322,
+      "legacy_after": 0.2544,
+      "english_share": 0.124,
+      "legacy_units": 4100,
+      "legacy_units_english": 20,
+      "legacy_units_english_share": 0.0049,
+      "attempted": 5020,
+      "accepted": 2045,
+      "ambiguous": 1590,
+      "rejected": 1385,
+      "guarded_english": 851,
+      "guarded_unicode": 0,
+      "recovery": "partial",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "b0c1f3cf3084539bcaefd085d37ea4ce5ad6b9561e4543ce6817c95c64421dc9",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2020/04/bylaws-of-the-notes-and-coin-printing.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 0.9796,
+      "legacy_line_ratio": 0.9597,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.5499,
+      "legacy_after": 0.4057,
+      "english_share": 0.0011,
+      "legacy_units": 817,
+      "legacy_units_english": 0,
+      "legacy_units_english_share": 0.0,
+      "attempted": 899,
+      "accepted": 383,
+      "ambiguous": 170,
+      "rejected": 346,
+      "guarded_english": 1,
+      "guarded_unicode": 0,
+      "recovery": "partial",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "bb19cf9fec377036e93571a5bb15177bc19c8713b0ddb39742d12e5b3e820d2a",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2019/12/Directives-Unified-Directives-2071.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 0.8409,
+      "legacy_line_ratio": 0.8446,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.7756,
+      "legacy_after": 0.0491,
+      "english_share": 0.1506,
+      "legacy_units": 8950,
+      "legacy_units_english": 56,
+      "legacy_units_english_share": 0.0063,
+      "attempted": 11568,
+      "accepted": 6580,
+      "ambiguous": 4592,
+      "rejected": 396,
+      "guarded_english": 2009,
+      "guarded_unicode": 0,
+      "recovery": "recovered",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "be85d30b0b0f323a7436c99ecab6b2fad9a6305b22f2403d9508204fb6eec34a",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2020/10/Press-Release-20770705.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 0.9667,
+      "legacy_line_ratio": 0.9667,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.817,
+      "legacy_after": 0.15,
+      "english_share": 0.0312,
+      "legacy_units": 58,
+      "legacy_units_english": 1,
+      "legacy_units_english_share": 0.0172,
+      "attempted": 63,
+      "accepted": 19,
+      "ambiguous": 36,
+      "rejected": 8,
+      "guarded_english": 2,
+      "guarded_unicode": 0,
+      "recovery": "recovered",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "c38524fc94040d4406f04a681ecda3d06b1e13d3558166068174322dec9ce3a7",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2021/07/Sources-and-Uses-of-Microfinance-Institutions-2077.12.31.xlsx"
+      ],
+      "band": "0.50-0.80",
+      "family": "spreadsheet",
+      "unit_legacy_ratio": 0.5185,
+      "legacy_line_ratio": 0.0,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.0,
+      "legacy_after": 0.7037,
+      "english_share": 0.963,
+      "legacy_units": 14,
+      "legacy_units_english": 14,
+      "legacy_units_english_share": 1.0,
+      "attempted": 0,
+      "accepted": 0,
+      "ambiguous": 0,
+      "rejected": 0,
+      "guarded_english": 139,
+      "guarded_unicode": 0,
+      "recovery": "unresolved",
+      "routing_verdict": "false_route_english"
+    },
+    {
+      "content_sha256": "c71b6f18e1bd723bcc92c8af7a9593bc926b844b84c1104028c29b25f9db8352",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2021/09/RTI_NRB-Report_2078-Asar.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 0.9609,
+      "legacy_line_ratio": 0.9164,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.5956,
+      "legacy_after": 0.2879,
+      "english_share": 0.0315,
+      "legacy_units": 295,
+      "legacy_units_english": 2,
+      "legacy_units_english_share": 0.0068,
+      "attempted": 384,
+      "accepted": 140,
+      "ambiguous": 149,
+      "rejected": 95,
+      "guarded_english": 19,
+      "guarded_unicode": 0,
+      "recovery": "partial",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "c7d0f1762ef2bfc679065b726bca7dd61507f026a30ed475f494d558d3ef57c9",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2019/12/CMES_-Annual_-2072-73-Nepali-1.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 1.0,
+      "legacy_line_ratio": 0.8814,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.9011,
+      "legacy_after": 0.0177,
+      "english_share": 0.0017,
+      "legacy_units": 490,
+      "legacy_units_english": 1,
+      "legacy_units_english_share": 0.002,
+      "attempted": 629,
+      "accepted": 292,
+      "ambiguous": 327,
+      "rejected": 10,
+      "guarded_english": 3,
+      "guarded_unicode": 0,
+      "recovery": "recovered",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "c7e894b7686d93665f8c0d8779cdd9935d32440b5390d3ba929b3f21dd0c3d2d",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2025/02/Midterm-Review-of-MP-2081-82.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 0.9903,
+      "legacy_line_ratio": 0.8841,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.8655,
+      "legacy_after": 0.0215,
+      "english_share": 0.0121,
+      "legacy_units": 205,
+      "legacy_units_english": 1,
+      "legacy_units_english_share": 0.0049,
+      "attempted": 240,
+      "accepted": 154,
+      "ambiguous": 82,
+      "rejected": 4,
+      "guarded_english": 4,
+      "guarded_unicode": 0,
+      "recovery": "recovered",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "d1c99f3cf34decda9d0f695b549765b6669e28eaf2eedc4dac952ded2acc0446",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2023/09/MOhar_License-Cancelation-.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 1.0,
+      "legacy_line_ratio": 1.0,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.9663,
+      "legacy_after": 0.0,
+      "english_share": 0.0,
+      "legacy_units": 9,
+      "legacy_units_english": 0,
+      "legacy_units_english_share": 0.0,
+      "attempted": 10,
+      "accepted": 8,
+      "ambiguous": 2,
+      "rejected": 0,
+      "guarded_english": 0,
+      "guarded_unicode": 0,
+      "recovery": "recovered",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "d46a1a28d7a2fc73d1e3ff11dbf139bfd42644e16a0b0a8d5da7299697f380a9",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2019/12/2062_63-Circular_10.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 1.0,
+      "legacy_line_ratio": 1.0,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.8561,
+      "legacy_after": 0.1053,
+      "english_share": 0.037,
+      "legacy_units": 19,
+      "legacy_units_english": 1,
+      "legacy_units_english_share": 0.0526,
+      "attempted": 33,
+      "accepted": 9,
+      "ambiguous": 18,
+      "rejected": 6,
+      "guarded_english": 1,
+      "guarded_unicode": 0,
+      "recovery": "recovered",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "da0c680d072d6b266ee040068419df705755752d91663e2b8439ec4201ff0ee8",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2024/12/Interest-subsidized-loan-to-be-published-Kartik-2081.pdf"
+      ],
+      "band": "minority-region-only",
+      "family": "pdf",
+      "unit_legacy_ratio": 0.0089,
+      "legacy_line_ratio": 0.0807,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.0093,
+      "legacy_after": 0.0751,
+      "english_share": 0.9793,
+      "legacy_units": 11,
+      "legacy_units_english": 0,
+      "legacy_units_english_share": 0.0,
+      "attempted": 12,
+      "accepted": 7,
+      "ambiguous": 5,
+      "rejected": 0,
+      "guarded_english": 1228,
+      "guarded_unicode": 0,
+      "recovery": "recovered",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "da8024b7616ba6a0513a99b585060ee7829905eb867e73d913b6086692ede980",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2019/12/FXM_notice_20190131.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 1.0,
+      "legacy_line_ratio": 1.0,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.0163,
+      "legacy_after": 0.9565,
+      "english_share": 0.0,
+      "legacy_units": 23,
+      "legacy_units_english": 0,
+      "legacy_units_english_share": 0.0,
+      "attempted": 28,
+      "accepted": 0,
+      "ambiguous": 2,
+      "rejected": 26,
+      "guarded_english": 0,
+      "guarded_unicode": 0,
+      "recovery": "unresolved",
+      "routing_verdict": "unresolved"
+    },
+    {
+      "content_sha256": "e089888605343b7d01ba84de7a0255f019e77eb7e6eb7c8de5ecee2c7a66dde5",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2024/02/7_2080-81_Foreign-Investment-Loan-Bylaw-2.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 0.8487,
+      "legacy_line_ratio": 0.8626,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.7909,
+      "legacy_after": 0.0575,
+      "english_share": 0.1589,
+      "legacy_units": 1060,
+      "legacy_units_english": 10,
+      "legacy_units_english_share": 0.0094,
+      "attempted": 1526,
+      "accepted": 860,
+      "ambiguous": 592,
+      "rejected": 74,
+      "guarded_english": 399,
+      "guarded_unicode": 0,
+      "recovery": "recovered",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "e75f209d1db780d821ba9d58734cb6c88ea4bd5ac9252e7c5999e283b4bc666f",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2020/09/in_Nepali-2067-68.pdf"
+      ],
+      "band": "0.50-0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 0.7072,
+      "legacy_line_ratio": 0.6494,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.2869,
+      "legacy_after": 0.3952,
+      "english_share": 0.2701,
+      "legacy_units": 3352,
+      "legacy_units_english": 15,
+      "legacy_units_english_share": 0.0045,
+      "attempted": 3579,
+      "accepted": 1578,
+      "ambiguous": 892,
+      "rejected": 1109,
+      "guarded_english": 2068,
+      "guarded_unicode": 0,
+      "recovery": "partial",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "ed3bd543c54a2d1ed958d5401bdf75ed5b8be8ec75a59e5a5f70cccc2a9795dd",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2021/09/Sources-and-Uses-Report-of-Microfinance-Institurions-Asar-End-20781.xlsx"
+      ],
+      "band": "0.20-0.50",
+      "family": "spreadsheet",
+      "unit_legacy_ratio": 0.4828,
+      "legacy_line_ratio": 0.0,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.0,
+      "legacy_after": 0.6897,
+      "english_share": 0.9286,
+      "legacy_units": 14,
+      "legacy_units_english": 14,
+      "legacy_units_english_share": 1.0,
+      "attempted": 1,
+      "accepted": 0,
+      "ambiguous": 1,
+      "rejected": 0,
+      "guarded_english": 139,
+      "guarded_unicode": 0,
+      "recovery": "partial",
+      "routing_verdict": "false_route_english"
+    },
+    {
+      "content_sha256": "f13f00aeea2ac58145ffdfe8fa38bcc0a1581bd3b55874a2caafa4470e98df86",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2019/12/Current_Macroeconomic_Situation_Nepali-2066-07_Text_Based-on-First-two-Months-data-of-2066-67.pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 0.9955,
+      "legacy_line_ratio": 0.9822,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.479,
+      "legacy_after": 0.4889,
+      "english_share": 0.0,
+      "legacy_units": 222,
+      "legacy_units_english": 0,
+      "legacy_units_english_share": 0.0,
+      "attempted": 240,
+      "accepted": 93,
+      "ambiguous": 34,
+      "rejected": 113,
+      "guarded_english": 0,
+      "guarded_unicode": 0,
+      "recovery": "partial",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "f27657201f6910d5295f9b8447d16c8928f2179cb70bc8691fc5533148c7906d",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2026/08/20.-Price-Bid-Notice.pdf"
+      ],
+      "band": "0.50-0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 0.7692,
+      "legacy_line_ratio": 0.7143,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.628,
+      "legacy_after": 0.1071,
+      "english_share": 0.0968,
+      "legacy_units": 20,
+      "legacy_units_english": 0,
+      "legacy_units_english_share": 0.0,
+      "attempted": 20,
+      "accepted": 17,
+      "ambiguous": 2,
+      "rejected": 1,
+      "guarded_english": 5,
+      "guarded_unicode": 0,
+      "recovery": "recovered",
+      "routing_verdict": "legacy_recovered"
+    },
+    {
+      "content_sha256": "fa37454a07573e4234f78bc5b2c4aee8781ea0757c9bec0cbce725a5ed5b84f9",
+      "comparison_keys": [
+        "https://www.nrb.org.np/contents/uploads/2025/03/Press-note-FIU-Annual-Report-_Final...pdf"
+      ],
+      "band": ">=0.80",
+      "family": "pdf",
+      "unit_legacy_ratio": 1.0,
+      "legacy_line_ratio": 0.9722,
+      "devanagari_before": 0.0,
+      "devanagari_after": 0.9304,
+      "legacy_after": 0.0,
+      "english_share": 0.0,
+      "legacy_units": 35,
+      "legacy_units_english": 0,
+      "legacy_units_english_share": 0.0,
+      "attempted": 39,
+      "accepted": 31,
+      "ambiguous": 8,
+      "rejected": 0,
+      "guarded_english": 1,
+      "guarded_unicode": 0,
+      "recovery": "recovered",
+      "routing_verdict": "legacy_recovered"
+    }
+  ],
+  "conversion_by_band": {
+    ">=0.80 (candidate queue)": {
+      "n": 56,
+      "verdicts": {
+        "legacy_recovered": 52,
+        "unresolved": 4
+      }
+    },
+    "0.50-0.80": {
+      "n": 9,
+      "verdicts": {
+        "legacy_recovered": 6,
+        "false_route_english": 3
+      }
+    },
+    "0.20-0.50": {
+      "n": 1,
+      "verdicts": {
+        "false_route_english": 1
+      }
+    },
+    "minority-region-only": {
+      "n": 1,
+      "verdicts": {
+        "legacy_recovered": 1
+      }
+    }
+  },
+  "candidate_queue": {
+    "metric": "unit_legacy_ratio >= 0.80 AND status=suspicious/legacy_font_suspected",
+    "routed": 56,
+    "false_route_english": 0,
+    "legacy_recovered": 52,
+    "unknown_or_other_mapping": 0,
+    "unresolved": 4,
+    "recovered": 36,
+    "partial": 16
+  },
+  "input_guard_controls": [
+    {
+      "content_sha256": "1edd82c6c430f50c608e3130bcd6a316d82a250dab2eccbd8c0222199931939c",
+      "kind": "english_numeric_clean",
+      "family": "spreadsheet",
+      "devanagari_ratio": 0.0,
+      "converted_units": 0,
+      "byte_identical": null,
+      "guarded_english": 238,
+      "guarded_unicode": 0
+    },
+    {
+      "content_sha256": "6181952b868ef4218fc9f70e47a44e2ab4303d492df449c00e26a995bdbb710a",
+      "kind": "english_numeric_clean",
+      "family": "pdf",
+      "devanagari_ratio": 0.0,
+      "converted_units": 0,
+      "byte_identical": true,
+      "guarded_english": 35,
+      "guarded_unicode": 0
+    },
+    {
+      "content_sha256": "747522f45151d37b037952cd7cd48ca2e14de5920e5fb9a63a0cb129142bf8bd",
+      "kind": "english_numeric_clean",
+      "family": "pdf",
+      "devanagari_ratio": 0.0,
+      "converted_units": 0,
+      "byte_identical": true,
+      "guarded_english": 56,
+      "guarded_unicode": 0
+    },
+    {
+      "content_sha256": "a9204333929c8be5d594da6ea9841feea4ab46dd1f224a6f9458b362d91fd062",
+      "kind": "english_numeric_clean",
+      "family": "pdf",
+      "devanagari_ratio": 0.0,
+      "converted_units": 0,
+      "byte_identical": true,
+      "guarded_english": 408,
+      "guarded_unicode": 0
+    },
+    {
+      "content_sha256": "d449d6ffc79e820cfc85fe12bb175ec306bb89bb37e73d8a0b2da1c935a93534",
+      "kind": "english_numeric_clean",
+      "family": "pdf",
+      "devanagari_ratio": 0.0,
+      "converted_units": 0,
+      "byte_identical": true,
+      "guarded_english": 156,
+      "guarded_unicode": 0
+    },
+    {
+      "content_sha256": "842ab02fb3fa48ab2a377b51641a3a39f3ac8e20ca50d48908f8e7f741d3f46f",
+      "kind": "genuine_unicode",
+      "family": "pdf",
+      "devanagari_ratio": 0.8439,
+      "converted_units": 0,
+      "byte_identical": true,
+      "guarded_english": 0,
+      "guarded_unicode": 48
+    }
+  ],
+  "input_guard_summary": {
+    "english_numeric": {
+      "n": 5,
+      "any_converted": 0
+    },
+    "genuine_unicode": {
+      "n": 1,
+      "any_converted": 0
+    }
+  },
+  "false_negative_scan": {
+    "clean_documents": 49,
+    "clean_with_legacy_units": 36,
+    "detail": [
+      {
+        "content_sha256": "01b0c99276be0c2ff42dae300e10379dc8e81e8a3b17abc3389c2a998175632f",
+        "family": "pdf",
+        "unit_legacy_candidates": 10,
+        "unit_judged": 427,
+        "unit_legacy_ratio": 0.0234,
+        "unit_max_legacy_run": 2,
+        "converted_units": 0,
+        "guarded_english": 606
+      },
+      {
+        "content_sha256": "121b0de258adb6769d65c595ae71ca63c827e6491c3ce4cd071ac4bc408db56b",
+        "family": "pdf",
+        "unit_legacy_candidates": 13,
+        "unit_judged": 87,
+        "unit_legacy_ratio": 0.1494,
+        "unit_max_legacy_run": 3,
+        "converted_units": 1,
+        "guarded_english": 84
+      },
+      {
+        "content_sha256": "1b0beb646790ceb9c2c3b8199af347b4663f85cf0e5a14f8fc5fab49b3abf5a8",
+        "family": "pdf",
+        "unit_legacy_candidates": 1,
+        "unit_judged": 2,
+        "unit_legacy_ratio": 0.5,
+        "unit_max_legacy_run": 1,
+        "converted_units": 0,
+        "guarded_english": 16
+      },
+      {
+        "content_sha256": "2d2603f958cfb53cd6069682cdba9cb4c4e2075e19f985bf99da5ef06ba5df2e",
+        "family": "spreadsheet",
+        "unit_legacy_candidates": 1,
+        "unit_judged": 25,
+        "unit_legacy_ratio": 0.04,
+        "unit_max_legacy_run": 1,
+        "converted_units": 0,
+        "guarded_english": 52
+      },
+      {
+        "content_sha256": "3fdd3d57182424f0cb0b4c1f34f137fb07c2a672f498bbc489994bfeca2a80c9",
+        "family": "spreadsheet",
+        "unit_legacy_candidates": 1,
+        "unit_judged": 25,
+        "unit_legacy_ratio": 0.04,
+        "unit_max_legacy_run": 1,
+        "converted_units": 0,
+        "guarded_english": 53
+      },
+      {
+        "content_sha256": "42733f3ea850ab049f81ab3f381f3c089400bcffc45dbeb83d1486d9d2933abf",
+        "family": "pdf",
+        "unit_legacy_candidates": 1,
+        "unit_judged": 23,
+        "unit_legacy_ratio": 0.0435,
+        "unit_max_legacy_run": 1,
+        "converted_units": 0,
+        "guarded_english": 31
+      },
+      {
+        "content_sha256": "439d98316cb16a4b242209b3d5e8fbb2ceeafb14d6cb065e0f8e976ddb9334d4",
+        "family": "pdf",
+        "unit_legacy_candidates": 54,
+        "unit_judged": 456,
+        "unit_legacy_ratio": 0.1184,
+        "unit_max_legacy_run": 2,
+        "converted_units": 0,
+        "guarded_english": 1212
+      },
+      {
+        "content_sha256": "48f4e170e1bcd0bbd4bf4fbb3a7dbf6f00f97677ba5f3fc7e57cd9b693c50888",
+        "family": "spreadsheet",
+        "unit_legacy_candidates": 1,
+        "unit_judged": 19,
+        "unit_legacy_ratio": 0.0526,
+        "unit_max_legacy_run": 1,
+        "converted_units": 0,
+        "guarded_english": 55
+      },
+      {
+        "content_sha256": "4c6618255d051fd2590397dd45e6e6d9112b5c1578fa0d12468c124055142ece",
+        "family": "pdf",
+        "unit_legacy_candidates": 14,
+        "unit_judged": 549,
+        "unit_legacy_ratio": 0.0255,
+        "unit_max_legacy_run": 1,
+        "converted_units": 0,
+        "guarded_english": 532
+      },
+      {
+        "content_sha256": "51aad887170435026a19071e38c0732db06b0de5d3197180bd6489a33a79c595",
+        "family": "spreadsheet",
+        "unit_legacy_candidates": 20,
+        "unit_judged": 477,
+        "unit_legacy_ratio": 0.0419,
+        "unit_max_legacy_run": 4,
+        "converted_units": 0,
+        "guarded_english": 2965
+      },
+      {
+        "content_sha256": "62864a8e23cc9bc6e3b35d99519efd314b6d701cc5a739a1b93ef3eee2c94fb0",
+        "family": "pdf",
+        "unit_legacy_candidates": 1,
+        "unit_judged": 17,
+        "unit_legacy_ratio": 0.0588,
+        "unit_max_legacy_run": 1,
+        "converted_units": 0,
+        "guarded_english": 36
+      },
+      {
+        "content_sha256": "6a9b0df86b74d2d49ff8b34202d719186a807c1aaa73a7a15157ae7dcdb6f43f",
+        "family": "pdf",
+        "unit_legacy_candidates": 4,
+        "unit_judged": 27,
+        "unit_legacy_ratio": 0.1481,
+        "unit_max_legacy_run": 2,
+        "converted_units": 1,
+        "guarded_english": 25
+      },
+      {
+        "content_sha256": "7425cbd1d9eef307267f23cf42e79fbbce724a87e26f670e7f0e9595ef868527",
+        "family": "spreadsheet",
+        "unit_legacy_candidates": 31,
+        "unit_judged": 664,
+        "unit_legacy_ratio": 0.0467,
+        "unit_max_legacy_run": 5,
+        "converted_units": 0,
+        "guarded_english": 2423
+      },
+      {
+        "content_sha256": "8142221b9627ee39cbdefb1edf7aab0d96e3ad0626e5a1aaaaf259f11feb82ab",
+        "family": "pdf",
+        "unit_legacy_candidates": 1,
+        "unit_judged": 7,
+        "unit_legacy_ratio": 0.1429,
+        "unit_max_legacy_run": 1,
+        "converted_units": 0,
+        "guarded_english": 10
+      },
+      {
+        "content_sha256": "84df89abe020fc5bc3705eee990e37417b8ba6450f87ee2bac62c9704e50391e",
+        "family": "pdf",
+        "unit_legacy_candidates": 14,
+        "unit_judged": 493,
+        "unit_legacy_ratio": 0.0284,
+        "unit_max_legacy_run": 2,
+        "converted_units": 0,
+        "guarded_english": 508
+      },
+      {
+        "content_sha256": "8f3abee401344bf8202aab65a24bf6d5e41414803dba70ad1af83ae0ba46f477",
+        "family": "spreadsheet",
+        "unit_legacy_candidates": 2,
+        "unit_judged": 5,
+        "unit_legacy_ratio": 0.4,
+        "unit_max_legacy_run": 2,
+        "converted_units": 0,
+        "guarded_english": 64
+      },
+      {
+        "content_sha256": "90000071e2d751656618518985e7157ea3dacb523a09b8e9854c2619b777a9d8",
+        "family": "pdf",
+        "unit_legacy_candidates": 44,
+        "unit_judged": 9035,
+        "unit_legacy_ratio": 0.0049,
+        "unit_max_legacy_run": 5,
+        "converted_units": 1,
+        "guarded_english": 10093
+      },
+      {
+        "content_sha256": "97ff09b03d7f6e46e1237bd15660a80bca0196ff035ea4843e52e9b23f3b3f7e",
+        "family": "spreadsheet",
+        "unit_legacy_candidates": 1,
+        "unit_judged": 25,
+        "unit_legacy_ratio": 0.04,
+        "unit_max_legacy_run": 1,
+        "converted_units": 0,
+        "guarded_english": 57
+      },
+      {
+        "content_sha256": "9f0376f016638eb7afa193deb99a2a259709c6adeed95c061d09f86f2071971d",
+        "family": "pdf",
+        "unit_legacy_candidates": 1,
+        "unit_judged": 17,
+        "unit_legacy_ratio": 0.0588,
+        "unit_max_legacy_run": 1,
+        "converted_units": 0,
+        "guarded_english": 38
+      },
+      {
+        "content_sha256": "a1604d862e65391ee2021a5b5059cfb59e9dcbccd47de1b4c82374f88d6738e5",
+        "family": "spreadsheet",
+        "unit_legacy_candidates": 18,
+        "unit_judged": 393,
+        "unit_legacy_ratio": 0.0458,
+        "unit_max_legacy_run": 3,
+        "converted_units": 0,
+        "guarded_english": 1600
+      },
+      {
+        "content_sha256": "a2077aa9b24d5f2f6a90d6cf7abc3ac46d5d4497bf843d4bdf41736e3bc5f995",
+        "family": "spreadsheet",
+        "unit_legacy_candidates": 14,
+        "unit_judged": 1239,
+        "unit_legacy_ratio": 0.0113,
+        "unit_max_legacy_run": 10,
+        "converted_units": 7,
+        "guarded_english": 2930
+      },
+      {
+        "content_sha256": "a37d093dbde464ffb37dc7edfcb7d83b9d036aaba6bad09ca500ef5adf638704",
+        "family": "pdf",
+        "unit_legacy_candidates": 2,
+        "unit_judged": 27,
+        "unit_legacy_ratio": 0.0741,
+        "unit_max_legacy_run": 2,
+        "converted_units": 0,
+        "guarded_english": 140
+      },
+      {
+        "content_sha256": "abd9de185d0189b5fd7009abe4e7acf65e3e4296c4a989a8d5a926a3f9dfdbb4",
+        "family": "pdf",
+        "unit_legacy_candidates": 73,
+        "unit_judged": 1654,
+        "unit_legacy_ratio": 0.0441,
+        "unit_max_legacy_run": 3,
+        "converted_units": 0,
+        "guarded_english": 4273
+      },
+      {
+        "content_sha256": "b0e83be13249c555f64dfe4430520222ef7860814c8129d16d320ead658bc67d",
+        "family": "spreadsheet",
+        "unit_legacy_candidates": 1,
+        "unit_judged": 25,
+        "unit_legacy_ratio": 0.04,
+        "unit_max_legacy_run": 1,
+        "converted_units": 0,
+        "guarded_english": 57
+      },
+      {
+        "content_sha256": "b21d20aa6be65e5bb10712916987a777a8e377621d9d8c8a852c8da54b91595a",
+        "family": "document",
+        "unit_legacy_candidates": 1,
+        "unit_judged": 18,
+        "unit_legacy_ratio": 0.0556,
+        "unit_max_legacy_run": 1,
+        "converted_units": 0,
+        "guarded_english": 27
+      },
+      {
+        "content_sha256": "bae0b731ec43e8d02597c7b67c51e54f655bb740cdf760423135a7d795ada3e4",
+        "family": "pdf",
+        "unit_legacy_candidates": 2,
+        "unit_judged": 33,
+        "unit_legacy_ratio": 0.0606,
+        "unit_max_legacy_run": 1,
+        "converted_units": 0,
+        "guarded_english": 43
+      },
+      {
+        "content_sha256": "c0badbbfcccc902a91c737b4a9cd095ec5a93f085e71496202bf65c20b488975",
+        "family": "pdf",
+        "unit_legacy_candidates": 8,
+        "unit_judged": 750,
+        "unit_legacy_ratio": 0.0107,
+        "unit_max_legacy_run": 1,
+        "converted_units": 0,
+        "guarded_english": 853
+      },
+      {
+        "content_sha256": "d3889b5bc52f787a0257d827b862a46979c6deaf004d00eb70b68bb219f6d7cf",
+        "family": "pdf",
+        "unit_legacy_candidates": 1,
+        "unit_judged": 4,
+        "unit_legacy_ratio": 0.25,
+        "unit_max_legacy_run": 1,
+        "converted_units": 0,
+        "guarded_english": 14
+      },
+      {
+        "content_sha256": "d3e2e6b556d2fbfe665faa23a670a9210aff41ba9109d8e95b9a84e1d1812808",
+        "family": "pdf",
+        "unit_legacy_candidates": 67,
+        "unit_judged": 1410,
+        "unit_legacy_ratio": 0.0475,
+        "unit_max_legacy_run": 3,
+        "converted_units": 0,
+        "guarded_english": 3848
+      },
+      {
+        "content_sha256": "d500c25896e41be8e72c3283adaf0b51c1148bf94234dfcac48f7ed2476ebb8c",
+        "family": "pdf",
+        "unit_legacy_candidates": 19,
+        "unit_judged": 448,
+        "unit_legacy_ratio": 0.0424,
+        "unit_max_legacy_run": 3,
+        "converted_units": 0,
+        "guarded_english": 455
+      },
+      {
+        "content_sha256": "d7179d943c26638cae61a6e99ace6191213538d12a5eec53713d1f78c6d2e5b5",
+        "family": "spreadsheet",
+        "unit_legacy_candidates": 6,
+        "unit_judged": 398,
+        "unit_legacy_ratio": 0.0151,
+        "unit_max_legacy_run": 1,
+        "converted_units": 0,
+        "guarded_english": 62
+      },
+      {
+        "content_sha256": "d74b592c894a20610463d729591cd3e51fd7dbc502db47b7a1df53b6cf865254",
+        "family": "pdf",
+        "unit_legacy_candidates": 59,
+        "unit_judged": 2811,
+        "unit_legacy_ratio": 0.021,
+        "unit_max_legacy_run": 14,
+        "converted_units": 0,
+        "guarded_english": 3626
+      },
+      {
+        "content_sha256": "e0b19b88ecb13ff94c0ccf39b548149df32434d8096842bd014c4c6ccf380dab",
+        "family": "pdf",
+        "unit_legacy_candidates": 4,
+        "unit_judged": 1810,
+        "unit_legacy_ratio": 0.0022,
+        "unit_max_legacy_run": 2,
+        "converted_units": 2,
+        "guarded_english": 1767
+      },
+      {
+        "content_sha256": "ecbf0f73d46cdd4c7ca7234ed009278991e1973343f9976ece79c962ce59c822",
+        "family": "pdf",
+        "unit_legacy_candidates": 6,
+        "unit_judged": 238,
+        "unit_legacy_ratio": 0.0252,
+        "unit_max_legacy_run": 1,
+        "converted_units": 0,
+        "guarded_english": 602
+      },
+      {
+        "content_sha256": "f1c70a8e029d0324cfd3c42ceacff04ff66176230c5d3b44673611579ce31178",
+        "family": "pdf",
+        "unit_legacy_candidates": 21,
+        "unit_judged": 319,
+        "unit_legacy_ratio": 0.0658,
+        "unit_max_legacy_run": 2,
+        "converted_units": 0,
+        "guarded_english": 413
+      },
+      {
+        "content_sha256": "f378c154a700793fe5e34936f381a61af1d3c61ecb90736d20ea98fd2411323d",
+        "family": "pdf",
+        "unit_legacy_candidates": 33,
+        "unit_judged": 309,
+        "unit_legacy_ratio": 0.1068,
+        "unit_max_legacy_run": 2,
+        "converted_units": 0,
+        "guarded_english": 342
+      }
+    ]
+  },
+  "false_positive_class": {
+    "definition": ">=50% of the units native-2 flagged legacy are confidently English",
+    "total": 4,
+    "of_suspicious": 67,
+    "in_high_band": 0,
+    "by_band": {
+      "0.50-0.80": 3,
+      "0.20-0.50": 1
+    },
+    "detail": [
+      {
+        "content_sha256": "690c193dc4a98849b91ed4d38585b66f29d14b9136849bbffa16e8163bb72127",
+        "family": "spreadsheet",
+        "band": "0.50-0.80",
+        "unit_legacy_ratio": 0.5385,
+        "legacy_units": 14,
+        "legacy_units_english": 14
+      },
+      {
+        "content_sha256": "971aa739f8441e2b18c428c3c990158e419406ba89fa6597697532d474fa4daa",
+        "family": "spreadsheet",
+        "band": "0.50-0.80",
+        "unit_legacy_ratio": 0.5185,
+        "legacy_units": 14,
+        "legacy_units_english": 14
+      },
+      {
+        "content_sha256": "c38524fc94040d4406f04a681ecda3d06b1e13d3558166068174322dec9ce3a7",
+        "family": "spreadsheet",
+        "band": "0.50-0.80",
+        "unit_legacy_ratio": 0.5185,
+        "legacy_units": 14,
+        "legacy_units_english": 14
+      },
+      {
+        "content_sha256": "ed3bd543c54a2d1ed958d5401bdf75ed5b8be8ec75a59e5a5f70cccc2a9795dd",
+        "family": "spreadsheet",
+        "band": "0.20-0.50",
+        "unit_legacy_ratio": 0.4828,
+        "legacy_units": 14,
+        "legacy_units_english": 14
+      }
+    ]
+  },
+  "performance": {
+    "conversion_seconds": 86.16,
+    "suspicious_blobs_converted": 67
+  },
+  "read_failures": 0
+}

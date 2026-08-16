@@ -2224,3 +2224,229 @@ point: the middle band was mostly mis-flagged tables and they are gone. Whether
 its own `reason` value, whether the 4 region-detected documents should be
 converted per-region rather than per-document, and the GPL-3 licence gate from
 §12.7. None is answerable from this evidence.
+
+---
+
+## 14. Phase 6B Task 3 — independent holdout validation (native-2 VALIDATED, conversion not wired)
+
+**Date:** 2026-08-16. **Continues** commit `2a6b498`. **Commits:** `ddc5f2d` (the
+frozen holdout, pre-network) and the evidence commit that follows it.
+
+This phase answers one question: *does native-2 hold up on NRB files that never
+influenced it, and is `unit_legacy_ratio >= 0.80` safe enough to become the
+production conversion gate?*
+
+Everything in §11–§13 was measured on the Phase 6A benchmark, and that benchmark
+shaped native-1, native-2, the table guards, the spreadsheet rule, the
+minority-region rule, `MIN_JUDGED_FOR_RATIO`, `MIN_LEGACY_ABSOLUTE` **and** the
+`>=0.80` band itself. Validating any of that against the same 400 files would be
+circular, so none of it was.
+
+### The six answers
+
+**A. Is native-2 still trustworthy on unseen files? Yes**, with one new
+false-positive class named below. On 142 previously unseen blobs it flagged 67
+`legacy_font_suspected`, and the document types it flagged are exactly the ones
+NRB publishes in Nepali: **circular 9/9, rule_bylaw 5/5, enforcement_action 4/4,
+forex 3/3, monetary_policy 3/3**. It did not flag a single image (0/6) or `.docx`
+(0/3).
+
+**B. Of the high-confidence queue, how much is genuinely legacy?** Of **56**
+blobs at `unit_legacy_ratio >= 0.80`: **0 English false routes**, 52 confirmed
+glyph-mapped with the converter producing Unicode, 4 unresolved. Measured the
+strict way — by asking whether the units native-2 *itself* flagged are readable
+English — the false-positive count in the queue is **0 of 56**.
+
+**C. Of genuine Preeti at high confidence, how much does npttf2utf recover?**
+Of the 56: **36 `recovered`, 16 `partial`, 4 `unresolved`** — 52/56 (92.9%)
+produced usable Unicode, 36/56 (64.3%) cleanly. Recovery is not correctness; see
+the reader caveat.
+
+**D. Does `>=0.80` survive without tuning? Yes.** Not one threshold was moved
+before, during or after this cohort. The band is *sharper* on unseen data than on
+the benchmark: 56 of 67 flagged blobs sit at `>=0.80`, and the four false
+positives found all sit at **0.483–0.538**, below the gate.
+
+**E. Does anything force `native-3`? Not for the queue.** One real defect was
+found (§14.3) and it is entirely outside the conversion gate. Fixing it is a
+`native-3` change with a new cohort; shipping the gate does not wait on it.
+
+**F. Enough evidence to build production conversion routing? Yes**, for the
+`>=0.80` queue only, and with the Nepali-reader confirmation in §14.5 outstanding.
+
+### 14.1 The cohort, and why it is independent
+
+`docs/nrb/phase6b-routing-holdout.json`, fingerprint
+`6344e674f788808ab02f46218e59a76c215c0644cb95abbbf8212d45d400a970`, 150 files,
+seed `phase6b-routing-holdout-v1`, floor 1, 2019 cap 45, algorithm
+`nrb-stratified-v1` unchanged.
+
+Independence is enforced in the sampler, not by hand. `stratified_sample` gained
+`exclude_keys`, which removes candidates **before stratification** — so the
+withheld files never touch allocation or strata — and the excluded SET is hashed
+into the sampler parameters as `exclude_keys_sha256`. That is stronger than
+recording a count: swapping *which* 400 keys were withheld, at the same count,
+changes the fingerprint. Drawn from 17,866 candidates = 18,266 catalog files
+minus exactly the 400 Phase 6A keys.
+
+`intersection(phase6a, holdout) == 0`, asserted in
+`tests/test_nrb_phase6b_holdout.py` and re-asserted at run time by the validator,
+which aborts rather than produce a contaminated report.
+
+The manifest was **committed before any network access** (`ddc5f2d`), which is the
+same discipline Phase 6A used and the reason a redraw would be visible.
+
+One honest difference from §11: Phase 6A was drawn with `floor=2`,
+`max_cohort_share=1/1`, 2019 cap 120. The holdout uses `floor=1`, share `3/10`,
+cap 45. Different parameters, deliberately — a 150-file cohort needs a tighter cap
+— so the two are comparable in *kind*, not parameter-for-parameter.
+
+### 14.2 What the holdout measured
+
+| | fetched | native-2 |
+|---|---|---|
+| requested | 150 | |
+| fetched | 142 | 142 rows |
+| HTTP 404 | 8 | in the denominator, never substituted |
+
+The 8 failures are genuine NRB 404s (six 2019 account-block notices, one 2066/67
+circular, one `notice.jpg`). Per the task's own rule they stay in the denominator.
+A second native-2 pass selects **0** — the pass is idempotent.
+
+| status | n | | reason | n |
+|---|---|---|---|---|
+| suspicious | 67 | | legacy_font_suspected | 67 |
+| extracted | 49 | | clean | 49 |
+| needs_ocr | 17 | | no_text_layer | 11 |
+| unsupported | 8 | | image_file | 6 |
+| failed | 1 | | no_native_parser | 8 |
+| | | | parser_error | 1 |
+
+Bands over `unit_legacy_ratio` — **native-2's own metric, not native-1's
+`legacy_line_ratio`**, and the distinction is load-bearing because the two
+genuinely differ on exactly the population this phase cares about:
+
+| band | blobs |
+|---|---|
+| ≥ 0.80 | **56** |
+| 0.50–0.80 | 9 |
+| 0.20–0.50 | 1 |
+| region rule only | 1 |
+
+Compared descriptively with Phase 6A (144 / 4 / 2 / 4 of 154): the holdout is
+legacy-denser (47% vs 40% of blobs flagged) and its middle band is proportionally
+larger. That is corpus composition, and **nothing was changed because of it**.
+
+The `.xls` gap is worth naming: 26 manifest spreadsheets are 20 `.xlsx` plus **6
+legacy OLE2 `.xls`**, all `unsupported`/`no_native_parser`. Of the 20 parseable, 7
+flagged legacy. That is a parser gap, not a classifier gap, and it is new
+information about the corpus.
+
+### 14.3 The defect the holdout found — English accounting templates
+
+**Four spreadsheets are mis-routed**, and they are the same NRB financial-statement
+template repeated: `690c193dc4a9`, `971aa739f844`, `c38524fc9404`, `ed3bd543c54a`.
+Every one of their flagged units is readable English:
+
+```
+Profit & Loss A/c
+5.2.Pension & Gratuity Fund
+5.7.Payable to Cumulative leave of staff
+2.2.in "A"Class Licensed Institution
+```
+
+**14 of 14 flagged units English, in all four.** The cause is the same
+intra-word-symbol signal §13.2 corrected for prose tables, meeting a shape those
+corrections do not cover: a numbered accounting label (`5.2.Pension`) is one token
+containing letters and periods, and `A/c` is a two-run compound whose runs are a
+single capital and a vowel-less pair. The rest of each sheet is numeric, so those
+14 units land in a small judged denominator and drag the ratio to ~0.5.
+
+**This is reported, not fixed.** Per the task's rule and §11.9's own logic, a
+classifier change after seeing holdout results makes this cohort development
+evidence. The fix belongs to `native-3` with a fresh cohort. Its likely shape:
+exempt `<digit>.<digit>.<Word>` outline labels and treat `A/c`-style abbreviations
+as compounds — both narrow orthographic corrections, both testable on shapes.
+
+**It does not touch the conversion gate.** All four sit at 0.483–0.538, and the
+high band contains **0** members of this class. That is the difference between a
+caveat and a blocker.
+
+### 14.4 What did NOT go wrong
+
+* **Genuine Unicode is safe.** The Unicode control (`842ab02fb3fa`, 0.8439
+  Devanagari) is `clean`, and the converter changed nothing in it.
+* **Input guards hold.** Six negative controls with zero legacy units — five
+  English/numeric, one Unicode — all reconstruct with **0 units converted**.
+* **Spreadsheet detection works on unseen data.** 7 of 20 parseable workbooks
+  flagged, including three large research workbooks at unit ratio 0.969–0.993
+  whose `legacy_line_ratio` is 0.15–0.19 — i.e. **native-1 would have called all
+  three clean**. This is §13.4's rule earning its place on files it never saw.
+* **The small-denominator floors are doing their job.** No document was flagged on
+  a handful of units; the four false positives have 14 flagged units each, so
+  `MIN_JUDGED_FOR_RATIO = 8` / `MIN_LEGACY_ABSOLUTE = 4` were not the cause and
+  neither is implicated.
+* **The minority rule is not trigger-happy.** Exactly **1** blob was routed by the
+  region rule alone (`da0c680d072d`, unit ratio 0.0089).
+
+### 14.5 False negatives, and what a reader must confirm
+
+Of 49 `clean` documents, **36 carry at least one legacy unit**. Almost all are
+scattered singletons at ratios of 0.01–0.06 — noise the router was right to
+ignore. Three deserve a look: `d74b592c894a` (59 units, run 14), `a2077aa9b24d`
+(14 units, run 10), `7425cbd1d9ee` (31 units, run 5). A run of ≥10 is the shape
+§13.5's minority rule exists to catch, and these fell just under its
+`contested_legacy_ratio` requirement. Reported as candidates, not as confirmed
+misses — they are in `docs/nrb/phase6b-routing-holdout-manual-review.txt`.
+
+**Nothing here is labelled `confirmed_correct` for Nepali.** Every recovered
+document is `awaiting_nepali_review`: the converter turned glyph-mapped input into
+Devanagari, and whether that Devanagari *reads correctly* is a competent reader's
+call, not a metric's. What IS confirmed, because it is script-independent: which
+inputs were English (the four false positives), that the guards touched no clean
+control, and that no image or Unicode document was routed to conversion.
+
+### 14.6 Evaluation & Improvement (Phase 6B Task 3)
+
+**Success metric** — routing precision of the `>=0.80` queue: the share of routed
+blobs that are genuinely glyph-mapped rather than English/numeric/Unicode.
+Observed **56/56 (100%)** on unseen files. Nearest SQL proxy: every false route is
+a document that would be corrupted before it could be retrieved.
+
+**Eval** — this frozen 150-file holdout, disjoint from Phase 6A by construction;
+native-2 run unchanged at `2a6b498`; per-blob scoring by a signal independent of
+the classifier (are the flagged units themselves English?), plus six zero-legacy
+negative controls. Current rates: routing precision 56/56, converter recovery
+52/56, false-positive class 4/67 (0 in the queue), false-negative candidates
+36/49 mostly singletons.
+
+**Feedback capture** — `docs/nrb/phase6b-routing-holdout-{profile,manual-review}.txt`
+plus the JSON. Reader corrections and the `native-3` defect list accumulate there;
+they feed a *future* cohort and must never retune native-2 against this one.
+
+**Review loop** — re-validate on a fresh holdout whenever the classifier changes.
+Any threshold or rule move forces a new extractor version and a new cohort; that
+is what keeps this evidence worth having.
+
+### 14.7 The gate to the conversion-routing task
+
+**Recommended: proceed**, scoped to the `>=0.80` queue.
+
+Against the task's nine acceptance conditions: English/table false positives in
+the queue **0/56** (1); genuine Unicode never routed (2); spreadsheet legacy
+detected, 7/20, including three native-1 would have missed (3); minority regions
+still detectable, 1 routed by the rule alone (4); queue precision **100%** on
+unseen files (5); Preeti recovers on 52/56, cleanly on 36 (6); guards accepted no
+destructive English/numeric conversion, 6/6 controls untouched (7); Preeti failing
+leaves text unresolved rather than guessing another mapping (8); one new
+false-positive class, wholly outside the queue (9).
+
+**Carry these forward:** the `native-3` fix for numbered English accounting labels
+(with a new cohort); the 6 unparseable `.xls`; the three high-run false-negative
+candidates; OCR for the 17 `needs_ocr` and the 4 unresolved high-band blobs; and
+the GPL-3 distribution gate from §12.7, still **unresolved by design** — npttf2utf
+was used here as an evaluation instrument only, and `requirements-nrb.txt` is
+still not installed by `Dockerfile`.
+
+**Not done, deliberately:** no conversion is wired, no `converted` status exists,
+no extracted text was mutated, and no OCR was run.
