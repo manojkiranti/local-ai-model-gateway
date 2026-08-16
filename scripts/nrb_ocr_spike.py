@@ -83,6 +83,15 @@ EVIDENCE = REPO / "docs/nrb/phase6b-routing-holdout-evidence.json"
 OCR_BACKEND = "torch"
 OCR_LANG = "devanagari"
 
+# The backend SELECTS THE MODEL VERSION, which is why `--backend` exists at all:
+# docling's `_resolve_rapidocr` sends torch down a PP-OCRv4-only branch and
+# onnxruntime to PP-OCRv5 (devanagari is not in PP-OCRv6's language set). So the
+# two runs differ in backend AND recogniser generation together, and neither can
+# be varied alone through this interface. Reports are written per backend so the
+# v4 evidence is never overwritten by a v5 run.
+BACKEND_MODEL = {"torch": "PP-OCRv4", "onnxruntime": "PP-OCRv5"}
+REPORT_STEM = {"torch": "phase6b-ocr-spike", "onnxruntime": "phase6b-ocr-spike-v5"}
+
 # Page rendering for the human artifact. Matches the review pack's 90 dpi so the
 # two read the same; the OCR itself works off docling's own higher-res raster.
 RENDER_DPI = 90
@@ -381,7 +390,8 @@ def markdown(results: list[Result], elapsed: float) -> str:
     out.append("| orchestration | docling OCR stage (`PdfPipelineOptions.do_ocr=True`, `force_full_page_ocr=True`) |")
     out.append("| engine | RapidOCR 3.9.2 |")
     out.append(f"| inference backend | **`{OCR_BACKEND}`** |")
-    out.append(f"| detection / recognition | `ch_PP-OCRv4_det_mobile` / **`{OCR_LANG}_PP-OCRv4_rec_mobile`** |")
+    model = BACKEND_MODEL[OCR_BACKEND]
+    out.append(f"| detection / recognition | `ch_{model}_det_mobile` / **`{OCR_LANG}_{model}_rec_mobile`** |")
     out.append("| OCR render scale | docling default `3.0` (not swept) |")
     out.append("| native comparison | `pypdf`, the same call `app/nrb/extraction.py` makes |\n")
     out.append(
@@ -546,9 +556,9 @@ def markdown(results: list[Result], elapsed: float) -> str:
         "2. **Is it usable Unicode Nepali?** Script yes, orthography no — see §3. Usable as "
         "a coarse signal, not as text a reader or an index should trust.\n"
         f"3. **Which backend ran?** Docling OCR stage → RapidOCR → **`{OCR_BACKEND}`** "
-        f"backend → **PP-OCRv4 `{OCR_LANG}_..._rec_mobile`**. No new Python package: torch "
-        "was already installed. PP-OCRv5 Devanagari was **not** reachable — docling maps the "
-        "torch backend to PP-OCRv4 only, and v5 needs `onnxruntime`, which is absent.\n"
+        f"backend → **{BACKEND_MODEL[OCR_BACKEND]} `{OCR_LANG}_..._rec_mobile`**. The "
+        "backend choice IS the model choice: docling maps torch to PP-OCRv4 and onnxruntime "
+        "to PP-OCRv5, and neither can be varied alone through this interface.\n"
         f"4. **How slow?** {steady[len(steady) // 2]:.1f}s/page median after warmup "
         f"({min(steady):.1f}–{max(steady):.1f}s), on GPU. The first page pays "
         f"{max(ocr_secs):.0f}s of model load and compile.\n"
@@ -611,10 +621,16 @@ def markdown(results: list[Result], elapsed: float) -> str:
 
 
 def main() -> int:
+    global OCR_BACKEND
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--pages", type=int, default=0, help="limit to the first N cases")
     ap.add_argument("--out-dir", default="docs/nrb")
+    ap.add_argument(
+        "--backend", choices=sorted(BACKEND_MODEL), default=OCR_BACKEND,
+        help="torch => PP-OCRv4 (no extra package); onnxruntime => PP-OCRv5",
+    )
     args = ap.parse_args()
+    OCR_BACKEND = args.backend
 
     cases = CASES[: args.pages] if args.pages else CASES
     out_dir = REPO / args.out_dir
@@ -626,17 +642,19 @@ def main() -> int:
 
     payload = {
         "backend": OCR_BACKEND,
+        "recogniser": BACKEND_MODEL[OCR_BACKEND],
         "lang": OCR_LANG,
         "force_full_page_ocr": True,
         "native_parser": "pypdf",
         "elapsed_seconds": round(elapsed, 1),
         "cases": [asdict(r) for r in results],
     }
-    (out_dir / "phase6b-ocr-spike.json").write_text(
+    stem = REPORT_STEM[OCR_BACKEND]
+    (out_dir / f"{stem}.json").write_text(
         json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
     )
-    (out_dir / "phase6b-ocr-spike.md").write_text(markdown(results, elapsed), encoding="utf-8")
-    print(f"\nwrote {out_dir}/phase6b-ocr-spike.{{md,json}}  ({elapsed:.0f}s)")
+    (out_dir / f"{stem}.md").write_text(markdown(results, elapsed), encoding="utf-8")
+    print(f"\nwrote {out_dir}/{stem}.{{md,json}}  ({elapsed:.0f}s)")
     return 0
 
 

@@ -8,14 +8,14 @@ Experimental spike. **No production change**: native-2 is untouched, no threshol
 | --- | --- |
 | orchestration | docling OCR stage (`PdfPipelineOptions.do_ocr=True`, `force_full_page_ocr=True`) |
 | engine | RapidOCR 3.9.2 |
-| inference backend | **`torch`** |
-| detection / recognition | `ch_PP-OCRv4_det_mobile` / **`devanagari_PP-OCRv4_rec_mobile`** |
+| inference backend | **`onnxruntime`** |
+| detection / recognition | `ch_PP-OCRv5_det_mobile` / **`devanagari_PP-OCRv5_rec_mobile`** |
 | OCR render scale | docling default `3.0` (not swept) |
 | native comparison | `pypdf`, the same call `app/nrb/extraction.py` makes |
 
 **PP-OCRv5 Devanagari was NOT tested here, and the reason is structural.** Docling's `_resolve_rapidocr` sends the `torch` backend down a PP-OCRv4-only branch — v5 recognition weights are published for `onnxruntime`, `openvino` and `paddle`, not for torch. This venv has torch but **no `onnxruntime`**, so v4 was the only Devanagari recogniser reachable without adding a package. Choosing torch was what kept this spike to a weights fetch instead of a dependency change; the cost is that the v4-vs-v5 question stays open here.
 
-14 pages, 35s wall clock.
+14 pages, 55s wall clock.
 
 ## 1. Why these pages — all 56 queue members accounted for
 
@@ -43,22 +43,22 @@ The gap is downstream of the classifier, in something not yet built: reading `un
 
 | blob | page | group | native dev | **OCR dev** | OCR dev ratio | latin ratio | pre-base misordered | s |
 | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `3d2eca8b9f95` | 1 | scan-backed queue | 0 | **1347** | 0.791 | 0.185 | 1 | 20.61 |
-| `da8024b7616b` | 1 | scan-backed queue | 0 | **1567** | 0.8863 | 0.095 | 1 | 1.16 |
-| `796bb59c3443` | 1 | scan-backed queue | 0 | **590** | 0.8806 | 0.1015 | 2 | 0.88 |
-| `70b0d415dcf3` | 1 | scan-backed queue | 0 | **1650** | 0.9111 | 0.0729 | 7 | 1.2 |
-| `2e65dadfffa3` | 1 | scan-backed queue | 0 | **667** | 0.8065 | 0.1669 | 2 | 0.8 |
-| `360eaafd44bd` | 1 | scan-backed queue | 0 | **1198** | 0.7794 | 0.1835 | 0 | 1.05 |
-| `a17fa322b81a` | 1 | scan-backed queue | 0 | **1499** | 0.7952 | 0.1756 | 2 | 1.16 |
-| `8e8467f74f84` | 1 | scan-backed queue | 0 | **1429** | 0.7826 | 0.1911 | 1 | 1.17 |
-| `438c55304da5` | 1 | needs_ocr | 0 | **784** | 0.716 | 0.0694 | 0 | 0.87 |
-| `c298efaf1f16` | 1 | needs_ocr | 0 | **1234** | 0.6245 | 0.2647 | 0 | 0.96 |
-| `276b2eb62802` | 1 | needs_ocr | 0 | **364** | 0.4505 | 0.2054 | 0 | 0.72 |
-| `1a9b6321aa61` | 1 | font-embedded control | 0 | **540** | 0.9872 | 0.0 | 1 | 0.54 |
-| `d1c99f3cf34d` | 1 | font-embedded control | 0 | **385** | 0.8594 | 0.1183 | 0 | 0.57 |
-| `268bcfe86d03` | 1 | font-embedded control | 0 | **486** | 0.7265 | 0.2347 | 0 | 0.63 |
+| `3d2eca8b9f95` | 1 | scan-backed queue | 0 | **1731** | 0.9495 | 0.0219 | 0 | 21.46 |
+| `da8024b7616b` | 1 | scan-backed queue | 0 | **1720** | 0.955 | 0.0178 | 0 | 2.94 |
+| `796bb59c3443` | 1 | scan-backed queue | 0 | **391** | 0.8427 | 0.0862 | 0 | 1.88 |
+| `70b0d415dcf3` | 1 | scan-backed queue | 0 | **1019** | 0.8747 | 0.0575 | 0 | 3.37 |
+| `2e65dadfffa3` | 1 | scan-backed queue | 0 | **504** | 0.8889 | 0.0547 | 0 | 2.05 |
+| `360eaafd44bd` | 1 | scan-backed queue | 0 | **807** | 0.8495 | 0.0726 | 0 | 3.94 |
+| `a17fa322b81a` | 1 | scan-backed queue | 0 | **1634** | 0.8388 | 0.1273 | 0 | 2.94 |
+| `8e8467f74f84` | 1 | scan-backed queue | 0 | **1744** | 0.9468 | 0.0206 | 0 | 2.95 |
+| `438c55304da5` | 1 | needs_ocr | 0 | **813** | 0.7384 | 0.0018 | 0 | 1.89 |
+| `c298efaf1f16` | 1 | needs_ocr | 0 | **1552** | 0.7429 | 0.1077 | 0 | 2.95 |
+| `276b2eb62802` | 1 | needs_ocr | 0 | **612** | 0.6096 | 0.003 | 0 | 1.63 |
+| `1a9b6321aa61` | 1 | font-embedded control | 0 | **345** | 0.9637 | 0.0 | 0 | 1.42 |
+| `d1c99f3cf34d` | 1 | font-embedded control | 0 | **280** | 0.9459 | 0.0 | 0 | 1.56 |
+| `268bcfe86d03` | 1 | font-embedded control | 0 | **692** | 0.9545 | 0.0069 | 0 | 1.6 |
 
-Runtime: median **1.0s/page**, range 0.5–20.6s, on CPU with the torch backend. The first page carries model load and `torch.compile` warmup.
+Runtime: median **2.9s/page**, range 1.4–21.5s, on CPU with the torch backend. The first page carries model load and `torch.compile` warmup.
 
 **`pre-base misordered`** counts vowel signs that open a cluster — PP-OCR emits glyphs in *visual* order, so `वि` comes back as `िव`. Read it as a floor, not a count: the regex needs a space before the sign, and this output has almost no spaces, so nearly every real occurrence is invisible to it. The excerpts in §4 show the true rate.
 
@@ -69,20 +69,20 @@ Recovering Devanagari codepoints is not the same as recovering Nepali. Two struc
 | text | halant per Devanagari char | mean Devanagari word length |
 | --- | ---: | ---: |
 | **reference** — npttf2utf on 56 font-embedded queue docs | **0.0982** | **5.7** |
-| OCR — `3d2eca8b9f95` (scan-backed queue) | 0.0082 | 27.0 |
-| OCR — `da8024b7616b` (scan-backed queue) | 0.0070 | 43.0 |
-| OCR — `796bb59c3443` (scan-backed queue) | 0.0068 | 17.5 |
-| OCR — `70b0d415dcf3` (scan-backed queue) | 0.0030 | 30.8 |
-| OCR — `2e65dadfffa3` (scan-backed queue) | 0.0030 | 27.5 |
-| OCR — `360eaafd44bd` (scan-backed queue) | 0.0008 | 25.8 |
-| OCR — `a17fa322b81a` (scan-backed queue) | 0.0027 | 22.9 |
-| OCR — `8e8467f74f84` (scan-backed queue) | 0.0056 | 47.2 |
-| OCR — `438c55304da5` (needs_ocr) | 0.0064 | 19.7 |
-| OCR — `c298efaf1f16` (needs_ocr) | 0.0016 | 11.2 |
-| OCR — `276b2eb62802` (needs_ocr) | 0.0110 | 22.8 |
-| OCR — `1a9b6321aa61` (font-embedded control) | 0.0000 | 28.7 |
-| OCR — `d1c99f3cf34d` (font-embedded control) | 0.0026 | 36.0 |
-| OCR — `268bcfe86d03` (font-embedded control) | 0.0000 | 29.2 |
+| OCR — `3d2eca8b9f95` (scan-backed queue) | 0.0884 | 5.4 |
+| OCR — `da8024b7616b` (scan-backed queue) | 0.0901 | 5.5 |
+| OCR — `796bb59c3443` (scan-backed queue) | 0.0563 | 5.6 |
+| OCR — `70b0d415dcf3` (scan-backed queue) | 0.0667 | 4.7 |
+| OCR — `2e65dadfffa3` (scan-backed queue) | 0.0694 | 6.8 |
+| OCR — `360eaafd44bd` (scan-backed queue) | 0.0644 | 4.7 |
+| OCR — `a17fa322b81a` (scan-backed queue) | 0.0838 | 5.8 |
+| OCR — `8e8467f74f84` (scan-backed queue) | 0.0929 | 5.5 |
+| OCR — `438c55304da5` (needs_ocr) | 0.0787 | 5.6 |
+| OCR — `c298efaf1f16` (needs_ocr) | 0.0760 | 5.3 |
+| OCR — `276b2eb62802` (needs_ocr) | 0.0670 | 5.5 |
+| OCR — `1a9b6321aa61` (font-embedded control) | 0.0493 | 5.6 |
+| OCR — `d1c99f3cf34d` (font-embedded control) | 0.0714 | 5.3 |
+| OCR — `268bcfe86d03` (font-embedded control) | 0.0882 | 5.8 |
 
 Nepali is conjunct-heavy and the virama binds the conjuncts. The converter's output carries one about every ten Devanagari characters; this OCR carries one every ~200 — roughly **twenty times fewer** — and its mean word runs 4-8× too long because word boundaries are gone. Concretely, on a control the existing path already handles:
 
@@ -113,9 +113,9 @@ Same page, same words. The OCR loses every space, drops `वित्त`→`ि
 | `Rqft hhqq tffia q-il'l E{, tott +1 ssT lo<r. d M BTRr+ri rfrq q-ft qs ` | च्त्रात जजत्रत्र तााष्ब त्र(ष्िुि भर््, तयतत ंज्ञ ककत् यि?च। म : द्यत् | rejected |
 | `rA61 4tftr$q dq-{€A tarftFrqrffi qrccr qf rrft ,Trrf,terf, il+ aqr ffi` | चब्टज्ञ द्धतातच४त्र मत्रर्(€ब् तबचातँचत्रचााष् त्रचअअच त्रा चचात ,त्चच | rejected |
 
-**Docling OCR** — 1347 Devanagari chars:
+**Docling OCR** — 1731 Devanagari chars:
 
-> e al viht Hjale hle e? िवदेशीिविनमयथवरथापनिवभाग Uest lohe Mh Ery lnre Mih hpIk pePere beolnjie सूचना वदेशीिविनमयतनयिमतगने ऐन,रणरकोदफापoख.लेिदएकोआंधकारपयोगगरीयसबैंकबाटइजाजतपनपात गरेकावािणजयबैंकहरलेदेहायकाशतहरकोपालनागनेगरीभारतिरथतबैंकतथािवतीयसंरशाहरबाटभारतीयमुदामाऋण लनसवनेयवरथागिरएकोलेसमबिधतसबैकोजानकारीकोलािंगयोसूचनापकाशनगिरएकोछ शतहर - यसबैकबाटइजाजतपघपातकवगंकाबैंकहरलेनवीकरणीयउजिजलिव्धुत,सौयीउजिरवायुउजिउलादन तथापसारणलाइ …
+> विदेशी विनिमय व्यवस्थापन विभाग सूचना विदेशी विनिमय (नियमित गर्न) ऐन, २०१९ को दफा १०ख. ले दिएको अधिकार प्रयोग गरी यस बैंकबाट इजाजतपत्रप्राप्त गरेका वाणिज्य बैंकहरुले देहायका शर्तहरुको पालना गर्न गरी भारतस्थित बैंक तथा वित्तीय संस्थाहरुबाट भारतीय मुद्ामा ऋरण लिन सक्ने व्यवस्था गरिएकोले सम्बन्धित सबैको जानकारीको लागि यो सूचना प्रकाशन गरिएको छ। शर्तहर - यस बैंकबाट इजाजतपत् प्रा्त "क" वर्गका बैंकहरुले नवीकरणीय उर्जा (जलवि …
 
 ### `da8024b7616b` p.1 — scan-backed queue
 
@@ -136,9 +136,9 @@ Same page, same words. The OCR loses every space, drops `वित्त`→`ि
 | `Rqft fuhqq ttrqfua qill tc, tolt +1 Esl loq. A M BTRI+TT Tfrq rrft qq ` | च्त्रात ागजत्रत्र ततचत्रागब त्रष्िि तअ, तयति ंज्ञ भ्कि यित्र। ब् : द्य | rejected |
 | `qt{r qq tff ffi ar{l-6-{A kIT+T flffi cm{r q-i ,Tft htst.*+ aqr ffiq €` | त्रर्तच त्रत्र ताा ााष् बर्च(िटर्(ब् पक्ष्त्तं् ाािाष् mर्अच त्र(ष् ,त | rejected |
 
-**Docling OCR** — 1567 Devanagari chars:
+**Docling OCR** — 1720 Devanagari chars:
 
-> e Rol siht hhler hlye? वदेशीिविनमययवरथापनिवभाग Eh Erl nk Wiph UoP eh peeo hpe Pe Be यवरथासमबधीसूचना वदेशीिविनमयतनयिमतगने ऐन,र॰परकोदफापoख.लेिदएकोओिधकारपयोगगरीयसबैंकबाटइजाजतपघपात गरेकालघुिवचिवतीयसंरथाहकलेदेहायकाशतहरकोपालनागनेगरीिवदेशीबैकतथािवतीयसंरथावाअयसंरथाहरबाट पिरवयीिवदेशीमुदामाऋणिलनसवनेयवरथागिरएकोलेसमबिधतसबैकोजानकारीकोलिंगयोसावजिनकसूचना पकाशनगिरएकोछ शतहर - यसबैकबाटइजाजतपऋपातघवगकालघुवतिवतीयसंरशाहहलेिवदेशीमुदाआजनगने …
+> विदेशी विनिमय व्यवस्थापन विभाग व्यवस्था सम्बन्धी सूचना विदेशी विनिमय (नियमित गर्ने) ऐन, २०१९ को दफा १०ख. ले दिएको अधिकार प्रयोग गरी यस बैंकबाट इजाजतपत्रप्राप्त गरेका लघु वित्त वित्तीय संस्थाहरले देहायका शर्तहरको पालना गर्न गरी विदेशी बैंक तथा वित्तीय संस्था वा अन्य संस्थाहरूबाट परिवत्य विदेशी मुद्रामा ऋण लिन सक्ने व्यवस्था गरिएकोले सम्बन्धित सबैको जानकारीको लागि यो सारवजनिक सूचना प्रकाशन गरिएको छ। शर्तहरु - यस बैकबाट …
 
 ### `796bb59c3443` p.1 — scan-backed queue
 
@@ -159,9 +159,9 @@ Same page, same words. The OCR loses every space, drops `वित्त`→`ि
 | `Enrail: nrbsid(frrrb org np` | भ्लचबष्सि् लचदकष्म९ाचचचद यचन लउ | rejected |
 | `qq ++,qre ffi qoev/lR/oR eJ @T€il@1 ."ftft14' sx" qtt+mr aeil` | त्रत्र ं,त्रचभ ााष् त्रयभखरच्रियच् भव् २त्€ष्२िज्ञ ।ूातातज्ञद्धु कहू क | rejected |
 
-**Docling OCR** — 590 Devanagari chars:
+**Docling OCR** — 391 Devanagari chars:
 
-> फोन न O-yoदद पयाiaस न Ou-yroe Site: www nrb org np Email: nrbsidanrb org np पकिशत िमित २०७xI०श०२ बोलपघरवीकृतकालिंगछनौटगनेआशयकोसूचना यसबैंकबाटिमित२॰णवशाणशकोरिषट्यरतरको.दैनकपऋपिकामातथा बैंककोवेभसाइटमापकिशतर सूचनाअनुसारयसकायिलयकोकायिलयभवन Io Piela Piprlia गाडीववाटरहकमारंगरोगनगनेकायकालािगसलबदी बोलपघआहवानगिरएकोमारीतपूवेकपेशहुनआएकािसलवदीबोलपनहरमधयेधी भगवतीकवरट्वसन,बुटवलपळ,रपदेहीलेपेशगरेकोदररेटकोआधारमाकुल रकम . ,दB,ooo अभरप …
+> फोन नं: ०७१-५२०१८८ फ्याक्स न: ०७१-५२०१८९ Site: www.nrb org np Email: nrbsid@nrb org.np सूचना। प्रकाशित मिति २०७५/०२/०३ स्वीकृतिका आशयको २०७४/१२/०२ को "दैनिक पत्र" बैंकको वेभसाइटमा पहक 1 अनुसार क भवन, अधिकृत रंगरोगन द गरिएकोमा कन्स्टरूक्सन, बुटवल - ९०, रुूपन्देहीले गरेको कुल रकम रु. २१,४३,५७७१० (अक्षरेपी एक्काइस हजार h सतहत्तरर पैसा दश मात्र) (VAT समेत) न्यूनतम मूल्याङ्रित रही सारभूतरुपमा ts क २०६३ २०७३) दफा २७ २ र ने …
 
 ### `70b0d415dcf3` p.1 — scan-backed queue
 
@@ -182,9 +182,9 @@ Same page, same words. The OCR loses every space, drops `वित्त`→`ि
 | `(zF) h*c a-frffi qfri r+TT Eeil qqR ET-tsR q-qrq-{ sfuki hqi<.T rt q-q` | ९शँ० ज८अ ब(ाचााष् त्राचष् चंत्त् भ्भष्ि त्रत्रच् भ्त्(तकच् त्र(त्रचत्र | rejected |
 | `(q) fr&q q-6-q-i qki r+q 3n€rq-+] q-{fl.iqrq irE ae-+] ffi qTq( k€i-s ` | ९त्र० ाच७त्र त्र(ट(त्र(ष् त्रपष् चंत्र घल€चत्र(ें त्रर्(ा।िष्त्रचत्र ष | rejected |
 
-**Docling OCR** — 1650 Devanagari chars:
+**Docling OCR** — 1019 Devanagari chars:
 
-> l pih राष्ऋणथवरथापनिवभाग नभेपसंकलनउपकरणसमबधीकायिविध - नभेपसंकलनगिरनेरकमखुलाबजारकारोबारसंचालनसिमितलेिनधिरणगरेबमोिजमहुनेछ क - ख िनभेपसंकलनगिरनेरकमआहानकोसूचनानेपालराष्बैंककोवेवसाईटमाफतिदईनेछ - ग I sy? Hiye Nh: pph hil rjufle Eh ii ehIh bhble - घ िनभेपसंकलनकोबोलकबोलबहुलाजदरपणालीमागिरनेछ - िनभेपसंकलनबोलकबोलमामौदकनीतमायवरथाभएबमोिजमकाकाउपटरपाटीहरक,खरग बगकाबैंकतथािवतीयसंरथाहलेमाघसहभागीहुनपाउनेछन् - च काउणटरपाटीहरलेबोलफाराममा …
+> क निक्षेप संकलन उपकरण सम्बन्धी - (क) निक्षेप संकलन गरिने रकम खुला बजार कारोबार संचालन समितिले निधारण गरे बमोजिम हुनेछ । - (ख) गरिने रकम आव्हानको सूचना नेपाल राष्ट्र बैंकको वेवसाईट मार्फत दिईनेछ । - (ग) साथ संलग्न भए बमोजिम - (घ) कक क गरिनेछ। - (ड) क भए क , ≥E,,)pP क e वित्तीय संस्था) ले मात्र सहभागी हुन h - (च) फाराममा आफूले Phle रकम र (दशमलव कु गर्नु पर्नछ। - (छ) गरिएको रकम क अनुसार सवभन्दा क 1 राखी गरेको रकमसम्म कऋ …
 
 ### `2e65dadfffa3` p.1 — scan-backed queue
 
@@ -205,9 +205,9 @@ Same page, same words. The OCR loses every space, drops `वित्त`→`ि
 | `fi+fu:RorglzrgzqTTd'qr:k.3IT.9.1R / Yq / oel / \eY` | ाष्ांगस्च्यचनशिचनशत्रत्त्मुत्रचस्प।घक्ष्त्।ढ।ज्ञच् र थ्त्र र यभि र ्भथ | rejected |
 | `kqq : qfilfrT{fir+1 Eil k{rq q6rsi sqnrqr r` | पत्रत्र स् त्राष्िाचतर््ष्चांज्ञ भ्ष्ि र्पचत्र त्रटचकष् कत्रलचत्रच च | rejected |
 
-**Docling OCR** — 667 Devanagari chars:
+**Docling OCR** — 504 Devanagari chars:
 
-> Boll pi वदेशीिविनमययवरथापनवभाग आनतिरकपशासनशाखा पaसंखय:fd.आ.प. Or? o0rIG? YPbe holnjie gl िवषयःपिततपवहककोछुहिववरणपठाउनेसमबधमा Hlip! यसअिघभारतकोकोलकातााहिदयाबदरगाहहुँदैतेसोमुलुकसँगकोआयातिनयितकारोवार भइरहेकोमाहालिवसाखापतनमबदरगाहबाटआयातिनयितकारोवारगनीनेपालभारतदुईदेशिबच सहमितभएकोसदभीमािवसाखापतनमबदरगाहहुदैमालबरतुआयातगनीसिकनेउचबदरगाहहुद आयातहुनेमालवरतुनेपालकािवराटनगर,वीरगनज,भैरहवारनेपालगजभसारनाकाहुदैनेपाल भव्याउनसिकनेरवािणज …
+> विदेशी विनिमय व्यवस्थापन विभाग पत्रसंख्या:वि.आ.प्र.१२/४६/०७३/७४ एक्सटेन्सन: ९८३ फ्याक्सः ००९७७ ९ ४४९४५५३ ऐ० 2h फोन: ४१९८०४/६/७ ४९१०२०१/४९०१५८/४९१२५० फ्याक्सः ००९७७ ९ ४४९४५५३ ऐ० 2h Email : xm@nrb.org.np मितिः२०७३/७/८ महाशय सहमति भएको सन्दर्भमा विसाखापतनम बन्दरगाह हुदै मालबस्तु आयात गर्न सकिने, उक्त बन्दरगाह हुद आयात हुने मालवस्तु नेपालका विराटनगर, वीरगव्ज, भैरहवा र नेपालगव्ज भन्सार नाका हुँदै नेपाल भित्रयाउन सकिने र व …
 
 ### `360eaafd44bd` p.1 — scan-backed queue
 
@@ -228,9 +228,9 @@ Same page, same words. The OCR loses every space, drops `वित्त`→`ि
 | `Web Site : www.nrb org nP` |  | kept_english |
 | `ffi qr{Tfcrdrr ra-+1 qq a'mqT f{M wql qqT tr{ S"fr hq-{qr frtflTf,` | ााष् त्रर्चतअचमचच चब(ंज्ञ त्रत्र mबुत्रत् र्ःा धत्रि त्रत्रत् तर्च क्ा | rejected |
 
-**Docling OCR** — 1198 Devanagari chars:
+**Docling OCR** — 807 Devanagari chars:
 
-> Yal pih! कामीम बैकतथावतीयसंरथािनयमनिवभाँग ऐषािधसीप पa संयाबै.व.न.व. नीत पिरपaIकखग qशoछ छए इजाजतपघपातकवगकाबैंकहर महाशयु नेपालीनागिरकसँगरहेकोसुनबैंकमािनभेपकोपमाजमागनीसवनेवषयमानीतगत यवरथागनेसदभीमायसबैंकवाटकखरगवगकाइजाजतपनपातसंरथाहलाईजारी गिरएकोएकीकृतिनदेशनर॰ए कोइ.पा.नदेशनशा०प मादेहायबमोिजमबुँदान.न थप Je aRot B ro al pihy ? Pailr pir Hijhe leu Ip? ehy Piph larh gr दफाणरलेिदएकोओिधकारपयोगगरीयोिनदेशनजारीगिरएकोछ डःनेपालीनागिर …
+> नेपाल क संस्था नियमन पत्र संख्या : वैवि.निवि./ नीति/ परिपत्र/कखग/१२/०७६/७७ क बैंकहर, क सुन वैंकमा क रुपमा 1+ गर्न सन्दर्भमा "क ","ख" ं " र "ग क संस्थाहरुलाई गरिएको एकीकृत निर्देशन २०७६ क इ.प्रा. निरदेशन २१/०७६ मा बुंदा ४ट गरी C गरिएको है ह गर्नु गराउनुह हुन वैंक ऐन, २०५८ दफा अधिकार गरी गरिएको छ। महाशय, केन्द्रीय बालुवाटार, ४४११४०७ फ्याक्स kkxbxx E-mail <nrbbfirdppd@nrb.org.np> Web Site : www.nrb.org.np : उ३ मितिः २०७ …
 
 ### `a17fa322b81a` p.1 — scan-backed queue
 
@@ -251,9 +251,9 @@ Same page, same words. The OCR loses every space, drops `वित्त`→`ि
 | `* A-rtq rrE *+, +f+-f, hlrrr Frqr.ki q+qoi qtqTftrrfr zr'r-zltdq-6r, E` | ८ ब्(चतत्र चचभ् ८ं, ां(ा, जचिचच ँचत्रच।पष् त्रंत्रयष् त्रतत्रततचचाच शच | rejected |
 | `ilfurq +drf{ r nEq<rc+r (G[' ili+-[ k+.rq il+-m r` | ष्िागचत्र ंमर्चा च लभ्त्र?चअंच ९न्ुृ ष्ष्िं(ृ पं।चत्र mष्िं( च | rejected |
 
-**Docling OCR** — 1499 Devanagari chars:
+**Docling OCR** — 1634 Devanagari chars:
 
-> महाशयु वदेशीिविनमयकारोबारगनीइजाजतपघपातबैंकतथािवतीयसंरथारअयिनकायलाईजारीगिरएको एकीकृतपिरपऋ-॰णमादेहायबमोिजमसंशोधनगिरएकोहुँदासोहीवमोिजमगनुगराउनुहुनिवदेशीिविनमय वनयिमतगनेऐन,॰परकोदफापशलेिदएकोअिधकारपयोगगरीयोपिरपऋजारीगिरएकोछा एकीकृत पिरप-२o को एकीकृत s.पा. पिरप: OाRo७ को दफा O.9 को उप-दफा A.9. लाई देहायबमोिजमसंशोधनगिरएकोछ यरतोसटहीसिवधाबढीमाएकपटकमाअमेिरकीडलरपoठठपैतीसहजार वासोबराबरकोपिरवयी वदेशीमुदासमकोलािगमाऋपदानगनीसिकनेछपयसर …
+> महाशय, इ.प्रा. परिपत्र संख्या : १४/२०७७-७८ मितिः २०७८/०१/३० श्री नेपाल राष्ट्र बैंक, बैकिङ्ध विभाग लगायत सम्पूर्ण प्रदेशस्थत कार्यालयहर, इजाजतपत्प्रा्त "क" वर्गका वाणिज्य बैंकहर र राष्टयस्तरका "ख" वर्गका विकास बैंकहरु । विषय : एकीकृत परिपत्र-२०७६ मा संशोधन गरिएको सम्बन्धमा । विदेशी विनिमय कारोवार गर्न इजाजतपत्प्रप्त वैंक तथा वित्तीय संस्था र अन्य निकायलाई जारी गरिएको एकीकृत परिपत्र-२०७६ मा देहायवमोजिम संशोधन गरिएको ह …
 
 ### `8e8467f74f84` p.1 — scan-backed queue
 
@@ -274,9 +274,9 @@ Same page, same words. The OCR loses every space, drops `वित्त`→`ि
 | `Ernrq ffi qftFrd Ht{fi Tfrrqr EEUI kf, vfr ET{st` | भ्चलचत्र ााष् त्रातँचम र्ज्ताष् तचचत्रच भ्भ्ग्क्ष् पा, खाच भ्तर््कत | rejected |
 | `ktqt Ht+rq tFrqka qil tt, toq<, +1 EsT qocr. A @r BIftmR !r*{r rrft qs` | पतत्रत ज्तंचत्र तँचत्रपब त्रष्ि तत, तयत्र?, ंज्ञ भ्कत् त्रयअच। ब् २च m | ambiguous |
 
-**Docling OCR** — 1429 Devanagari chars:
+**Docling OCR** — 1744 Devanagari chars:
 
-> e Al piht Wieler hlye? Iee! Ehlhaphe hh! U6Pe! Thaphe ph Br! lore HIsh 1e?e! geh pepee holofie सरबधीसूचना वदेशीिविनमयतनयिमतगनेऐन,शणशकोदफापoख.लेिदएकोओंधकारपयोगगरीयसबैंकबाटइजाजतपनपात गरेकाबािणयबैकहरलेदेहायकाशतहलकोपालनागनेगरीिवदेशीबैंकतथािवतीयसंरथाहरबाटपिरवलीवदेशीमुदामा ऋणिलनसवनेशवरथागिरएकोलेसमबिधतसबैकोजानकारीकोलािंगयोसावेजिनकसूचनापकाशनगिरएकोछ शतंहर - यसबैंकबाटइजाजतपघपातकवगकाबैकहरलेनवीकरणीयउजि्जलिवधुत,सौयीरवायुउजिउलपादन …
+> विदेशी विनिमय व्यवस्थापन विभाग h सम्बन्धी सूचना विदेशी विनिमय (नियमित गर्न) ऐन, २०१९ को दफा १०ख. ले दिएको अधिकार प्रयोग गरी यस बैंकबाट इजाजतपत् प्रापत गरेका बाणिज्य बैंकहरुले देहायका शर्तहरुको पालना गर्न गरी विदेशी बैंक तथा वित्तीय संस्थाहरुबाट परिव्य विदेशी मुद्रामा ऋण लिन सक्ने व्यवस्था गरिएकोले सम्बन्धित सबैको जानकारीको लागि यो सार्वजनिक सूचना प्रकाशन गरिएको छ। शर्तहर - यस बैंकबाट इजाजतपत्रप्राप्त "क" वर्गका बैंकह …
 
 ### `438c55304da5` p.1 — needs_ocr
 
@@ -288,9 +288,9 @@ Same page, same words. The OCR loses every space, drops `वित्त`→`ि
 
 > *(empty)*
 
-**Docling OCR** — 784 Devanagari chars:
+**Docling OCR** — 813 Devanagari chars:
 
-> p 201 pine Iep! Ehorpre EaIl piih. सूचना बैंकमासहयोगीसेवातफिरकरहेकोइिजिनयरपदकरारमाफतपितंगनेसबधमािमितश॰टशश॰छमा पकािशतसूचनाबमोिजमरीतपुवेकदरखारतिदईबैंकबाटसउचालनगिरएकोपरीभामासहभागीभएका उमेदवारहलेपामगरेकोअङ्ककाआधारमासफलभएकातपिशलकामुखयउमेदवारलाईकरारमािनयिक गनेिनणियभएकोहुँदासमबिधतसबैकोजानकारीकोलिगयोसूचनापकािशतगिरएकोछा वज़ापननं.१॰/२॰८, Ahuiu ph C roph IIh अ | रोलनं. उममेदवारकोनामथर - ५१ पिदपभहराई | |-------------------------- …
+> सूचना बैकमा सहयोगी सेवातर्फ रिकतरहेको इन्जिनियर पद करारमार्फत पूरतिंर्े सम्बन्धमा मिति २०८१/१०/७ मा प्रकाशित सूचनाबमोजिम h 2 उम्मेदवारहरूले ्रप गरेको अड्कका आधारमा सफल भएका तपशिलका मुख्य उम्मेदवारलाई करारमा नियुक्ति गे नि्णिय भएको हुंदा सम्बन्धित सबैको जानकारीको लाग यो सूचना प्रकाशित गरिएको छ । १०७/२०८१, माग पदसंख्या: २ अ) मुख्य उम्मेदवार | योग्यताक्रम रोल नं. उम्मेदवारको नाम, थर ५१ प्रदिप भटराई २ ४० | |------------- …
 
 ### `c298efaf1f16` p.1 — needs_ocr
 
@@ -302,9 +302,9 @@ Same page, same words. The OCR loses every space, drops `वित्त`→`ि
 
 > *(empty)*
 
-**Docling OCR** — 1234 Devanagari chars:
+**Docling OCR** — 1552 Devanagari chars:
 
-> अनुसूचीन लगानीसःबधीसूचना यसबैककोविभलकोषहलमारहेकोरकमलगानीगनुपनेभएकोलेयसबैकबाटइजाजतपघपातदेहाय बमोिजमकाशतहरपुरागरेकाबैकतथािवतीयसंरथाबाटदेहायबमोिजमकोसीमिभघरहीआफूलेिलनचाहेको Hah thiyhe uiia e! hl Wh Dh Ibolhe lhjl bi leiz lb heh! pa hl hh? भरी उच फारमलाई df format मा Scan गरी Password Protect गरर कुल लगानीयोरय रकम मeय fमित २o५ वैशाख श गत दख रooवैशाख a तदनुसार ञपल aर, oरशदिख ओिपलaर, Roशश सम ३x दनक Eijee Oo:b pi pr obabsoot …
+> अनुसूची- १ लगानी सम्बन्धी सूचना यस बैंकको विभिन्न कोषहरुमा रहेको रकम लगानी गर्न प्े भएकोले यस बैंकबाट इजाजतपत्र प्रप्त देहाय बमोजिमका शर्तहरु पुरा गरेका बैंक तथा वित्तीय संस्थाबाट देहाय बमोजिमको सीमाभित्र रही आफूले लिन चाहेको भरी उक्त फारमलाई pdf format मा Scan गरी Password Protect गरेर कुल लगानीयोग्य रकम मध्ये मिति २०७९ वैशाख २ गते देखि २०५० वैशाख १ (तदनुसार अप्रिल १५, २०२२ देखि अप्रिल १४, २०२३) सम्म ३६५ दिनको मुइती …
 
 ### `276b2eb62802` p.1 — needs_ocr
 
@@ -316,9 +316,9 @@ Same page, same words. The OCR loses every space, drops `वित्त`→`ि
 
 > *(empty)*
 
-**Docling OCR** — 364 Devanagari chars:
+**Docling OCR** — 612 Devanagari chars:
 
-> We pl siht सामादयासेवािवभाग दरभाउपञखीकृतभएकोसूचना L albaLfis IeE th aih h++ eih Be! tbin ooot i E lyis Ee+e th. आपितगनसछधमामितर्कपनालशगतगोरखापनापकिशतसलवदीदरमाउपन आह्वानकोसूचनानमिजमपशनमपकातदरभाउपधहरमधयिननसामानरसकालाा Piolt bihm yheipipehelbr Ehpp Iineiek Ith? pil pgihsh Whe भपकोलनेपालशाट्वैकखिरदनिविनयमावलीनशनसंशोधनसमतमकोिविनयमरण कोचपिनिनयमवशाकोमयोजनकोलिंगयोसूचनान्पकिशतागिरारकोछ | Thihit. Wileeheiet कस haE! धान r Ihil  …
+> सामान्य सेवा विभाग दरभाउपत् स्वीकृत भएको सूचना यस वैकको लागि वि. सं. २०उ सालको भिते पातो, डेवस प्याड पात्रो तथा डापरी छपाई गरी आपर्ति गन् सम्बन्धमा मिति २०उ६१०२१ गते गोरखापत्र प्रकाशित सिलवन्दी दरभाउपत्र आह्वानको सचना वमोजिम पेश भएका दरभाउपत्ररुमध्ये निम्न सामानहरका लागि न्यूनतम मूल्या्ित सारभूत रुपमा प्रभावग्राही देहायका दरभाउपत्रदाताहरको दरभाउ म्वीकृत भएकोले नेपाल राष्ट वैक खरिद विनियमावली, २०५ (संशोधन समेत को विनि …
 
 ### `1a9b6321aa61` p.1 — font-embedded control
 
@@ -339,9 +339,9 @@ Same page, same words. The OCR loses every space, drops `वित्त`→`ि
 | `c?0f kmfOgfG; lnld6]8nfO{ g]kfn /fi6 a}+s, a}+s tyf ljQLo ;+:yfsf] zL3` | अरुण फाइनान्स लिमिटेडलाई नेपाल राष्ट बैंक, बैंक तथा वित्तीय संस्थाको श | converted |
 | `;DaGwL ljlgodfjnL, @)^$ sf] ljlgod # sf] -v_ adf]lhd ldlt @)^(.!.#! sf` | सम्बन्धी विनियमावली, २०६४ को विनियम ३ को (ख) बमोजिम मिति २०६९।१।३१ को  | converted |
 
-**Docling OCR** — 540 Devanagari chars:
+**Docling OCR** — 345 Devanagari chars:
 
-> कारवाहीफुकुवाभएकािवतकमपनीहरकोिववरण प.अकणफाइनासिलिमटेडधरान,सुनसरीलाईगिरएकोकारवाहीफुकुवा अरणफाइनासिलिमटेडलाईनेपालराषटबैंक,बैंकतथािवतीयसंरथाकोशीघसुधारामककारवाही समबधीिविनयमावली,रदद कोिविनयमशको ख बमोिजमिमितर०दशाशप कोिनणयानुसारगिरएको शीघसुधारामककारवाहीिमित२॰शाश२दिखफुकुवागिरएकोछ . सृजनाफाइनासिलिमटेडिवराटनगरलाईगिरएकोकारवाहीफुकुवा सृजनाफाइनासिलिमटेडलाईसमानुपाितकचुवतापूँजीवृिदनगरेकोहुनालेयसबैंककोएकीकृत नदेशन,२०७ कोिनदेशननःश क …
+> शदक फुकुवा भएका वित्त कम्पनीहरूको विवरण : 9. अरुण फाइनान्स लिमिटेड धरान, सुनसरीलाई गरिएको कारवाही फुकुवा। क संस्थाको शीघ्र क सम्बन्थी विनियमावली, ()क पु २०६९।९।३१ को निर्णयानुसार गरिएको ्रसुधारात्मक २०६९२२४ फुकुवा गरिएको छ। २. सृजना फाइनान्स विराटनगरलाई क फुकुवा। फाइनान्स लिमिटेडलाई कप कक एकीकृत २०६७ को निरदेशन नं.२९ (६)^ अनुसार उक्त संस्थालाई २०६७१ २ा२७ संकलन 2 क लगाइएको कक सम्पूर्ण शर्तहर गरी मिति २०६९।०२१० गरिएकोह …
 
 ### `d1c99f3cf34d` p.1 — font-embedded control
 
@@ -362,9 +362,9 @@ Same page, same words. The OCR loses every space, drops `वित्त`→`ि
 | `df]x/ l8lh6n k\|f=ln=  n] e'QmfgL tyf km:of}{6 P]g, @)&% sf] bkmf #^ sf` | मोहर डिजिटल प्रा.लि.  ले भुक्तानी तथा फर्स्यौट ऐन, २०७५ को दफा ३६ को ख | converted |
 | `adf]lhdsf] s;'/ u/]sf] b]lvPsf]n] e'QmfgL tyf km:of}{6 ljlgodfjnL  -k\|` | बमोजिमको कसुर गरेको देखिएकोले भुक्तानी तथा फर्स्यौट विनियमावली  (प्रथम | converted |
 
-**Docling OCR** — 385 Devanagari chars:
+**Docling OCR** — 280 Devanagari chars:
 
-> मोहरिडिजटलपा.िल.कोअनुमितपऋखारेजगिरएकोसूचना यसबैंकबाटभुकानीसेवापदायककोरपमाकायीगनेगरीिमितoछशणशाः9्माअनुमितपघपात मोहरिडिजटलपा.ल.लेभुकानीतथाफरयौटऐन,oपकोदफा कोखuड छ रज बमोिजमकोकसुरगरेकोदिखएकोलेभुकानीतथाफरयौटविनयमावलीपथमसंशोधन,॰दण, hfi Eaip thPihpie lk pa Huh hrbre O pnb e Hhe oooc यहोरासमबिधतसबैकोजानकारीकालािंगयोसूचनापकाशनगिरएकोछाउकसंरथालेजारी गरेकाभुकानीउपकरणहरकोपयोगगनेयाहकहरसंगकोकुनैदियलबाँकीरहेसमबिधतसंरथामा समपकीगनुहुन …
+> मोहर डिजिटल को खारेज गरिएको सूचना । २०क सेवा रुपमा जाक २०७६/०६/३० मा मोहर $ २०७५ क दफा ३६ क (छ) ()≥ कसुर गरेको फस्यौट विनियमावली संशोधन, २०८०), २०७७ ३५ को () उक्त संस्थाको अनुमतिपत्र गरिएको व्यहोरा सम्बन्धित सूचना प्रकाशन गरिएको उक्त संस्थाले गरेका भुक्तानी कक कक३ दायित्व सम्बन्धित संस्थामा सम्पर्क गर्नुहुन सूचनाद्वारा अनुरोध गरिन्छ । मिति : २०८०/०६/०८
 
 ### `268bcfe86d03` p.1 — font-embedded control
 
@@ -385,16 +385,16 @@ Same page, same words. The OCR loses every space, drops `वित्त`→`ि
 | `Ohfhtkqk\|fKt æsÆ / /fli6«o:t/sf ævÆ ju{sf a}+s tyf ljQLo ;+:yfx¿ . ` | इजाजतपत्रप्राप्त “क” र राष्ट्रियस्तरका “ख” वर्गका बैंक तथा वित्तीय संस | converted |
 | `ljifo M–  :yfgLo ljqm]tfn] ko{6snfO{ ljqmL u/]sf] ;fdfgsf] lgof{tsf] ` | विषय :–  स्थानीय विक्रेताले पर्यटकलाई विक्री गरेको सामानको निर्यातको  | converted |
 
-**Docling OCR** — 486 Devanagari chars:
+**Docling OCR** — 692 Devanagari chars:
 
-> इ.पा.पिरप संछया.- ३१७ भितः-दश4 I yelo? hlpe! or ee lejfe Be, lePrrfl I , PllshPele? YPjr guih palr yp! piveyh pipyp hlio? -- Whe! अियमभुकानीपमाणपऋजारीगनेबारे महाशयु पयटकलेरथानीयिवकेताबाटखिरदगरेकोसामानिनयितपिकयाअपनाईरथानीयिवकेता फमलेनैपयटककोठेगानामापठाउनेभएमायरतोसामानहरकोभुकानीवापतपयटकले बैंकािवतीयसंरथामापिरवयीिवदेशीमुदाबुझाउनलयाएमािवदेशीमुदाखवीकारगरीसोकोहुने Pye khlolh yipi Hiyele ePiu! Bi h hiPi eph Pue! hi Ih? Frlo …
+> इ.प्रा.परिपत्र संख्या:- ३९७ मिति :- २०६३/१२/१९ इजाजतपत्र्राप्त "क" र राष्टयस्तरका "ख" वर्गका बैंक तथा वित्तीय संस्थाहरू। अग्रिम भुक्तानी प्रमाणपत्र जारी गर्े बारे। महाशय, पर्यटकले स्थानीय विक्ेताबाट खरिद गरेको सामान निर्यात प्रक्रिया अपनाई स्थानीय विक्रेता फर्मले नै पर्यटकको ठेगानामा पठाउने भएमा त्यस्तो सामानहरुको भुक्तानी वापत पर्यटकले रुपैयाँ स्थानीय विक्ऋरता फर्मको खातामा जम्मा गरी निर्यातको अग्रीमा भुक्तानी प्रमा …
 
 ## 5. The six questions this spike was asked
 
 1. **Can it read the problematic pages?** Yes. All 8 scan-backed queue pages went from **0** Devanagari characters to hundreds; the existing pipeline recovers nothing there because there is nothing to recover.
 2. **Is it usable Unicode Nepali?** Script yes, orthography no — see §3. Usable as a coarse signal, not as text a reader or an index should trust.
-3. **Which backend ran?** Docling OCR stage → RapidOCR → **`torch`** backend → **PP-OCRv4 `devanagari_..._rec_mobile`**. The backend choice IS the model choice: docling maps torch to PP-OCRv4 and onnxruntime to PP-OCRv5, and neither can be varied alone through this interface.
-4. **How slow?** 0.9s/page median after warmup (0.5–1.2s), on GPU. The first page pays 21s of model load and compile.
+3. **Which backend ran?** Docling OCR stage → RapidOCR → **`onnxruntime`** backend → **PP-OCRv5 `devanagari_..._rec_mobile`**. The backend choice IS the model choice: docling maps torch to PP-OCRv4 and onnxruntime to PP-OCRv5, and neither can be varied alone through this interface.
+4. **How slow?** 2.0s/page median after warmup (1.4–3.9s), on GPU. The first page pays 21s of model load and compile.
 5. **Does it beat Preeti conversion on the failure cases?** On the scan-backed pages there is nothing to beat — conversion cannot apply. On the font-embedded controls it clearly **loses** to the existing converter (§3).
 6. **Good enough to become the fallback?** Not as it stands. It earns a place only for pages with no legacy text layer. See the recommendation.
 

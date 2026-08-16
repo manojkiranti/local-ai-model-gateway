@@ -1,0 +1,747 @@
+{
+  "backend": "onnxruntime",
+  "recogniser": "PP-OCRv5",
+  "lang": "devanagari",
+  "force_full_page_ocr": true,
+  "native_parser": "pypdf",
+  "elapsed_seconds": 55.5,
+  "cases": [
+    {
+      "short": "3d2eca8b9f95",
+      "page": 1,
+      "group": "scan-backed queue",
+      "why": "unresolved; 300 dpi scan; forex 2018",
+      "blob": "3d2eca8b9f951ecda27129f3fc7e90c503eb1e84802797d6e9833fdae6d39e39.pdf",
+      "rendered_page": "docs/nrb/holdout-pages/3d2eca8b9f95-p001.jpg",
+      "native": {
+        "chars": 2083,
+        "chars_nonspace": 1695,
+        "devanagari": 0,
+        "latin": 1366,
+        "devanagari_ratio": 0.0,
+        "latin_ratio": 0.8059,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "ocr": {
+        "chars": 2174,
+        "chars_nonspace": 1823,
+        "devanagari": 1731,
+        "latin": 40,
+        "devanagari_ratio": 0.9495,
+        "latin_ratio": 0.0219,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "native_text": "tqrq w +6\na-ffi i$i?ii!i?T\nt{tqft frfu{q aFrerFFT f{qr{r\n{rdF{\n(1)\n(R)\n(v)\n(s)\n({)\n/C \\\n(1)\n(10)\nqTftrq ffi rrrrfrq Trrqr flur k{ Tfr q*w vq*ft\nqT{r\nRqft hhqq tffia q-il'l E{, tott +1 ssT lo<r. d M BTRr+ri rfrq q-ft qs *+-qrs gqmaq{ qrq\nrA61 4tftr$q dq-{€A tarftFrqrffi qrccr qf rrft ,Trrf,terf, il+ aqr ffiq veTw€qrd }il-cfrq {ffqT €q\nfu{ {d qzreuTr qRr|+tA {qfrrd rrffi qr+arffi qrftr fr qErfl TsTqrq rM g r\nq-q +fi-Erd rqrqtrq{ eTk[ u.F\" T{t-+T ffi Tffiq wt tqsft-{d, +4 g.qi < sr{ sqb sel-{q\nilfi FsRq FITE;I, (rsF', g€-fl'qFt, kfl-{rr{, tq-nr6r, 5q irwr snrd6 qqfqR targtdf,; wrn korqqtmr ffi frr qF+1, hht g{r Brrdq qi qffi, sS tr{ { qq kf, *Tcr Fqt q-{r6 nril\nq+trr+r qrFT ffiq ffirq-+l q-{frr ,rt *+ aqr ffiq v€Trqrc $TRfi'q {.frrcr ruur k{ vfr\nu-1 t +vft rrtrfrq {arqr €ur fttsr wq qffi, hhft gn+n ruur ftT\\'+l qq fr vta ffi q-d silRfr\nqrqkfr tffi {o skqrf, qi fr{r tr* w1 qfu 1\nqq m ffi c*firq+1{ffis +r+q qt+r ffi qn zrd ruq k{ vd wt rqd aur kc avr srq Trf ffi fqlq-fi sfrfu truiq qqd 6{ cilE r\nruor ki *o nqr ffiq Tf€Trfl{ srR-ritrq ffiqr ffiq +.rn-{R'it'qr E+ t€M sk{+r qrffi g{\nq*r t\nzrd {q-+1 Tmrfr eraRr qffiq I q{?fu B{Rffi-q { 4{vq+1 6{ cfu | rR, ?Rr ffi ffi r<mrrtqr rd aur q-frfi-{ur.rd'si+ig ,\n{urffdfi iffirgi grq rgTlt e!GF' (Fee) vi( Tft Eur+} BiRr€-fq aflum( MCLR (Marginal cost of\nFunding based Lending Rate) HT 3lRr+-ilq 1 qfuqrdr-qr q& -r{n rrft ilq qH et cfu | vrF qrqr<\nqrts+ arq Ei 'qlo+, +fuqm kc crgi fu rqd rur kn TriM eTnT d fuffi fH, wrre, ft6 rqrtdt kc crgi Aq r\ncd aq fuc r{ ++-{rc T4 fr+-.d fm{ sfu | €ur r+q FTffi csqrE eTtTqr4 trqr r{ +6qr\nnqrql1rrCrq qfu r\nnr+1 qiar qM Tfirfi .rqt T{ W slhvq qrcorft rr<rt cs ffi eTffnqqr srut-4firfi rRrs1\nqfu r {rt {ur+1 aqrq Ttrrfi lrdt e-skf, fuqr-{qR crri +< +,fr.rt{ un gmrft.r-{ Tfu |\n*oi aur r+q Fqqr'.ier rrqfr r5frr-<w aqr qrarqrft h-qT+-flTqr ftfi-q qrnfi IilER\"T Tqnft\ne-qt{d tEq ftTr eT<rdFq EFr{fldr Tuf {cqr qt-qa1 15{ qfrs I\nsrffi t{trr6\nfrt{ft frtffq aFrsTrr{ tfin{r\nffi lovXTov/RR rrA s*{Tf\\Tf, T+ fuqqf{r qFqhrf, qfir qlk rrRSr+} e r\nWebsite: www.nrb.ors.np ril IFF'Ftlit Ftfr totl*Zolllo",
+      "ocr_text": "विदेशी विनिमय व्यवस्थापन विभाग\n\nसूचना\n\nविदेशी विनिमय (नियमित गर्न) ऐन, २०१९ को दफा १०ख. ले दिएको अधिकार प्रयोग गरी यस बैंकबाट इजाजतपत्रप्राप्त गरेका वाणिज्य बैंकहरुले देहायका शर्तहरुको पालना गर्न गरी भारतस्थित बैंक तथा वित्तीय संस्थाहरुबाट भारतीय मुद्ामा ऋरण लिन सक्ने व्यवस्था गरिएकोले सम्बन्धित सबैको जानकारीको लागि यो सूचना प्रकाशन गरिएको छ।\n\nशर्तहर\n\n- यस बैंकबाट इजाजतपत् प्रा्त \"क\" वर्गका बैंकहरुले नवीकरणीय उर्जा (जलविदुत, सौर्य उर्जा र वायु उर्जी) उत्पादन तथा प्रसारण लाइन, सडक, सुरु्धमा्ग, विमानस्थल, केवलकार, पुल जस्ता भौतिक पूर्वाधार (हाउजि्, जगगा विकास जस्ता रियलस्टेटको कषेत्र बाहेक), विदेशी मुद्रा आर्जन गर्न पर्यटन, कृष क्षत्र र लघु वित्त क्षत्रमा कर्जा प्वाह गर् प्रयोजनका लागि वित्तीय साधनको प्रबन्ध गर्न भारतस्थत बैंक तथा वित्तीय संस्थाबाट भारतीय मुद्ामा ऋृण लिन सक्ने छन्। यसरी भारतीय मुद्रामा ऋण लिंदा अन्य परिव्य विदेशी मद्ामा ऋण लिएको भए सो समेत गरी कुल आफ्नो प्राथमिक पूजीको ५० प्रतिशत को सीमा भित्र रहनु पर्ेछ।\n- यस्तो ऋृण लिन ऋण प्राप्त ग्ने बैंकको संचालक समितिबाट निर्णय भएको हुनु पर्नेछ।\n- यस बैंकले तोके बमोजिमको पूजीकोष कायम गरेका बैंकहरुले मात्र यस्तो ऋण लिन सक्ने छन्।\n- ऋण दिने बैंक तथा वित्तीय संस्थालाई अन्तराष्ट्य रूपमा वित्तीय कारोवार गर्निमा कुनै किसिमको प्रतिबन्ध लागेको हुनु\n- यस्तो ऋणको भुक्तानी अवधि न्यूनतम १ वर्षदेखि अधिकतम ५ वर्षसम्मको हुनु पन्छ । तर, यस बैंकले स्वीकृति प्रदान गरेमा यस्तो ऋण नवीकरण गर्न सकिनेछ।\n6. (७)\n- ऋणदाताले लगाउने अन्य सम्पूर्ण शुल्क (Fe) समेत गरी ऋणको अधिकतम व्याजदर MCLR (Marginal Cost of बाहेक अन्य कुनै शुल्क, कमिशन दिन पाइने छैन ।\n8. (द) यस्तो तऋण लिन यस बैंकबाट पूर्व स्वीकृत लिनु पर्नंछ । ऋण रकम भित्रिसके पश्चात् अनिवार्य रुपमा यस बैंकमा लेखाइन गराउनु पर्ेछ ।\n9. (१० बैंकले तऋण रकम भित्र्याउँदा सम्पत्त शुद्धीकरण तथा आत्वादी क्रियाकलापमा वित्तीय लगानी निवारण सम्बन्धी प्रचलित राष्टिय तथा अन्तराष्टिय कानूनको पूर्ण रुपमा पालना गर्नु पर्नेछ ।\n- ऋणको साँवा ब्याज भुक्तानी ग्दा यस बैंकलाई अविलम्ब जानकारी गराई यस बैंकको अभिलेखमा अधावधिक गराउनु पन्छ। साथै, ऋणको बव्याज भुक्तानी गदा प्रचलित नियमानुसार लागने कर कटी गरेर मात्रभुक्तानी गर्न पर्ेछ।\n\n( विदेशी विनिमय व्यवस्थापन विभाग\n\nमिति २०७५ /०४/२३ गते प्रकाशित यसै विषयसंग सम्बन्धित सूचना खारेज गरिएको छ। Website: www.nrb.org.np मा प्रकाशन मिति २०७y/o९/१०",
+      "converted_sample": [
+        {
+          "where": "p.1",
+          "original": "t{tqft frfu{q aFrerFFT f{qr{r",
+          "converted": "र्ततत्रात ाचार्गत्र बँचभचँत् र्त्रार्चच",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "qTftrq ffi rrrrfrq Trrqr flur k{ Tfr q*w vq*ft",
+          "converted": "त्रततचत्र ााष् चचचचाचत्र त्चचत्रच ागिच र्प तच त्र८ध खत्र८ात",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "Rqft hhqq tffia q-il'l E{, tott +1 ssT lo<r. d M BTRr+ri rfrq q-ft qs *+-qrs gqmaq{ qrq",
+          "converted": "च्त्रात जजत्रत्र तााष्ब त्र(ष्िुि भर््, तयतत ंज्ञ ककत् यि?च। म : द्यत्च्चंचष् चाचत्र त्र(ात त्रक ८ं(त्रचक नक्रबर्त्र त्रचत्र",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "rA61 4tftr$q dq-{€A tarftFrqrffi qrccr qf rrft ,Trrf,terf, il+ aqr ffiq veTw€qrd }il-cfrq {ffqT €q",
+          "converted": "चब्टज्ञ द्धतातच४त्र मत्रर्(€ब् तबचातँचत्रचााष् त्रचअअच त्रा चचात ,त्चचा,तभचा, ष्िं बत्रच ााष्त्र खभत्ध€त्रचम ैष्(िआचत्र र्ाात्रत् €त्र",
+          "disposition": "rejected"
+        }
+      ],
+      "seconds": 21.46,
+      "error": null
+    },
+    {
+      "short": "da8024b7616b",
+      "page": 1,
+      "group": "scan-backed queue",
+      "why": "unresolved; 300 dpi scan; forex 2019",
+      "blob": "da8024b7616ba6a0513a99b585060ee7829905eb867e73d913b6086692ede980.pdf",
+      "rendered_page": "docs/nrb/holdout-pages/da8024b7616b-p001.jpg",
+      "native": {
+        "chars": 2099,
+        "chars_nonspace": 1704,
+        "devanagari": 0,
+        "latin": 1362,
+        "devanagari_ratio": 0.0,
+        "latin_ratio": 0.7993,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "ocr": {
+        "chars": 2144,
+        "chars_nonspace": 1801,
+        "devanagari": 1720,
+        "latin": 32,
+        "devanagari_ratio": 0.955,
+        "latin_ratio": 0.0178,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "native_text": "iqrq {rE +€\nffiq +rqfqq\nkt{ft P{fu{q aFrerFFT f+n{r\n(1)\n(R)\n(Y)\n({)\n\\\\/\n(\\9)\n(1)\n(10)\nqg trn ffiq ffi qRr+d Htqft 1nrqr apr k{ vfr\naFreil Tqfrft qq{r\nRqft fuhqq ttrqfua qill tc, tolt +1 Esl loq. A M BTRI+TT Tfrq rrft qq +{-qrd Fq[qilT{ qrq\nqt{r qq tff ffi ar{l-6-{A kIT+T flffi cm{r q-i ,Tft htst.*+ aqr ffiq €€Tr zTT q-q RrTr6{-crcqk{fli Rqt gcrqr ruq kc e-d_q+en rrMfA rr-qtrro sffi qrf,+Ttal qrfu * qrffic-r qffir\nwFlwr rftq+1 d I\nqrdF{\nqq +rqra {slufilT{ ylq \"s' flt-€r qq k{ kfi-c g+qr-6{-A Rqfr t-{r Bildq rri Triiq, +.S *{,q{ sqq dql qrfl-IT, oq wat+qn 6q1 qffiq g-qi, M a?T[ sffi Nil crd-dqrqqdc, rrkfr Fr{Ru\"( sflr-{q BTfuqkqT Fdq}T 5ri rrft sffi.fr an-i=+R mra qi sqq, aFRtTz[,\nqkd-q-qT BTrt{qr +-qi rsm rli ed-q-iqT {rftr ffiq qrqE-+1 rq-rq .rd Rqt *+ aqr ffiq lren sl\nwq senmerc qfue-(d, htqt tFrrn ryr kc qd6{ |\nqr m ffi e*tqrr+1 {ffiiE orqq qt6r vq kn ffi'q v€il6{A qH {d aq kc vd ut rqd aq fuEt vm'€q T+q ri-a frqsr BilRn qre{kfi tffi qfrqr 1o {w wq qrr ffiq *oqkqrd{ 6+ cfr rift q+en fuers{ Ttd I\nqd aq k{ q_q-dfr sfukqrc ffiq €{ qf,s 1\nruq ki Rst +fi nQTr mq seTrfl{ eTR-dEq wqr ffiq +.nt{R rrfqr d fuM efu*?rqqrrrg\\rdr fl cfu r\nTd €ur+1 TmT-ft erqRr q+flq 1 Teitfu BTRr+-f,q x qffi qFr qT cts r il{, q{ Ae-n ffiTEr+ rrtqr rfi-fiiq rt;t qt+-id I\nruur+] qlur(t F|flzm EuT-ilfl-fr fingi 3fq {swi 'sI@ (Fee) gid qt BIRI+-dq 6 Month Libor + 3%\nflrr g1 qfs r $ffi-aTlcf(t EraF Fqt ffid rrct ftdi qq t+ qw', +furm tcc cr$i *{ rqcd aq Rqrqrc Fwrsi qzM qrftr Rqt *+ nw ffiq e-{qrfl-t +.* mtsq-+f fH, qqrq-f,,\n+fi rqrtfr kc cr$i fu r\nqd ruur kc r{ ++-c-rd T4 frW ts{ Tis I aq .m-q csqfE 3Tt{Erd qqqr {s +fiqr\nnqTF{ rt-{t-s1 cfu r ruur+1 qtar qFq TsT-ft qt qqqFf, d {q;Tqr +q Affi B{t{dq qmfl-ft\nmni qs aq-+l eTf\\TiqqT erqrqRrfi rrircT qfu r qr$, {ur+J qrq rrflrft q-qi sqk-f, ftqqrTqTi\noni +< +fr .nr wa Tmrft .rt qt-g r\n*oi ruvr c+q Fr{qrc-<t qaqt{ slfu-owr dqr errtrgE[ft hqr+-\"ilqqT ffiq q.trft FrsRUT (q{ft\ns-qka nF nqr il<-dEq fi-fl+1 Wi qr\"rcr.r{ ciliq r\nWebsite: www.nrb.org.np rIT lliFl{FT fufu Rotgd/1ol19\nffi 1out17o{/R{ qT eq,tftrf, T( {qfr q-firqr€ qtq rfirq+t 6 |\nEFrffi frTt{r+",
+      "ocr_text": "विदेशी विनिमय व्यवस्थापन विभाग\n\nव्यवस्था सम्बन्धी सूचना\n\nविदेशी विनिमय (नियमित गर्ने) ऐन, २०१९ को दफा १०ख. ले दिएको अधिकार प्रयोग गरी यस बैंकबाट इजाजतपत्रप्राप्त गरेका लघु वित्त वित्तीय संस्थाहरले देहायका शर्तहरको पालना गर्न गरी विदेशी बैंक तथा वित्तीय संस्था वा अन्य संस्थाहरूबाट परिवत्य विदेशी मुद्रामा ऋण लिन सक्ने व्यवस्था गरिएकोले सम्बन्धित सबैको जानकारीको लागि यो सारवजनिक सूचना प्रकाशन गरिएको छ।\n\nशर्तहरु\n\n- यस बैकबाट इजाजतपत्रप्रा्त \"घ\" वर्गका लघु वित्त वित्तीय संस्थाहरुले विदेशी मुद्रा आर्जन गर्न पर्यटंन, कृषि क्े्र, आयआर्जन, गरिवी निवारण र उत्पादन अभिवृद्धमा सहयोग पुरने गरी आफ्नो कारोवार क्ष्रभित्र प्ने उधम, व्यवसाय, परियोजना आदिमा कर्जा प्रवाह गर्न प्रयोजनका लागि वित्तीय साधनको प्रवन्ध गर्न विदेशी बैंक तथा वित्तीय संस्था वा अन्य संस्थाहरुूबाट परिव्य विदेशी मुद्रामा ऋृण लिन सक्नेछन्।\n- परिचालन हुन सक्ने गरी व्यवस्था मिलाउनु पर्नेछ।\n- यस बैंकले तोके बमोजिमको पूजीकोष कायम गरेका लघु वित्त वि्तीय संस्थाहरुले मात्र यस्तो ऋृण लिन सक्ने छन्।\n- यस्तो ऋृण लिन संचालक समितिबाट निर्णय हुनु पर्नेछ।\n5. () यस्तो ऋणको भुक्तानी अवधि न्यूनतम ९ वर्षदेखि अधिकतम ४ बर्षसम्मको मात्र हुनु पन्ेछ । तर, यस बैकले स्वीकृति प्रदान गरेमा नवीकरण गर्न सकिनेछ।\n6. (x) ऋण दिने विदेशी बैंक तथा वितीय संस्थालाई अन्तराष्ट्य रूपमा वित्तीय कारोवार गरनमा कुनै किसिमको प्रतिवन्ध नलगाइएको हुनु पर्नछ ।\n- ऋणको व्याजदर लगायत ऋणदाताले लगाउने अन्य सम्पर्ण शुल्क (Fee) समेत गरी अधिकतम 6 Month Libor + 3% भित्र हुनु पर्नेछ । उक्त व्याजदर बाहेक कर्जा स्वीकृति ग्दा लिईने अन्य कुनै शुल्क, कमिशन दिन पाइने छैन ।\n- यस्तो ऋण लिन यस बैंकबाट पूर्व स्वीकृत लिनु पर्नंछ । ऋतण रकम भित्रिसके पश्चात् अनिवार्य रूपमा यस बैंकमा गराई यस बैंकको अभिलेखमा अध्यावधिक गराउनु पर्छ । साथै, ऋणको ब्याज भुक्तानी गद्दा प्रचलित नियमानुसार लागने कर कटी गरेर मात्र भुक्तानी गर्नु पर्नेछ।\n- यस्तो ऋण विदेशबाट भित्रयाउने प्रयोजनको लागि विदेशी बैंक तथा वित्तीय संस्थालाई कुनै किसिमको धितो, जमानत, क\n- बैंकले तऋण रकम भित्रयाउँदा सम्पत शुद्धिकरण तथा आतइ्वादी क्रियाकलापमा वितीय लगानी निवारण सम्बन्धी प्रचलित राष्टिय तथा अन्तराष्टिय कानूनको पर्ण पालना गन पर्नेछ ।\n\n(भिष्मराजि दुंगाना)\n\nWebsite: www.nrb.org.np मा प्रकाशन मिति: २०७५/१०/१७\n\nमिति २०७५/०५/२५ मा प्रकाशित यस सम्बन्धी सूचनालाई खारेज गरिएको छ।",
+      "converted_sample": [
+        {
+          "where": "p.1",
+          "original": "kt{ft P{fu{q aFrerFFT f+n{r",
+          "converted": "पर्तात र्एार्गत्र बँचभचँत् ांर्लच",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "qg trn ffiq ffi qRr+d Htqft 1nrqr apr k{ vfr",
+          "converted": "त्रन तचल ााष्त्र ााष् त्रच्चंम ज्तत्रात ज्ञलचत्रच बउच र्प खाच",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "Rqft fuhqq ttrqfua qill tc, tolt +1 Esl loq. A M BTRI+TT Tfrq rrft qq +{-qrd Fq[qilT{ qrq",
+          "converted": "च्त्रात ागजत्रत्र ततचत्रागब त्रष्िि तअ, तयति ंज्ञ भ्कि यित्र। ब् : द्यत्च्क्ष्त्तं् तचत्र चचात त्रत्र र्(ंत्रचम ँत्रृत्रष्तर््ि त्रचत्र",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "qt{r qq tff ffi ar{l-6-{A kIT+T flffi cm{r q-i ,Tft htst.*+ aqr ffiq €€Tr zTT q-q RrTr6{-crcqk{fli Rqt gcrqr ruq kc e-d_q+en rrMfA rr-qtrro sffi qrf,+Ttal qrfu * qrffic-r qffir",
+          "converted": "त्रर्तच त्रत्र ताा ााष् बर्च(िटर्(ब् पक्ष्त्तं् ाािाष् mर्अच त्र(ष् ,तत जतकत।८ं बत्रच ााष्त्र €€त्च शत्त् त्र(त्र च्चत्चर्ट(अचअत्रर्पाषि् च्त्रत नअचत्रच चगत्र पअ भ(म)त्रंभल चचःाब् चच(त्रतचचय कााष् त्रचा,ंत्तबि त्रचाग ८ त्रचााष्अ(च त्रााष्च",
+          "disposition": "rejected"
+        }
+      ],
+      "seconds": 2.94,
+      "error": null
+    },
+    {
+      "short": "796bb59c3443",
+      "page": 1,
+      "group": "scan-backed queue",
+      "why": "unresolved; 150 dpi scan; notice 2019",
+      "blob": "796bb59c34434e9e6bc5480e30a821cf11e333a93a709e075f26bbd52d5005b7.pdf",
+      "rendered_page": "docs/nrb/holdout-pages/796bb59c3443-p001.jpg",
+      "native": {
+        "chars": 877,
+        "chars_nonspace": 730,
+        "devanagari": 0,
+        "latin": 539,
+        "devanagari_ratio": 0.0,
+        "latin_ratio": 0.7384,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "ocr": {
+        "chars": 556,
+        "chars_nonspace": 464,
+        "devanagari": 391,
+        "latin": 40,
+        "devanagari_ratio": 0.8427,
+        "latin_ratio": 0.0862,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "native_text": "fr{q{ ffil{.r qrfrr q+c q-il,sil-el{fr} Ft|{r I\nkdrefTrR\nw-;tfr r\nql-{ c: o\\e1-{lolqq\nWIFRT q: oel-{?olqe'\nSite: www nrb org np\nEnrail: nrbsid(frrrb org np\nfarfqro ffi 1ou{/oR/ol\nqq ++,qre ffi qoev/lR/oR eJ @T€il@1 .\"ftft14' sx\" qtt+mr aeil\nffit {rm[5afl. rari{ra TfiT 3]'.ilsR zl-q o.[qi-{q qzF[,\nBTfh\"of, eTt\"{RT dsTT ,Td qqrfld[{TT Tr[ful-{ I-i 6.rtf6-r qrfrr Rsq{-ft\nfrdqT B{rFl]-{ @qr fu{o tn gt 3il-g6t k\"l.{-fr tt fr\nr1{-{fr FFF^afi1-{, E-fr - 10, {Ftfrfr tu rfffi cR}74] 3IT\".IIGT W\na4q T. R1,Yl,{\\eel1o (3T?rift qq.6,r{g qTrq ffidrq FTR qrq (|IT\n*-16T{ { tsr Eqr q1a) ffAT vtrol el frdrr FT{ilq {E{rB-f, €\n{RTnoTqr Fr+r4qrfi rfi s-frc 6i iM-A {r.iqhd qfr( (q, ?oqt\n(qffi qqfrtr{ Rost) 41 Esl Re el s-qilF-r R { iqm q +6 qRK\nhFrqq|-{fr, Rosl tffi qqfrilq lo\\eYl +1 tqfu{q {v al fdq-q-dT qrftr\nvsqFaro qaar qr+arffi ?nftr fr Tq{r r+-f}Td .rM u r\n(3rqt6 qrnr frRql\nFrtqro",
+      "ocr_text": "फोन नं: ०७१-५२०१८८\n\nफ्याक्स न: ०७१-५२०१८९\n\nSite: www.nrb org np\n\nEmail: nrbsid@nrb org.np\n\nसूचना।\n\nप्रकाशित मिति २०७५/०२/०३ स्वीकृतिका आशयको\n\n२०७४/१२/०२ को \"दैनिक पत्र\" बैंकको वेभसाइटमा पहक 1 अनुसार क भवन, अधिकृत रंगरोगन द गरिएकोमा कन्स्टरूक्सन, बुटवल - ९०, रुूपन्देहीले गरेको कुल रकम रु. २१,४३,५७७१० (अक्षरेपी एक्काइस हजार h सतहत्तरर पैसा दश मात्र) (VAT समेत) न्यूनतम मूल्याङ्रित रही सारभूतरुपमा ts क २०६३ २०७३) दफा २७ २ र नेपाल राष्ट्र खरिद विनियमावली, २०७१ (दोस्रो संशोधन २०७४) क सम्वन्धित सबैका जानकारीको यो सूचना प्रकाशित गरिएको छ।\n\n(अशोक कुमार पौडेल)",
+      "converted_sample": [
+        {
+          "where": "p.1",
+          "original": "fr{q{ ffil{.r qrfrr q+c q-il,sil-el{fr} Ft|{r I",
+          "converted": "ार्चर्त्र ााषर््ि।च त्रचाचच त्रंअ त्र(ष्,िकष्(िर्भिाचै ँर्त्रच क्ष्",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "Site: www nrb org np",
+          "converted": null,
+          "disposition": "kept_english"
+        },
+        {
+          "where": "p.1",
+          "original": "Enrail: nrbsid(frrrb org np",
+          "converted": "भ्लचबष्सि् लचदकष्म९ाचचचद यचन लउ",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "qq ++,qre ffi qoev/lR/oR eJ @T€il@1 .\"ftft14' sx\" qtt+mr aeil",
+          "converted": "त्रत्र ं,त्रचभ ााष् त्रयभखरच्रियच् भव् २त्€ष्२िज्ञ ।ूातातज्ञद्धु कहू क्रततंच बभष्ि",
+          "disposition": "rejected"
+        }
+      ],
+      "seconds": 1.88,
+      "error": null
+    },
+    {
+      "short": "70b0d415dcf3",
+      "page": 1,
+      "group": "scan-backed queue",
+      "why": "unresolved; act 2019",
+      "blob": "70b0d415dcf306bc6640027aa64dbfd236418611b1806477fcdd232430af4fc3.pdf",
+      "rendered_page": "docs/nrb/holdout-pages/70b0d415dcf3-p001.jpg",
+      "native": {
+        "chars": 2303,
+        "chars_nonspace": 1895,
+        "devanagari": 0,
+        "latin": 1433,
+        "devanagari_ratio": 0.0,
+        "latin_ratio": 0.7562,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "ocr": {
+        "chars": 1438,
+        "chars_nonspace": 1165,
+        "devanagari": 1019,
+        "latin": 67,
+        "devanagari_ratio": 0.8747,
+        "latin_ratio": 0.0575,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "native_text": "\\\\.?tr{trT q q€\nw ruq aFrerTq?T hflT\nff,*.r <i+-{q srrcFarr q-Er;tfr +r{tqRr\n(zF) h*c a-frffi qfri r+TT Eeil qqR ET-tsR q-qrq-{ sfuki hqi<.T rt q-q1kq {ils \nr\n(q) fr&q q-6-q-i qki r+q 3n€rq-+] q-{fl.iqrq irE ae-+] ffi qTq( k€i-s r\n(rr) qi.qr{ sRTqel aqal qft etzifufh HTqT {6rq rrq q-q}kq qi.u r\n(q) fr*q q-frq-q-+l e}-d+,-d-f, qqeme< errfiqT rtts t\n(s) fr*c €-fi-d{ frqcF-+R{rr +rfr-{ frihqT q{eTr qq q*k{fir (\"+.\", \"e\" ( \"r[\"\nqri+T +{ ow ffiq veqD t qlr {6rrr{ft g+ vrei u1r\n(q) fiw-<qrffi frq s-Rlqqr 3nEt fr*q qnro qq1 q;i qrH[ {+-q { qrq{{ (Eqrq-qFT\nqffi 6+qr qR w+-cql sdq q qi-g r\n(d) fr*q v+-qq-fr orfrr qrqrq qM aaq qi€sis qqi d-q q-q-rfuq\"dr qlcfei q'-q-qT{ qET<T\n+-q drq qf fisn-eiqdqd qrrrn{+flr h-rr-rrT qd qram rrHt r-s-qcrq r-{qT: qieq.fs\nqftts r\n(q) qqm qrsre< s-R'q- q\\rfir drqq-i-ildr r+-q qqilqr rci Ea trwftn r+-qE-qt ofi Wq\"I\nPro-rata basis +IT qiestg qti-g t\n(r+-) Eqr qqR o.[t-qR q-qffi{ qfum cut-off rate fruirq .d qd'd { dti]-q q-& em-Er+1\nto*q d-fl{.ri qr c-{Ti 3TRr+.ri qftrtf,drr {iRT(.dAR I\n(q) 3{r€m rrRq-dr drq {fi-qqet {rqui qr ffir+ e}q d-+R qr {*+.R r-i 3fsrfli qfufr-dd\nrdAE I\n(a) ft.+n v\\r6r d-{qr qqil+} roq ffi qqfrrf, ersueilTffi qq +fi-qr fft qnr q=i .Ttr\nffia r *+qr R-{kn hM wcrt qror drfr qqr nri-g r\n(6) +qr{ dqd q\\r€[ fl-so-.iqrffi qkil-fl fr gr+-{q frqTq-{ qfri k{qT q]-qn qqiK\ncqqqr saffi 6|gu-&qrfrfl-i 4IdE*qT TI-fr qr4-@T ffi{qT sEqrfr q4 E.+q {fl*ts I\n(s) Tfik.d frM Tfr-ffi erqP.r sflq irq qfu ffi frqikd qrc stdf, hfrq r+-q qqtra-o\nt+-dt qror,qr qqr rrft Ra r\n(d) h*q q-f,trq qftq-dr rfi-q sqftl-d eTsr-fllffi q{rrf,r Portfolio qi uq+tfr m r+q-qe\n3Tffi qrrq qtqrd (CRR) qr rruF{t rT-t qTTi &q r ffi, qq adr ftrtqrq qfrfiil'q eFnt l-ct\nqt srn ({I Liquidity Ratio rIT gft- {+-q rlul-il Tl;f qEi-g t\n(ur) fr*c e-f,-d{ €rcF-{q qq.ffq eto qq n.{ T-ts { { F-ilsA }T[.r q-Ei fr:q]q ]T[q'e[i 3{-f,ql\n3TRIfiffi 3Tf€l=t @ T+-r6fq *q q.i st+tdt I\n(d) ffid-d fr*o .t* I1mrfr fufr q-{Tr+ qqt{rd oreq<qfu fu-ot H d-q r\n(eT) h*q R-{-q-{ €rl-F-{ut Td\"iT rrffi orf\\ grmorrr f}rfr rrco ffi qaqEr ffi e t\n(E) fr.dq R-{-d{ EqcF-{uFFI qPt-qirc furd m + fr}q-qT qi s( r\n(sT) frfrq q-+-q-{ dqr{ dET q\\r6r 4.rsreqrff6{-fl'{ fr ft1 fus1 1qflw-{l qq fuqrq-fr qR-srq\nqFF-{ Giqr Br-q-qR H aqq-w rtM A t\nfiz:- almq rre{+aqqr ffi 1ou11vllc qT dqd ,l,i qFf qq+l t\nWorking Procedure",
+      "ocr_text": "क\n\nनिक्षेप संकलन उपकरण सम्बन्धी\n\n- (क) निक्षेप संकलन गरिने रकम खुला बजार कारोबार संचालन समितिले निधारण गरे बमोजिम हुनेछ ।\n- (ख) गरिने रकम आव्हानको सूचना नेपाल राष्ट्र बैंकको वेवसाईट मार्फत दिईनेछ ।\n- (ग) साथ संलग्न भए बमोजिम\n- (घ) कक क गरिनेछ।\n- (ड) क भए क , ≥E,,)pP क e वित्तीय संस्था) ले मात्र सहभागी हुन h\n- (च) फाराममा आफूले Phle रकम र (दशमलव कु गर्नु पर्नछ।\n- (छ) गरिएको रकम क अनुसार सवभन्दा क 1 राखी गरेको रकमसम्म कऋरमश: बॉडफाॉंड गरिनेछ।\n- (ज) समान भएका रकम समावेश गर्दा कुल क रकमभन्दा भएमा Pro-rata basis मा गरिनेछ।\n- (ऋ) बजार कारोबार संचालन समितिले Cut-off rate निर्धारण सक्नेछ र सोभन्दा बढी बव्याजदरको क नगर्न अधिकार समितिसंग सुरक्षित रहनेछ ।\n- (k) क क स्वीकार वा अस्वीकार गर्े अधिकार समितिलाई रहनेछ।\n- (ट) भएका रकम कक सम्बन्धित र बैकमा\n- (ठ) स्वीकृत भएका मौज्दात पर्याप्त क सहभागी हुन वन्देज लगाईनेछ।\n- (≥) क समाप्त भए सहित कक\n- (ढ) क रकम सम्बन्धित Portfolio क रकमलाई (CRR) मा r छैत तर, यस वैंकको निर्देशन राखनु पर्ने SLR तथा Liquidity Ratio मा उक्त रकम $ पाइनेछ।\n- () संकलन उपकरण बोल मूल्य रु.४ करोड र ५ करोडले भाग ग्दा नि:शेष भाग जाने अंकमा अधिकतम आव्हान गरिएको रकमसम्म गर्न सकिनेछ।\n- (त) संकलित निक्षेप रकम भुक्तानी मिति अगावै सम्बन्ित काउण्टरपार्टीलाई\n- (द) संकलन उपकरणका प्रक्रियाहरु रिभर्स रिपो कै मोडेलमा छन्।\n- (थ) संकलन be h  h    h रहेको छ।\n- (ध) क स्वीकृत भएका काउण्टरपा्ीहरुलाई सो को निस्सा (प्रमाणपत्र) यस विभागले यसैसाथ दिने व्यवस्था गरिएको छ।\n\nनोट:- श्रीमान् गभर्नरज्यूबाट मिति २०७१।४।१८ मा स्वीकृत भई लागू भएको ।",
+      "converted_sample": [
+        {
+          "where": "p.1",
+          "original": "w ruq aFrerTq?T hflT",
+          "converted": "ध चगत्र बँचभचत्त्ररुत् जाति्",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "ff,*.r <i+-{q srrcFarr q-Er;tfr +r{tqRr",
+          "converted": "ाा,८।च ?ष्र्(ंत्र कचचअँबचच त्र(भ्चसताच ंर्चतत्रच्च",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "(zF) h*c a-frffi qfri r+TT Eeil qqR ET-tsR q-qrq-{ sfuki hqi<.T rt q-q1kq {ils ",
+          "converted": "९शँ० ज८अ ब(ाचााष् त्राचष् चंत्त् भ्भष्ि त्रत्रच् भ्त्(तकच् त्र(त्रचत्रर्( कागपष् जत्रष्?।त् चत त्र(त्रज्ञपत्र र्ष्कि ",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "(q) fr&q q-6-q-i qki r+q 3n€rq-+] q-{fl.iqrq irE ae-+] ffi qTq( k€i-s r",
+          "converted": "९त्र० ाच७त्र त्र(ट(त्र(ष् त्रपष् चंत्र घल€चत्र(ें त्रर्(ा।िष्त्रचत्र ष्चभ् बभ(ें ााष् त्रत्त्र९ प€ष्(क च",
+          "disposition": "rejected"
+        }
+      ],
+      "seconds": 3.37,
+      "error": null
+    },
+    {
+      "short": "2e65dadfffa3",
+      "page": 1,
+      "group": "scan-backed queue",
+      "why": "partial, Devanagari-after 0.1996; 150 dpi",
+      "blob": "2e65dadfffa3e740eb0292c2c96524ba6ae5642d016f20d557dfa8228f100969.pdf",
+      "rendered_page": "docs/nrb/holdout-pages/2e65dadfffa3-p001.jpg",
+      "native": {
+        "chars": 1036,
+        "chars_nonspace": 869,
+        "devanagari": 0,
+        "latin": 680,
+        "devanagari_ratio": 0.0,
+        "latin_ratio": 0.7825,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "ocr": {
+        "chars": 666,
+        "chars_nonspace": 567,
+        "devanagari": 504,
+        "latin": 31,
+        "devanagari_ratio": 0.8889,
+        "latin_ratio": 0.0547,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "native_text": "ffiw\nilrM trg +fi\nHtqft Hfrqq aFrerr{ hrn\nqrqnr+ Tqlrgr {nqT\nffiq q;rqi\"-q\n?]Sffi, 6T6qr€1\nqt{: Yjc,coY /\\/\\s\nYlolo1 /Yl01{c/Yll1to\ngffie=${: lqi\n\\Tl-4S: ool\\ee 1 YYIY{{i\nfrE f,ffi: \\ei\nEmail :km@nrb.org.np\nfi+fu:RorglzrgzqTTd'qr:k.3IT.9.1R / Yq / oel / \\eY\nq+ Erfrrq +firt\nkqq : qfilfrT{fir+1 Eil k{rq q6rsi sqnrqr r\nrr6rqr{T\nqq 3{fu rrr.il+1 +tq+rorzakqr q-<rrn6 & ffi {qpnirA B{Frfl kqid o,rimr\nT{€+tqr arq kfirqrkffiq q<rqrffire Bil-qm kqid +.rt+rt rt;i tqm wrra gi tqr kq\nvdqfd rr\\r+1 u<fqr t+Hqrril{q {<rrn6 fr um-*q qFnf, rrf qt+i, sm q<-r.rra &\n3Tr.rkT qi qrcmq tqm+,r t{rra{rR, frrlrq, +G,{r ( iqm{rq r;qR ffor $ lqM\nFrflrs{ qH ( qrfurq ffi fr qqcn6 & qr*rm Bnrrkr qrt dt+,r effi qB\nk{tq zrq +6qr r6r-sr{qi qzreTr qffi g.sr. qftT{ vqr qql ffi loulrqc qr qrft\ntr{sAqJ q-dTr erorrril qfl\"i<q 1 fr qqrna qrqfil snril-f, qn ffir+q qdrsi rqM\nqrftr g.T{tffi qk{ qstdq dlt{\\r+.r qfdilr{f,€+1 et fffi{ur il{tR rrft Et{ Brrr{r\n1c-visakhapatnam@nrb.org.np qT q6rqg{ q{tq g t\niffiftq\nab+L qG*,.J\n(Er{tE qRr+rftl\n+l.{.6Fisft htqr+\nffi,q\nkw",
+      "ocr_text": "विदेशी विनिमय व्यवस्थापन विभाग\n\nपत्रसंख्या:वि.आ.प्र.१२/४६/०७३/७४\n\nएक्सटेन्सन: ९८३\n\nफ्याक्सः ००९७७ ९ ४४९४५५३\n\nऐ० 2h\n\nफोन: ४१९८०४/६/७ ४९१०२०१/४९०१५८/४९१२५०\n\nफ्याक्सः ००९७७ ९ ४४९४५५३\n\nऐ० 2h\n\nEmail : xm@nrb.org.np\n\nमितिः२०७३/७/८\n\nमहाशय\n\nसहमति भएको सन्दर्भमा विसाखापतनम बन्दरगाह हुदै मालबस्तु आयात गर्न सकिने, उक्त बन्दरगाह हुद आयात हुने मालवस्तु नेपालका विराटनगर, वीरगव्ज, भैरहवा र नेपालगव्ज भन्सार नाका हुँदै नेपाल भित्रयाउन सकिने र वाणिज्य बैंकहरुले सो बन्दरगाह हुदै सामान आयात गरन खोलेका प्रतितपत्ररुको छुटहै 3 k लागि उपर्यक्त परिपत्र बमोजिम खोलिएका प्रतितपत्रहरुको छुट्ै विवरण तयार गरी इमेल ठेगाना hdu810queedeyyesग\n\nभवदीय\n\n(वासुदेव अधिकारी) का.मु.कार्यकारी निर्ेंशक",
+      "converted_sample": [
+        {
+          "where": "p.1",
+          "original": "Htqft Hfrqq aFrerr{ hrn",
+          "converted": "ज्तत्रात जचत्रत्र बँचभचर्च जचल",
+          "disposition": "ambiguous"
+        },
+        {
+          "where": "p.1",
+          "original": "\\Tl-4S: ool\\ee 1 YYIY{{i",
+          "converted": "्त्(िद्धक्स् ययि्भभ ज्ञ थ्थ्क्ष्थर्र््ष्",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "fi+fu:RorglzrgzqTTd'qr:k.3IT.9.1R / Yq / oel / \\eY",
+          "converted": "ाष्ांगस्च्यचनशिचनशत्रत्त्मुत्रचस्प।घक्ष्त्।ढ।ज्ञच् र थ्त्र र यभि र ्भथ्",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "kqq : qfilfrT{fir+1 Eil k{rq q6rsi sqnrqr r",
+          "converted": "पत्रत्र स् त्राष्िाचतर््ष्चांज्ञ भ्ष्ि र्पचत्र त्रटचकष् कत्रलचत्रच च",
+          "disposition": "rejected"
+        }
+      ],
+      "seconds": 2.05,
+      "error": null
+    },
+    {
+      "short": "360eaafd44bd",
+      "page": 1,
+      "group": "scan-backed queue",
+      "why": "partial; highest English share in band (8.9%)",
+      "blob": "360eaafd44bdf4addde8bfc2b4582e687a5e1f846498e8541811cda7c4504707.pdf",
+      "rendered_page": "docs/nrb/holdout-pages/360eaafd44bd-p001.jpg",
+      "native": {
+        "chars": 1924,
+        "chars_nonspace": 1602,
+        "devanagari": 0,
+        "latin": 1178,
+        "devanagari_ratio": 0.0,
+        "latin_ratio": 0.7353,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "ocr": {
+        "chars": 1181,
+        "chars_nonspace": 950,
+        "devanagari": 807,
+        "latin": 69,
+        "devanagari_ratio": 0.8495,
+        "latin_ratio": 0.0726,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "native_text": "irrn\nAq dt{T\n{rq\nfrfr, {err Frqqq\nqfl qrqr : t.h.fr-.fu. zffizqRqzTa$r/11/ o\\st(/ \\e\\e\n{qIf,f,qarr.r.w \naq;rr Trffit 44-6{,\n,+Ctq arqieq\nqryarcR, araqrg'i\nqTc YYll Yo'e\nqAT4TI; YYiY{{!\nE-mail <nrbbfirdppd@nrb org np>\nWeb Site : www.nrb org nP\nq'ir4 A4q \\9j\nffi; loeq /11/ ?1\nffiqiI|.ffi-q\n{wtt fr+T-{ trd\n\\.\n*F\n'iiqil-Ql{t,\nffi qr{Tfcrdrr ra-+1 qq a'mqT f{M wql qqT tr{ S\"fr hq-{qr frtflTf,\nqz{-<rtt rrt q<{qr qq t-{-{rd \"4\",uq-'' a 'n' q-Tio-r gqrq-flTa< tteilE{il{ qft\n.t*\"i *fi,- #* RosE +1 q.qr.FTtqT?I Rl/osq qT ?fl,-{q}tf,q 1i+ a' Yc t{r.\nrr-ft T-qTireqT # rftq\"i i(r drft r** rf *^\"f-Eq i.qr{ {Iv at?F (q' ?o{c e1\n.* oq A mr 3ftrf,R qmq'rfr fr triqm qrt rlt\\rd 6 I\nYc.m qr{rtcaf{r qq+1 q{ Hfrq ffi uqerfl :\n1. {q +-fi-qrd gqrwf,T{Tl-w u4' ilfo-r qrfurq ffi\n{ffi f-{dr€ ?-dTq q-mfif,qd @zn{TI trft frM\nsfr65 ;-\n4. nfrrq ffi.{q freq ffi (-E{rtITI-r ffi nqr frKn 6ldr4fu ffir€\na-qr.f,6 qfurilqrd wkd rlar€ ffr Tffia I qR-fr gq fteq Ffrmi+\nqqq-r qq :tsqr m ftaiq r{g-dr qrf,-4Tti|Eqftn qrq-fl-t rRrsl qts t\nq' v{ fu*q 6iqr frfrr+-diqrd sre'rer qi wdr qlf,{r deIT +f,+l qrq .rt\nffi TE*-,T qfr umqr 31{ Fiiness +1 ga-rn frmT-( rr+qtdi I\nrr. ilRrq ffi t{*Iqi Fwil flqI {qqlE Eta (rfu-f,r rrfr ql_f,f,r aqr\nf,jq75} 3{TeTI-Gt erq-q qfr g{}m .r.t €q& fi1{ il{A qq-e{T rrdq-tdi I\nqt-& g-{eTrfirdIftr flTIRI, q-rr tr, ffi qrfr qmq-o 3ilqqqcF.\nq\"rFd fuqTq qtg t\nq'q.qry-q1*B'.g{t{frqd*I.rtdfrffi-(qf,{rwF.Ia];ITd{+B[l\nR. gq fhM .*i fr6R .rdi Erfrrq ffi Mr qEqr 3l-qnlt6ffi\nrriq-+E :-\ne' Rtnilt 1{ rlrq qfrF-l-ur+] {-{q-r€ HdlIqi {TqT frfiR q-ffiBi I\nq fr\"ffi {-{ frfrq ITCq 3{KqT srqT {-d-dr{ dft{qi qTrcrr+il qrq -Kr{\nqraaT f,e{r frq qt+n rrft q-q* w'ffiq ' \\ 3ilqarr +{-,il{fr g-{ Hfrq 116 ?4qfiT t1rf,+flg {q Hmq k<i4-r {ckI i\nw*rr 116 ei4r E{ nq1 {tfl {rt FF-di ffi qr;fl-{qT ffi m fi qt+n\nrp6qqfr61 I\ns. q( qtfl rrd f'{M qqPa (rr'laturitv) f,q rF-ffi{ ' * lofr[+1 q-4ftT\nq/ii6q[tqtinqrslfile.flq{qd41.eiqfr_grqdgat{Milfr-+TUI",
+      "ocr_text": "नेपाल\n\nक\n\nसंस्था नियमन\n\nपत्र संख्या : वैवि.निवि./ नीति/ परिपत्र/कखग/१२/०७६/७७\n\nक\n\nबैंकहर,\n\nक सुन वैंकमा क रुपमा 1+ गर्न सन्दर्भमा \"क \",\"ख\" ं \" र \"ग क संस्थाहरुलाई गरिएको एकीकृत निर्देशन २०७६ क इ.प्रा. निरदेशन २१/०७६ मा बुंदा ४ट गरी C गरिएको है ह गर्नु गराउनुह हुन वैंक ऐन, २०५८ दफा अधिकार गरी गरिएको छ।\n\nमहाशय,\n\nकेन्द्रीय बालुवाटार,\n\n४४११४०७\n\nफ्याक्स\n\nkkxbxx\n\nE-mail <nrbbfirdppd@nrb.org.np>\n\nWeb Site : www.nrb.org.np\n\n: उ३\n\nमितिः २०७६/११/२२\n\nनीतिगत\n\n- वैंकवाट \"क\" रहेको सुनलाई क गरी क रुपमा सक्नेछन् :-\n- क.\n\nनागरिकसंग भएको सुन सम्बन्धमा :\n\n- सुन विस्तृत समितिबाट गराई लागू गर्नुपर्नेछ। यसरी सुन संचालक यस निर्णय भएको सात गराउनु पर्नछ ।\n- ख.\n- ग. रुपमा सुनलाई $ दाखिला गरी शुद्ता क आधारमा गरी भित्र गर्नुपरनेछ । सुरक्षाकालागि सिसिटिभि क्यामरा, 1$ रुम, कhble प्रवन्ध मिलाउनु पर्नेछ।\n- सुन हुने सुनको शुद्रता क संयन्रको ९९४ Fitness को सुनमात्र गर्नपर्नेछ ।\n- घ. सूचना प्रकाशन गन्ुपरनेछ ।\n- क. न्यूनतम २४ H क सुनलाई क रुपमा स्वीकार गर्नुप्नछ ।\n- सुन क रूपमा स्वीकार देहायको गर्नपर्ेःछ :-\n- क सुन राखन आएमा सुनलाई कक ख. पत्र दिनुपरनेछ ।\n- शुद्वरता\n- अवधि घ.\n- सुन गर्दा अवधि (Maturity) तय ३ वर्ष 2 अधिकतम ५ सुन निक्षेपलाई गर्न सकिनेछ।\n- सुन राखन क सुन आफूले गरेको सुन कु गराउनुपरनछ ।",
+      "converted_sample": [
+        {
+          "where": "p.1",
+          "original": "qfl qrqr : t.h.fr-.fu. zffizqRqzTa$r/11/ o\\st(/ \\e\\e",
+          "converted": "त्राि त्रचत्रच स् त।ज।ाच(।ाग। शााष्शत्रच्त्रशत्ब४चरज्ञज्ञर य्कत९र ्भ्भ",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "E-mail <nrbbfirdppd@nrb org np>",
+          "converted": null,
+          "disposition": "kept_english"
+        },
+        {
+          "where": "p.1",
+          "original": "Web Site : www.nrb org nP",
+          "converted": null,
+          "disposition": "kept_english"
+        },
+        {
+          "where": "p.1",
+          "original": "ffi qr{Tfcrdrr ra-+1 qq a'mqT f{M wql qqT tr{ S\"fr hq-{qr frtflTf,",
+          "converted": "ााष् त्रर्चतअचमचच चब(ंज्ञ त्रत्र mबुत्रत् र्ःा धत्रि त्रत्रत् तर्च क्ाूच जत्रर्(त्रच ाचताति,",
+          "disposition": "rejected"
+        }
+      ],
+      "seconds": 3.94,
+      "error": null
+    },
+    {
+      "short": "a17fa322b81a",
+      "page": 1,
+      "group": "scan-backed queue",
+      "why": "partial; circular 2021",
+      "blob": "a17fa322b81a2ff7a7b7181d4564a742510c69536965d71a768d1396f09b9d02.pdf",
+      "rendered_page": "docs/nrb/holdout-pages/a17fa322b81a-p001.jpg",
+      "native": {
+        "chars": 2389,
+        "chars_nonspace": 2008,
+        "devanagari": 0,
+        "latin": 1610,
+        "devanagari_ratio": 0.0,
+        "latin_ratio": 0.8018,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "ocr": {
+        "chars": 2282,
+        "chars_nonspace": 1948,
+        "devanagari": 1634,
+        "latin": 248,
+        "devanagari_ratio": 0.8388,
+        "latin_ratio": 0.1273,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "native_text": "iqrn rq +n\nffiqq1qf\"o\nf{tqft kfurq q{eTrr{ kqr.r\nE.fi. qfurl Sqr : ly/Roee-eq fuk: loec /ol/1o\n* A-rtq rrE *+, +f+-f, hlrrr Frqr.ki q+qoi qtqTftrrfr zr'r-zltdq-6r, EwvriilrNrlrqi tq;\" !r-Tiz[-[\nilfurq +drf{ r nEq<rc+r (G[' ili+-[ k+.rq il+-m r\nftqq ; \\rftf\"il qftq{-1o\\s(r qr qqfurq rrftg+1 q-Er+rrtt I\nq6[qTq,\nkqft kfr{q zrrt-qR rt=i rcffiflcrct-w t+ a+r fffiq inqr r rq ffi qrtt rrtrq+1\nq-+t6-d qfrqr-1oeq qr iiar+Efrkq qqira-c rrcr {ET mfr qqTiq (,,mrq q+ Rfi kftqq\nrFr:qko.rtr (q, ?olc, +1 Ecnr 1? A kgqi BIfir+Tr [qtq'rt-fr 4i qftqr qrfr qrcr a t\n\\rfiEf, qfu*-toisE +1 \\rdfry E.sI. qftqa; ol/Ro\\etr oI Ecnr 1.\\e rt1 sq-ilFl l.te.{ w{\nMfdq ffi{ qfiq+1 a:\nq-d {afr gkm {&qT gfr qeEqT sr+ffi sf,{ l{,ooo rtftq 6qR) qT Sr e-rrd.+i cft-i-.if\nRst {ffiwqai orfrr rne s-il{ .Ft qffi-d r qcft fu fc wtcid sefr s-il{ rci B&ffiI €-c1-{\nR{,ooo rt<I {& kqft Tfl+i q-afr gqer€I qtre-<T Beneliciary 4i Business Credibility\nInformarion (BCI) ki qzf€fl fuqrs1 ctd r qrt, trqftan s-r{qqT m-rr 3IRrAq rc<3ta r\nrR, +lfirs-fq +1 {dq1-a F6€DT vqsrqr€ t+qrq (w afm qrftr Trfi-flur .rd\nMfirr+1 aFrer qfrq+1 eu\n1) qrs qEtTerzr, €rszr t{r hrFr+1 ffiqqr rrfti frFrs-l1 {rr rqftrf, Bmrrq\ngrq{ftdre dqr FIr€t gqtF(ur6{ (Medical Supplies antl Medical Equipments) qi 3rmRr+1 6rF,qr\nWt tro-qrc arfffi Efl-( 1,oo,ooo (3riffi rd-( gir-qrq) qq+l r+.q Eryczfu.fu. +1\nrrTarrtqre 55.rft rrd qffig I {rt, sriffi FR loo,ooo $r<I qrfW ve:e {fqqr BIFtv-rt;F\nqtqr srs tqr tmrFr+1 Rrwrfrlwsira ffd-+l trrftr q-q t+ vqq kff t{r rr{ qfu r\n1) Oxygen Cylinders, Oxygen Concentrators, Oxygen Tanks, Oxygen Generators, Oxygen\nManufacturing Plants, Oxygen Delivery Accessories, 3IaI Oxygcn 1l-E[frft qFf{ft dctt Ventilator\nEquipments nFITzkr.FT +lftre-tq 4l gpq grlrtl-{rlT qqrg 5:4r€fr frfl{effi t{rPt\nffif,{ft/sq-+-{ur6r-+1 qrqrtrfi.l 6+-ff gffi{ grrczfu.fu. +1 r{-rrqftft frqt, Business\nCredibility Information (BCI) { ttferr t<r t+rnr+1 frss'rfa{ loeq 3RIT( rgr<cqot oftr\nBTtffirf ag{ q6qEr rrft\\rzfr E r (r*, qs qq-tqwfrkq qrtil-fl r+ qrqra-+-oii R{ft f4h{q\n3mqffr rTqqr Rrr{ fiilS{R gi <:frvw t+ nqr ffi4 v*qmqe{ q{r r-{ Tfr-g ( t+ aqr\nffiq r{qrfr T{ qr*fi {mfsq qFnf, T\\r+1 hflq q-orr{ Giqrqr qrftrs oq-qr q-*{ qttr{r\nrrrrTkr qq+l wd *r4 ffire r{r rEqr{RrTeT Efi Tr{ qfu t\n(.r) qrq sq+r ffirro qd o.rq ,Ti qt k+.[q er tqrdqr s]rql ;Flqi{q rr\\t6l q-<iitrq C\nqfdM-d Fr+rqr-tql sfdftfirclcid q-rqtflf, fu 3{r*fr rrrq {ffir kI cig r",
+      "ocr_text": "महाशय,\n\nइ.प्रा. परिपत्र संख्या : १४/२०७७-७८\n\nमितिः २०७८/०१/३०\n\nश्री नेपाल राष्ट्र बैंक, बैकिङ्ध विभाग लगायत सम्पूर्ण प्रदेशस्थत कार्यालयहर, इजाजतपत्प्रा्त \"क\" वर्गका वाणिज्य बैंकहर र राष्टयस्तरका \"ख\" वर्गका विकास बैंकहरु ।\n\nविषय : एकीकृत परिपत्र-२०७६ मा संशोधन गरिएको सम्बन्धमा ।\n\nविदेशी विनिमय कारोवार गर्न इजाजतपत्प्रप्त वैंक तथा वित्तीय संस्था र अन्य निकायलाई जारी गरिएको एकीकृत परिपत्र-२०७६ मा देहायवमोजिम संशोधन गरिएको हुदा सोही वमोजिम गरनु/गराउनु हुन विदेशी विनिमय (नियमित गर्ने) ऐन, २०१९ को दफा १२ ले दिएको अधिकार प्रयोग गरी यो परिपत्र जारी गरिएको छ।\n\nएकीकृत परिपत्र-२०७६ को एकीकृत इप्रा. परिपत्रः ०१/२०७६ को दफा १.७ को उप-दफा १.७.५ लाई देहायबमोजिम संशोधन गरिएको छ :\n\nयस्तो सटही सुविधा बढीमा एक पटकमा अमेरिकी डलर ३५,०० (पैंतीस हजार) वा सो बराबरको परिव्य मार्फत सटही प्रदान गदा अमेरिकी डलर २५,००० भन्दा बढी विदेशी मुद्ाको सटही उपलब्ध गराउंदा Beneficiary को Business Credibility Information (BC]) लिने व्यवस्था मिलाउन पनेछ । साथै, सम्वन्धत फाइलमा सोको अभिलेख राख्ुपनेछ ।\n\n- तर, कोभिड-१९ को वर्तमान स्वास्थ्य समस्यालाई रोकथाम तथा न्यूनीकरणको लागि सहजीकरण गर्न देहायबमोजिमको व्यवस्था गरिएको छ:\n- स्वास्थ्य मन्त्रालय, स्वास्थ्य सेवा विभागको सिफारिसमा गरिने कोभिड-१९ सँंग सम्बन्धित औषधिजन्य सामग्रीहर तथा स्वास्य उपकरणहर (Medical Supplies and Medical Equipments) को आयातको हकमा रकम ड्राफ्ट/टिटि. को माध्यमबाट भुक्तानी गर्न सकिनेछ् । साथै, अमेरिकी डलर १००,००० भन्दा माथिको सटही र परेमा स्वास्य सेवा विभागको सिफारिससहित स्वीकृतिका लागि यस बैंक समक्ष निवेदन पेश गर्न पर्ेंछ।\n- Oxygen Cylinders, Oxygen Concentrators, Oxygen Tanks, Oxygen Generators, Oxygen Manufacturing Plants, Oxygen Delivery Accessories, अन्य Oxygen सम्बन्धी सामग्री तथा Ventilator Equipments लगायतका कोभिड-१९ को स्वास्थ्य समस्याकोउपचारमासघाउ पुन्याउने जीवनरक्षक स्वास्थ्य सामग्री/ उपकरणहरुको आयातको हकमा उल्लित डराफ्ट/टिटि. को रकमसम्बन्धी सीमा, Business Credibility Information (BCI) र स्वास्थ्य सेवा विभागको सिफारिस २०७द असार मसान्तसम्मका लागि अनिवार्य नहुने व्यवस्था गरिएको छ । साथै, यस व्यवस्थाबमोजिम आयात गर्न आयातकर्ताले विदेशी विनिमय अपचलन भएमा स्वयम् जिम्मेवार हुने स्वःघोषणा बैंक तथा वित्तीय संस्थासमक्ष पेश गर्नु प्ेछ् र बैंक तथा वित्तीय संस्थाले यस व्यवस्था बमोजिम आयात भएको विवरण संलगन ढाँचामा मासिक रुूपमा प्त्येक महिना\n- प्रतिष्ित निकायहरुको प्रतिनिधिमाफत सम्वन्धित बैंक आफेैले साख सूचना लिनु पर्नेछ।",
+      "converted_sample": [
+        {
+          "where": "p.1",
+          "original": "f{tqft kfurq q{eTrr{ kqr.r",
+          "converted": "र्तात्रात पागचत्र र्त्रभत्चर्च पत्रच।च",
+          "disposition": "ambiguous"
+        },
+        {
+          "where": "p.1",
+          "original": "E.fi. qfurl Sqr : ly/Roee-eq fuk: loec /ol/1o",
+          "converted": "भ्।ाष्। त्रागचि क्त्रच स् थिरच्यभभ(भत्र ागपस् यिभअ रयरिज्ञय",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "* A-rtq rrE *+, +f+-f, hlrrr Frqr.ki q+qoi qtqTftrrfr zr'r-zltdq-6r, EwvriilrNrlrqi tq;\" !r-Tiz[-[",
+          "converted": "८ ब्(चतत्र चचभ् ८ं, ां(ा, जचिचच ँचत्रच।पष् त्रंत्रयष् त्रतत्रततचचाच शचुच(शतिमत्र(टच, भ्धखचष्ष्चिल्चचित्रष् तत्रसू १च(त्ष्शृ(ृ",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "ilfurq +drf{ r nEq<rc+r (G[' ili+-[ k+.rq il+-m r",
+          "converted": "ष्िागचत्र ंमर्चा च लभ्त्र?चअंच ९न्ुृ ष्ष्िं(ृ पं।चत्र mष्िं( च",
+          "disposition": "rejected"
+        }
+      ],
+      "seconds": 2.94,
+      "error": null
+    },
+    {
+      "short": "8e8467f74f84",
+      "page": 1,
+      "group": "scan-backed queue",
+      "why": "partial; forex 2018",
+      "blob": "8e8467f74f84713299c43d05a18261ffd23c2a6de35af71413c4699823518e66.pdf",
+      "rendered_page": "docs/nrb/holdout-pages/8e8467f74f84-p001.jpg",
+      "native": {
+        "chars": 2233,
+        "chars_nonspace": 1812,
+        "devanagari": 0,
+        "latin": 1469,
+        "devanagari_ratio": 0.0,
+        "latin_ratio": 0.8107,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "ocr": {
+        "chars": 2196,
+        "chars_nonspace": 1842,
+        "devanagari": 1744,
+        "latin": 38,
+        "devanagari_ratio": 0.9468,
+        "latin_ratio": 0.0206,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "native_text": "iqm TE t6ffi{ srqt--rq\nfqtfi f$rrq aFrsffi{ tmr{r\nErnrq ffi qftFrd Ht{fi Tfrrqr EEUI kf, vfr ET{st\nsqmqffir\nktqt Ht+rq tFrqka qil tt, toq<, +1 EsT qocr. A @r BIftmR !r*{r rrft qs *+-Ere Eqt,ldr{ sTqr\nrrt6r qrftrq ffi tarrfir qrffi qr+cr *rf, rrft hht *+ aqr ffiq senrtqre qfrsd Rft gnwr\naq kr rfr q+en rrMA {qftra s*+1 qr++rffi qrfu m qrffi+, qfin rsrqr{ rM a r\n{rd6{\n(1) qs *+qre sflukrr{ 9rq r*' T{t+l ffi nffiq vqt tsqt+{(, *d't 4q vqt) srore{ cIrIT\nIRTrIUT Err$[, TlsF, {r$qr,i, ktrmerfr, +qil{R, gi{ q<rT *tfr# T-dfqr tarsfuf,, qnn kors qmt\nIM et{ Ertr+l, Htrt g*r sTrd-{ rrt qfen, F ea ( iTq kfr *{qT 6qt s-{r6 Tril Efr'rflor\nqrftr ffiq qTrr++1 rq-rr .r{ kht t;r eqr ffiq velmrd gil.qfr qrQIfuf, {ffi {o sfuqt-a\nftF-rnrq qftEd ktst T{rqr aur k{ e*tr{ t\n(R) zrs ffi ffi qfrtrr+1 {-ffis arrrq {t+.r ffi qH zrd aur k{ {d ir{ r\n(t) zrd ruq k{ sqftrf, ffi dqrd+, sfukErc fotq Et cfu r\n(y) ru\"r ffi fstet ++, aw ffiq qF{rdTt Br;ilrftrq rqqr ffiq 6rn-{R .rtqT d fuftqdl E\"tq\nffiE\\r+1 ({ddnrr\nu) Td {ur+1 IIiFrft ersfu ;{rffq-l 4qefu B{ftrfif,q { qdTq+1 qrir Et vfra r il{, zRT ffi @f,\nr<rq rrtqr q-d Aur qfrEErur rrd'Sffig r\n(q) {ur+1 arruret FrqFrfi ryrffffe qqrci srq (qut IGF (Fee) rrft 3lRr+'ilq 6 Month Libor + ax &ra qg\ncfrs r wh'qrq qFrff+t ffim {tr +.qt *+..( ri riitwt+1 ilftr {+ r1w, +ktrc fui cf, qq\n{uT sTK r+q cfu Tmrft fti rrft arnrn kqrs{ qftF+m I\n(s) rd rur hhrcrc Frflrsi rftrru1 qrftr Ret *o aqr ffiq {Fnqr€ d t{Mi fffi, wil{f,,\n+6 rqtH tcc cr$i &{ r\n(c) q-{ft M Eqqre qrk qit d. 1 qr sdk( fi{ffiqr qftqr{ Rfi gnw vto ruur rsr6 rrd\n(fu'ts r\n(1) &FA qvft Fwr\\r+1 TUr (sq qRFd hft E-fle1 w.a< *+ :n,rt{rrqr sqt{r .rd .nsi fu r\n(qo) q-S ruur kr rs ++-{rc Tf rft+.e tc{ cfu | {ur (.F-rr fuffi caqr( qFffir{ qqqr q-q +{-{r\n+qrr{ rffig1 cfu r iEUr+1 qi{r qM TfrTfr qt csqrf, fr {q+rcT q-s Affi s{fffq qrqE.rft\nrr<ni zrq ffi Brfrfuqr {qrdftr+ rnrg{ cfu r q}, qqzfr qrq Ttrrft rrd s-qkf, ftqqr{qR\norrt m uEfr qir un gmrft.rt ctd t\n(11) *+t ruur wq Fr{crtqr $ffi qkorw aqr B{rf,flarft ttqr+qrqqr ffiq wnft ffiRUT vrffift\nrF aqr eTffifEc tr,r{q ( fifuztr+q+1 ryi vrtmr.rt cfu t\nGrq<rw €qmr)\nEFrffi t{t{r€\nffi losxzlR/io rrt q6TRr( T+ fuqqfrr sg{ftrf, (ffir qttq qftq+1 g t\nWebsite: rvrvw.nrb.ors.np rlt IiIRFT Hfr : Ro9{/o9/Ro",
+      "ocr_text": "विदेशी विनिमय व्यवस्थापन विभाग\n\nh सम्बन्धी सूचना\n\nविदेशी विनिमय (नियमित गर्न) ऐन, २०१९ को दफा १०ख. ले दिएको अधिकार प्रयोग गरी यस बैंकबाट इजाजतपत् प्रापत गरेका बाणिज्य बैंकहरुले देहायका शर्तहरुको पालना गर्न गरी विदेशी बैंक तथा वित्तीय संस्थाहरुबाट परिव्य विदेशी मुद्रामा ऋण लिन सक्ने व्यवस्था गरिएकोले सम्बन्धित सबैको जानकारीको लागि यो सार्वजनिक सूचना प्रकाशन गरिएको छ।\n\nशर्तहर\n\n- यस बैंकबाट इजाजतपत्रप्राप्त \"क\" वर्गका बैंकहरुले नवीकरणीय उर्जा (जलविदुत, सौर्य र वायु उर्जा) उत्पादन तथा क क रियलस्टेटको क्षेत्र बाहेक), विदेशी मुद्रा आर्जन गर्न पर्यटन, कृष क्षेत्र र लघु वित्त श्षेत्रमा कर्जा प्रवाह ग्ने प्रयोजनका लागि वित्तीय साधनको प्रवन्ध गर्न विदेशी बैंक तथा वित्तीय संस्थाबाट आफ्नो प्राथमिक पूजीको ५० प्रतिशत रकमसम्म परिवत्य विदेशी मुद्रामा ऋचण लिन सक्नेछन्।\n- यस्तो ऋरृण लिन सम्बन्धित बैंकको संचालक समितिबाट निर्णय हुनु पर्ेंछ।\n- यस बैंकले तोके बमोजिमको पूंजीकोष कायम गरेका बैंकहरुले मात्र यस्तो ऋण लिन सक्ने छन्।\n4. (x) ऋण दिने विदेशी बैंक तथा वित्तीय संस्थालाई अन्तराष्ट्य रुपमा वित्तीय कारोवार गर्नमा कुनै किसिमको बन्देज\n5. (y) यस्तो ऋणको भुक्तानी अवधि न्यूनतम ९ वर्षदेखि: अधिकतम ५ बर्षसम्मको मात्र हुनु पन्छ । तर, यस बैंकले स्वीकृति प्रदान गरेमा यस्तो ऋृण नविकरण गर्न सकिनेछ।\n- ऋणको व्याजदर लगायत ऋणदाताले लगाउने अन्य सम्पर्ण शुल्क (Fee) गरी अधिकतम 6 Month Libor + 3% भित्र हुनु पर्नछ। उक्त व्याज लागतको सीमाभित्र रहेर कर्जा स्वीकृत गर्न प्रयोजनको लागि कुनै शुल्क, कमिशन ति्न पर्े भए ऋण प्राप्त भए पछि भु्तानी दिने गरी व्यवस्था मिलाउन सकिनेछ।\n- क\n8. (९)\n9. (ट) यसरी लिएको तऋणबाट माथि शर्त नं. ९ मा उल्लेखित क्षे्रहरुमा परिवत्य विदेशी मुद्रामा समेत तऋण प्रवाह गर्न सकिनेछ।\n10. (ob) यस्तो ऋण लिन यस बैंकबाट पूर्व स्वीकृत लिनु पनछ । ऋण रकम भित्िसके पश्चात् अनिवार्य रुूपमा यस वैंकमा लेखाइन गराउनु पर्ेछ । ऋणको साँवा ब्याज भुक्तानी गरे पश्चात सो सम्बन्धमा यस बैंकलाई अबिलम्ब जानकारी गराई यस बैंकको अभिलेखमा अद्यावधिक गराउनु पर्छ । साथै, ऋणको ब्याज भुक्तानी गद्दा प्रचलित नियमानुसार लागने कर कटी गरेर मात्र भुक्तानी ग्नु पर्नेछ।\n- बैकले तऋण रकम भित्रयाउँदा सम्पत शुद्धिकरण तथा आतक्वादी क्रियाकलापमा वित्तीय लगानी निवारण सम्बन्धी राष्टरिय तथा अन्तराष्टिय कानून र नीति/नियमको पूर्ण पालना गन्नु पर्नेछ।\n\n(भिष्मराज ढुंगाना) कार्यकारी निर्देशक\n\nWebsite: www.nrb.org.np मा प्रकाशन मिति : २०७y/o७/२०",
+      "converted_sample": [
+        {
+          "where": "p.1",
+          "original": "iqm TE t6ffi{ srqt--rq",
+          "converted": "ष्क्र त्भ् तटााषर्् कचत्रत((चत्र",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "fqtfi f$rrq aFrsffi{ tmr{r",
+          "converted": "ात्रताष् ा४चचत्र बँचकााषर्् mतर्चच",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "Ernrq ffi qftFrd Ht{fi Tfrrqr EEUI kf, vfr ET{st",
+          "converted": "भ्चलचत्र ााष् त्रातँचम र्ज्ताष् तचचत्रच भ्भ्ग्क्ष् पा, खाच भ्तर््कत",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "ktqt Ht+rq tFrqka qil tt, toq<, +1 EsT qocr. A @r BIftmR !r*{r rrft qs *+-Ere Eqt,ldr{ sTqr",
+          "converted": "पतत्रत ज्तंचत्र तँचत्रपब त्रष्ि तत, तयत्र?, ंज्ञ भ्कत् त्रयअच। ब् २च mद्यक्षतच् १चर्८च चचात त्रक ८ं(भ्चभ भ्त्रत,मिर्च कत्त्रच",
+          "disposition": "ambiguous"
+        }
+      ],
+      "seconds": 2.95,
+      "error": null
+    },
+    {
+      "short": "438c55304da5",
+      "page": 1,
+      "group": "needs_ocr",
+      "why": "no_text_layer; exam result 2025",
+      "blob": "438c55304da52580dd6314b01e8db71d3a3a9023abd9265cd99fd9ada3f21152.pdf",
+      "rendered_page": "docs/nrb/ocr-spike-pages/438c55304da5-p001.jpg",
+      "native": {
+        "chars": 0,
+        "chars_nonspace": 0,
+        "devanagari": 0,
+        "latin": 0,
+        "devanagari_ratio": 0.0,
+        "latin_ratio": 0.0,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "ocr": {
+        "chars": 1299,
+        "chars_nonspace": 1101,
+        "devanagari": 813,
+        "latin": 2,
+        "devanagari_ratio": 0.7384,
+        "latin_ratio": 0.0018,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "native_text": "",
+      "ocr_text": "सूचना\n\nबैकमा सहयोगी सेवातर्फ रिकतरहेको इन्जिनियर पद करारमार्फत पूरतिंर्े सम्बन्धमा मिति २०८१/१०/७ मा प्रकाशित सूचनाबमोजिम h  2 उम्मेदवारहरूले ्रप गरेको अड्कका आधारमा सफल भएका तपशिलका मुख्य उम्मेदवारलाई करारमा नियुक्ति गे नि्णिय भएको हुंदा सम्बन्धित सबैको जानकारीको लाग यो सूचना प्रकाशित गरिएको छ ।\n\n१०७/२०८१, माग पदसंख्या: २ अ) मुख्य उम्मेदवार\n\n| योग्यताक्रम  रोल नं.  उम्मेदवारको नाम, थर  ५१  प्रदिप भटराई  २  ४०   |\n|----------------------------------------------------------------------|\n\nआ) प्रतिक्षासूचीका उम्मेदवार\n\n| रोल नं.  उम्मेदवारको नाम, थर  ७८  सुजन खड़का  ७४  शुबेक्षा ठकुरी  ३  १७  वशन्त भटराई  ४  ५  अजय कुमार श्रेष्ठ  ५  ६६  साहिल श्रे्  ५९  राकेश भट्टराई  ७०  ८  ५६  प्रियाँंशु पाठक   |\n|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|\n\nसाथै, छनौट भएका मुख्य उम्मेदवारले करार गनें सिलसिलामा यस बैंकको के्द्ीय कार्यालय, मानव संसाधन व्यवस्थापन विभाग, बालुवाटार, काठमाण्डौमा आप्नो सम्पर्ण प्रमापत्हरूको सक्कलै प्रतिहरू र तीन प्रति पासपोर्ट साईजको फोटो साथमा लिई मिति २०८१/११/१८ गतभित्रस्वास्य परीक्षणको लाग सम्प्क राखुहुन नियुक्त प्रदान गरने र तोकिएको मितिमा सम्परक राखन नआएमा नियमानुसार हुने व्यहोरा समेत सूचित गरिन्छ\n\nमितिः २०८१/११/१२\n\nव199192\n\n(s)",
+      "converted_sample": [],
+      "seconds": 1.89,
+      "error": null
+    },
+    {
+      "short": "c298efaf1f16",
+      "page": 1,
+      "group": "needs_ocr",
+      "why": "no_text_layer; notice 2078.12.10",
+      "blob": "c298efaf1f16a8e8f10424636769a8a7effe1eba81bbfcd0a1328a6924764156.pdf",
+      "rendered_page": "docs/nrb/ocr-spike-pages/c298efaf1f16-p001.jpg",
+      "native": {
+        "chars": 0,
+        "chars_nonspace": 0,
+        "devanagari": 0,
+        "latin": 0,
+        "devanagari_ratio": 0.0,
+        "latin_ratio": 0.0,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "ocr": {
+        "chars": 2466,
+        "chars_nonspace": 2089,
+        "devanagari": 1552,
+        "latin": 225,
+        "devanagari_ratio": 0.7429,
+        "latin_ratio": 0.1077,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "native_text": "",
+      "ocr_text": "अनुसूची- १ लगानी सम्बन्धी सूचना\n\nयस बैंकको विभिन्न कोषहरुमा रहेको रकम लगानी गर्न प्े भएकोले यस बैंकबाट इजाजतपत्र प्रप्त देहाय बमोजिमका शर्तहरु पुरा गरेका बैंक तथा वित्तीय संस्थाबाट देहाय बमोजिमको सीमाभित्र रही आफूले लिन चाहेको भरी उक्त फारमलाई pdf format मा Scan गरी Password Protect गरेर कुल लगानीयोग्य रकम मध्ये मिति २०७९ वैशाख २ गते देखि २०५० वैशाख १ (तदनुसार अप्रिल १५, २०२२ देखि अप्रिल १४, २०२३) सम्म ३६५ दिनको मुइती निक्षेपको रूपमा लिन चाहेको रकम खुलाई यस बैंकमा मिति २०७५/१२/१७ गते राती १२:०० बजेभित्र mdinvestment@nrb.org.np मा प्ाप्त हुने गरी ब्याजदर प्रस्ताव गर्न आह्वान गरिएको छ । साथै, उक्त File को Password मिति २०७८/१२/२० गतेका दिन राती १२:०० बजे भित्र fmdinvestment@nrb.org.np मा जानकारी गराउन समेत अनुरोध छ।\n\n| संस्थाहरु  रकम (रु. लाखमा)  \"क\" वर्गका वाणिज्य बैंकहरुमा  ९,४४,६२।००  \"ख\" वर्गका राष्टियस्तरका विकास बैंकहरुमा  २५,९५।००  \"ग\" वर्गका राष्टियस्तरका वित्त कम्पनीहरुमा  ९,६६1००  कुल लगानी योग्य रकम  ९,९३,२६।००   |\n|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|\n\nशर्तहरु :\n\n- (ख) निष्कृय कर्जा (एन.पी.ए) कुल कर्जा सापटको पाँच प्रतिशत भन्दा कम भएको।\n- (क) बैंकबाट तोकिएको न्यूनतम पूंजीकोष कायम रहेको।\n- (ग) खुद तरल सम्पत्त स्वदेशी निक्षेपको कम्तीमा बीस प्रतिशत वा सो भन्दा बढी रहेको।\n- (घ) आव. २०७७/०७द मा सञ्चालन मुनाफामा (व्यवस्था पछिको)रहेको।\n- (ड) रियल स्टेट कर्जा बैंकबाट तोकएको सीमाभन्दा बढी नभएको ।\n- (च) लगानी गरिने संस्थाको कुनै पनि सञ्चालक, प्रमुख कार्यकारी अधिकृत वा कार्यकारी सञ्चालकलाई यस बैकले जरीवाना गरेको अवस्थामा त्यस्तो जरीवाना गरिएका सञ्चालक, प्रमुख कार्यकारी अधिकृत वा कार्यकारी सञ्चालक उक्त संस्थामा कायम नरहेको ।\n- (छ) शीघ्र सुधारात्मक कारवाहीमा परेको भए, फुकुवा भएको कम्तीमा छ महिना पुरा भएको ।\n- (ज) समस्याग्रस्त घोषणा नभएको । समस्याग्रस्त घोषणा भएकोमा सो फुकुवा भएको छ महिना अवधि पुरा भएको।\n- (ञ) प्रस्ताव पेश गरेको व्याजदर माथि उल्लखित लगानी गरिने मितिसम्म मान्य हुनेछ। त्यस बैंक/वित्तीय 1\n- (्) सर्वसाधारणको लाग छुट्याईएको शेयर जारी गरिसकेको ।\n- (ट) प्रस्ताव पेश गद्द E-mail को Subject तथा Filename मा \"FMD Fund FD Proposal_Bank Code\" भनी उल्लेख गर्नु पन्नेछ । साथै Password पठाउंदा E-mail को Subject मा \" FMD Fund FD Proposal एक्सचेन्जमा लिस्टड बमोजिमको Stock Symbol राखनु परनेछ । संस्थाको आधिकारीक E-mail मा्फत प्राप्त प्रस्तावलाई मात्र मान्यता दिइनेछ । जस्तै: Gmail.com, Hotmail.com, Yahoo.com आदि मार्फत प्राप्त E-\n- (ठ) omssdh ood omssed hbe   b",
+      "converted_sample": [],
+      "seconds": 2.95,
+      "error": null
+    },
+    {
+      "short": "276b2eb62802",
+      "page": 1,
+      "group": "needs_ocr",
+      "why": "no_text_layer; calendar 2020",
+      "blob": "276b2eb6280234402e8495cd1f8dc4b436c11f032acccac00ad603027694b623.pdf",
+      "rendered_page": "docs/nrb/ocr-spike-pages/276b2eb62802-p001.jpg",
+      "native": {
+        "chars": 0,
+        "chars_nonspace": 0,
+        "devanagari": 0,
+        "latin": 0,
+        "devanagari_ratio": 0.0,
+        "latin_ratio": 0.0,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "ocr": {
+        "chars": 1162,
+        "chars_nonspace": 1004,
+        "devanagari": 612,
+        "latin": 3,
+        "devanagari_ratio": 0.6096,
+        "latin_ratio": 0.003,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "native_text": "",
+      "ocr_text": "सामान्य सेवा विभाग\n\nदरभाउपत् स्वीकृत भएको सूचना\n\nयस वैकको लागि वि. सं. २०उ सालको भिते पातो, डेवस प्याड पात्रो तथा डापरी छपाई गरी आपर्ति गन् सम्बन्धमा मिति २०उ६१०२१ गते गोरखापत्र प्रकाशित सिलवन्दी दरभाउपत्र आह्वानको सचना वमोजिम पेश भएका दरभाउपत्ररुमध्ये निम्न सामानहरका लागि न्यूनतम मूल्या्ित सारभूत रुपमा प्रभावग्राही देहायका दरभाउपत्रदाताहरको दरभाउ म्वीकृत भएकोले नेपाल राष्ट वैक खरिद विनियमावली, २०५ (संशोधन समेत को विनियम ५७ को उपविनियम (१२ को प्रयोजनको लागि यो सूचना प्रकाशित गरिएको छ।\n\n| दरभाउपत्रदाताको  क्र.सं.  थान  प्रस्तावित रकम (मू अ कर बाहेक)  1112h  श्री अल मिडिया  =४.६५.००01-  9  मिते पात्रा  90.000  सोलुसन प्रा लि  बागवजार, काठमाडौ  ९८००  श्री अल मिडिया  10008=  4900  सोलस प्रा लि  बगवजॉर, काठमाडौ।  900  ऋ१५६द००।-  11h  9४00  एण्ड पडिलसर्स,  (अक्षरंप एक लाख हैसदट्ी हजार छ सय  12h4123112  मात्र   |\n|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|\n\nमितिः २०७५/९१/१५",
+      "converted_sample": [],
+      "seconds": 1.63,
+      "error": null
+    },
+    {
+      "short": "1a9b6321aa61",
+      "page": 1,
+      "group": "font-embedded control",
+      "why": "recovered; Preeti+Bishall; 10/10 units shown",
+      "blob": "1a9b6321aa6124efdd618348ef1184f9dd5e57549c5ff0f7479b09226e986866.pdf",
+      "rendered_page": "docs/nrb/holdout-pages/1a9b6321aa61-p001.jpg",
+      "native": {
+        "chars": 779,
+        "chars_nonspace": 634,
+        "devanagari": 0,
+        "latin": 408,
+        "devanagari_ratio": 0.0,
+        "latin_ratio": 0.6435,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "ocr": {
+        "chars": 427,
+        "chars_nonspace": 358,
+        "devanagari": 345,
+        "latin": 0,
+        "devanagari_ratio": 0.9637,
+        "latin_ratio": 0.0,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "native_text": "sf/jfxL km's'jf ePsf ljQ sDkgLx?sf] ljj/)f M \n \n \n \n!= c?0f kmfOgfG; lnld6]8 w/fg, ;'g;/LnfO{ ul/Psf] sf/jfxL km's'jf . \n \nc?0f kmfOgfG; lnld6]8nfO{ g]kfn /fi6 a}+s, a}+s tyf ljQLo ;+:yfsf] zL3| ;'wf/fTds sf/jfxL \n;DaGwL ljlgodfjnL, @)^$ sf] ljlgod # sf] -v_ adf]lhd ldlt @)^(.!.#! sf] lg0f{ofg';f/ ul/Psf] \nzL3| ;'wf/fTds sf/jfxL ldlt @)^(.@.@$ b]lv km's'jf ul/Psf] 5 . \n@=  ;[hgf kmfOgfG; lnld6]8 lj/f6gu/nfO{ ul/Psf] sf/jfxL km's'jf .   \n         ;[hgf kmfOgfG; lnld6]8nfO{ ;dfg'kflts r'Stf k\"FhL j[l4 gu/]sf] x'gfn] o;  a}+ssf] PsLs[t \nlgb]{zg, @)^& sf] lgb]{zg g+=@! sf] $ -#_ cg';f/ pQm ;+:yfnfO{ ldlt @)^&.!@.@& b]lv nfef+; \nljt/0f, lgIf]k ;+sng tyf shf{ nufgLdf nufOPsf] k|ltjGw o; a}+sn] tf]s]sf] ;Dk\"0f{ zt{x? \nkfngf ug]{ u/L ldlt @)^(.)@.!) b]lv km's'jf ul/Psf] 5 . \n ",
+      "ocr_text": "शदक फुकुवा भएका वित्त कम्पनीहरूको विवरण :\n\n9. अरुण फाइनान्स लिमिटेड धरान, सुनसरीलाई गरिएको कारवाही फुकुवा।\n\nक संस्थाको शीघ्र क सम्बन्थी विनियमावली, ()क पु २०६९।९।३१ को निर्णयानुसार गरिएको ्रसुधारात्मक २०६९२२४ फुकुवा गरिएको छ।\n\n२. सृजना फाइनान्स विराटनगरलाई क फुकुवा।\n\nफाइनान्स लिमिटेडलाई कप कक एकीकृत २०६७ को निरदेशन नं.२९ (६)^ अनुसार उक्त संस्थालाई २०६७१ २ा२७ संकलन 2 क लगाइएको कक सम्पूर्ण शर्तहर गरी मिति २०६९।०२१० गरिएकोह छ।",
+      "converted_sample": [
+        {
+          "where": "p.1",
+          "original": "sf/jfxL km's'jf ePsf ljQ sDkgLx?sf] ljj/)f M ",
+          "converted": "कारवाही फुकुवा भएका वित्त कम्पनीहरुको विवर०ा : ",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "!= c?0f kmfOgfG; lnld6]8 w/fg, ;'g;/LnfO{ ul/Psf] sf/jfxL km's'jf . ",
+          "converted": "१. अरुण फाइनान्स लिमिटेड धरान, सुनसरीलाई गरिएको कारवाही फुकुवा । ",
+          "disposition": "ambiguous"
+        },
+        {
+          "where": "p.1",
+          "original": "c?0f kmfOgfG; lnld6]8nfO{ g]kfn /fi6 a}+s, a}+s tyf ljQLo ;+:yfsf] zL3| ;'wf/fTds sf/jfxL ",
+          "converted": "अरुण फाइनान्स लिमिटेडलाई नेपाल राष्ट बैंक, बैंक तथा वित्तीय संस्थाको शीघ्र सुधारात्मक कारवाही ",
+          "disposition": "converted"
+        },
+        {
+          "where": "p.1",
+          "original": ";DaGwL ljlgodfjnL, @)^$ sf] ljlgod # sf] -v_ adf]lhd ldlt @)^(.!.#! sf] lg0f{ofg';f/ ul/Psf] ",
+          "converted": "सम्बन्धी विनियमावली, २०६४ को विनियम ३ को (ख) बमोजिम मिति २०६९।१।३१ को निर्णयानुसार गरिएको ",
+          "disposition": "converted"
+        }
+      ],
+      "seconds": 1.42,
+      "error": null
+    },
+    {
+      "short": "d1c99f3cf34d",
+      "page": 1,
+      "group": "font-embedded control",
+      "why": "recovered; smallest in queue, 9/9 units",
+      "blob": "d1c99f3cf34decda9d0f695b549765b6669e28eaf2eedc4dac952ded2acc0446.pdf",
+      "rendered_page": "docs/nrb/holdout-pages/d1c99f3cf34d-p001.jpg",
+      "native": {
+        "chars": 785,
+        "chars_nonspace": 573,
+        "devanagari": 0,
+        "latin": 366,
+        "devanagari_ratio": 0.0,
+        "latin_ratio": 0.6387,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "ocr": {
+        "chars": 356,
+        "chars_nonspace": 296,
+        "devanagari": 280,
+        "latin": 0,
+        "devanagari_ratio": 0.9459,
+        "latin_ratio": 0.0,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "native_text": " \n \n \n \ng]kfn /fi6« a}+s \n \ndf]x/ l8lh6n k|f=ln= sf] cg'dltkq vf/]h ul/Psf] ;\"rgf . \n \no; a}+saf6 e'QmfgL ;]jf k|bfossf] ?kdf sfo{ ug]{ u/L ldlt @)&^÷)^÷#) df cg'dltkqk|fKt  \ndf]x/ l8lh6n k|f=ln=  n] e'QmfgL tyf km:of}{6 P]g, @)&% sf] bkmf #^ sf] v08 -5_ / -h_ \nadf]lhdsf] s;'/ u/]sf] b]lvPsf]n] e'QmfgL tyf km:of}{6 ljlgodfjnL  -k|yd ;+zf]wg, @)*)_, \n@)&& sf] ljlgod #% sf] v08 -u_ sf] Joj:yf adf]lhd pQm ;+:yfsf] cg'dltkq vf/]h ul/Psf] \nJoxf]/f ;DalGwt ;a}sf] hfgsf/Lsf nflu of] ;\"rgf k|sfzg ul/P sf] 5 . pQm ;+:yfn] hf/L \nu/]sf e'QmfgL pks/0fx?sf] k|of]u ug]{ u|fxsx?;+usf] s'g} bfloTj afFsL /x] ;DalGwt ;+:yf df \n;Dks{ ug'{x'g ;d]t o;} ;\"rgfåf/f cg'/f]w ul/G5 .   \n \n \n \n  \n            \n                  \nldlt M @)*)÷)^÷)*                           e'QmfgL k|0ffnL ljefu \n \n  \n \n ",
+      "ocr_text": "मोहर डिजिटल को खारेज गरिएको सूचना ।\n\n२०क सेवा रुपमा जाक २०७६/०६/३० मा मोहर $ २०७५ क दफा ३६ क (छ) ()≥ कसुर गरेको फस्यौट विनियमावली संशोधन, २०८०), २०७७ ३५ को () उक्त संस्थाको अनुमतिपत्र गरिएको व्यहोरा सम्बन्धित सूचना प्रकाशन गरिएको उक्त संस्थाले गरेका भुक्तानी कक कक३ दायित्व सम्बन्धित संस्थामा सम्पर्क गर्नुहुन सूचनाद्वारा अनुरोध गरिन्छ ।\n\nमिति : २०८०/०६/०८",
+      "converted_sample": [
+        {
+          "where": "p.1",
+          "original": "df]x/ l8lh6n k|f=ln= sf] cg'dltkq vf/]h ul/Psf] ;\"rgf . ",
+          "converted": "मोहर डिजिटल प्रा.लि. को अनुमतिपत्र खारेज गरिएको सूचना । ",
+          "disposition": "converted"
+        },
+        {
+          "where": "p.1",
+          "original": "o; a}+saf6 e'QmfgL ;]jf k|bfossf] ?kdf sfo{ ug]{ u/L ldlt @)&^÷)^÷#) df cg'dltkqk|fKt  ",
+          "converted": "यस बैंकबाट भुक्तानी सेवा प्रदायकको रुपमा कार्य गर्ने गरी मिति २०७६/०६/३० मा अनुमतिपत्रप्राप्त  ",
+          "disposition": "converted"
+        },
+        {
+          "where": "p.1",
+          "original": "df]x/ l8lh6n k|f=ln=  n] e'QmfgL tyf km:of}{6 P]g, @)&% sf] bkmf #^ sf] v08 -5_ / -h_ ",
+          "converted": "मोहर डिजिटल प्रा.लि.  ले भुक्तानी तथा फर्स्यौट ऐन, २०७५ को दफा ३६ को खण्ड (छ) र (ज) ",
+          "disposition": "converted"
+        },
+        {
+          "where": "p.1",
+          "original": "adf]lhdsf] s;'/ u/]sf] b]lvPsf]n] e'QmfgL tyf km:of}{6 ljlgodfjnL  -k|yd ;+zf]wg, @)*)_, ",
+          "converted": "बमोजिमको कसुर गरेको देखिएकोले भुक्तानी तथा फर्स्यौट विनियमावली  (प्रथम संशोधन, २०८०), ",
+          "disposition": "converted"
+        }
+      ],
+      "seconds": 1.56,
+      "error": null
+    },
+    {
+      "short": "268bcfe86d03",
+      "page": 1,
+      "group": "font-embedded control",
+      "why": "partial; circular 2007",
+      "blob": "268bcfe86d03e9ef684b47f17345a5c0b8e072cdc92f71efca45d6c9e29937b2.pdf",
+      "rendered_page": "docs/nrb/holdout-pages/268bcfe86d03-p001.jpg",
+      "native": {
+        "chars": 1094,
+        "chars_nonspace": 861,
+        "devanagari": 0,
+        "latin": 616,
+        "devanagari_ratio": 0.0,
+        "latin_ratio": 0.7154,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "ocr": {
+        "chars": 859,
+        "chars_nonspace": 725,
+        "devanagari": 692,
+        "latin": 5,
+        "devanagari_ratio": 0.9545,
+        "latin_ratio": 0.0069,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "native_text": "g]kfn /fi6« a}+s \ns]Gb|Lo sfof{no \nljb]zL ljlgdo Joj:yfkg ljefu \n \n \nO=k|f=kl/kq ;+VofM– #(& ldlt M– @)^#÷!@÷!! \n \n \nOhfhtkqk|fKt æsÆ / /fli6«o:t/sf ævÆ ju{sf a}+s tyf ljQLo ;+:yfx¿ . \n \n \nljifo M–  :yfgLo ljqm]tfn] ko{6snfO{ ljqmL u/]sf] ;fdfgsf] lgof{tsf] \n clu |d e'QmfgL k|df0fkq hf/L ug]{ af/] . \n \ndxfzo, \nko{6sn] :yfgLo ljqm ]tfaf6 vl/b u/ ]sf] ;fdfg lgof {t k|lqmof ckgfO{ :yfgLo ljqm ]tf \nkmd{n] g } ko {6ssf] 7 ]ufgfdf k7fpg ] ePdf To:tf ] ;fdfgx?sf ] e 'QmfgL jfkt ko {6sn] \na}+s÷ljQLo ;+:yfdf kl/jTo{ ljb]zL d'b|f a'emfpg NofPdf ljb ]zL d'b|f :jLsf/ u/L ;f ]sf] x'g] \n?k}ofF :yfgLo ljqm ]tf kmd {sf] vftfdf hDdf u/L lgof {tsf] cu |Ldf e 'QmfgL k |df0fkq ljqm ]tf \ngfpFdf hf/L u/L lbg ] Joj:yf ul/Psf] x'Fbf ljb]zL ljlgdo  -lgoldt ug ]{_ P]g, @)!( -;+zf]wg \n;lxt_ sf] bkmf–!@ n] lbPsf] clwsf/ k|of]u u/L of] kl/kq hf/L ul/Psf] 5 . \nt/, ko{6sn] gub ljb ]zL d'b|f a'emfpg] ePdf cd ]l/sL 8n/ b 'O{ xhf/ -jf ;f ] a/fa/ \ncGo ljb]zL d'b|f_ eGbf j9Lsf] xsdf g]kfn k|j]z ubf{ \nDeclare u/L NofPsf] olsg u/]/ dfq \n:jLsf/ ug{ ldNg]5 . \n \n ejbLo, \n \n  \n -/fdhL / ]UdL_ \n sf=d '=sfo{sf/L lgb]{zs ",
+      "ocr_text": "इ.प्रा.परिपत्र संख्या:- ३९७\n\nमिति :- २०६३/१२/१९\n\nइजाजतपत्र्राप्त \"क\" र राष्टयस्तरका \"ख\" वर्गका बैंक तथा वित्तीय संस्थाहरू।\n\nअग्रिम भुक्तानी प्रमाणपत्र जारी गर्े बारे।\n\nमहाशय,\n\nपर्यटकले स्थानीय विक्ेताबाट खरिद गरेको सामान निर्यात प्रक्रिया अपनाई स्थानीय विक्रेता फर्मले नै पर्यटकको ठेगानामा पठाउने भएमा त्यस्तो सामानहरुको भुक्तानी वापत पर्यटकले रुपैयाँ स्थानीय विक्ऋरता फर्मको खातामा जम्मा गरी निर्यातको अग्रीमा भुक्तानी प्रमाणपत्र विक्रेता नाउमा जारी गरी दिने व्यवस्था गरिएको हुंदा विदेशी विनिमय (नियमित गर्न) ऐन, २०१९ (संशोधन सहित) को दफा-१२ ले दिएको अधिकार प्रयोग गरी यो परिपत्र जारी गरिएको छ।\n\nतर, पर्यटकले नगद विदेशी मुद्रा बुभाउने भएमा अमेरिकी डलर दुई हजार (वा सो बराबर अन्य विदेशी मुद्रा) भन्दा वढीको हकमा नेपाल प्रवेश गद्दा Deवare गरी ल्याएको यकिन गरेर मात्र स्वीकार गर्न मिल्नेछ।\n\nभवदीय,\n\n(1) का. मु. कार्यकारी निर्देशक\n\nविदेशी विनिमय व्यवस्थापन विभाग",
+      "converted_sample": [
+        {
+          "where": "p.1",
+          "original": "ljb]zL ljlgdo Joj:yfkg ljefu ",
+          "converted": "विदेशी विनिमय व्यवस्थापन विभाग ",
+          "disposition": "ambiguous"
+        },
+        {
+          "where": "p.1",
+          "original": "O=k|f=kl/kq ;+VofM– #(& ldlt M– @)^#÷!@÷!! ",
+          "converted": "इ.प्रा.परिपत्र संख्याः– ३९७ मिति :– २०६३/१२/११ ",
+          "disposition": "ambiguous"
+        },
+        {
+          "where": "p.1",
+          "original": "Ohfhtkqk|fKt æsÆ / /fli6«o:t/sf ævÆ ju{sf a}+s tyf ljQLo ;+:yfx¿ . ",
+          "converted": "इजाजतपत्रप्राप्त “क” र राष्ट्रियस्तरका “ख” वर्गका बैंक तथा वित्तीय संस्थाहरू । ",
+          "disposition": "converted"
+        },
+        {
+          "where": "p.1",
+          "original": "ljifo M–  :yfgLo ljqm]tfn] ko{6snfO{ ljqmL u/]sf] ;fdfgsf] lgof{tsf] ",
+          "converted": "विषय :–  स्थानीय विक्रेताले पर्यटकलाई विक्री गरेको सामानको निर्यातको ",
+          "disposition": "converted"
+        }
+      ],
+      "seconds": 1.6,
+      "error": null
+    }
+  ]
+}
