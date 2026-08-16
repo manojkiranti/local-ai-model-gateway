@@ -64,6 +64,13 @@ project's environment.
 # Migrations
 .venv/bin/alembic revision --autogenerate -m "describe change"
 .venv/bin/alembic upgrade head
+
+# NRB corpus pipeline — offline, never model-facing, SCRATCH database only.
+# Every one of these needs DATABASE_URL=.../local_ai_gateway_p4 (see the NRB
+# section below); several refuse to run without an explicit scope.
+.venv/bin/python scripts/nrb_sync.py --dry-run      # catalog reconciliation
+.venv/bin/python scripts/nrb_fetch.py --core        # download + verify bytes
+.venv/bin/python scripts/nrb_extract.py --extractor-version native-2
 ```
 
 Port convention is fixed: this gateway uses `8000`; the sibling
@@ -96,7 +103,8 @@ app/
 ├── files/              owner-scoped uploads, generated files, readers/store
 ├── history/            persisted sessions/messages and context reconstruction
 ├── rag/                 department auth, corpus, hybrid retrieval, ingest jobs
-└── nrb/                 constrained Nepal Rastra Bank API client
+└── nrb/                 forex tool (model-facing) + the NRB document pipeline
+                        (catalog, fetch, extract, classify — NOT model-facing)
 
 alembic/                schema migrations
 tests/                  unit, contract, integration, live, and evaluation tests
@@ -165,6 +173,44 @@ requirements-worker.txt API dependencies plus Docling
 - Use `app/localtime.py` for "today" in Nepal. Do not derive Nepal's date from
   UTC or ask the model to supply current dates/rates from memory.
 
+## NRB document pipeline
+
+`app/nrb/` is two unrelated things. `client.py` backs the model-facing
+`get_nrb_forex` tool. **Everything else is an offline corpus pipeline that no
+model can call** — it is driven by `scripts/nrb_*.py` and exists to turn Nepal
+Rastra Bank's public site into a searchable corpus. Read
+`docs/nrb-integration.md` before touching any of it; that document is the status
+record, and re-deriving state from code or chat history has gone wrong before.
+
+- **Use the scratch database `local_ai_gateway_p4`**, never `local_ai_gateway`.
+  `alembic current` failing against the dev DB on this branch is by design; do
+  not "fix" it with `alembic stamp` or by recreating the database.
+- Where it stands: the catalog (18,577 sources / 18,266 files) syncs
+  idempotently, files download with magic-byte verification into
+  content-addressed storage, and every fetched blob is parsed and classified.
+  **Nothing is chunked, embedded or searchable yet** — Phase 7 (chunk+embed) and
+  the `search_nrb_documents` tool are not started.
+- Extraction identity is `(content_sha256, extractor_version)`. `native-1` and
+  `native-2` rows coexist deliberately, so an old measurement stays reproducible.
+  A classifier change means a NEW version, never an edit in place.
+- Legacy Nepali fonts (Preeti and friends) are a detection-and-recovery problem
+  with a counter-intuitive rule: **producing Devanagari is not succeeding.** An
+  English table run through a Preeti converter comes out 91% Devanagari and
+  scores well on every after-the-fact check, so the guards run on the INPUT.
+- `npttf2utf` is GPL-3.0, imported lazily, and reachable only through
+  `app/nrb/legacy_font.py`. It is not installed by `Dockerfile`. The distribution
+  question is unresolved on purpose; do not vendor its tables and do not import
+  it anywhere else.
+- No conversion is wired into any runtime path. It has been evaluated, not
+  deployed.
+- **Frozen evidence is frozen.** The Phase 6A benchmark and the Phase 6B routing
+  holdout are committed manifests with self-verifying fingerprints, and the
+  holdout was committed before any network access precisely so it could validate
+  a classifier it never influenced. Once a finding from a holdout changes the
+  classifier, that holdout becomes development evidence: the change needs a new
+  extractor version and a NEW cohort. Never tune against it, never redraw it,
+  never rewrite its artifacts.
+
 ## Database and RAG invariants
 
 - Preserve the composite department/document foreign key. It is the database
@@ -229,6 +275,8 @@ availability, or live deployment state.
 
 - `CLAUDE.md` — detailed, hard-won implementation invariants and known seams
 - `README.md` — setup, architecture, endpoints, and basic verification flow
+- `docs/nrb-integration.md` — NRB status and roadmap; the record of what each
+  phase measured and why. Required before any NRB change.
 - `docs/server-and-models.md` — current environment and model facts
 - `docs/llm-transport-and-deployment.md` — context and backend transport details
 - `DOCKER.md` — API/worker container setup
