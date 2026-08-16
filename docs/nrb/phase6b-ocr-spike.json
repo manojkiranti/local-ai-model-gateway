@@ -1,0 +1,746 @@
+{
+  "backend": "torch",
+  "lang": "devanagari",
+  "force_full_page_ocr": true,
+  "native_parser": "pypdf",
+  "elapsed_seconds": 34.9,
+  "cases": [
+    {
+      "short": "3d2eca8b9f95",
+      "page": 1,
+      "group": "scan-backed queue",
+      "why": "unresolved; 300 dpi scan; forex 2018",
+      "blob": "3d2eca8b9f951ecda27129f3fc7e90c503eb1e84802797d6e9833fdae6d39e39.pdf",
+      "rendered_page": "docs/nrb/holdout-pages/3d2eca8b9f95-p001.jpg",
+      "native": {
+        "chars": 2083,
+        "chars_nonspace": 1695,
+        "devanagari": 0,
+        "latin": 1366,
+        "devanagari_ratio": 0.0,
+        "latin_ratio": 0.8059,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "ocr": {
+        "chars": 1853,
+        "chars_nonspace": 1703,
+        "devanagari": 1347,
+        "latin": 315,
+        "devanagari_ratio": 0.791,
+        "latin_ratio": 0.185,
+        "prebase_misordered": 1,
+        "nfc_stable": false
+      },
+      "native_text": "tqrq w +6\na-ffi i$i?ii!i?T\nt{tqft frfu{q aFrerFFT f{qr{r\n{rdF{\n(1)\n(R)\n(v)\n(s)\n({)\n/C \\\n(1)\n(10)\nqTftrq ffi rrrrfrq Trrqr flur k{ Tfr q*w vq*ft\nqT{r\nRqft hhqq tffia q-il'l E{, tott +1 ssT lo<r. d M BTRr+ri rfrq q-ft qs *+-qrs gqmaq{ qrq\nrA61 4tftr$q dq-{€A tarftFrqrffi qrccr qf rrft ,Trrf,terf, il+ aqr ffiq veTw€qrd }il-cfrq {ffqT €q\nfu{ {d qzreuTr qRr|+tA {qfrrd rrffi qr+arffi qrftr fr qErfl TsTqrq rM g r\nq-q +fi-Erd rqrqtrq{ eTk[ u.F\" T{t-+T ffi Tffiq wt tqsft-{d, +4 g.qi < sr{ sqb sel-{q\nilfi FsRq FITE;I, (rsF', g€-fl'qFt, kfl-{rr{, tq-nr6r, 5q irwr snrd6 qqfqR targtdf,; wrn korqqtmr ffi frr qF+1, hht g{r Brrdq qi qffi, sS tr{ { qq kf, *Tcr Fqt q-{r6 nril\nq+trr+r qrFT ffiq ffirq-+l q-{frr ,rt *+ aqr ffiq v€Trqrc $TRfi'q {.frrcr ruur k{ vfr\nu-1 t +vft rrtrfrq {arqr €ur fttsr wq qffi, hhft gn+n ruur ftT\\'+l qq fr vta ffi q-d silRfr\nqrqkfr tffi {o skqrf, qi fr{r tr* w1 qfu 1\nqq m ffi c*firq+1{ffis +r+q qt+r ffi qn zrd ruq k{ vd wt rqd aur kc avr srq Trf ffi fqlq-fi sfrfu truiq qqd 6{ cilE r\nruor ki *o nqr ffiq Tf€Trfl{ srR-ritrq ffiqr ffiq +.rn-{R'it'qr E+ t€M sk{+r qrffi g{\nq*r t\nzrd {q-+1 Tmrfr eraRr qffiq I q{?fu B{Rffi-q { 4{vq+1 6{ cfu | rR, ?Rr ffi ffi r<mrrtqr rd aur q-frfi-{ur.rd'si+ig ,\n{urffdfi iffirgi grq rgTlt e!GF' (Fee) vi( Tft Eur+} BiRr€-fq aflum( MCLR (Marginal cost of\nFunding based Lending Rate) HT 3lRr+-ilq 1 qfuqrdr-qr q& -r{n rrft ilq qH et cfu | vrF qrqr<\nqrts+ arq Ei 'qlo+, +fuqm kc crgi fu rqd rur kn TriM eTnT d fuffi fH, wrre, ft6 rqrtdt kc crgi Aq r\ncd aq fuc r{ ++-{rc T4 fr+-.d fm{ sfu | €ur r+q FTffi csqrE eTtTqr4 trqr r{ +6qr\nnqrql1rrCrq qfu r\nnr+1 qiar qM Tfirfi .rqt T{ W slhvq qrcorft rr<rt cs ffi eTffnqqr srut-4firfi rRrs1\nqfu r {rt {ur+1 aqrq Ttrrfi lrdt e-skf, fuqr-{qR crri +< +,fr.rt{ un gmrft.r-{ Tfu |\n*oi aur r+q Fqqr'.ier rrqfr r5frr-<w aqr qrarqrft h-qT+-flTqr ftfi-q qrnfi IilER\"T Tqnft\ne-qt{d tEq ftTr eT<rdFq EFr{fldr Tuf {cqr qt-qa1 15{ qfrs I\nsrffi t{trr6\nfrt{ft frtffq aFrsTrr{ tfin{r\nffi lovXTov/RR rrA s*{Tf\\Tf, T+ fuqqf{r qFqhrf, qfir qlk rrRSr+} e r\nWebsite: www.nrb.ors.np ril IFF'Ftlit Ftfr totl*Zolllo",
+      "ocr_text": "e al viht Hjale hle e? िवदेशीिविनमयथवरथापनिवभाग\n\nUest lohe Mh Ery lnre Mih hpIk pePere beolnjie सूचना\n\nवदेशीिविनमयतनयिमतगने ऐन,रणरकोदफापoख.लेिदएकोआंधकारपयोगगरीयसबैंकबाटइजाजतपनपात गरेकावािणजयबैंकहरलेदेहायकाशतहरकोपालनागनेगरीभारतिरथतबैंकतथािवतीयसंरशाहरबाटभारतीयमुदामाऋण लनसवनेयवरथागिरएकोलेसमबिधतसबैकोजानकारीकोलािंगयोसूचनापकाशनगिरएकोछ\n\nशतहर\n\n- यसबैकबाटइजाजतपघपातकवगंकाबैंकहरलेनवीकरणीयउजिजलिव्धुत,सौयीउजिरवायुउजिउलादन तथापसारणलाइन,सडक,सुरड़माग,वमानरथल,केवलकार, पुलजरताभौतकपूविधारहाउिजड़,जरगािवकास जरतािरयलरटेटकोभेऋबाहेक,िवदेशीमुदाआजनगनेपयटन,कृषभेऋरलघुवतभेघमाकजिपवाहगने पयोजनकालािगिवतीयसाधनकोपबधगनीभारतिरथतबैंकतथािवतीयसंरथाबाटभारतीयमुदामाऋणिलनसवने Whle pa lir Ph  Ak tehy hnre hiph Yo?e! fbh ele Pr! inrk hiph hpike iah Ie पाथिमकपूँजीकोपणपितशतकोसीमािभघरहनुपनेछ\n- यरतोऋणि्लनऋणपातगनैबैककोसंचालकसिमितबाटिनणयभएकोहुनुपनेछ\n- यसबैंकलेतोकेबमोिजमकोपूँजीकोषकायमगरेकाबैंकहरलेमावयरतोऋणिलनसवनेछन्\n- E? lblie pebPin thajey ta lhp Aiblir Hpe! hht heule fiia? hpeu hoB te H! mre हुदैन\n- ऋणदातालेलगाउने अय समपूuीशुलक् Fee समत गरी ऋणको आिधकतमयाजदर MCLRMargina Cost of Funतing based Lending Rat मा ओिधकतमa पितशतभनदा बढीनहुने गरी तयगरेकोहुनु पनेछI उक वयाजदर बाहेकअयकुनैशुलक,किमशनिदनपाइनेछैन\n- यरतोऋणकोभुकानीअविधयूनतमववषदिखभिंधकतमपवषसममकोहुनुपनेछातरयसबैंकलेखीकृतपदान गरेमायरतोऋणनवीकरणगनीसिकनेछ\n- I Ee l$ih Ee paihr te Peihia pry ghife pe ljie oetn e inre pah\n- ऋणकोसावालाज्भुकानीगदियसबैकलाईभिवलबजानकारी्गराईयसबैककोओिभलेखमाअघाविधकगराउनु प्नेछासाथैऋणकोयाजभुकानीगदिपचिलतिनयमानुसारलारनेकरकहीगरेरमाऋभुकानीगनुपनेछ\n- यरतोऋणिलनयसबैकबाटपूवीखीकृतिलनुपनेछाऋणरकमिभिघसकेपशचात्भिनवायीपमायसबैंकमा लेखाङनगराउनुपनेछ\n- ९० बैंकलेऋणरकमिभव्याउदासमपितशुदीकरणतथाआतङवादीिकयाकलापमािवतीयलगानीिनवारणसमबधी पचिलतरिट्यतथाअतरिट्यकानूनकोपूणीकपमापालनागनुपनेछ\n\nMa? ii. कायकारीिनदेशक Iller! Ehlebhe hhe! Y6Pe!\n\nमित ॰णपoःशरगते पकािशत यसैिवषयसँगसमबिधतसूचनाखारजगिरएकोछ Website: www.nrb.org.np मT yoleन मid Roux I or I qo",
+      "converted_sample": [
+        {
+          "where": "p.1",
+          "original": "t{tqft frfu{q aFrerFFT f{qr{r",
+          "converted": "र्ततत्रात ाचार्गत्र बँचभचँत् र्त्रार्चच",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "qTftrq ffi rrrrfrq Trrqr flur k{ Tfr q*w vq*ft",
+          "converted": "त्रततचत्र ााष् चचचचाचत्र त्चचत्रच ागिच र्प तच त्र८ध खत्र८ात",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "Rqft hhqq tffia q-il'l E{, tott +1 ssT lo<r. d M BTRr+ri rfrq q-ft qs *+-qrs gqmaq{ qrq",
+          "converted": "च्त्रात जजत्रत्र तााष्ब त्र(ष्िुि भर््, तयतत ंज्ञ ककत् यि?च। म : द्यत्च्चंचष् चाचत्र त्र(ात त्रक ८ं(त्रचक नक्रबर्त्र त्रचत्र",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "rA61 4tftr$q dq-{€A tarftFrqrffi qrccr qf rrft ,Trrf,terf, il+ aqr ffiq veTw€qrd }il-cfrq {ffqT €q",
+          "converted": "चब्टज्ञ द्धतातच४त्र मत्रर्(€ब् तबचातँचत्रचााष् त्रचअअच त्रा चचात ,त्चचा,तभचा, ष्िं बत्रच ााष्त्र खभत्ध€त्रचम ैष्(िआचत्र र्ाात्रत् €त्र",
+          "disposition": "rejected"
+        }
+      ],
+      "seconds": 20.19,
+      "error": null
+    },
+    {
+      "short": "da8024b7616b",
+      "page": 1,
+      "group": "scan-backed queue",
+      "why": "unresolved; 300 dpi scan; forex 2019",
+      "blob": "da8024b7616ba6a0513a99b585060ee7829905eb867e73d913b6086692ede980.pdf",
+      "rendered_page": "docs/nrb/holdout-pages/da8024b7616b-p001.jpg",
+      "native": {
+        "chars": 2099,
+        "chars_nonspace": 1704,
+        "devanagari": 0,
+        "latin": 1362,
+        "devanagari_ratio": 0.0,
+        "latin_ratio": 0.7993,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "ocr": {
+        "chars": 1872,
+        "chars_nonspace": 1768,
+        "devanagari": 1567,
+        "latin": 168,
+        "devanagari_ratio": 0.8863,
+        "latin_ratio": 0.095,
+        "prebase_misordered": 1,
+        "nfc_stable": true
+      },
+      "native_text": "iqrq {rE +€\nffiq +rqfqq\nkt{ft P{fu{q aFrerFFT f+n{r\n(1)\n(R)\n(Y)\n({)\n\\\\/\n(\\9)\n(1)\n(10)\nqg trn ffiq ffi qRr+d Htqft 1nrqr apr k{ vfr\naFreil Tqfrft qq{r\nRqft fuhqq ttrqfua qill tc, tolt +1 Esl loq. A M BTRI+TT Tfrq rrft qq +{-qrd Fq[qilT{ qrq\nqt{r qq tff ffi ar{l-6-{A kIT+T flffi cm{r q-i ,Tft htst.*+ aqr ffiq €€Tr zTT q-q RrTr6{-crcqk{fli Rqt gcrqr ruq kc e-d_q+en rrMfA rr-qtrro sffi qrf,+Ttal qrfu * qrffic-r qffir\nwFlwr rftq+1 d I\nqrdF{\nqq +rqra {slufilT{ ylq \"s' flt-€r qq k{ kfi-c g+qr-6{-A Rqfr t-{r Bildq rri Triiq, +.S *{,q{ sqq dql qrfl-IT, oq wat+qn 6q1 qffiq g-qi, M a?T[ sffi Nil crd-dqrqqdc, rrkfr Fr{Ru\"( sflr-{q BTfuqkqT Fdq}T 5ri rrft sffi.fr an-i=+R mra qi sqq, aFRtTz[,\nqkd-q-qT BTrt{qr +-qi rsm rli ed-q-iqT {rftr ffiq qrqE-+1 rq-rq .rd Rqt *+ aqr ffiq lren sl\nwq senmerc qfue-(d, htqt tFrrn ryr kc qd6{ |\nqr m ffi e*tqrr+1 {ffiiE orqq qt6r vq kn ffi'q v€il6{A qH {d aq kc vd ut rqd aq fuEt vm'€q T+q ri-a frqsr BilRn qre{kfi tffi qfrqr 1o {w wq qrr ffiq *oqkqrd{ 6+ cfr rift q+en fuers{ Ttd I\nqd aq k{ q_q-dfr sfukqrc ffiq €{ qf,s 1\nruq ki Rst +fi nQTr mq seTrfl{ eTR-dEq wqr ffiq +.nt{R rrfqr d fuM efu*?rqqrrrg\\rdr fl cfu r\nTd €ur+1 TmT-ft erqRr q+flq 1 Teitfu BTRr+-f,q x qffi qFr qT cts r il{, q{ Ae-n ffiTEr+ rrtqr rfi-fiiq rt;t qt+-id I\nruur+] qlur(t F|flzm EuT-ilfl-fr fingi 3fq {swi 'sI@ (Fee) gid qt BIRI+-dq 6 Month Libor + 3%\nflrr g1 qfs r $ffi-aTlcf(t EraF Fqt ffid rrct ftdi qq t+ qw', +furm tcc cr$i *{ rqcd aq Rqrqrc Fwrsi qzM qrftr Rqt *+ nw ffiq e-{qrfl-t +.* mtsq-+f fH, qqrq-f,,\n+fi rqrtfr kc cr$i fu r\nqd ruur kc r{ ++-c-rd T4 frW ts{ Tis I aq .m-q csqfE 3Tt{Erd qqqr {s +fiqr\nnqTF{ rt-{t-s1 cfu r ruur+1 qtar qFq TsT-ft qt qqqFf, d {q;Tqr +q Affi B{t{dq qmfl-ft\nmni qs aq-+l eTf\\TiqqT erqrqRrfi rrircT qfu r qr$, {ur+J qrq rrflrft q-qi sqk-f, ftqqrTqTi\noni +< +fr .nr wa Tmrft .rt qt-g r\n*oi ruvr c+q Fr{qrc-<t qaqt{ slfu-owr dqr errtrgE[ft hqr+-\"ilqqT ffiq q.trft FrsRUT (q{ft\ns-qka nF nqr il<-dEq fi-fl+1 Wi qr\"rcr.r{ ciliq r\nWebsite: www.nrb.org.np rIT lliFl{FT fufu Rotgd/1ol19\nffi 1out17o{/R{ qT eq,tftrf, T( {qfr q-firqr€ qtq rfirq+t 6 |\nEFrffi frTt{r+",
+      "ocr_text": "e Rol siht hhler hlye? वदेशीिविनमययवरथापनिवभाग\n\nEh Erl nk Wiph UoP eh peeo hpe Pe Be यवरथासमबधीसूचना\n\nवदेशीिविनमयतनयिमतगने ऐन,र॰परकोदफापoख.लेिदएकोओिधकारपयोगगरीयसबैंकबाटइजाजतपघपात गरेकालघुिवचिवतीयसंरथाहकलेदेहायकाशतहरकोपालनागनेगरीिवदेशीबैकतथािवतीयसंरथावाअयसंरथाहरबाट पिरवयीिवदेशीमुदामाऋणिलनसवनेयवरथागिरएकोलेसमबिधतसबैकोजानकारीकोलिंगयोसावजिनकसूचना पकाशनगिरएकोछ\n\nशतहर\n\n- यसबैकबाटइजाजतपऋपातघवगकालघुवतिवतीयसंरशाहहलेिवदेशीमुदाआजनगनेपयटन,कृषभेऋ लघुउधमतथायवसाय,लघुजलिवधुततथानवीकरणीयउजिरोजगारीतथारवरोजगारीिसजनामाफत आयआजनगिरवीिनवारणरउलपादनभिभविद्मासहयोगपुरनेगरीआफ्नोकारोवारभेघिभऋपनेउघम,यवसाय पिरयोजनाआदमाकजिपवाहगनेपयोजनकालािंगिवतीयसाधनकोपवधगनीिवदेशीबैंकतथािवतीयसंरथावा अयसंरथाहरबाटपिरवलीिवदेशीमुदामाऋणिलनसवनेछन्प\n- P hPe bih Hh Mo O+ HI?e lyUh ghhI Whla PPUo Pih her! lore pa Ipr hre Dh पिरचालनहुनसवनेगरीलवरथामलाउनुपनेछ\n- यसबैंकलेतोकेबमोिजमकोपूँजीकोषकायमगरेकालघुिवतिवतीयसंरथाहरलेमाऋयरतोऋणिलनसवनेछन्म\n- यरतोऋणिलनसंचालकसिमितबाटिनणयहुनुपनेछ\n- यरतोऋणकोभुकानीअविधयूनतमपवषदिखभिधकतमपबषसमकोमाऋहुनुपनेछातरयसबैंकलेखीकृत पदानगरेमानवीकरणगनीसिकनेछ\n- ऋणिदनेिवदेशीबैंकतथािवतीयसंरथालाईअतरििट्यरपमािवतीयकारोवारगनमाकुनैिकिसमकोपितवध I Bph E? ohsiis!\n- ऋणकोयाजदरलगायतऋणदातालेलगाउनेअयसमपूणीशुलकलeeसमेतगरी अिधकतम॰MonthLजorच3न िभऋहुनुपनेछाउचलाजदरबाहेककजिखीकृतगदििलईनेअयकुनैशुलक,किमशनिदनपाइनेछैना\n- यरतोऋणिलनयसबैंकबाटपूवीखीकृतिलनुपनेछाऋणरकमिभिऋसकेपशचात्आिनवायीकपमायसबैंकमा लेखाइनगराउनुपनेछऋणकोसाँवायाजभुकानीगरेपशचातसोसमबधमायसबैंकलाईआिबलमबजानकारी गराईयसबैंककोअिभलेखमाअधाविधक्गराउनुपनेछपसाथैऋणकोयाजभुकानीगदिपचिलतिनयमानुसार लारनेकरकहीगरेरमाऋभुकानीगनुपनेछ\n- यरतोऋणिवदेशबाटिभव्याउनेपयोजनकोलािगिवदेशीबैकतथािवतीयसंरथालाईकुनैिकिसमकोिधतोजमानत + Ee psh E p-alhr e\n- ९० बैंकलेऋणरकमिभ्याउदासमपितशुदुकरणतथाआतङवादीकयाकलापमािवतीयलगानीिनवारणसमबधी पचिलतरिष्यतथाअतरििषट्यकानूनकोपूणीपालनागनुपनेछ\n\nMhil? yiig. कायकारीिनदेशक\n\nWebsite: www.nrb.org.np मT पoाशन fमित: Roux I qo I4u\n\nमित २॰णर॰राशx मापकािशतयससमबधीसूचनालाईखारेजगिरएकोछ",
+      "converted_sample": [
+        {
+          "where": "p.1",
+          "original": "kt{ft P{fu{q aFrerFFT f+n{r",
+          "converted": "पर्तात र्एार्गत्र बँचभचँत् ांर्लच",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "qg trn ffiq ffi qRr+d Htqft 1nrqr apr k{ vfr",
+          "converted": "त्रन तचल ााष्त्र ााष् त्रच्चंम ज्तत्रात ज्ञलचत्रच बउच र्प खाच",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "Rqft fuhqq ttrqfua qill tc, tolt +1 Esl loq. A M BTRI+TT Tfrq rrft qq +{-qrd Fq[qilT{ qrq",
+          "converted": "च्त्रात ागजत्रत्र ततचत्रागब त्रष्िि तअ, तयति ंज्ञ भ्कि यित्र। ब् : द्यत्च्क्ष्त्तं् तचत्र चचात त्रत्र र्(ंत्रचम ँत्रृत्रष्तर््ि त्रचत्र",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "qt{r qq tff ffi ar{l-6-{A kIT+T flffi cm{r q-i ,Tft htst.*+ aqr ffiq €€Tr zTT q-q RrTr6{-crcqk{fli Rqt gcrqr ruq kc e-d_q+en rrMfA rr-qtrro sffi qrf,+Ttal qrfu * qrffic-r qffir",
+          "converted": "त्रर्तच त्रत्र ताा ााष् बर्च(िटर्(ब् पक्ष्त्तं् ाािाष् mर्अच त्र(ष् ,तत जतकत।८ं बत्रच ााष्त्र €€त्च शत्त् त्र(त्र च्चत्चर्ट(अचअत्रर्पाषि् च्त्रत नअचत्रच चगत्र पअ भ(म)त्रंभल चचःाब् चच(त्रतचचय कााष् त्रचा,ंत्तबि त्रचाग ८ त्रचााष्अ(च त्रााष्च",
+          "disposition": "rejected"
+        }
+      ],
+      "seconds": 1.17,
+      "error": null
+    },
+    {
+      "short": "796bb59c3443",
+      "page": 1,
+      "group": "scan-backed queue",
+      "why": "unresolved; 150 dpi scan; notice 2019",
+      "blob": "796bb59c34434e9e6bc5480e30a821cf11e333a93a709e075f26bbd52d5005b7.pdf",
+      "rendered_page": "docs/nrb/holdout-pages/796bb59c3443-p001.jpg",
+      "native": {
+        "chars": 877,
+        "chars_nonspace": 730,
+        "devanagari": 0,
+        "latin": 539,
+        "devanagari_ratio": 0.0,
+        "latin_ratio": 0.7384,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "ocr": {
+        "chars": 724,
+        "chars_nonspace": 670,
+        "devanagari": 590,
+        "latin": 68,
+        "devanagari_ratio": 0.8806,
+        "latin_ratio": 0.1015,
+        "prebase_misordered": 2,
+        "nfc_stable": true
+      },
+      "native_text": "fr{q{ ffil{.r qrfrr q+c q-il,sil-el{fr} Ft|{r I\nkdrefTrR\nw-;tfr r\nql-{ c: o\\e1-{lolqq\nWIFRT q: oel-{?olqe'\nSite: www nrb org np\nEnrail: nrbsid(frrrb org np\nfarfqro ffi 1ou{/oR/ol\nqq ++,qre ffi qoev/lR/oR eJ @T€il@1 .\"ftft14' sx\" qtt+mr aeil\nffit {rm[5afl. rari{ra TfiT 3]'.ilsR zl-q o.[qi-{q qzF[,\nBTfh\"of, eTt\"{RT dsTT ,Td qqrfld[{TT Tr[ful-{ I-i 6.rtf6-r qrfrr Rsq{-ft\nfrdqT B{rFl]-{ @qr fu{o tn gt 3il-g6t k\"l.{-fr tt fr\nr1{-{fr FFF^afi1-{, E-fr - 10, {Ftfrfr tu rfffi cR}74] 3IT\".IIGT W\na4q T. R1,Yl,{\\eel1o (3T?rift qq.6,r{g qTrq ffidrq FTR qrq (|IT\n*-16T{ { tsr Eqr q1a) ffAT vtrol el frdrr FT{ilq {E{rB-f, €\n{RTnoTqr Fr+r4qrfi rfi s-frc 6i iM-A {r.iqhd qfr( (q, ?oqt\n(qffi qqfrtr{ Rost) 41 Esl Re el s-qilF-r R { iqm q +6 qRK\nhFrqq|-{fr, Rosl tffi qqfrilq lo\\eYl +1 tqfu{q {v al fdq-q-dT qrftr\nvsqFaro qaar qr+arffi ?nftr fr Tq{r r+-f}Td .rM u r\n(3rqt6 qrnr frRql\nFrtqro",
+      "ocr_text": "फोन न O-yoदद\n\nपयाiaस न Ou-yroe\n\nSite: www nrb org np\n\nEmail: nrbsidanrb org np\n\nपकिशत िमित २०७xI०श०२ बोलपघरवीकृतकालिंगछनौटगनेआशयकोसूचना\n\nयसबैंकबाटिमित२॰णवशाणशकोरिषट्यरतरको.दैनकपऋपिकामातथा बैंककोवेभसाइटमापकिशतर सूचनाअनुसारयसकायिलयकोकायिलयभवन Io Piela Piprlia गाडीववाटरहकमारंगरोगनगनेकायकालािगसलबदी बोलपघआहवानगिरएकोमारीतपूवेकपेशहुनआएकािसलवदीबोलपनहरमधयेधी भगवतीकवरट्वसन,बुटवलपळ,रपदेहीलेपेशगरेकोदररेटकोआधारमाकुल रकम . ,दB,ooo अभरपी एवकाइसलाख िचािलस हजार पांच स सय सतहतररपैसादशमाऋलभार समेतकोबोलपऋयूनतममूलयािङ्तरही सारभूतरपमापभावगाहीरहीछनौटहुनेदिखएकोलेसावजिनकखिरदऐन,श॰दर पिहलोसंशोधन॰u कोदफा७कोउपदफाशरनेपालराष् बैक खिरद विनयमावली,रoणदोसोसंशोधनश॰छ४ कोिविनयमपरकोपयोजनकालािग समविधतसबैकाजानकारीकोलािंगयोसूचनापकिशतगिरएकोछ\n\nअशोककुमारपौडेल",
+      "converted_sample": [
+        {
+          "where": "p.1",
+          "original": "fr{q{ ffil{.r qrfrr q+c q-il,sil-el{fr} Ft|{r I",
+          "converted": "ार्चर्त्र ााषर््ि।च त्रचाचच त्रंअ त्र(ष्,िकष्(िर्भिाचै ँर्त्रच क्ष्",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "Site: www nrb org np",
+          "converted": null,
+          "disposition": "kept_english"
+        },
+        {
+          "where": "p.1",
+          "original": "Enrail: nrbsid(frrrb org np",
+          "converted": "भ्लचबष्सि् लचदकष्म९ाचचचद यचन लउ",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "qq ++,qre ffi qoev/lR/oR eJ @T€il@1 .\"ftft14' sx\" qtt+mr aeil",
+          "converted": "त्रत्र ं,त्रचभ ााष् त्रयभखरच्रियच् भव् २त्€ष्२िज्ञ ।ूातातज्ञद्धु कहू क्रततंच बभष्ि",
+          "disposition": "rejected"
+        }
+      ],
+      "seconds": 0.9,
+      "error": null
+    },
+    {
+      "short": "70b0d415dcf3",
+      "page": 1,
+      "group": "scan-backed queue",
+      "why": "unresolved; act 2019",
+      "blob": "70b0d415dcf306bc6640027aa64dbfd236418611b1806477fcdd232430af4fc3.pdf",
+      "rendered_page": "docs/nrb/holdout-pages/70b0d415dcf3-p001.jpg",
+      "native": {
+        "chars": 2303,
+        "chars_nonspace": 1895,
+        "devanagari": 0,
+        "latin": 1433,
+        "devanagari_ratio": 0.0,
+        "latin_ratio": 0.7562,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "ocr": {
+        "chars": 1922,
+        "chars_nonspace": 1811,
+        "devanagari": 1650,
+        "latin": 132,
+        "devanagari_ratio": 0.9111,
+        "latin_ratio": 0.0729,
+        "prebase_misordered": 7,
+        "nfc_stable": true
+      },
+      "native_text": "\\\\.?tr{trT q q€\nw ruq aFrerTq?T hflT\nff,*.r <i+-{q srrcFarr q-Er;tfr +r{tqRr\n(zF) h*c a-frffi qfri r+TT Eeil qqR ET-tsR q-qrq-{ sfuki hqi<.T rt q-q1kq {ils \nr\n(q) fr&q q-6-q-i qki r+q 3n€rq-+] q-{fl.iqrq irE ae-+] ffi qTq( k€i-s r\n(rr) qi.qr{ sRTqel aqal qft etzifufh HTqT {6rq rrq q-q}kq qi.u r\n(q) fr*q q-frq-q-+l e}-d+,-d-f, qqeme< errfiqT rtts t\n(s) fr*c €-fi-d{ frqcF-+R{rr +rfr-{ frihqT q{eTr qq q*k{fir (\"+.\", \"e\" ( \"r[\"\nqri+T +{ ow ffiq veqD t qlr {6rrr{ft g+ vrei u1r\n(q) fiw-<qrffi frq s-Rlqqr 3nEt fr*q qnro qq1 q;i qrH[ {+-q { qrq{{ (Eqrq-qFT\nqffi 6+qr qR w+-cql sdq q qi-g r\n(d) fr*q v+-qq-fr orfrr qrqrq qM aaq qi€sis qqi d-q q-q-rfuq\"dr qlcfei q'-q-qT{ qET<T\n+-q drq qf fisn-eiqdqd qrrrn{+flr h-rr-rrT qd qram rrHt r-s-qcrq r-{qT: qieq.fs\nqftts r\n(q) qqm qrsre< s-R'q- q\\rfir drqq-i-ildr r+-q qqilqr rci Ea trwftn r+-qE-qt ofi Wq\"I\nPro-rata basis +IT qiestg qti-g t\n(r+-) Eqr qqR o.[t-qR q-qffi{ qfum cut-off rate fruirq .d qd'd { dti]-q q-& em-Er+1\nto*q d-fl{.ri qr c-{Ti 3TRr+.ri qftrtf,drr {iRT(.dAR I\n(q) 3{r€m rrRq-dr drq {fi-qqet {rqui qr ffir+ e}q d-+R qr {*+.R r-i 3fsrfli qfufr-dd\nrdAE I\n(a) ft.+n v\\r6r d-{qr qqil+} roq ffi qqfrrf, ersueilTffi qq +fi-qr fft qnr q=i .Ttr\nffia r *+qr R-{kn hM wcrt qror drfr qqr nri-g r\n(6) +qr{ dqd q\\r€[ fl-so-.iqrffi qkil-fl fr gr+-{q frqTq-{ qfri k{qT q]-qn qqiK\ncqqqr saffi 6|gu-&qrfrfl-i 4IdE*qT TI-fr qr4-@T ffi{qT sEqrfr q4 E.+q {fl*ts I\n(s) Tfik.d frM Tfr-ffi erqP.r sflq irq qfu ffi frqikd qrc stdf, hfrq r+-q qqtra-o\nt+-dt qror,qr qqr rrft Ra r\n(d) h*q q-f,trq qftq-dr rfi-q sqftl-d eTsr-fllffi q{rrf,r Portfolio qi uq+tfr m r+q-qe\n3Tffi qrrq qtqrd (CRR) qr rruF{t rT-t qTTi &q r ffi, qq adr ftrtqrq qfrfiil'q eFnt l-ct\nqt srn ({I Liquidity Ratio rIT gft- {+-q rlul-il Tl;f qEi-g t\n(ur) fr*c e-f,-d{ €rcF-{q qq.ffq eto qq n.{ T-ts { { F-ilsA }T[.r q-Ei fr:q]q ]T[q'e[i 3{-f,ql\n3TRIfiffi 3Tf€l=t @ T+-r6fq *q q.i st+tdt I\n(d) ffid-d fr*o .t* I1mrfr fufr q-{Tr+ qqt{rd oreq<qfu fu-ot H d-q r\n(eT) h*q R-{-q-{ €rl-F-{ut Td\"iT rrffi orf\\ grmorrr f}rfr rrco ffi qaqEr ffi e t\n(E) fr.dq R-{-d{ EqcF-{uFFI qPt-qirc furd m + fr}q-qT qi s( r\n(sT) frfrq q-+-q-{ dqr{ dET q\\r6r 4.rsreqrff6{-fl'{ fr ft1 fus1 1qflw-{l qq fuqrq-fr qR-srq\nqFF-{ Giqr Br-q-qR H aqq-w rtM A t\nfiz:- almq rre{+aqqr ffi 1ou11vllc qT dqd ,l,i qFf qq+l t\nWorking Procedure",
+      "ocr_text": "l pih\n\nराष्ऋणथवरथापनिवभाग नभेपसंकलनउपकरणसमबधीकायिविध\n\n- नभेपसंकलनगिरनेरकमखुलाबजारकारोबारसंचालनसिमितलेिनधिरणगरेबमोिजमहुनेछ क\n- ख िनभेपसंकलनगिरनेरकमआहानकोसूचनानेपालराष्बैंककोवेवसाईटमाफतिदईनेछ\n- ग I sy? Hiye Nh: pph hil rjufle Eh ii ehIh bhble\n- घ िनभेपसंकलनकोबोलकबोलबहुलाजदरपणालीमागिरनेछ\n- िनभेपसंकलनबोलकबोलमामौदकनीतमायवरथाभएबमोिजमकाकाउपटरपाटीहरक,खरग बगकाबैंकतथािवतीयसंरथाहलेमाघसहभागीहुनपाउनेछन्\n- च काउणटरपाटीहरलेबोलफाराममाआफूलेिनभेपवापतजमागनीचाहेकोरकमरलाजदरदशमलव पिछकोहकमाचारअंकसममउलेखगनुपनेछ\n- छ िनभेपसंकलनकोलािंगआकहानगिरएकोरकमबाँडफाँडगदिबोलबमोिजमकोयाजदरअनुसारसवभनदा कमबोलगनेकाउटरपाटीलाईपाथिमकताकममाराखीआहानगरेकोरकमसममऋमशःबाँडफॉँड I शरa\n- ज समानजाजदरउललेखभएकाबोलपवहरकोरकमसमावेशगदिकुलिनषकािसतरकमभनदाबढीभएमा I gy Plh?le Ih siseq eieI-oId\n- झ खुलाबजारकारोबारसंचालनसिमितलेCपt-॰ििरateिनधिरणगनीसवनेछरसोभदाबढीयाजदरको नभेपरवीकारगनेवानगनेअिधकारसिमितसँगसुरिभतरहनेछ\n- आहानगिरएकोबोलरकममधयेसमपूणीवाआिशकबोलरवीकारवाअरवीकारगनेओिधकारसिमितलाई रहनेछा\n- रवीकृतभएकाबोलपनवापतकोरकमबैंकलेसमबिधतकाउणटरपाटीकोयसबैंकमारहेकोखाताखचीगरी लनेछरबैंकमासंकिलतिनभेपकोअलरगैखाताखोलीजमागनेछ\n- ठ बोलपघरवीकृतभएकाकाउणटरपाटीकोखातामासोउपकरणिनछकासनगिरनेिदनमामौजदातपयित नभएमालरताकाउपटरपाटीलाईकालोसूचीमाराखीपिछलाबोलकबोलमासहभागीहुनबदेजलगाईनेछ\n- संकिलतिनभेपकोभुकानीअविधसमातभएपिछबैकलेिनधििरतयाजसिंहतिनभेपरकमसमबिधत बैंककोखातामाजमागिरिदनेछ\n- ढ िनभेपसंकलनगिरएकोरकमसमबिधतकाउपटरपाटीकोलगानीशorि॰ांठहुनेभएकोलेसोरकमलाई अिनवायीनगदमौजदातटशशमागणनागनीपाईनेछैनातर,यसबैंककोिनदेशनबमोिजमकायमराखनु पन SLR तथ Liquidity Ratio मा उच रकम गuना गन पाइनेछ\n- On िनभेपसंकलनउपकरणयूनतमबोलमूयर.पकरोडरपकरोडलेभागगदििनःशेषभागजानेअंकमा भिधकतमआहानगिरएकोरकमसममबोलगनीसिकनेछ\n- त I Ee yee ph sipihPnale prjpth Bll Iu Iiu Heh hbu pejer?\n- थ नभेपसंकलनउपकरणपयोगगनकोलािगसुरभणपघिधतोराननपनेलयवरथारहेकोछ\n- दे नभेपसंकलनउपकरणकापिकयाहरिरभसीरपोकैमोडेलमाहुनेछन्म\n- ध िनभेपसंकलनबोलपऋरवीकृतभएकाकाउणटरपाटीहरलाईसोकोिनरसापमाणपऋयसिवभागलेयसैसाथ संलरनढाँचाअनुसारिदनेवयवरथागिरएकोछ\n\nनोटः-धीमान्गभनरजूबाटिमित॰णवाःपछमाखवीकृतभईलागूभएको",
+      "converted_sample": [
+        {
+          "where": "p.1",
+          "original": "w ruq aFrerTq?T hflT",
+          "converted": "ध चगत्र बँचभचत्त्ररुत् जाति्",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "ff,*.r <i+-{q srrcFarr q-Er;tfr +r{tqRr",
+          "converted": "ाा,८।च ?ष्र्(ंत्र कचचअँबचच त्र(भ्चसताच ंर्चतत्रच्च",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "(zF) h*c a-frffi qfri r+TT Eeil qqR ET-tsR q-qrq-{ sfuki hqi<.T rt q-q1kq {ils ",
+          "converted": "९शँ० ज८अ ब(ाचााष् त्राचष् चंत्त् भ्भष्ि त्रत्रच् भ्त्(तकच् त्र(त्रचत्रर्( कागपष् जत्रष्?।त् चत त्र(त्रज्ञपत्र र्ष्कि ",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "(q) fr&q q-6-q-i qki r+q 3n€rq-+] q-{fl.iqrq irE ae-+] ffi qTq( k€i-s r",
+          "converted": "९त्र० ाच७त्र त्र(ट(त्र(ष् त्रपष् चंत्र घल€चत्र(ें त्रर्(ा।िष्त्रचत्र ष्चभ् बभ(ें ााष् त्रत्त्र९ प€ष्(क च",
+          "disposition": "rejected"
+        }
+      ],
+      "seconds": 1.18,
+      "error": null
+    },
+    {
+      "short": "2e65dadfffa3",
+      "page": 1,
+      "group": "scan-backed queue",
+      "why": "partial, Devanagari-after 0.1996; 150 dpi",
+      "blob": "2e65dadfffa3e740eb0292c2c96524ba6ae5642d016f20d557dfa8228f100969.pdf",
+      "rendered_page": "docs/nrb/holdout-pages/2e65dadfffa3-p001.jpg",
+      "native": {
+        "chars": 1036,
+        "chars_nonspace": 869,
+        "devanagari": 0,
+        "latin": 680,
+        "devanagari_ratio": 0.0,
+        "latin_ratio": 0.7825,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "ocr": {
+        "chars": 896,
+        "chars_nonspace": 827,
+        "devanagari": 667,
+        "latin": 138,
+        "devanagari_ratio": 0.8065,
+        "latin_ratio": 0.1669,
+        "prebase_misordered": 2,
+        "nfc_stable": false
+      },
+      "native_text": "ffiw\nilrM trg +fi\nHtqft Hfrqq aFrerr{ hrn\nqrqnr+ Tqlrgr {nqT\nffiq q;rqi\"-q\n?]Sffi, 6T6qr€1\nqt{: Yjc,coY /\\/\\s\nYlolo1 /Yl01{c/Yll1to\ngffie=${: lqi\n\\Tl-4S: ool\\ee 1 YYIY{{i\nfrE f,ffi: \\ei\nEmail :km@nrb.org.np\nfi+fu:RorglzrgzqTTd'qr:k.3IT.9.1R / Yq / oel / \\eY\nq+ Erfrrq +firt\nkqq : qfilfrT{fir+1 Eil k{rq q6rsi sqnrqr r\nrr6rqr{T\nqq 3{fu rrr.il+1 +tq+rorzakqr q-<rrn6 & ffi {qpnirA B{Frfl kqid o,rimr\nT{€+tqr arq kfirqrkffiq q<rqrffire Bil-qm kqid +.rt+rt rt;i tqm wrra gi tqr kq\nvdqfd rr\\r+1 u<fqr t+Hqrril{q {<rrn6 fr um-*q qFnf, rrf qt+i, sm q<-r.rra &\n3Tr.rkT qi qrcmq tqm+,r t{rra{rR, frrlrq, +G,{r ( iqm{rq r;qR ffor $ lqM\nFrflrs{ qH ( qrfurq ffi fr qqcn6 & qr*rm Bnrrkr qrt dt+,r effi qB\nk{tq zrq +6qr r6r-sr{qi qzreTr qffi g.sr. qftT{ vqr qql ffi loulrqc qr qrft\ntr{sAqJ q-dTr erorrril qfl\"i<q 1 fr qqrna qrqfil snril-f, qn ffir+q qdrsi rqM\nqrftr g.T{tffi qk{ qstdq dlt{\\r+.r qfdilr{f,€+1 et fffi{ur il{tR rrft Et{ Brrr{r\n1c-visakhapatnam@nrb.org.np qT q6rqg{ q{tq g t\niffiftq\nab+L qG*,.J\n(Er{tE qRr+rftl\n+l.{.6Fisft htqr+\nffi,q\nkw",
+      "ocr_text": "Boll pi वदेशीिविनमययवरथापनवभाग\n\nआनतिरकपशासनशाखा\n\nपaसंखय:fd.आ.प. Or? o0rIG?\n\nYPbe holnjie gl\n\nिवषयःपिततपवहककोछुहिववरणपठाउनेसमबधमा\n\nHlip!\n\nयसअिघभारतकोकोलकातााहिदयाबदरगाहहुँदैतेसोमुलुकसँगकोआयातिनयितकारोवार भइरहेकोमाहालिवसाखापतनमबदरगाहबाटआयातिनयितकारोवारगनीनेपालभारतदुईदेशिबच सहमितभएकोसदभीमािवसाखापतनमबदरगाहहुदैमालबरतुआयातगनीसिकनेउचबदरगाहहुद आयातहुनेमालवरतुनेपालकािवराटनगर,वीरगनज,भैरहवारनेपालगजभसारनाकाहुदैनेपाल भव्याउनसिकनेरवािणजयबैकहलेसोबदरगाहहुदैसामानआयातगनीखोलेकापिततपघहरकोछुह ववरणयसबैकमा पठाउनुपनेयवरथासिंहतकोइपा. पिरपवसंखयाद िमितशoणशाणड मा जारी भइसकेकोलहोराअवगतगराउँदछुपसोबदरगाहमाफेतआयातहुनेमालवरतुछुटाउनेपयोजनको लािंगउपयुकपिरपवबमोिजमखोिलएकापिततपनहरकोछुदैिववरणतयारगरीइमेलठेगाना I s rlEle E?Ealeh IH du Bro qruouewedeyves-or\n\nHiis\n\nवासुदेवभिंधकारीन का.मुकायकारीिनदेशक\n\nHeile hIt Iplhele ibi6 फोनः ख़दoए Okebb!sbob bocob?\n\nएवसटेसनःपड२\n\nफ्यावस Oo I yyपy\n\nE0 nb 2h\n\nEmail : Ixmonrb.org.np\n\nमितःrooro",
+      "converted_sample": [
+        {
+          "where": "p.1",
+          "original": "Htqft Hfrqq aFrerr{ hrn",
+          "converted": "ज्तत्रात जचत्रत्र बँचभचर्च जचल",
+          "disposition": "ambiguous"
+        },
+        {
+          "where": "p.1",
+          "original": "\\Tl-4S: ool\\ee 1 YYIY{{i",
+          "converted": "्त्(िद्धक्स् ययि्भभ ज्ञ थ्थ्क्ष्थर्र््ष्",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "fi+fu:RorglzrgzqTTd'qr:k.3IT.9.1R / Yq / oel / \\eY",
+          "converted": "ाष्ांगस्च्यचनशिचनशत्रत्त्मुत्रचस्प।घक्ष्त्।ढ।ज्ञच् र थ्त्र र यभि र ्भथ्",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "kqq : qfilfrT{fir+1 Eil k{rq q6rsi sqnrqr r",
+          "converted": "पत्रत्र स् त्राष्िाचतर््ष्चांज्ञ भ्ष्ि र्पचत्र त्रटचकष् कत्रलचत्रच च",
+          "disposition": "rejected"
+        }
+      ],
+      "seconds": 0.82,
+      "error": null
+    },
+    {
+      "short": "360eaafd44bd",
+      "page": 1,
+      "group": "scan-backed queue",
+      "why": "partial; highest English share in band (8.9%)",
+      "blob": "360eaafd44bdf4addde8bfc2b4582e687a5e1f846498e8541811cda7c4504707.pdf",
+      "rendered_page": "docs/nrb/holdout-pages/360eaafd44bd-p001.jpg",
+      "native": {
+        "chars": 1924,
+        "chars_nonspace": 1602,
+        "devanagari": 0,
+        "latin": 1178,
+        "devanagari_ratio": 0.0,
+        "latin_ratio": 0.7353,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "ocr": {
+        "chars": 1694,
+        "chars_nonspace": 1537,
+        "devanagari": 1198,
+        "latin": 282,
+        "devanagari_ratio": 0.7794,
+        "latin_ratio": 0.1835,
+        "prebase_misordered": 0,
+        "nfc_stable": false
+      },
+      "native_text": "irrn\nAq dt{T\n{rq\nfrfr, {err Frqqq\nqfl qrqr : t.h.fr-.fu. zffizqRqzTa$r/11/ o\\st(/ \\e\\e\n{qIf,f,qarr.r.w \naq;rr Trffit 44-6{,\n,+Ctq arqieq\nqryarcR, araqrg'i\nqTc YYll Yo'e\nqAT4TI; YYiY{{!\nE-mail <nrbbfirdppd@nrb org np>\nWeb Site : www.nrb org nP\nq'ir4 A4q \\9j\nffi; loeq /11/ ?1\nffiqiI|.ffi-q\n{wtt fr+T-{ trd\n\\.\n*F\n'iiqil-Ql{t,\nffi qr{Tfcrdrr ra-+1 qq a'mqT f{M wql qqT tr{ S\"fr hq-{qr frtflTf,\nqz{-<rtt rrt q<{qr qq t-{-{rd \"4\",uq-'' a 'n' q-Tio-r gqrq-flTa< tteilE{il{ qft\n.t*\"i *fi,- #* RosE +1 q.qr.FTtqT?I Rl/osq qT ?fl,-{q}tf,q 1i+ a' Yc t{r.\nrr-ft T-qTireqT # rftq\"i i(r drft r** rf *^\"f-Eq i.qr{ {Iv at?F (q' ?o{c e1\n.* oq A mr 3ftrf,R qmq'rfr fr triqm qrt rlt\\rd 6 I\nYc.m qr{rtcaf{r qq+1 q{ Hfrq ffi uqerfl :\n1. {q +-fi-qrd gqrwf,T{Tl-w u4' ilfo-r qrfurq ffi\n{ffi f-{dr€ ?-dTq q-mfif,qd @zn{TI trft frM\nsfr65 ;-\n4. nfrrq ffi.{q freq ffi (-E{rtITI-r ffi nqr frKn 6ldr4fu ffir€\na-qr.f,6 qfurilqrd wkd rlar€ ffr Tffia I qR-fr gq fteq Ffrmi+\nqqq-r qq :tsqr m ftaiq r{g-dr qrf,-4Tti|Eqftn qrq-fl-t rRrsl qts t\nq' v{ fu*q 6iqr frfrr+-diqrd sre'rer qi wdr qlf,{r deIT +f,+l qrq .rt\nffi TE*-,T qfr umqr 31{ Fiiness +1 ga-rn frmT-( rr+qtdi I\nrr. ilRrq ffi t{*Iqi Fwil flqI {qqlE Eta (rfu-f,r rrfr ql_f,f,r aqr\nf,jq75} 3{TeTI-Gt erq-q qfr g{}m .r.t €q& fi1{ il{A qq-e{T rrdq-tdi I\nqt-& g-{eTrfirdIftr flTIRI, q-rr tr, ffi qrfr qmq-o 3ilqqqcF.\nq\"rFd fuqTq qtg t\nq'q.qry-q1*B'.g{t{frqd*I.rtdfrffi-(qf,{rwF.Ia];ITd{+B[l\nR. gq fhM .*i fr6R .rdi Erfrrq ffi Mr qEqr 3l-qnlt6ffi\nrriq-+E :-\ne' Rtnilt 1{ rlrq qfrF-l-ur+] {-{q-r€ HdlIqi {TqT frfiR q-ffiBi I\nq fr\"ffi {-{ frfrq ITCq 3{KqT srqT {-d-dr{ dft{qi qTrcrr+il qrq -Kr{\nqraaT f,e{r frq qt+n rrft q-q* w'ffiq ' \\ 3ilqarr +{-,il{fr g-{ Hfrq 116 ?4qfiT t1rf,+flg {q Hmq k<i4-r {ckI i\nw*rr 116 ei4r E{ nq1 {tfl {rt FF-di ffi qr;fl-{qT ffi m fi qt+n\nrp6qqfr61 I\ns. q( qtfl rrd f'{M qqPa (rr'laturitv) f,q rF-ffi{ ' * lofr[+1 q-4ftT\nq/ii6q[tqtinqrslfile.flq{qd41.eiqfr_grqdgat{Milfr-+TUI",
+      "ocr_text": "Yal pih!\n\nकामीम बैकतथावतीयसंरथािनयमनिवभाँग ऐषािधसीप पa संयाबै.व.न.व. नीत पिरपaIकखग qशoछ  छए\n\nइजाजतपघपातकवगकाबैंकहर\n\nमहाशयु\n\nनेपालीनागिरकसँगरहेकोसुनबैंकमािनभेपकोपमाजमागनीसवनेवषयमानीतगत यवरथागनेसदभीमायसबैंकवाटकखरगवगकाइजाजतपनपातसंरथाहलाईजारी गिरएकोएकीकृतिनदेशनर॰ए कोइ.पा.नदेशनशा०प मादेहायबमोिजमबुँदान.न थप Je aRot B ro al pihy ? Pailr pir Hijhe leu Ip? ehy Piph larh gr दफाणरलेिदएकोओिधकारपयोगगरीयोिनदेशनजारीगिरएकोछ\n\nडःनेपालीनागिरकसँगभएकोसुनिनभेपिलनेसमबधमा\n\n- यसवैंकवाटइजाजतपवपातकवगकावािणयबैंकहरलेनेपालीनागिरकहकसंग रहेकोसुनलाईदेहायवमोिजमकोयवरथागरीिनभेपकोपमारवीकारगनी\n१. सवनेछन्-\n- क.वािणयबैंकहरलेसुनिनभेपिलनेसमबधमानीिततथािवरतृतकायीविधबनाई सिमितवाटपािरतगराईलागूगनुपनेछायसरीसुनिनभेपरवीकाने\n- संचालक I sph paiI Iiepll kijEprl PI ph fiot I lhee Wh hs\n- Pir Ele lavp loR Peio ei A? pephe pipthB PP! hB E P\n- संयनकोरथापनागरीकरतीमाशरपधineडडकोसुनमाऋरवीकारगनुपनेछ\n- ग.वािणजयबैंकहरलेिनभेपकोपमापातसुनलाईढुकुटीदािखलागरीशुदतातथा तौलकोआधारमाअलगगरीसुरिभततवरलेढुकुटीिभऋराखनेयवरथागनुपनेछ Whobla Phileb ple pe 'H L Thh fPi! lipieI?A pe??\n- पवधिमलाउनुपनेछ\n- घ.कुनशाखावाटसुनिनभेपरवीकारगनेहोसोतोकेरसूचनापकाशनगनुपनेछ\n- सुननभेपकोरपमारवीकारगदिवािणजयवैंकहलेदेहायकोपकृयाअवलमवन २. गनुपनेछ\n- क.यूनतमशयामपिरमाणकोसुनलाईिनभेपकोपमाखवीकारगनुपनेछ\n- ख.िनभेपकतिलसुनिनभेपरानआएमापातसुनलाईतोिकएकोशाखामाजाँचगराई\n- शुदतातथातौलयिकनगरीपमाणपघपदनुपनेछा\n- Whie I Pee lelpb hB! Ea pivehein ehie Bl hb! E papre I जमागरेकोसाँवासुनतथालाजसुनमैफतििलनेवानगदमािलनेसोकोयिकन गराउनुपनेछ\n- सुनजममागदििनभेपकोअविधMatपाrाityतयगनुपनेछसोिनभेपकोअविध घ. किरतमाशवषीतथाभिधकतमपवषकोहुनुपनेछायरतोसुनिनभेपलाईनवीकरण गनीसिकनेछ\n\nकेदीयकायिलय बालुवाटार,काठमाडौ\n\nफोनक़94४0७\n\nhhxb  hhiht\n\nE-mail : nrbbfirdppdanrb.org.np\n\nWeb Site : www.nrb.org.np\n\nG0 E he 2lh\n\nमिd: Ros qaI r२",
+      "converted_sample": [
+        {
+          "where": "p.1",
+          "original": "qfl qrqr : t.h.fr-.fu. zffizqRqzTa$r/11/ o\\st(/ \\e\\e",
+          "converted": "त्राि त्रचत्रच स् त।ज।ाच(।ाग। शााष्शत्रच्त्रशत्ब४चरज्ञज्ञर य्कत९र ्भ्भ",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "E-mail <nrbbfirdppd@nrb org np>",
+          "converted": null,
+          "disposition": "kept_english"
+        },
+        {
+          "where": "p.1",
+          "original": "Web Site : www.nrb org nP",
+          "converted": null,
+          "disposition": "kept_english"
+        },
+        {
+          "where": "p.1",
+          "original": "ffi qr{Tfcrdrr ra-+1 qq a'mqT f{M wql qqT tr{ S\"fr hq-{qr frtflTf,",
+          "converted": "ााष् त्रर्चतअचमचच चब(ंज्ञ त्रत्र mबुत्रत् र्ःा धत्रि त्रत्रत् तर्च क्ाूच जत्रर्(त्रच ाचताति,",
+          "disposition": "rejected"
+        }
+      ],
+      "seconds": 1.1,
+      "error": null
+    },
+    {
+      "short": "a17fa322b81a",
+      "page": 1,
+      "group": "scan-backed queue",
+      "why": "partial; circular 2021",
+      "blob": "a17fa322b81a2ff7a7b7181d4564a742510c69536965d71a768d1396f09b9d02.pdf",
+      "rendered_page": "docs/nrb/holdout-pages/a17fa322b81a-p001.jpg",
+      "native": {
+        "chars": 2389,
+        "chars_nonspace": 2008,
+        "devanagari": 0,
+        "latin": 1610,
+        "devanagari_ratio": 0.0,
+        "latin_ratio": 0.8018,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "ocr": {
+        "chars": 2014,
+        "chars_nonspace": 1885,
+        "devanagari": 1499,
+        "latin": 331,
+        "devanagari_ratio": 0.7952,
+        "latin_ratio": 0.1756,
+        "prebase_misordered": 2,
+        "nfc_stable": false
+      },
+      "native_text": "iqrn rq +n\nffiqq1qf\"o\nf{tqft kfurq q{eTrr{ kqr.r\nE.fi. qfurl Sqr : ly/Roee-eq fuk: loec /ol/1o\n* A-rtq rrE *+, +f+-f, hlrrr Frqr.ki q+qoi qtqTftrrfr zr'r-zltdq-6r, EwvriilrNrlrqi tq;\" !r-Tiz[-[\nilfurq +drf{ r nEq<rc+r (G[' ili+-[ k+.rq il+-m r\nftqq ; \\rftf\"il qftq{-1o\\s(r qr qqfurq rrftg+1 q-Er+rrtt I\nq6[qTq,\nkqft kfr{q zrrt-qR rt=i rcffiflcrct-w t+ a+r fffiq inqr r rq ffi qrtt rrtrq+1\nq-+t6-d qfrqr-1oeq qr iiar+Efrkq qqira-c rrcr {ET mfr qqTiq (,,mrq q+ Rfi kftqq\nrFr:qko.rtr (q, ?olc, +1 Ecnr 1? A kgqi BIfir+Tr [qtq'rt-fr 4i qftqr qrfr qrcr a t\n\\rfiEf, qfu*-toisE +1 \\rdfry E.sI. qftqa; ol/Ro\\etr oI Ecnr 1.\\e rt1 sq-ilFl l.te.{ w{\nMfdq ffi{ qfiq+1 a:\nq-d {afr gkm {&qT gfr qeEqT sr+ffi sf,{ l{,ooo rtftq 6qR) qT Sr e-rrd.+i cft-i-.if\nRst {ffiwqai orfrr rne s-il{ .Ft qffi-d r qcft fu fc wtcid sefr s-il{ rci B&ffiI €-c1-{\nR{,ooo rt<I {& kqft Tfl+i q-afr gqer€I qtre-<T Beneliciary 4i Business Credibility\nInformarion (BCI) ki qzf€fl fuqrs1 ctd r qrt, trqftan s-r{qqT m-rr 3IRrAq rc<3ta r\nrR, +lfirs-fq +1 {dq1-a F6€DT vqsrqr€ t+qrq (w afm qrftr Trfi-flur .rd\nMfirr+1 aFrer qfrq+1 eu\n1) qrs qEtTerzr, €rszr t{r hrFr+1 ffiqqr rrfti frFrs-l1 {rr rqftrf, Bmrrq\ngrq{ftdre dqr FIr€t gqtF(ur6{ (Medical Supplies antl Medical Equipments) qi 3rmRr+1 6rF,qr\nWt tro-qrc arfffi Efl-( 1,oo,ooo (3riffi rd-( gir-qrq) qq+l r+.q Eryczfu.fu. +1\nrrTarrtqre 55.rft rrd qffig I {rt, sriffi FR loo,ooo $r<I qrfW ve:e {fqqr BIFtv-rt;F\nqtqr srs tqr tmrFr+1 Rrwrfrlwsira ffd-+l trrftr q-q t+ vqq kff t{r rr{ qfu r\n1) Oxygen Cylinders, Oxygen Concentrators, Oxygen Tanks, Oxygen Generators, Oxygen\nManufacturing Plants, Oxygen Delivery Accessories, 3IaI Oxygcn 1l-E[frft qFf{ft dctt Ventilator\nEquipments nFITzkr.FT +lftre-tq 4l gpq grlrtl-{rlT qqrg 5:4r€fr frfl{effi t{rPt\nffif,{ft/sq-+-{ur6r-+1 qrqrtrfi.l 6+-ff gffi{ grrczfu.fu. +1 r{-rrqftft frqt, Business\nCredibility Information (BCI) { ttferr t<r t+rnr+1 frss'rfa{ loeq 3RIT( rgr<cqot oftr\nBTtffirf ag{ q6qEr rrft\\rzfr E r (r*, qs qq-tqwfrkq qrtil-fl r+ qrqra-+-oii R{ft f4h{q\n3mqffr rTqqr Rrr{ fiilS{R gi <:frvw t+ nqr ffi4 v*qmqe{ q{r r-{ Tfr-g ( t+ aqr\nffiq r{qrfr T{ qr*fi {mfsq qFnf, T\\r+1 hflq q-orr{ Giqrqr qrftrs oq-qr q-*{ qttr{r\nrrrrTkr qq+l wd *r4 ffire r{r rEqr{RrTeT Efi Tr{ qfu t\n(.r) qrq sq+r ffirro qd o.rq ,Ti qt k+.[q er tqrdqr s]rql ;Flqi{q rr\\t6l q-<iitrq C\nqfdM-d Fr+rqr-tql sfdftfirclcid q-rqtflf, fu 3{r*fr rrrq {ffir kI cig r",
+      "ocr_text": "महाशयु\n\nवदेशीिविनमयकारोबारगनीइजाजतपघपातबैंकतथािवतीयसंरथारअयिनकायलाईजारीगिरएको एकीकृतपिरपऋ-॰णमादेहायबमोिजमसंशोधनगिरएकोहुँदासोहीवमोिजमगनुगराउनुहुनिवदेशीिविनमय वनयिमतगनेऐन,॰परकोदफापशलेिदएकोअिधकारपयोगगरीयोपिरपऋजारीगिरएकोछा\n\nएकीकृत पिरप-२o को एकीकृत s.पा. पिरप: OाRo७ को दफा O.9 को उप-दफा A.9. लाई देहायबमोिजमसंशोधनगिरएकोछ\n\nयरतोसटहीसिवधाबढीमाएकपटकमाअमेिरकीडलरपoठठपैतीसहजार वासोबराबरकोपिरवयी वदेशीमुदासमकोलािगमाऋपदानगनीसिकनेछपयसरीिट.ट.माफेतसटहीपदानगदिअमिरकीडलर RX,ooo भद बढी fqदef मदol सcही उपल गxउद Beneficiary , ol, Business Credibility IनिomatांठnलािलनेयवरथािमलाउनुपनेछI साथै,समविधतफाइलमासोकोओिभलेखरालुपनेछ\n\n- तर,कोिभड-रकोवतमानखवारयसमरयालाईरोकथामतथायूनीकरणकोलािंगसहजीकरणगनी jehfi Iorbhe leh ijut s hip?\n- कखवारयमनालय,खवारथसेवािवभागकोिसफािरसमागिरनेकोिभड-रसँगसमबिधतऔषिधजय सामuीह तथi रaारय उपकरणह Medical Supplies and Medical Equipments को आयातको हकमा एउटैबीजकबाटअमिरकीडलरप,oooठoअमिरकीडलरएकलाख समकोरकमडापटािट.ट.को माधयमबाटभुकानीगनीसिकनेछपसाथै,अमिरकीडलरपठठठठठभदामािथकोसटहीसुवधाआवशयक परेमारवारथसेवािवभागकोिसफािरससिंहतीकृतकालािंगयसबैंकसमभिनवेदनपेशगनुपनेछ\n- R Oxygen Cylinders, Oxygen Concentrators, Oxygen Tanks, Oxygen Generators, Oxygen Manufacturing Plants, Oxygen Delivery Accessories, 3u Oxygen Mrut WIमuf au Ventilator Equांमलशntडलगायतकाकोिभड-शकोरवारथसमरयाकोउपचारमासघाउपुयाउनेजीवनरभकखवारय W? pineshaI Ieh? आयातकोहकमाउिलिखतडापटािट.ट.कोरकमसमबधीसीमा,Busांnesड Credibility Information BCन र खवारय सेवा fवभागको िसफारस २oछz असार मसाचसमका लािग आिनवायीनहुनेयवरथागिरएकोछासाथैयसयवरथाबमोिजमआयातगनीआयातकतिलेिवदेशीिविनमय अपचलनभएमाखवयम्िजमेवारहुनेरवःघोषणाबैकतथािवतीयसंरथासमभपेशगनुपनेछरबैंकतथा िवतीयसंरथालेयसयवरथाबमोिजमआयातभएकोिववरणसंलरनढाँचामामािसकपमापलेकमिहना समातभएकोसातकायीिदनिभऋयसिवभागसमभपेशगनुपनेछ\n- कासाखसूचनानेपालिरथतयरतोकामगनेकुनैिनकायवानेपालमाशाखाकायिलयभएकाअतरिट्यकुनै पितिछतिनकायहलकोपितिनिधमाफतसमविधतबैंकआफैलेसाखसूचनािलनुपनैछ\n\nइ..T. Oरu सiut  4? I Rouo-Gz\n\nमित: RoIoI ३0\n\nधीनेपालराष्वैंक,बिकड़िवभागलगायतसमपूणीपदेशिरथतकायिलयहर,इजाजतपनपातकवगका वािणजयबैंकहरररिट्यरतरकाखवगंकािवकासबैंकहर\n\nवषयःएकीकृतपिरपऋ-श॰मासंशोधनगिरएकोसमबधमा",
+      "converted_sample": [
+        {
+          "where": "p.1",
+          "original": "f{tqft kfurq q{eTrr{ kqr.r",
+          "converted": "र्तात्रात पागचत्र र्त्रभत्चर्च पत्रच।च",
+          "disposition": "ambiguous"
+        },
+        {
+          "where": "p.1",
+          "original": "E.fi. qfurl Sqr : ly/Roee-eq fuk: loec /ol/1o",
+          "converted": "भ्।ाष्। त्रागचि क्त्रच स् थिरच्यभभ(भत्र ागपस् यिभअ रयरिज्ञय",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "* A-rtq rrE *+, +f+-f, hlrrr Frqr.ki q+qoi qtqTftrrfr zr'r-zltdq-6r, EwvriilrNrlrqi tq;\" !r-Tiz[-[",
+          "converted": "८ ब्(चतत्र चचभ् ८ं, ां(ा, जचिचच ँचत्रच।पष् त्रंत्रयष् त्रतत्रततचचाच शचुच(शतिमत्र(टच, भ्धखचष्ष्चिल्चचित्रष् तत्रसू १च(त्ष्शृ(ृ",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "ilfurq +drf{ r nEq<rc+r (G[' ili+-[ k+.rq il+-m r",
+          "converted": "ष्िागचत्र ंमर्चा च लभ्त्र?चअंच ९न्ुृ ष्ष्िं(ृ पं।चत्र mष्िं( च",
+          "disposition": "rejected"
+        }
+      ],
+      "seconds": 1.15,
+      "error": null
+    },
+    {
+      "short": "8e8467f74f84",
+      "page": 1,
+      "group": "scan-backed queue",
+      "why": "partial; forex 2018",
+      "blob": "8e8467f74f84713299c43d05a18261ffd23c2a6de35af71413c4699823518e66.pdf",
+      "rendered_page": "docs/nrb/holdout-pages/8e8467f74f84-p001.jpg",
+      "native": {
+        "chars": 2233,
+        "chars_nonspace": 1812,
+        "devanagari": 0,
+        "latin": 1469,
+        "devanagari_ratio": 0.0,
+        "latin_ratio": 0.8107,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "ocr": {
+        "chars": 1969,
+        "chars_nonspace": 1826,
+        "devanagari": 1429,
+        "latin": 349,
+        "devanagari_ratio": 0.7826,
+        "latin_ratio": 0.1911,
+        "prebase_misordered": 1,
+        "nfc_stable": false
+      },
+      "native_text": "iqm TE t6ffi{ srqt--rq\nfqtfi f$rrq aFrsffi{ tmr{r\nErnrq ffi qftFrd Ht{fi Tfrrqr EEUI kf, vfr ET{st\nsqmqffir\nktqt Ht+rq tFrqka qil tt, toq<, +1 EsT qocr. A @r BIftmR !r*{r rrft qs *+-Ere Eqt,ldr{ sTqr\nrrt6r qrftrq ffi tarrfir qrffi qr+cr *rf, rrft hht *+ aqr ffiq senrtqre qfrsd Rft gnwr\naq kr rfr q+en rrMA {qftra s*+1 qr++rffi qrfu m qrffi+, qfin rsrqr{ rM a r\n{rd6{\n(1) qs *+qre sflukrr{ 9rq r*' T{t+l ffi nffiq vqt tsqt+{(, *d't 4q vqt) srore{ cIrIT\nIRTrIUT Err$[, TlsF, {r$qr,i, ktrmerfr, +qil{R, gi{ q<rT *tfr# T-dfqr tarsfuf,, qnn kors qmt\nIM et{ Ertr+l, Htrt g*r sTrd-{ rrt qfen, F ea ( iTq kfr *{qT 6qt s-{r6 Tril Efr'rflor\nqrftr ffiq qTrr++1 rq-rr .r{ kht t;r eqr ffiq velmrd gil.qfr qrQIfuf, {ffi {o sfuqt-a\nftF-rnrq qftEd ktst T{rqr aur k{ e*tr{ t\n(R) zrs ffi ffi qfrtrr+1 {-ffis arrrq {t+.r ffi qH zrd aur k{ {d ir{ r\n(t) zrd ruq k{ sqftrf, ffi dqrd+, sfukErc fotq Et cfu r\n(y) ru\"r ffi fstet ++, aw ffiq qF{rdTt Br;ilrftrq rqqr ffiq 6rn-{R .rtqT d fuftqdl E\"tq\nffiE\\r+1 ({ddnrr\nu) Td {ur+1 IIiFrft ersfu ;{rffq-l 4qefu B{ftrfif,q { qdTq+1 qrir Et vfra r il{, zRT ffi @f,\nr<rq rrtqr q-d Aur qfrEErur rrd'Sffig r\n(q) {ur+1 arruret FrqFrfi ryrffffe qqrci srq (qut IGF (Fee) rrft 3lRr+'ilq 6 Month Libor + ax &ra qg\ncfrs r wh'qrq qFrff+t ffim {tr +.qt *+..( ri riitwt+1 ilftr {+ r1w, +ktrc fui cf, qq\n{uT sTK r+q cfu Tmrft fti rrft arnrn kqrs{ qftF+m I\n(s) rd rur hhrcrc Frflrsi rftrru1 qrftr Ret *o aqr ffiq {Fnqr€ d t{Mi fffi, wil{f,,\n+6 rqtH tcc cr$i &{ r\n(c) q-{ft M Eqqre qrk qit d. 1 qr sdk( fi{ffiqr qftqr{ Rfi gnw vto ruur rsr6 rrd\n(fu'ts r\n(1) &FA qvft Fwr\\r+1 TUr (sq qRFd hft E-fle1 w.a< *+ :n,rt{rrqr sqt{r .rd .nsi fu r\n(qo) q-S ruur kr rs ++-{rc Tf rft+.e tc{ cfu | {ur (.F-rr fuffi caqr( qFffir{ qqqr q-q +{-{r\n+qrr{ rffig1 cfu r iEUr+1 qi{r qM TfrTfr qt csqrf, fr {q+rcT q-s Affi s{fffq qrqE.rft\nrr<ni zrq ffi Brfrfuqr {qrdftr+ rnrg{ cfu r q}, qqzfr qrq Ttrrft rrd s-qkf, ftqqr{qR\norrt m uEfr qir un gmrft.rt ctd t\n(11) *+t ruur wq Fr{crtqr $ffi qkorw aqr B{rf,flarft ttqr+qrqqr ffiq wnft ffiRUT vrffift\nrF aqr eTffifEc tr,r{q ( fifuztr+q+1 ryi vrtmr.rt cfu t\nGrq<rw €qmr)\nEFrffi t{t{r€\nffi losxzlR/io rrt q6TRr( T+ fuqqfrr sg{ftrf, (ffir qttq qftq+1 g t\nWebsite: rvrvw.nrb.ors.np rlt IiIRFT Hfr : Ro9{/o9/Ro",
+      "ocr_text": "e Al piht Wieler hlye? Iee! Ehlhaphe hh! U6Pe!\n\nThaphe ph Br! lore HIsh 1e?e! geh pepee holofie सरबधीसूचना\n\nवदेशीिविनमयतनयिमतगनेऐन,शणशकोदफापoख.लेिदएकोओंधकारपयोगगरीयसबैंकबाटइजाजतपनपात गरेकाबािणयबैकहरलेदेहायकाशतहलकोपालनागनेगरीिवदेशीबैंकतथािवतीयसंरथाहरबाटपिरवलीवदेशीमुदामा ऋणिलनसवनेशवरथागिरएकोलेसमबिधतसबैकोजानकारीकोलािंगयोसावेजिनकसूचनापकाशनगिरएकोछ\n\nशतंहर\n\n- यसबैंकबाटइजाजतपघपातकवगकाबैकहरलेनवीकरणीयउजि्जलिवधुत,सौयीरवायुउजिउलपादनतथा पसारणलाइन,्सडक,सुरङमागिवमानरथल,केवलकार,पुलजरताभौतकपूविधारहाउिजड़,जरगािवकासजरता रयलरटेटकोभेऋबाहेक,िवदेशीमुदाआजनगनेपयंटन,कृषभेवरलघुवतभेघमाकजिपवाहगनेपयोजनका लािंगिवतीयसाधनकोपवधगनीवदेशीबैकतथािवतीयसंरथाबाटआफ्नोपाथिमकपूँजीकोपoपितशत रकमसममपिरवलीवदेशीमुदामाऋणिलनसवनेछन्\n- यरतोऋणिलनसमबिधतबैंककोसंचालकसिमितबाटिनणयहुनुपनेछ\n- यसबैंकलेतोकेबमोिजमकोपूजीकोषकायमग्रेकाबैकहरलेमाघयरतोऋणिलनसवनेछन्म\n- APe lohijel Ea hf iellh hpe! Wh? hilPe piplop hipe ee ue yoPe Pe loie I Ee I? E$ onsiek\n- ऋणकोयाजदरलगायतऋणदातालेलगाउनेअयसमपूणीशुलकधeeगरीअिधकतम॰MonthLीनorचउऋन िभऋ हुनु पनेछाउकयाजलागतकोसीमािभऋरहेरकजिरवीकृतगनेपयोजनकोलािंगकुनैशुलक,किमशनितनीपनेभए ऋणपातभएपिछभुकानीिदनेगरीयवरथािमलाउनसिकनेछ\n- यरतोऋणकोभुकानीअविधयूनतमशवषदिखःअिधकतमपबषसमकोमाघहुनुपनेछातरयसबैकलेखवीकृत पदानगरेमायरतोऋणनिवकरणगनीसिकनेछा\n- यरतोऋणिवदेशबाटिभघ्याउनेपयोजनकोलािंगिवदेशीबैकतथािवतीयसंरथालाईकुनैिकिसमकोिधतो,जमानत I Ee psih E I-ahr e\n- I E'e paih pir Ian hielie re Pe leiph yo?e byh heh nik lehiabliy Lah bu\n- यसरीिलएकोऋणबाटमािथशतीन.वमाउलेखतभेघहरमापिरवलीिवदेशीमुदामासमेतऋणपवाहगनी सिकनेछा\n- ob यरतोऋणिलनयसबैकबाटपूवीरवीकृतिलनुपनेछाऋणरकमिभिऋसकेपशचात्आिनवायीपमायसबैंकमा लेखाइनगराउनुपनेछाऋणकोसाँवायाजभुकानीगरेपशचातसोसमबधमायसबैंकलाईअिबलमबजानकारी गराईयसबैंककोअिभलेखमाअधाविधकगराउनुपनेछासाथैहऋणकोयाजभुकानीगदिपचिलतिनयमानुसार लारनेकरकदीगरेरमाघभुकानीगनुपनेछ\n- Lbh nib Jil hpe hhleelhu piBPle oR nepf Bthh I2Binbif her ni pere I Bph Fir Erih Iph lehhy P I Eier hiofiDhe IsP hoyl?\n\nMhr? silep कायकारीिनदेशक\n\nमितश॰एःपशार०गतेपकिशतयसैिवषयसँगसमबिधतसूचनाखारेजगिरएकोछ Website: www.nrb.org.np मI yoleन fमिid : Roux I ou I Ro",
+      "converted_sample": [
+        {
+          "where": "p.1",
+          "original": "iqm TE t6ffi{ srqt--rq",
+          "converted": "ष्क्र त्भ् तटााषर्् कचत्रत((चत्र",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "fqtfi f$rrq aFrsffi{ tmr{r",
+          "converted": "ात्रताष् ा४चचत्र बँचकााषर्् mतर्चच",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "Ernrq ffi qftFrd Ht{fi Tfrrqr EEUI kf, vfr ET{st",
+          "converted": "भ्चलचत्र ााष् त्रातँचम र्ज्ताष् तचचत्रच भ्भ्ग्क्ष् पा, खाच भ्तर््कत",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "ktqt Ht+rq tFrqka qil tt, toq<, +1 EsT qocr. A @r BIftmR !r*{r rrft qs *+-Ere Eqt,ldr{ sTqr",
+          "converted": "पतत्रत ज्तंचत्र तँचत्रपब त्रष्ि तत, तयत्र?, ंज्ञ भ्कत् त्रयअच। ब् २च mद्यक्षतच् १चर्८च चचात त्रक ८ं(भ्चभ भ्त्रत,मिर्च कत्त्रच",
+          "disposition": "ambiguous"
+        }
+      ],
+      "seconds": 1.09,
+      "error": null
+    },
+    {
+      "short": "438c55304da5",
+      "page": 1,
+      "group": "needs_ocr",
+      "why": "no_text_layer; exam result 2025",
+      "blob": "438c55304da52580dd6314b01e8db71d3a3a9023abd9265cd99fd9ada3f21152.pdf",
+      "rendered_page": "docs/nrb/ocr-spike-pages/438c55304da5-p001.jpg",
+      "native": {
+        "chars": 0,
+        "chars_nonspace": 0,
+        "devanagari": 0,
+        "latin": 0,
+        "devanagari_ratio": 0.0,
+        "latin_ratio": 0.0,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "ocr": {
+        "chars": 1200,
+        "chars_nonspace": 1095,
+        "devanagari": 784,
+        "latin": 76,
+        "devanagari_ratio": 0.716,
+        "latin_ratio": 0.0694,
+        "prebase_misordered": 0,
+        "nfc_stable": false
+      },
+      "native_text": "",
+      "ocr_text": "p 201 pine\n\nIep! Ehorpre EaIl piih. सूचना\n\nबैंकमासहयोगीसेवातफिरकरहेकोइिजिनयरपदकरारमाफतपितंगनेसबधमािमितश॰टशश॰छमा पकािशतसूचनाबमोिजमरीतपुवेकदरखारतिदईबैंकबाटसउचालनगिरएकोपरीभामासहभागीभएका उमेदवारहलेपामगरेकोअङ्ककाआधारमासफलभएकातपिशलकामुखयउमेदवारलाईकरारमािनयिक गनेिनणियभएकोहुँदासमबिधतसबैकोजानकारीकोलिगयोसूचनापकािशतगिरएकोछा\n\nवज़ापननं.१॰/२॰८, Ahuiu ph C roph IIh अ\n\n| रोलनं.  उममेदवारकोनामथर  -  ५१  पिदपभहराई   |\n|---------------------------------------------|\n\nआहपितभसूचीकाउमेदवार\n\n| रोलनं.  उममेदवारकोनाम,थर  ७८  सुजनखड्का  २  शुबेवशाठकुरी  ७  वशतभहृराई  ४  ५  Rie inh hisk?  द५  सिहलभेछ  ६  द९  राकेशभहराई  ७  GiIe Iy!  ८  द६  षयाँशुपाठक   |\n|---------------------------------------------------------------------------------------------------------------------------------------------------------------|\n\nसाथैछनौटभएकामुखयउमेदवारलेकरारगनेिसलिसलामायसबैंककोकेनदीयकायिलय,मानवसंसाधन यवरथापनिवभाग,्बालुवाटार्काठमाणडौमाआपनोसमपूणीपमापहखकोसवकलैधितहररतीनपित पासपोटसाईजकोफोटोसाथमािलईिमितश॰टशशशशटगतिभऋरवारशयपरीअणकोलािगसमपकराखजुहुन जानकारीगराइछ्I रवाररयपरीअणरअयलयहोराअनुकूलभएमािमितश॰टशशशशशदिखकरारमा नयुिकपदानगिरनेरतोिकएकोिमितमासमपकेराजनआएमािनयमानुसारहुनेयहोरासमेतसिचतगिरछ\n\nमितः: २0ट29श2२\n\n९\n\nPenishs Rumh मुhph--eyh riph",
+      "converted_sample": [],
+      "seconds": 0.88,
+      "error": null
+    },
+    {
+      "short": "c298efaf1f16",
+      "page": 1,
+      "group": "needs_ocr",
+      "why": "no_text_layer; notice 2078.12.10",
+      "blob": "c298efaf1f16a8e8f10424636769a8a7effe1eba81bbfcd0a1328a6924764156.pdf",
+      "rendered_page": "docs/nrb/ocr-spike-pages/c298efaf1f16-p001.jpg",
+      "native": {
+        "chars": 0,
+        "chars_nonspace": 0,
+        "devanagari": 0,
+        "latin": 0,
+        "devanagari_ratio": 0.0,
+        "latin_ratio": 0.0,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "ocr": {
+        "chars": 2245,
+        "chars_nonspace": 1976,
+        "devanagari": 1234,
+        "latin": 523,
+        "devanagari_ratio": 0.6245,
+        "latin_ratio": 0.2647,
+        "prebase_misordered": 0,
+        "nfc_stable": false
+      },
+      "native_text": "",
+      "ocr_text": "अनुसूचीन लगानीसःबधीसूचना\n\nयसबैककोविभलकोषहलमारहेकोरकमलगानीगनुपनेभएकोलेयसबैकबाटइजाजतपघपातदेहाय बमोिजमकाशतहरपुरागरेकाबैकतथािवतीयसंरथाबाटदेहायबमोिजमकोसीमिभघरहीआफूलेिलनचाहेको Hah thiyhe uiia e! hl Wh Dh Ibolhe lhjl bi leiz lb heh! pa hl hh? भरी उच फारमलाई df format मा Scan गरी Password Protect गरर कुल लगानीयोरय रकम मeय fमित २o५ वैशाख श गत दख रooवैशाख a तदनुसार ञपल aर, oरशदिख ओिपलaर, Roशश सम ३x दनक Eijee Oo:b pi pr obabsoot Ph hey Hh $ib he! epis i hh! lhlb Yi तmdinvestmentonrb.org.नp मा पात हुने गरी याजदर परताव गन आहवान गिरएको छ I साथ, उक File को Password मid Ro07 puR Ro -dor दन kdi qR:oo बज fHa fmdinvestmentanrb.org.np HT aIनeाrी गराउनसमेतअनुरोधछा\n\n| संरथाहर  रकम.लाखमा  apee helole lefb me..  A,ro0  खपवगकारािषट्यरतरकािवकासबैंकहरमा  ,0  T+Puhrh Pe lbadhr/i epb mi..  ,०  कुललगानीयोरयरकम  ,, 00   |\n|---------------------------------------------------------------------------------------------------------------------------------------------------|\n\nशतहर\n\n- क बैकबाटतििकएकोयूनतमपूँजीकोषकायमरहेको\n- ख नषकृयकजिलएन.पी.एकुलकजिसापटकोपाँचपितशतभदाकमभएको\n- ग खुदतरलसमपितखवदेशीिनभेपकोकरतीमाबीसपितशतवासोभदाबढीरहेको\n- आ.व. र॰५छठछz मासउचालनमुनाफामा लवरथा पिछको रहेको\n- रयलरटेटकजिबैकबाटतोिकएकोसीमाभदाबढीनभएको\n- लगानीगिरनेसंरथाकोकुनैपिनसउचालकपमुवकायकारीआिधकृतवाकायकारीसचालकलाईयस बैकलेजरीवानागरेकोअवरथामायरतोजरीवानागिरएकासऋचालक,पमुखकायकारीओिधकृतवा कायकारीसचालकउकसंरथामाकायमनरहेको\n- छ शीघसुधारामककारवाहीमापरेकोभएफुकुवाभएकोकमतीमाछमिहनापुराभएकोा\n- बैकतथावचीयसंरथानेपालराष बैकऐन, शoपe कोदफाeश वमोिजमकोकारवाहीमा परी ज समरयायरतघोषणानभएकोसमरयायरतघोषणाभएकोमासोफुकुवाभएकोछमिहनाअविधपुरा भएको\n- झा सवसाधारणकोलािंगछुट्याईएकोशेयरजारीगिरसकेको\n- परतावपेशगरेकोयाजदरमािथउिललिखतलगानीगिरनेमितसमममायहुनेछायसबैकािवतीय संरथाकोलाजदरपिरवतनसमबधीसावजिनकसूचनालेपरतािवतयाजदरलाईकुनै असरो I ie puh eah\n- परaid uet uदf E-mail al Subject तer Filename मI FMD Fund FD Proposal Bank Code Hनi उxलख uन uनछ I सr Password पoIउदt E-mail al Subject मI  FMD Fund FD Proposal Password Bank Code भनी उलख गन पनछ I Bank Code मा सiबिad सरeाiको नपाल रटक एवसचेजमािलिरटड़ बमोिजमकोSockymजoाराजुपनेछI संरथाकोआिधकारीकE-maाामाफत पात परaालाf मI मIua fदsनछ I जरत: Gmail.com, Hotmail.com, Yahoo.com आiद मtत uu E+ Ee EPP PhIh fiE meu\n- ठा SIR? epIE plOMssed I eph 4 poboId piOMssed hh? aib/e I Ib blan + Ee E$I Phih",
+      "converted_sample": [],
+      "seconds": 0.98,
+      "error": null
+    },
+    {
+      "short": "276b2eb62802",
+      "page": 1,
+      "group": "needs_ocr",
+      "why": "no_text_layer; calendar 2020",
+      "blob": "276b2eb6280234402e8495cd1f8dc4b436c11f032acccac00ad603027694b623.pdf",
+      "rendered_page": "docs/nrb/ocr-spike-pages/276b2eb62802-p001.jpg",
+      "native": {
+        "chars": 0,
+        "chars_nonspace": 0,
+        "devanagari": 0,
+        "latin": 0,
+        "devanagari_ratio": 0.0,
+        "latin_ratio": 0.0,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "ocr": {
+        "chars": 902,
+        "chars_nonspace": 808,
+        "devanagari": 364,
+        "latin": 166,
+        "devanagari_ratio": 0.4505,
+        "latin_ratio": 0.2054,
+        "prebase_misordered": 0,
+        "nfc_stable": false
+      },
+      "native_text": "",
+      "ocr_text": "We pl siht सामादयासेवािवभाग\n\nदरभाउपञखीकृतभएकोसूचना\n\nL albaLfis IeE th aih h++ eih Be! tbin ooot i E lyis Ee+e th. आपितगनसछधमामितर्कपनालशगतगोरखापनापकिशतसलवदीदरमाउपन आह्वानकोसूचनानमिजमपशनमपकातदरभाउपधहरमधयिननसामानरसकालाा Piolt bihm yheipipehelbr Ehpp Iineiek Ith? pil pgihsh Whe भपकोलनेपालशाट्वैकखिरदनिविनयमावलीनशनसंशोधनसमतमकोिविनयमरण कोचपिनिनयमवशाकोमयोजनकोलिंगयोसूचनान्पकिशतागिरारकोछ\n\n| Thihit.  Wileeheiet  कस  haE!  धान  r Ihil  पुरतािनतरकमतमूभकरबाहका  Ie Ei l-  भतमानी  अमचिमचारलाखपेसहीहनारमान  आारवजारकाठमाड़ो  Iheff teis x.  आहबजादकममाजोग  The y i byu.  Plth, ie  ih.  परपडायलसयन  पमभरापतकलाखमुनहीसजायकामय  Te+h++re+++sif it.  भाना   |\n|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|\n\nd. ot  -",
+      "converted_sample": [],
+      "seconds": 0.77,
+      "error": null
+    },
+    {
+      "short": "1a9b6321aa61",
+      "page": 1,
+      "group": "font-embedded control",
+      "why": "recovered; Preeti+Bishall; 10/10 units shown",
+      "blob": "1a9b6321aa6124efdd618348ef1184f9dd5e57549c5ff0f7479b09226e986866.pdf",
+      "rendered_page": "docs/nrb/holdout-pages/1a9b6321aa61-p001.jpg",
+      "native": {
+        "chars": 779,
+        "chars_nonspace": 634,
+        "devanagari": 0,
+        "latin": 408,
+        "devanagari_ratio": 0.0,
+        "latin_ratio": 0.6435,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "ocr": {
+        "chars": 570,
+        "chars_nonspace": 547,
+        "devanagari": 540,
+        "latin": 0,
+        "devanagari_ratio": 0.9872,
+        "latin_ratio": 0.0,
+        "prebase_misordered": 1,
+        "nfc_stable": true
+      },
+      "native_text": "sf/jfxL km's'jf ePsf ljQ sDkgLx?sf] ljj/)f M \n \n \n \n!= c?0f kmfOgfG; lnld6]8 w/fg, ;'g;/LnfO{ ul/Psf] sf/jfxL km's'jf . \n \nc?0f kmfOgfG; lnld6]8nfO{ g]kfn /fi6 a}+s, a}+s tyf ljQLo ;+:yfsf] zL3| ;'wf/fTds sf/jfxL \n;DaGwL ljlgodfjnL, @)^$ sf] ljlgod # sf] -v_ adf]lhd ldlt @)^(.!.#! sf] lg0f{ofg';f/ ul/Psf] \nzL3| ;'wf/fTds sf/jfxL ldlt @)^(.@.@$ b]lv km's'jf ul/Psf] 5 . \n@=  ;[hgf kmfOgfG; lnld6]8 lj/f6gu/nfO{ ul/Psf] sf/jfxL km's'jf .   \n         ;[hgf kmfOgfG; lnld6]8nfO{ ;dfg'kflts r'Stf k\"FhL j[l4 gu/]sf] x'gfn] o;  a}+ssf] PsLs[t \nlgb]{zg, @)^& sf] lgb]{zg g+=@! sf] $ -#_ cg';f/ pQm ;+:yfnfO{ ldlt @)^&.!@.@& b]lv nfef+; \nljt/0f, lgIf]k ;+sng tyf shf{ nufgLdf nufOPsf] k|ltjGw o; a}+sn] tf]s]sf] ;Dk\"0f{ zt{x? \nkfngf ug]{ u/L ldlt @)^(.)@.!) b]lv km's'jf ul/Psf] 5 . \n ",
+      "ocr_text": "कारवाहीफुकुवाभएकािवतकमपनीहरकोिववरण\n\nप.अकणफाइनासिलिमटेडधरान,सुनसरीलाईगिरएकोकारवाहीफुकुवा\n\nअरणफाइनासिलिमटेडलाईनेपालराषटबैंक,बैंकतथािवतीयसंरथाकोशीघसुधारामककारवाही समबधीिविनयमावली,रदद कोिविनयमशको ख बमोिजमिमितर०दशाशप कोिनणयानुसारगिरएको शीघसुधारामककारवाहीिमित२॰शाश२दिखफुकुवागिरएकोछ\n\n. सृजनाफाइनासिलिमटेडिवराटनगरलाईगिरएकोकारवाहीफुकुवा\n\nसृजनाफाइनासिलिमटेडलाईसमानुपाितकचुवतापूँजीवृिदनगरेकोहुनालेयसबैंककोएकीकृत नदेशन,२०७ कोिनदेशननःश कोश अनुसारउकसंरथालाईिमित र॰णपशरण दिखलाभांस िवतरण,िनभेपसंकलनतथाकजिलगानीमालगाइएकोपितवधयसबैंकलेतोकेकोसमपूणीशतहर पालनागनेगरीिमित॰शा॰शपठदेखफुकुवागिरएकोछ",
+      "converted_sample": [
+        {
+          "where": "p.1",
+          "original": "sf/jfxL km's'jf ePsf ljQ sDkgLx?sf] ljj/)f M ",
+          "converted": "कारवाही फुकुवा भएका वित्त कम्पनीहरुको विवर०ा : ",
+          "disposition": "rejected"
+        },
+        {
+          "where": "p.1",
+          "original": "!= c?0f kmfOgfG; lnld6]8 w/fg, ;'g;/LnfO{ ul/Psf] sf/jfxL km's'jf . ",
+          "converted": "१. अरुण फाइनान्स लिमिटेड धरान, सुनसरीलाई गरिएको कारवाही फुकुवा । ",
+          "disposition": "ambiguous"
+        },
+        {
+          "where": "p.1",
+          "original": "c?0f kmfOgfG; lnld6]8nfO{ g]kfn /fi6 a}+s, a}+s tyf ljQLo ;+:yfsf] zL3| ;'wf/fTds sf/jfxL ",
+          "converted": "अरुण फाइनान्स लिमिटेडलाई नेपाल राष्ट बैंक, बैंक तथा वित्तीय संस्थाको शीघ्र सुधारात्मक कारवाही ",
+          "disposition": "converted"
+        },
+        {
+          "where": "p.1",
+          "original": ";DaGwL ljlgodfjnL, @)^$ sf] ljlgod # sf] -v_ adf]lhd ldlt @)^(.!.#! sf] lg0f{ofg';f/ ul/Psf] ",
+          "converted": "सम्बन्धी विनियमावली, २०६४ को विनियम ३ को (ख) बमोजिम मिति २०६९।१।३१ को निर्णयानुसार गरिएको ",
+          "disposition": "converted"
+        }
+      ],
+      "seconds": 0.55,
+      "error": null
+    },
+    {
+      "short": "d1c99f3cf34d",
+      "page": 1,
+      "group": "font-embedded control",
+      "why": "recovered; smallest in queue, 9/9 units",
+      "blob": "d1c99f3cf34decda9d0f695b549765b6669e28eaf2eedc4dac952ded2acc0446.pdf",
+      "rendered_page": "docs/nrb/holdout-pages/d1c99f3cf34d-p001.jpg",
+      "native": {
+        "chars": 785,
+        "chars_nonspace": 573,
+        "devanagari": 0,
+        "latin": 366,
+        "devanagari_ratio": 0.0,
+        "latin_ratio": 0.6387,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "ocr": {
+        "chars": 479,
+        "chars_nonspace": 448,
+        "devanagari": 385,
+        "latin": 53,
+        "devanagari_ratio": 0.8594,
+        "latin_ratio": 0.1183,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "native_text": " \n \n \n \ng]kfn /fi6« a}+s \n \ndf]x/ l8lh6n k|f=ln= sf] cg'dltkq vf/]h ul/Psf] ;\"rgf . \n \no; a}+saf6 e'QmfgL ;]jf k|bfossf] ?kdf sfo{ ug]{ u/L ldlt @)&^÷)^÷#) df cg'dltkqk|fKt  \ndf]x/ l8lh6n k|f=ln=  n] e'QmfgL tyf km:of}{6 P]g, @)&% sf] bkmf #^ sf] v08 -5_ / -h_ \nadf]lhdsf] s;'/ u/]sf] b]lvPsf]n] e'QmfgL tyf km:of}{6 ljlgodfjnL  -k|yd ;+zf]wg, @)*)_, \n@)&& sf] ljlgod #% sf] v08 -u_ sf] Joj:yf adf]lhd pQm ;+:yfsf] cg'dltkq vf/]h ul/Psf] \nJoxf]/f ;DalGwt ;a}sf] hfgsf/Lsf nflu of] ;\"rgf k|sfzg ul/P sf] 5 . pQm ;+:yfn] hf/L \nu/]sf e'QmfgL pks/0fx?sf] k|of]u ug]{ u|fxsx?;+usf] s'g} bfloTj afFsL /x] ;DalGwt ;+:yf df \n;Dks{ ug'{x'g ;d]t o;} ;\"rgfåf/f cg'/f]w ul/G5 .   \n \n \n \n  \n            \n                  \nldlt M @)*)÷)^÷)*                           e'QmfgL k|0ffnL ljefu \n \n  \n \n ",
+      "ocr_text": "मोहरिडिजटलपा.िल.कोअनुमितपऋखारेजगिरएकोसूचना\n\nयसबैंकबाटभुकानीसेवापदायककोरपमाकायीगनेगरीिमितoछशणशाः9्माअनुमितपघपात मोहरिडिजटलपा.ल.लेभुकानीतथाफरयौटऐन,oपकोदफा कोखuड छ रज बमोिजमकोकसुरगरेकोदिखएकोलेभुकानीतथाफरयौटविनयमावलीपथमसंशोधन,॰दण, hfi Eaip thPihpie lk pa Huh hrbre  O pnb  e Hhe  oooc यहोरासमबिधतसबैकोजानकारीकालािंगयोसूचनापकाशनगिरएकोछाउकसंरथालेजारी गरेकाभुकानीउपकरणहरकोपयोगगनेयाहकहरसंगकोकुनैदियलबाँकीरहेसमबिधतसंरथामा समपकीगनुहुनसमेतयसैसूचनादाराअनुरोधगिरछ\n\nमितः०७०००५\n\nIlip! yloh yiI.",
+      "converted_sample": [
+        {
+          "where": "p.1",
+          "original": "df]x/ l8lh6n k|f=ln= sf] cg'dltkq vf/]h ul/Psf] ;\"rgf . ",
+          "converted": "मोहर डिजिटल प्रा.लि. को अनुमतिपत्र खारेज गरिएको सूचना । ",
+          "disposition": "converted"
+        },
+        {
+          "where": "p.1",
+          "original": "o; a}+saf6 e'QmfgL ;]jf k|bfossf] ?kdf sfo{ ug]{ u/L ldlt @)&^÷)^÷#) df cg'dltkqk|fKt  ",
+          "converted": "यस बैंकबाट भुक्तानी सेवा प्रदायकको रुपमा कार्य गर्ने गरी मिति २०७६/०६/३० मा अनुमतिपत्रप्राप्त  ",
+          "disposition": "converted"
+        },
+        {
+          "where": "p.1",
+          "original": "df]x/ l8lh6n k|f=ln=  n] e'QmfgL tyf km:of}{6 P]g, @)&% sf] bkmf #^ sf] v08 -5_ / -h_ ",
+          "converted": "मोहर डिजिटल प्रा.लि.  ले भुक्तानी तथा फर्स्यौट ऐन, २०७५ को दफा ३६ को खण्ड (छ) र (ज) ",
+          "disposition": "converted"
+        },
+        {
+          "where": "p.1",
+          "original": "adf]lhdsf] s;'/ u/]sf] b]lvPsf]n] e'QmfgL tyf km:of}{6 ljlgodfjnL  -k|yd ;+zf]wg, @)*)_, ",
+          "converted": "बमोजिमको कसुर गरेको देखिएकोले भुक्तानी तथा फर्स्यौट विनियमावली  (प्रथम संशोधन, २०८०), ",
+          "disposition": "converted"
+        }
+      ],
+      "seconds": 0.58,
+      "error": null
+    },
+    {
+      "short": "268bcfe86d03",
+      "page": 1,
+      "group": "font-embedded control",
+      "why": "partial; circular 2007",
+      "blob": "268bcfe86d03e9ef684b47f17345a5c0b8e072cdc92f71efca45d6c9e29937b2.pdf",
+      "rendered_page": "docs/nrb/holdout-pages/268bcfe86d03-p001.jpg",
+      "native": {
+        "chars": 1094,
+        "chars_nonspace": 861,
+        "devanagari": 0,
+        "latin": 616,
+        "devanagari_ratio": 0.0,
+        "latin_ratio": 0.7154,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "ocr": {
+        "chars": 743,
+        "chars_nonspace": 669,
+        "devanagari": 486,
+        "latin": 157,
+        "devanagari_ratio": 0.7265,
+        "latin_ratio": 0.2347,
+        "prebase_misordered": 0,
+        "nfc_stable": true
+      },
+      "native_text": "g]kfn /fi6« a}+s \ns]Gb|Lo sfof{no \nljb]zL ljlgdo Joj:yfkg ljefu \n \n \nO=k|f=kl/kq ;+VofM– #(& ldlt M– @)^#÷!@÷!! \n \n \nOhfhtkqk|fKt æsÆ / /fli6«o:t/sf ævÆ ju{sf a}+s tyf ljQLo ;+:yfx¿ . \n \n \nljifo M–  :yfgLo ljqm]tfn] ko{6snfO{ ljqmL u/]sf] ;fdfgsf] lgof{tsf] \n clu |d e'QmfgL k|df0fkq hf/L ug]{ af/] . \n \ndxfzo, \nko{6sn] :yfgLo ljqm ]tfaf6 vl/b u/ ]sf] ;fdfg lgof {t k|lqmof ckgfO{ :yfgLo ljqm ]tf \nkmd{n] g } ko {6ssf] 7 ]ufgfdf k7fpg ] ePdf To:tf ] ;fdfgx?sf ] e 'QmfgL jfkt ko {6sn] \na}+s÷ljQLo ;+:yfdf kl/jTo{ ljb]zL d'b|f a'emfpg NofPdf ljb ]zL d'b|f :jLsf/ u/L ;f ]sf] x'g] \n?k}ofF :yfgLo ljqm ]tf kmd {sf] vftfdf hDdf u/L lgof {tsf] cu |Ldf e 'QmfgL k |df0fkq ljqm ]tf \ngfpFdf hf/L u/L lbg ] Joj:yf ul/Psf] x'Fbf ljb]zL ljlgdo  -lgoldt ug ]{_ P]g, @)!( -;+zf]wg \n;lxt_ sf] bkmf–!@ n] lbPsf] clwsf/ k|of]u u/L of] kl/kq hf/L ul/Psf] 5 . \nt/, ko{6sn] gub ljb ]zL d'b|f a'emfpg] ePdf cd ]l/sL 8n/ b 'O{ xhf/ -jf ;f ] a/fa/ \ncGo ljb]zL d'b|f_ eGbf j9Lsf] xsdf g]kfn k|j]z ubf{ \nDeclare u/L NofPsf] olsg u/]/ dfq \n:jLsf/ ug{ ldNg]5 . \n \n ejbLo, \n \n  \n -/fdhL / ]UdL_ \n sf=d '=sfo{sf/L lgb]{zs ",
+      "ocr_text": "इ.पा.पिरप संछया.- ३१७\n\nभितः-दश4\n\nI yelo? hlpe! or ee lejfe  Be, lePrrfl I , PllshPele?\n\nYPjr guih palr yp! piveyh pipyp hlio? -- Whe! अियमभुकानीपमाणपऋजारीगनेबारे\n\nमहाशयु\n\nपयटकलेरथानीयिवकेताबाटखिरदगरेकोसामानिनयितपिकयाअपनाईरथानीयिवकेता फमलेनैपयटककोठेगानामापठाउनेभएमायरतोसामानहरकोभुकानीवापतपयटकले बैंकािवतीयसंरथामापिरवयीिवदेशीमुदाबुझाउनलयाएमािवदेशीमुदाखवीकारगरीसोकोहुने Pye khlolh yipi Hiyele ePiu! Bi h hiPi eph Pue! hi Ih? Frloh bot E Ci Phhio hhie! yo?e ip? ehy Iorbke PI lir i h? सिंहतकोदफा-पशलेिदएकोओिंधकारपयोगगरीयोपिरपऋजारीगिरएकोछ\n\nतर,पयटकलेनगदिवदेशीमुदाबुाउनेभएमाअमिरकीडलरदुईहजारवासोबराबर अयवदेशीमुदाभनदावढीकोहकमानेपालपवेशगदिणरटाaरगरीलाएकोयिकनगरेरमाऋ रवीकारगनीमलेछा\n\nभवदीयु\n\nका.मुःकायकारीिनदेशक\n\nal piht केदीयकायिलय वदेशीिविनमययवरथापनिवभाग",
+      "converted_sample": [
+        {
+          "where": "p.1",
+          "original": "ljb]zL ljlgdo Joj:yfkg ljefu ",
+          "converted": "विदेशी विनिमय व्यवस्थापन विभाग ",
+          "disposition": "ambiguous"
+        },
+        {
+          "where": "p.1",
+          "original": "O=k|f=kl/kq ;+VofM– #(& ldlt M– @)^#÷!@÷!! ",
+          "converted": "इ.प्रा.परिपत्र संख्याः– ३९७ मिति :– २०६३/१२/११ ",
+          "disposition": "ambiguous"
+        },
+        {
+          "where": "p.1",
+          "original": "Ohfhtkqk|fKt æsÆ / /fli6«o:t/sf ævÆ ju{sf a}+s tyf ljQLo ;+:yfx¿ . ",
+          "converted": "इजाजतपत्रप्राप्त “क” र राष्ट्रियस्तरका “ख” वर्गका बैंक तथा वित्तीय संस्थाहरू । ",
+          "disposition": "converted"
+        },
+        {
+          "where": "p.1",
+          "original": "ljifo M–  :yfgLo ljqm]tfn] ko{6snfO{ ljqmL u/]sf] ;fdfgsf] lgof{tsf] ",
+          "converted": "विषय :–  स्थानीय विक्रेताले पर्यटकलाई विक्री गरेको सामानको निर्यातको ",
+          "disposition": "converted"
+        }
+      ],
+      "seconds": 0.65,
+      "error": null
+    }
+  ]
+}
