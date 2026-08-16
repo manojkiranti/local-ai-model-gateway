@@ -156,7 +156,12 @@ class PdfPages:
 
 
 def read_pdf_pages(path: Path) -> PdfPages:
-    """PDF -> per-page text. The ONLY pypdf call site in this repository.
+    """PDF -> per-page text. The only pypdf call site that reads TEXT.
+
+    (`app/nrb/provenance.py` also opens a PDF with pypdf, for per-page font and
+    image provenance. It reads the resource dictionaries and no text at all, so
+    the two cannot disagree about what a page SAYS — only its page cap and
+    encryption handling are mirrored there, deliberately.)
 
     Two consumers with different needs: `_read_pdf` below flattens this into a
     line stream with `[page N]` markers for the `read_document` tool, and NRB's

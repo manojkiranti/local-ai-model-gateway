@@ -7,3 +7,24 @@
 -r requirements.txt
 
 docling>=2.0
+
+# --- OCR fallback for NRB scans (Phase 6B) --------------------------------- #
+#
+# `app/nrb/ocr.py` is the only importer, it imports both inside a function, and
+# `Dockerfile` installs `requirements.txt` alone — so the API image cannot
+# acquire an OCR stack by accident. Same structural guarantee as npttf2utf in
+# `requirements-nrb.txt`, for a different reason (size, not licence).
+#
+# THE BACKEND IS LOAD-BEARING, NOT INCIDENTAL. docling's `_resolve_rapidocr`
+# reaches PP-OCRv4 through torch and **PP-OCRv5 only through onnxruntime**, and
+# PP-OCRv4 is REJECTED for Nepali: measured over 14 NRB scan pages it produced
+# Devanagari without conjuncts and in visual rather than logical order (halant
+# per Devanagari character 0.0042, mean word length 24.7, against 0.0982 / 5.7
+# for npttf2utf's own output on the same corpus). PP-OCRv5 measured 0.0798 / 5.4
+# — at the reference, and better on every page and both signals.
+# Evidence: docs/nrb/phase6b-ocr-spike.md, docs/nrb/phase6b-ocr-spike-v5.md.
+#
+# Equivalent to docling's own `docling[rapidocr,onnxruntime]` extras; named
+# directly so the resolved versions are the ones the A/B was run against.
+rapidocr>=3.9
+onnxruntime>=1.20

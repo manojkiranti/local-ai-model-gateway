@@ -2642,3 +2642,232 @@ high-confidence routing candidate, but semantic conversion correctness remains
 pending Nepali human review. Native-2 also exposed a real lower-band English
 false-positive class. No classifier change or production converter integration is
 made in this task.**
+
+## 16. Phase 6B Task 4 — production extraction routing (page-level; OCR fallback is PP-OCRv5)
+
+**Date:** 2026-08-16. **Continues** commits `faa9489` and `50edde6` (the OCR
+spike and its A/B). **What this task is:** the first production behaviour built
+on Phase 6B's evidence — a router that decides, per page, whether text is kept,
+deterministically converted, or read from pixels.
+
+**What it is NOT:** an ingest. Nothing is chunked, embedded, persisted or
+searchable, no corpus pass was run, and neither database was opened. The
+classifier is untouched: no `native-3`, no new cohort, no threshold moved.
+
+### 16.1 The routing, in one place
+
+```
+native-2 verdict
+├─ extracted/clean ...................................... keep the native text
+├─ suspicious/legacy_font_suspected
+│   ├─ unit_legacy_ratio <  0.80 ....................... keep (below_conversion_gate)
+│   └─ unit_legacy_ratio >= 0.80  (the validated queue)
+│       ├─ PDF ....... per page:  font present → guarded npttf2utf
+│       │                         no font + pixels → PP-OCRv5 OCR
+│       ├─ XLSX ...... guarded npttf2utf, per CELL (unchanged from §13.4)
+│       └─ DOCX/TXT .. guarded npttf2utf, per line
+├─ needs_ocr (PDF) ...... per page: no usable text layer + pixels → PP-OCRv5 OCR
+│                                   a real text layer → keep
+└─ failed / unsupported / image ......................... no recovery
+```
+
+Code: `app/nrb/recovery.py` (the router), `app/nrb/provenance.py` (per-page font
+and image facts), `app/nrb/ocr.py` (the OCR boundary). Exercisable on a named
+blob with `scripts/nrb_recover.py`; there is deliberately no `--all`.
+
+### 16.2 The gate did not move, and provenance cannot widen it
+
+Eligibility is still `status == suspicious/legacy_font_suspected` **and**
+`unit_legacy_ratio >= 0.80` — native-2's own unit metric, never native-1's
+`legacy_line_ratio` (§13.4, §14.7). Font provenance is consulted **only inside**
+an already-eligible document, and only to choose between the converter and OCR.
+A page that embeds Preeti inside a document below the gate is not converted:
+that would widen npttf2utf eligibility on font presence alone, which the
+validated queue semantics forbid. `CONVERSION_GATE` is a separate constant from
+`legacy_convert.UNJUDGED_MIN_LEGACY_RATIO` even though both are 0.80, because
+they decide different things (which documents are eligible; which units inside
+one may be converted unjudged) and tying them would let a change to either move
+the other silently.
+
+The document's `unit_legacy_ratio` — not a per-page recomputation — is what gates
+unjudged units inside a page, exactly as `scripts/nrb_holdout_validate._doc_ratio`
+did. Re-deriving it per page would gate page 1 of a 1.0-ratio document on its own
+three headings.
+
+### 16.3 Where page provenance comes from — pypdf, not a subprocess
+
+The spike used `pdffonts`/`pdfimages` diagnostically. Production does not need
+them: pypdf is already a `requirements.txt` dependency (every PDF in this repo is
+read with it), and a page's `/Resources` answers both questions directly —
+`/Font` entries whose descriptor carries `/FontFile`, `/FontFile2` or
+`/FontFile3`, and `/XObject` entries of `/Subtype /Image`. Composite `/Type0`
+fonts are followed to their descendant (that is where NRB's subsetted CID fonts
+keep the descriptor) and `/Type3` counts as embedded by construction. Form
+XObjects are recursed into, bounded and cycle-guarded, because a scanner
+routinely wraps the page image in one.
+
+Verified against the spike's own findings on the seven diagnostic blobs. No
+system package, no subprocess timeout policy, no missing-binary failure mode.
+
+Three rules this implements, each traced to a measured case:
+
+* **A stripped font name is not a scan.** `7820b1f49fc1`'s producer emitted
+  `/CIDFont+F1 … /CIDFont+F6` and its deterministic conversion is good, so
+  eligibility reads embedded font **objects**. Recognisable family names are
+  supporting evidence only (`provenance.is_legacy_font_name`) — and they also
+  catch the opposite case, a page that names Preeti without embedding it, whose
+  bytes are still glyph-mapped.
+* **A logo is not a scan.** `scan_backed` is "no font of its own **and** pixels".
+  `268bcfe86d03` is an embedded-Preeti circular with the bank's logo on it; the
+  weaker rule would have sent it to OCR.
+* **A page is not judged on its document.** `e08988860534` page 1 is a 300 dpi
+  scan and pages 2–50 embed real Preeti. Run end to end, the router OCRs page 1
+  into `इ.प्रा. परिपत्र संख्या ०७/२०८०-८९ …` and converts pages 2–50 into
+  `नेपाल राष्ट्र बैंक विदेशी लगानी तथा विदेशी ऋण व्यवस्थापन विनियमावली, २०७८ …`,
+  in order. That is the whole reason routing is per page.
+
+**A known limit, stated rather than engineered around.** Some OCR software
+embeds a subsetted font for the invisible text layer it stamps onto a scan. Such
+a page would read as "font present" and go to the converter rather than to OCR.
+None of the 56 queue documents does this — every scan in the cohort uses a
+non-embedded `/Helvetica` or declares no font at all — so the case is recorded,
+not handled. The failure mode is degraded rather than corrupting: the
+conversion guards run on the INPUT, so an English-looking scanner layer is
+vetoed by `lexicon.is_confidently_english` and the rest is rejected by
+`validate_conversion`, leaving the original text. Finding one is a reason to add
+a signal, on a new cohort — not to loosen this rule.
+
+### 16.4 Fail-closed, in both directions
+
+A page that goes to OCR is **never** handed to npttf2utf. Its hidden text layer
+is a scanner's latin-alphabet guess (`Htqft Hfrqq aFrerr{ hrn`), not a glyph
+mapping, and the converter would turn it into fluent Devanagari nonsense that
+passes every validation rule the converter has (§12.2 measured exactly that on
+an English table).
+
+So when OCR is unavailable or fails, the page yields **empty text**, `ok=False`
+and the reason — not the junk layer, and not a conversion. When the converter is
+unavailable (it is GPL-3 and may legitimately be absent), the page keeps its
+**original** bytes and says so. When provenance cannot be read at all, the page
+keeps its native text: an unopenable resource dictionary is not evidence of a
+scan, and both alternatives act on a guess.
+
+### 16.5 Provenance for citations
+
+Every page comes back as a `PageText` carrying its 1-indexed **source** page
+number, its **route** (`native` / `legacy_conversion` / `ocr`), the reason that
+route was chosen, and per-route detail — the converter mapping and version and
+the per-disposition counts for a converted page, the engine, model and version
+for an OCR'd one. Page identity is never merged away; `.text` reconstructs the
+document in page order for measurement, and the pages remain addressable.
+
+Spreadsheets carry the **sheet name** and are converted per cell, with the grid
+re-read from the workbook. Recovering cells by splitting the stored
+`" | "`-joined row is not the inverse of rendering it, and `|` is itself a Preeti
+codepoint mapping to `्र` (§13.4).
+
+**Nothing is persisted.** There is no recovery table and no migration in this
+task — storage lands with Phase 7, which is also where the route belongs as a
+citation field. Adding a schema now would mean an Alembic revision on a branch
+whose lineage is deliberately unreconciled (§9.10).
+
+### 16.6 The OCR decision, and what it does not claim
+
+`docs/nrb/phase6b-ocr-spike.md` and `phase6b-ocr-spike-v5.md` hold the evidence.
+In short:
+
+| | halant per Devanagari char | mean word length |
+|---|---:|---:|
+| PP-OCRv4 (torch) | 0.0042 | 24.7 |
+| **PP-OCRv5 (onnxruntime)** | **0.0798** | **5.4** |
+| reference — npttf2utf over the 56-doc queue | 0.0982 | 5.7 |
+
+PP-OCRv4 is **rejected** for Nepali: it recovers the script but not the
+orthography — no conjuncts, visual rather than logical order. PP-OCRv5 is at the
+reference on both signals, unanimously on all 14 spike pages. The backend is
+load-bearing, not incidental: docling reaches v4 through torch and **v5 only
+through onnxruntime**.
+
+Three limits are stated rather than engineered around:
+
+1. **OCR output is retrieval text, not a transcription.** On a 150 dpi scan v5
+   drops letterheads, subject lines and whole body paragraphs, and it is
+   unreliable on latin runs (`lc_visakhapatnam@nrb.org.np` came back as noise).
+   It must never be treated as authoritative for a figure, a date, an account
+   number or a contact detail. Every OCR page records `authoritative: false`.
+2. **There is no confidence score.** The spike measured orthographic
+   well-formedness, which is not a per-field correctness estimate; inventing a
+   threshold from it would dress a guess as a measurement.
+3. **Conversion still beats OCR where a font is embedded.** On the control blob
+   v5 renders `कारवाही` as `शदक` and `२०६९।१।३१` as `२०६९।९।३१`. That is why OCR
+   is the narrow fallback and not the default.
+
+**PaddleOCR-VL remains deferred.** It was proposed to solve the collapse v5
+closed; revisit only if reader review finds the low-DPI recall gap
+disqualifying.
+
+### 16.7 The dependency boundary
+
+`rapidocr` and `onnxruntime` are declared in `requirements-worker.txt` and are
+**not** in `requirements.txt`, which is the only file `Dockerfile` installs — so
+the API image cannot acquire an OCR stack by accident. `app/nrb/ocr.py` is the
+only importer and imports both inside a function; a subprocess test asserts that
+importing the router pulls in none of docling, torch, onnxruntime, rapidocr or
+npttf2utf. Same structural guarantee `requirements-nrb.txt` gives npttf2utf, for
+a different reason (size, not licence).
+
+**The npttf2utf GPL-3.0 gate is still OPEN and still unresolved.** Wiring the
+converter into a routing path does not resolve it: obligations attach to
+distribution, so any build shipped to a client still needs a licensing decision
+or an independently-derived mapping table behind the same Protocol (§12).
+
+### 16.8 What is still not done
+
+Semantic correctness is **still unmeasured** — every verdict in the review pack
+is `awaiting_nepali_review` (§15). The router decides *which instrument reads a
+page*; whether what came out is right is a reader's judgement, and none of the
+numbers here change that. Also open: the §14.3 / §15.5 English accounting-template
+false positives (below the gate, so they are kept native, not converted); the
+§15.6 false negative `a2077aa9b24d`; the 8 OLE2 `.xls`/`.doc` files with no
+parser; image-only files (`image_ocr_not_enabled` — no image was in the measured
+cohort); Phase 7 chunk+embed; Phase 8 `search_nrb_documents`.
+
+### 16.9 Evaluation & Improvement (Phase 6B Task 4)
+
+**Success metric.** Share of high-confidence-legacy PDF **pages** that come back
+as usable Nepali text under the route the router chose. Proxy until reader
+verdicts land: on the frozen 56-document queue, 8 documents embed no font at all
+and hold all 4 of the converter's `unresolved` outcomes — routing those pages to
+OCR instead is the specific gain this task exists to produce, and it is
+measurable per page rather than per document.
+
+**Eval.** 29 committed tests in `tests/test_nrb_recovery.py`, currently **29/29**.
+They are a labelled set of routing decisions, not of Nepali text: each names the
+real blob whose behaviour it encodes (`7820b1f49fc1` stripped names,
+`268bcfe86d03` logo, `e08988860534` mixed, `3d2eca8b9f95` scan junk,
+`05fa82badf94` English table, `c298efaf1f16` no text layer). The PDFs are
+assembled byte by byte in the test file so provenance is stated, not inherited.
+
+**Feedback capture.** `scripts/nrb_recover.py --json` writes the full per-page
+record (route, reason, page number, converter mapping, OCR model, failures) for
+any named blob. A route a reader disagrees with is reported against the page
+number in that record. Reader verdicts on conversion continue to land in the
+§15 pack; the two are logged separately because a wrong ROUTE and a wrong
+CONVERSION have different fixes.
+
+**Review loop.** On reader return, and before any corpus pass. A change to the
+gate, to `plan_document` or to `route_page` is a change to what gets indexed and
+requires a fresh cohort — the §14/§15 holdout is spent evidence and must not be
+re-run as validation for it.
+
+### 16.10 The gate to Phase 7
+
+**Page-level routing is implemented and tested, and the OCR fallback is
+PP-OCRv5 via docling/RapidOCR on the worker side only. No corpus was routed, no
+route was persisted, and no document is searchable. Conversion and OCR
+correctness both remain pending Nepali human review, and the npttf2utf GPL-3.0
+distribution gate remains open.**
+
+The next step is a SMALL scratch-DB exercise against `local_ai_gateway_p4` — a
+handful of named blobs through route → chunk → embed → retrieve — to find out
+what Phase 7 has to store. Not a corpus ingest.

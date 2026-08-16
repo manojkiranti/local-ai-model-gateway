@@ -72,11 +72,21 @@ false-negative candidates only **`a2077aa9b24d`** is real (the other two carry
 English units native-2 was right not to route on) — it misses the minority-region
 rule on `contested_legacy_ratio` 0.2857 alone. **Every semantic verdict is
 `awaiting_nepali_review`; conversion CORRECTNESS is still unmeasured.**
-**NRB documents are now parsed
-and classified, but still NOT chunked, embedded or searchable** — the rest of 6B
-(OCR strategy), 7 (chunk+embed) and 8 (`search_nrb_documents`) are
-not started; the 6B gate and its recommendations are §11.9, §12.10, §13.11,
-§14.7 and §15.9. The roadmap was renumbered when Phase 4 was scoped down to
+**Phase 6B OCR strategy is DECIDED (2026-08-16, `faa9489`+`50edde6`, §16.6):
+PP-OCRv5 Devanagari via docling/RapidOCR on the **onnxruntime** backend is the
+fallback; **PP-OCRv4 is rejected** (it recovers the script but not the
+orthography — halant/Devanagari char 0.0042 and mean word length 24.7 vs v5's
+0.0798/5.4 against npttf2utf's own 0.0982/5.7); PaddleOCR-VL deferred.
+**Phase 6B Task 4 (production extraction ROUTING) is IMPLEMENTED and tested
+(2026-08-16, §16)**: `app/nrb/{provenance,ocr,recovery}.py` route each PDF PAGE
+to native text, the guarded converter or OCR, and reconstruct in page order —
+verified live on `e08988860534` (p1 OCR'd, p2-50 converted). The `>=0.80` gate is
+unchanged and font provenance is consulted only INSIDE an eligible document.
+**NRB documents are now parsed, classified and routable, but still NOT chunked,
+embedded or searchable** — nothing is persisted (no recovery table, no
+migration), no corpus pass was run; 7 (chunk+embed) and 8
+(`search_nrb_documents`) are not started; the 6B gate and its recommendations are
+§11.9, §12.10, §13.11, §14.7, §15.9 and §16.10. The roadmap was renumbered when Phase 4 was scoped down to
 persistence; read that doc before touching anything NRB-related instead of
 re-deriving status from chat history.
 
@@ -120,7 +130,13 @@ validation; writes NOTHING); `units`+`routing` = Phase 6B Task 2 `native-2`
 (three-state judgment units — lines for text, CELLS for spreadsheets — and the
 routing classifier; imports NOTHING from `legacy_font`, run via
 `scripts/nrb_extract.py --extractor-version native-2` and compared by
-`scripts/nrb_native2_compare.py`); `report` = all of them — everything but `client` is
+`scripts/nrb_native2_compare.py`); `provenance`+`ocr`+`recovery` = Phase 6B Task 4
+production extraction routing (`provenance` reads per-page fonts/images from the
+PDF with **pypdf, no subprocess**; `ocr` is the ONLY file that knows docling's OCR
+stage exists — PP-OCRv5/onnxruntime, lazy import, `requirements-worker.txt`;
+`recovery` routes each page to native/legacy_conversion/ocr and rebuilds in page
+order, persisting NOTHING, run via `scripts/nrb_recover.py`);
+`report` = all of them — everything but `client` is
 **not** model-facing, run via
 `scripts/nrb_{sitemap_inventory,document_inventory,sync,fetch,sample,extract,calibrate,build_lexicon,legacy_eval,native2_compare,holdout_validate,holdout_evidence}.py`), `tools/` (`registry.py` = engine; `local/` package = one module
 per in-process tool, each exporting a `SPEC`, aggregated in `local/__init__.py`'s
@@ -449,6 +465,43 @@ events (`token`/`tool_call`/`tool_result`/`done`) + the new id in the
   *clean* document containing English-looking units was never routed and belongs in
   the false-negative section, and conflating the two reports correct calls as
   mistakes (it briefly did).
+- **Font provenance NARROWS the conversion route; it never widens it.** Phase 6B
+  Task 4 (`app/nrb/recovery.py`) routes per PDF PAGE, and the order of the two
+  questions is the whole design: eligibility is still native-2's
+  `status=suspicious/legacy_font_suspected` **and** `unit_legacy_ratio >= 0.80`,
+  and only INSIDE an eligible document does provenance choose between the
+  converter and OCR. A page that embeds Preeti inside a below-gate document is
+  *not* converted — that would widen npttf2utf eligibility on font presence
+  alone. Five things a rewrite must not lose: (1) **a stripped font name is not a
+  scan** — `7820b1f49fc1`'s producer emitted `/CIDFont+F1…F6` and converts
+  correctly, so eligibility reads embedded font OBJECTS and recognised names are
+  supporting evidence only (they also catch a page that NAMES Preeti without
+  embedding it); (2) `scan_backed` is "no font of its own AND pixels", never "has
+  an image" — `268bcfe86d03` is an embedded-Preeti circular with a logo;
+  (3) **a page routed to OCR is never handed to npttf2utf** — its hidden text
+  layer is a scanner's latin guess, and the converter would turn it into fluent
+  nonsense that passes every validation rule (§12.2 measured that on an English
+  table), so OCR failure yields EMPTY text + `ok=False`, never the junk layer;
+  (4) the unjudged-unit gate uses the DOCUMENT's `unit_legacy_ratio`, not a
+  per-page recomputation (`nrb_holdout_validate._doc_ratio`); (5) pages are
+  re-read with `read_pdf_pages`, never recovered by splitting `result.text` —
+  `splitlines()` is not the inverse of `"\n".join(pages)`. `CONVERSION_GATE` and
+  `legacy_convert.UNJUDGED_MIN_LEGACY_RATIO` are both 0.80 and deliberately two
+  constants; they decide different things.
+- **PP-OCRv5 is retrieval text, not a transcription, and the BACKEND picks the
+  model.** docling reaches PP-OCRv4 through torch and **PP-OCRv5 only through
+  onnxruntime**, so `RapidOcrOptions(backend=...)` is load-bearing, not a
+  preference — v4 is rejected for Nepali (no conjuncts, visual order). On a
+  150 dpi scan v5 still drops letterheads, subject lines and whole paragraphs and
+  mangles latin runs (`lc_visakhapatnam@nrb.org.np` → noise), so OCR output must
+  never be treated as authoritative for a figure, date or contact detail — every
+  OCR page records `authoritative: false`. There is deliberately no confidence
+  score: the spike measured orthographic well-formedness, which is not a
+  per-field correctness estimate. Conversion still BEATS OCR where a font is
+  embedded (v5 renders `कारवाही` as `शदक`), which is why OCR is the narrow
+  fallback and not the default. `rapidocr`+`onnxruntime` live in
+  `requirements-worker.txt` only — `Dockerfile` installs `requirements.txt`
+  alone, so the API image cannot acquire an OCR stack by accident.
 - **`app/nrb/catalog.py` uses Core statements, never `update(Model)`, and that is
   load-bearing.** `nrb_sources` maps the attribute `meta` onto the column named
   `metadata` (declarative reserves `metadata`). A Core insert wants the key

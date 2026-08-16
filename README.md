@@ -40,7 +40,10 @@ Also in progress: the **NRB corpus pipeline** (`app/nrb/`, driven by
 `scripts/nrb_*.py`). Nepal Rastra Bank's 18,266-file public corpus is
 catalogued, downloaded with magic-byte verification, parsed and classified —
 including detection of legacy Nepali fonts, which render as Devanagari but store
-glyph-mapped ASCII. It is **not chunked, embedded or searchable yet**, and none
+glyph-mapped ASCII. Each PDF page is then routed on its own provenance: text that
+is already fine is kept, a page that embeds a legacy font goes through a guarded
+converter, and a scanned page goes to OCR. It is **not chunked, embedded or
+searchable yet**, and none
 of it is reachable by the model; the only model-facing NRB surface is the
 `get_nrb_forex` tool. Status and roadmap live in `docs/nrb-integration.md`, and
 the pipeline runs against a scratch database, not the dev one.

@@ -71,6 +71,7 @@ project's environment.
 .venv/bin/python scripts/nrb_sync.py --dry-run      # catalog reconciliation
 .venv/bin/python scripts/nrb_fetch.py --core        # download + verify bytes
 .venv/bin/python scripts/nrb_extract.py --extractor-version native-2
+.venv/bin/python scripts/nrb_recover.py <blob> --plan-only   # page routing, no DB
 ```
 
 Port convention is fixed: this gateway uses `8000`; the sibling
@@ -187,9 +188,11 @@ record, and re-deriving state from code or chat history has gone wrong before.
   not "fix" it with `alembic stamp` or by recreating the database.
 - Where it stands: the catalog (18,577 sources / 18,266 files) syncs
   idempotently, files download with magic-byte verification into
-  content-addressed storage, and every fetched blob is parsed and classified.
-  **Nothing is chunked, embedded or searchable yet** — Phase 7 (chunk+embed) and
-  the `search_nrb_documents` tool are not started.
+  content-addressed storage, every fetched blob is parsed and classified, and
+  each PDF page is routable to native text, the guarded converter or OCR
+  (`app/nrb/recovery.py`). **Nothing is chunked, embedded, searchable or even
+  persisted from that routing yet** — Phase 7 (chunk+embed) and the
+  `search_nrb_documents` tool are not started.
 - Extraction identity is `(content_sha256, extractor_version)`. `native-1` and
   `native-2` rows coexist deliberately, so an old measurement stays reproducible.
   A classifier change means a NEW version, never an edit in place.
@@ -201,8 +204,16 @@ record, and re-deriving state from code or chat history has gone wrong before.
   `app/nrb/legacy_font.py`. It is not installed by `Dockerfile`. The distribution
   question is unresolved on purpose; do not vendor its tables and do not import
   it anywhere else.
-- No conversion is wired into any runtime path. It has been evaluated, not
-  deployed.
+- Conversion and OCR are wired into ONE path only: `app/nrb/recovery.py`, the
+  offline extraction router. Nothing model-facing, nothing persisted, no corpus
+  pass. Font provenance (`app/nrb/provenance.py`, pypdf — no subprocess) chooses
+  between the converter and OCR *inside* an already-eligible document; it never
+  makes a document eligible. The `unit_legacy_ratio >= 0.80` gate is unchanged.
+- OCR is the narrow fallback for pages with no embedded font: PP-OCRv5
+  Devanagari via docling/RapidOCR on the **onnxruntime** backend (docling reaches
+  the rejected PP-OCRv4 through torch). Worker-side only —
+  `requirements-worker.txt`, never `requirements.txt`. Its output is retrieval
+  text, **not** authoritative for figures, dates or contact details.
 - **Frozen evidence is frozen.** The Phase 6A benchmark and the Phase 6B routing
   holdout are committed manifests with self-verifying fingerprints, and the
   holdout was committed before any network access precisely so it could validate

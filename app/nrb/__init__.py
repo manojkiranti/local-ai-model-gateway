@@ -24,6 +24,18 @@ never supplies a host, so neither is a second `fetch_url`.
     resumable pass, `locks` is the advisory-lock rule shared with `sync`.
     **Nothing is parsed** — a stored blob is a raw artefact; what it *says* is
     Phase 6's question.
+  * `quality` + `extraction` + `extract` + `units` + `routing` — native parsing
+    and the trust verdict (Phase 6A/6B: what the bytes SAY, and whether that can
+    be believed). `quality` is native-1's classifier, `units` + `routing` are
+    native-2's; both are pure and neither converts anything.
+  * `legacy_font` + `devanagari` + `lexicon` + `legacy_convert` — the guarded
+    legacy-font → Unicode conversion. `legacy_font` is the only file that knows
+    npttf2utf (GPL-3) exists.
+  * `provenance` + `ocr` + `recovery` — the production extraction routing path
+    (Phase 6B): `provenance` reads per-page fonts and images from the PDF itself,
+    `ocr` is the only file that knows docling's OCR stage exists (worker-side
+    only), and `recovery` routes each page to native text, the guarded converter
+    or PP-OCRv5 and reconstructs the document in page order.
   * `report` — aggregation and rendering for the inventories, a sync run and a
     fetch run.
 
