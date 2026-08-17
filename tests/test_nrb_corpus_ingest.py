@@ -529,3 +529,286 @@ def test_the_driver_never_consults_the_extraction_evidence_table():
     assert "nrb_extractions" not in code
     assert "NRBExtraction" not in code
     assert "extractor_version" not in code
+
+
+# --------------------------------------------------------------------------- #
+# Phase 7 step 1.1 — the explicit failed-document retry.
+#
+# The default is unchanged and is asserted here as well as above: a `failed`
+# document is skipped by the anti-join like everything else that is not
+# archived. `--retry-failed` is the only way past it, it reuses the existing
+# document row, and it can reach nothing else.
+# --------------------------------------------------------------------------- #
+async def _ingest_one(session, Session, dept, tmp_path, body: bytes, key: str,
+                      title: str):
+    """Create exactly one document from one blob and return its id."""
+    await _blob(session, tmp_path, body, key=key, title=title)
+    await session.commit()
+    targets = await corpus.select_ingest_targets(session, department_id=dept.id)
+    out = await corpus.create_ingest_targets(
+        Session, department_id=dept.id, department_code=DEPT_CODE,
+        targets=targets, rag_docs_dir=str(tmp_path / "rag"),
+    )
+    assert out.created == len(targets)
+    return out.documents
+
+
+async def _set(session, doc_id: str, status: str) -> None:
+    await session.execute(
+        text("UPDATE documents SET status = :s WHERE id = :i"),
+        {"s": status, "i": doc_id},
+    )
+
+
+async def _finish_jobs(session, doc_id: str, status: str) -> None:
+    """Take the document's jobs out of (queued|running), as a worker would."""
+    await session.execute(
+        text("UPDATE ingest_jobs SET status = :s, finished_at = now() "
+             "WHERE document_id = :i"),
+        {"s": status, "i": doc_id},
+    )
+
+
+def test_a_failed_document_is_skipped_by_the_ordinary_pass(tmp_path, monkeypatch):
+    """The defect this task fixes, stated as a property that must NOT change.
+
+    Without `--retry-failed` a failed document is invisible to the driver: it is
+    not `archived`, so the anti-join excludes it exactly as it excludes a
+    healthy one. That is right for the cohort's OLE2 file and wrong for a
+    transient failure, which is why the retry path is separate and opt-in.
+    """
+    _patch_store(monkeypatch, tmp_path)
+
+    async def body(session, Session):
+        dept = await _department(session)
+        docs = await _ingest_one(session, Session, dept, tmp_path, b"boom",
+                                 "https://www.nrb.org.np/boom.pdf", "Boom")
+        doc_id = docs[0][0]
+        await _set(session, doc_id, "failed")
+        await _finish_jobs(session, doc_id, "failed")
+        await session.commit()
+
+        assert await corpus.select_ingest_targets(session, department_id=dept.id) == []
+        retryable = await corpus.select_retry_targets(session, department_id=dept.id)
+        assert [t.document_id for t in retryable] == [doc_id]
+
+    _run(body)
+
+
+def test_retry_failed_requeues_exactly_the_failed_document(tmp_path, monkeypatch):
+    """One new job, against the SAME document row, and nothing else moves."""
+    _patch_store(monkeypatch, tmp_path)
+
+    async def body(session, Session):
+        dept = await _department(session)
+        bad = (await _ingest_one(session, Session, dept, tmp_path, b"bad",
+                                 "https://www.nrb.org.np/bad.pdf", "Bad"))[0][0]
+        good = (await _ingest_one(session, Session, dept, tmp_path, b"good",
+                                  "https://www.nrb.org.np/good.pdf", "Good"))[0][0]
+        await _set(session, bad, "failed")
+        await _finish_jobs(session, bad, "failed")
+        await _set(session, good, STATUS_READY)
+        await _finish_jobs(session, good, "succeeded")
+        await session.commit()
+
+        targets = await corpus.select_retry_targets(session, department_id=dept.id)
+        assert [t.document_id for t in targets] == [bad]
+        out = await corpus.requeue_failed(Session, targets=targets)
+        assert (out.selected, out.requeued, out.conflict_job, out.errors) == \
+               (1, 1, 0, [])
+
+        # Scoped to the test department on purpose: the scratch database carries
+        # unrelated pre-existing jobs (§20.7 item 4) and an unscoped count would
+        # be asserting about someone else's debris.
+        active = (
+            await session.execute(
+                text("SELECT j.document_id FROM ingest_jobs j "
+                     "JOIN documents d ON d.id = j.document_id "
+                     "WHERE d.department_id = :dept "
+                     "  AND j.status IN ('queued','running')"),
+                {"dept": dept.id},
+            )
+        ).scalars().all()
+        assert active == [bad]
+        # The document row is reused, not replaced, and it is no longer claiming
+        # to have failed while a job is queued for it.
+        status = (
+            await session.execute(
+                text("SELECT status FROM documents WHERE id = :i"), {"i": bad}
+            )
+        ).scalar_one()
+        assert status == "pending"
+
+    _run(body)
+
+
+def test_retry_failed_never_touches_ready_pending_or_archived_documents(
+    tmp_path, monkeypatch
+):
+    _patch_store(monkeypatch, tmp_path)
+
+    async def body(session, Session):
+        dept = await _department(session)
+        for name, status in (("ready", STATUS_READY), ("pending", "pending"),
+                             ("archived", STATUS_ARCHIVED)):
+            doc = (await _ingest_one(
+                session, Session, dept, tmp_path, name.encode(),
+                f"https://www.nrb.org.np/{name}.pdf", name.title()))[0][0]
+            await _set(session, doc, status)
+            await _finish_jobs(session, doc, "succeeded")
+        await session.commit()
+
+        assert await corpus.select_retry_targets(session, department_id=dept.id) == []
+
+    _run(body)
+
+
+def test_a_failed_document_with_an_active_job_is_not_requeued_twice(
+    tmp_path, monkeypatch
+):
+    """Two guards, and the test proves both.
+
+    The selection excludes a failed document that already has a queued or
+    running job, so the ordinary path never nominates it. And if one appears
+    anyway (a second driver between the select and the insert), `enqueue` hits
+    `ux_ingest_jobs_active_document` and the outcome counts a conflict instead
+    of writing a duplicate.
+    """
+    _patch_store(monkeypatch, tmp_path)
+
+    async def body(session, Session):
+        dept = await _department(session)
+        doc_id = (await _ingest_one(session, Session, dept, tmp_path, b"stuck",
+                                    "https://www.nrb.org.np/stuck.pdf", "Stuck"))[0][0]
+        await _set(session, doc_id, "failed")   # job left `queued` on purpose
+        await session.commit()
+
+        assert await corpus.select_retry_targets(session, department_id=dept.id) == []
+
+        # Force the raced case: hand `requeue_failed` a target anyway.
+        forced = [corpus.RetryTarget(document_id=doc_id, content_sha256="0" * 64,
+                                     title="Stuck")]
+        out = await corpus.requeue_failed(Session, targets=forced)
+        assert (out.requeued, out.conflict_job, out.errors) == (0, 1, [])
+
+        jobs = (
+            await session.execute(
+                text("SELECT count(*) FROM ingest_jobs WHERE document_id = :i"),
+                {"i": doc_id},
+            )
+        ).scalar_one()
+        assert jobs == 1
+
+    _run(body)
+
+
+def test_retry_reuses_the_document_identity_and_mints_no_second_row(
+    tmp_path, monkeypatch
+):
+    _patch_store(monkeypatch, tmp_path)
+
+    async def body(session, Session):
+        dept = await _department(session)
+        docs = await _ingest_one(session, Session, dept, tmp_path, b"identity",
+                                 "https://www.nrb.org.np/id.pdf", "Identity")
+        doc_id, sha = docs[0]
+        await _set(session, doc_id, "failed")
+        await _finish_jobs(session, doc_id, "failed")
+        await session.commit()
+
+        targets = await corpus.select_retry_targets(session, department_id=dept.id)
+        await corpus.requeue_failed(Session, targets=targets)
+
+        rows = (
+            await session.execute(
+                text("SELECT id FROM documents WHERE department_id = :d "
+                     "AND content_hash = :h AND status <> 'archived'"),
+                {"d": dept.id, "h": sha},
+            )
+        ).scalars().all()
+        assert rows == [doc_id]
+
+    _run(body)
+
+
+def test_a_retry_that_fails_again_does_not_stop_the_batch(tmp_path, monkeypatch):
+    """One bad target must not roll back or abort the ones beside it.
+
+    The same isolation `create_ingest_targets` has, for the same reason: a
+    corpus-scale retry that aborted on its first problem would be restartable
+    rather than resumable. The error is injected at the enqueue rather than
+    provoked from Postgres because `jobs.enqueue` maps every `IntegrityError` to
+    `JobConflict` — a real FK violation would be counted as a race, which is a
+    different (and separately asserted) outcome from an unexpected failure.
+
+    Note what this does NOT test: a retry that runs and fails again is the
+    WORKER's business, and it already isolates per job.
+    """
+    _patch_store(monkeypatch, tmp_path)
+
+    async def body(session, Session):
+        dept = await _department(session)
+        for i in range(3):
+            doc = (await _ingest_one(
+                session, Session, dept, tmp_path, f"retry-{i}".encode(),
+                f"https://www.nrb.org.np/retry-{i}.pdf", f"Retry {i}"))[0][0]
+            await _set(session, doc, "failed")
+            await _finish_jobs(session, doc, "failed")
+        await session.commit()
+
+        targets = await corpus.select_retry_targets(session, department_id=dept.id)
+        assert len(targets) == 3
+
+        real_enqueue = corpus.jobs_repo.enqueue
+        doomed = targets[1].document_id
+
+        async def flaky(session, *, document_id):
+            if document_id == doomed:
+                raise RuntimeError("storage backend went away")
+            return await real_enqueue(session, document_id=document_id)
+
+        monkeypatch.setattr(corpus.jobs_repo, "enqueue", flaky)
+        out = await corpus.requeue_failed(Session, targets=targets)
+        monkeypatch.setattr(corpus.jobs_repo, "enqueue", real_enqueue)
+
+        assert (out.selected, out.requeued, out.conflict_job) == (3, 2, 0)
+        assert len(out.errors) == 1 and "RuntimeError" in out.errors[0]
+
+        # The two good ones really are queued, and the doomed one is untouched.
+        queued = (
+            await session.execute(
+                text("SELECT j.document_id FROM ingest_jobs j "
+                     "JOIN documents d ON d.id = j.document_id "
+                     "WHERE d.department_id = :dept AND j.status = 'queued'"),
+                {"dept": dept.id},
+            )
+        ).scalars().all()
+        assert sorted(queued) == sorted(
+            t.document_id for t in targets if t.document_id != doomed
+        )
+
+    _run(body)
+
+
+def test_retry_never_adopts_a_non_nrb_document(tmp_path, monkeypatch):
+    """A failed ordinary upload in the same department is not ours to requeue.
+
+    The join to `nrb_files` is what makes `--retry-failed` an NRB command; drop
+    it and the flag silently starts requeuing other people's documents.
+    """
+    _patch_store(monkeypatch, tmp_path)
+
+    async def body(session, Session):
+        dept = await _department(session)
+        doc = await docs_repo.create_document(
+            session, department_id=dept.id, title="Someone's upload",
+            source="upload", file_type="pdf",
+            content_hash=hashlib.sha256(b"not-nrb").hexdigest(),
+            storage_key="x/y.pdf",
+        )
+        await _set(session, doc.id, "failed")
+        await session.commit()
+
+        assert await corpus.select_retry_targets(session, department_id=dept.id) == []
+
+    _run(body)

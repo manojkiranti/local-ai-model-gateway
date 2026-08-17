@@ -28,6 +28,16 @@ RUNNING IT TWICE IS THE POINT
     `tests/test_nrb_corpus_ingest.py` locks, and it is what makes an interrupted
     pass resumable rather than restartable.
 
+    `--retry-failed` is the one exception, and it is opt-in for a reason: the
+    anti-join excludes `failed` documents along with everything else that is not
+    archived, so a transient failure would otherwise never be picked up again.
+    With the flag, failed documents IN SCOPE get a fresh job against the
+    EXISTING document row — no second `documents` row, no re-copied file, and
+    `ready`/`pending`/`running` documents are untouched. A deterministically
+    unparseable blob (the cohort's OLE2 file) will simply fail again; that is
+    the operator's call to make, and there is no transient-vs-permanent
+    classifier here yet.
+
 SCRATCH DATABASE ONLY
     Refuses unless `DATABASE_URL` names `local_ai_gateway_p4`, and prints the
     resolved database name before touching anything. The two URLs differ by one
@@ -175,6 +185,9 @@ async def main() -> int:
     ap.add_argument("--limit", type=int)
     ap.add_argument("--all", action="store_true",
                     help="the whole fetched catalog — say it explicitly")
+    ap.add_argument("--retry-failed", action="store_true",
+                    help="also requeue FAILED documents in scope, reusing the "
+                         "existing document row (they may fail again)")
     ap.add_argument("--dry-run", action="store_true",
                     help="select and print, create nothing")
     ap.add_argument("--report", action="store_true", help="report status and exit")
@@ -218,16 +231,24 @@ async def main() -> int:
             return 2
 
         started = time.perf_counter()
+        scope = dict(
+            keys=keys or None,
+            sections=args.section or None,
+            owners=args.owner or None,
+            years=args.year or None,
+            extensions=args.extension or None,
+            limit=args.limit,
+        )
         async with Session() as session:
             targets = await corpus.select_ingest_targets(
-                session,
-                department_id=dept_id,
-                keys=keys or None,
-                sections=args.section or None,
-                owners=args.owner or None,
-                years=args.year or None,
-                extensions=args.extension or None,
-                limit=args.limit,
+                session, department_id=dept_id, **scope
+            )
+            retries = (
+                await corpus.select_retry_targets(
+                    session, department_id=dept_id, **scope
+                )
+                if args.retry_failed
+                else []
             )
             await session.rollback()
 
@@ -236,13 +257,39 @@ async def main() -> int:
         for t in targets:
             print(f"  {t.content_sha256[:12]} .{(t.extension or '?'):<5} "
                   f"{t.title[:64]}")
+        if args.retry_failed:
+            print(f"\n--retry-failed: {len(retries)} FAILED documents in scope")
+            for r in retries:
+                print(f"  {r.content_sha256[:12]} {r.title[:64]}")
 
         if args.dry_run:
-            print("\n(dry run — nothing created)")
+            print("\n(dry run — nothing created, nothing requeued)")
             return 0
-        if not targets:
+        if not targets and not retries:
             print("\nnothing to do: every blob in scope is already ingested here.")
             await do_report(Session, dept_id)
+            return 0
+
+        retry_outcome = None
+        if retries:
+            retry_outcome = await corpus.requeue_failed(Session, targets=retries)
+            print(f"\nrequeued {retry_outcome.requeued} failed documents "
+                  f"(same document rows; they may fail again)")
+            print(f"  conflict_job       {retry_outcome.conflict_job}")
+            for err in retry_outcome.errors:
+                print(f"  !! {err}")
+
+        if not targets:
+            elapsed = round(time.perf_counter() - started, 1)
+            print(f"\nno new blobs to create ({elapsed}s)")
+            print("\nA DEPLOYED WORKER MUST DRAIN THESE:  "
+                  ".venv/bin/python -m app.rag.worker")
+            if args.json:
+                Path(args.json).write_text(json.dumps(
+                    {"department": dept_code, "scope_keys": len(keys),
+                     "created": 0, "elapsed_seconds": elapsed,
+                     "retry": retry_outcome.as_dict() if retry_outcome else None},
+                    ensure_ascii=False, indent=2))
             return 0
 
         outcome = await corpus.create_ingest_targets(
@@ -268,7 +315,8 @@ async def main() -> int:
             payload = outcome.as_dict()
             payload.update(
                 {"department": dept_code, "cohort_sha256": cohort_sha,
-                 "scope_keys": len(keys), "elapsed_seconds": elapsed}
+                 "scope_keys": len(keys), "elapsed_seconds": elapsed,
+                 "retry": retry_outcome.as_dict() if retry_outcome else None}
             )
             Path(args.json).write_text(json.dumps(payload, ensure_ascii=False, indent=2))
         return 0

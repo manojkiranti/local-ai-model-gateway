@@ -31,6 +31,22 @@ TWO WAYS A DOCUMENT IS ALREADY PRESENT, AND THEY MEAN DIFFERENT THINGS
     (`status <> 'archived'`), because an archived document is deliberately
     re-ingestable and skipping it here would make archiving permanent.
 
+A THIRD WAY, AND IT IS OPT-IN — `--retry-failed`
+    The anti-join's side effect is that a document whose ingest FAILED is never
+    selected again: `failed` is not `archived`, so it stays excluded forever.
+    That is right by default — a permanently unparseable blob (the cohort's OLE2
+    file) must not be retried on every pass — and wrong for a transient failure,
+    which is what `select_retry_targets` + `requeue_failed` exist for.
+
+    They are a separate pair of functions, not a flag threaded through the
+    normal path, because they do a different thing: the normal path CREATES
+    documents, the retry path creates none and only enqueues a job against a
+    document that already exists. No second `documents` row is minted, no file
+    is re-copied, and `ready`, `pending` and `archived` documents are
+    unreachable from it. There is deliberately no transient-vs-permanent
+    classifier: "which failures are worth retrying" is an operator's judgement
+    for now, and the retry is explicit precisely so it can be.
+
 IDENTITY
     `documents.content_hash` is `sha256(bytes)` (`rag.documents.content_hash_of`)
     and so is `nrb_files.content_sha256` (`nrb.filestore`). They are the same
@@ -51,13 +67,21 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Sequence
 
-from sqlalchemy import extract, select, text
+from sqlalchemy import extract, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..rag import documents as docs_repo
 from ..rag import jobs as jobs_repo
 from ..rag import storage
-from ..rag.models import STATUS_ARCHIVED, Document
+from ..rag.models import (
+    JOB_QUEUED,
+    JOB_RUNNING,
+    STATUS_ARCHIVED,
+    STATUS_FAILED,
+    STATUS_PENDING,
+    Document,
+    IngestJob,
+)
 from . import filestore
 from .catalog import bounded_keys
 from .models import NRBFile, NRBSource, NRBSourceFile
@@ -68,8 +92,12 @@ logger = logging.getLogger("app.nrb.corpus")
 __all__ = [
     "IngestTarget",
     "IngestOutcome",
+    "RetryOutcome",
+    "RetryTarget",
     "create_ingest_targets",
+    "requeue_failed",
     "select_ingest_targets",
+    "select_retry_targets",
 ]
 
 # Commit cadence. Matches `fetch.py`'s: an interrupt keeps its progress, and the
@@ -126,6 +154,39 @@ class IngestOutcome:
         }
 
 
+def _scoped_files(stmt, *, keys, sections, owners, years, resource_types, extensions):
+    """Narrow a `nrb_files` select to the operator's scope. Shared, on purpose.
+
+    Both the create path and the retry path have to mean the SAME thing by
+    `--section circulars`; two copies of these predicates would eventually
+    disagree and a retry would quietly cover a different slice than the run it
+    is retrying.
+    """
+    if keys:
+        stmt = stmt.where(NRBFile.comparison_key.in_(bounded_keys(keys)))
+    if resource_types:
+        stmt = stmt.where(NRBFile.resource_type.in_(list(resource_types)))
+    if extensions:
+        stmt = stmt.where(NRBFile.extension.in_([e.lower() for e in extensions]))
+
+    if sections or owners or years:
+        link = (
+            select(NRBSourceFile.file_id)
+            .join(NRBSource, NRBSource.id == NRBSourceFile.source_id)
+            .where(NRBSourceFile.file_id == NRBFile.id, NRBSource.is_active.is_(True))
+        )
+        if sections:
+            link = link.where(NRBSource.document_type.in_(list(sections)))
+        if owners:
+            link = link.where(NRBSource.owner.in_(list(owners)))
+        if years:
+            link = link.where(
+                extract("year", NRBSource.published_at).in_([int(y) for y in years])
+            )
+        stmt = stmt.where(link.exists())
+    return stmt
+
+
 async def select_ingest_targets(
     session: AsyncSession,
     *,
@@ -168,29 +229,10 @@ async def select_ingest_targets(
         .distinct(NRBFile.content_sha256)
         .order_by(NRBFile.content_sha256, NRBFile.id)
     )
-
-    if keys:
-        stmt = stmt.where(NRBFile.comparison_key.in_(bounded_keys(keys)))
-    if resource_types:
-        stmt = stmt.where(NRBFile.resource_type.in_(list(resource_types)))
-    if extensions:
-        stmt = stmt.where(NRBFile.extension.in_([e.lower() for e in extensions]))
-
-    if sections or owners or years:
-        link = (
-            select(NRBSourceFile.file_id)
-            .join(NRBSource, NRBSource.id == NRBSourceFile.source_id)
-            .where(NRBSourceFile.file_id == NRBFile.id, NRBSource.is_active.is_(True))
-        )
-        if sections:
-            link = link.where(NRBSource.document_type.in_(list(sections)))
-        if owners:
-            link = link.where(NRBSource.owner.in_(list(owners)))
-        if years:
-            link = link.where(
-                extract("year", NRBSource.published_at).in_([int(y) for y in years])
-            )
-        stmt = stmt.where(link.exists())
+    stmt = _scoped_files(
+        stmt, keys=keys, sections=sections, owners=owners, years=years,
+        resource_types=resource_types, extensions=extensions,
+    )
 
     # Already ingested here? Skip. Correlates on `content_hash == content_sha256`
     # — the same number (see the module docstring) — and repeats the partial
@@ -344,5 +386,144 @@ async def create_ingest_targets(
             storage.delete_document(key, rag_docs_dir)
         if pending >= batch:
             logger.info("corpus ingest: %d documents queued so far", outcome.created)
+            pending = 0
+    return outcome
+
+
+# --------------------------------------------------------------------------- #
+# The explicit retry path (`--retry-failed`). Enqueue-only, like everything
+# above it: it creates no document, copies no file and drains no job.
+# --------------------------------------------------------------------------- #
+@dataclass(frozen=True)
+class RetryTarget:
+    """A document that already exists, already failed, and is in scope."""
+
+    document_id: str
+    content_sha256: str
+    title: str
+
+
+@dataclass
+class RetryOutcome:
+    selected: int = 0
+    requeued: int = 0
+    conflict_job: int = 0
+    errors: list[str] = field(default_factory=list)
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "selected": self.selected,
+            "requeued": self.requeued,
+            "conflict_job": self.conflict_job,
+            "errors": list(self.errors),
+        }
+
+
+async def select_retry_targets(
+    session: AsyncSession,
+    *,
+    department_id: int,
+    keys: Sequence[str] | None = None,
+    sections: Sequence[str] | None = None,
+    owners: Sequence[str] | None = None,
+    years: Sequence[int] | None = None,
+    resource_types: Sequence[str] | None = None,
+    extensions: Sequence[str] | None = None,
+    limit: int | None = None,
+) -> list[RetryTarget]:
+    """`failed` documents in this department whose blob is in the NRB scope.
+
+    Three exclusions, each doing work the others do not:
+
+    - `status = 'failed'` is the whole selection. `ready` documents are serving
+      and must never be requeued; `pending` ones are already on their way (a
+      second `--retry-failed` before the worker drains the first is a no-op for
+      this reason, not merely because of the job conflict below); `archived`
+      ones are re-ingestable through the ordinary create path, which is where
+      that decision already lives.
+    - **No active job.** A `failed` document with a `queued` or `running` job is
+      a state the sweep can produce, and enqueuing beside it would either hit
+      `ux_ingest_jobs_active_document` or — worse, if the index were ever
+      relaxed — put two workers on one document.
+    - The join to `nrb_files` is what makes this an *NRB* retry. A failed
+      ordinary upload sitting in the same department is not ours to requeue,
+      and without the join `--retry-failed` would silently adopt it.
+
+    `DISTINCT ON (documents.id)` because two catalog keys can share bytes and
+    would otherwise nominate one document twice.
+    """
+    active_job = select(IngestJob.id).where(
+        IngestJob.document_id == Document.id,
+        IngestJob.status.in_((JOB_QUEUED, JOB_RUNNING)),
+    )
+    stmt = (
+        select(Document.id, NRBFile.content_sha256, Document.title)
+        .join(NRBFile, NRBFile.content_sha256 == Document.content_hash)
+        .where(
+            Document.department_id == department_id,
+            Document.status == STATUS_FAILED,
+            NRBFile.fetch_status == "fetched",
+            NRBFile.content_sha256.isnot(None),
+            ~active_job.exists(),
+        )
+        .distinct(Document.id)
+        .order_by(Document.id)
+    )
+    stmt = _scoped_files(
+        stmt, keys=keys, sections=sections, owners=owners, years=years,
+        resource_types=resource_types, extensions=extensions,
+    )
+    if limit is not None:
+        stmt = stmt.limit(limit)
+
+    rows = (await session.execute(stmt)).all()
+    return [RetryTarget(doc_id, sha, title or sha) for doc_id, sha, title in rows]
+
+
+async def requeue_failed(
+    Session, *, targets: Sequence[RetryTarget], batch: int = BATCH
+) -> RetryOutcome:
+    """Queue a fresh job against each already-existing document. Returns counts.
+
+    The document row is REUSED — same id, same `content_hash`, same
+    `storage_key`, same `metadata`. Minting a second document would be rejected
+    by `ux_documents_active_content` anyway, but the reason not to try is that
+    the retry is a new attempt at the SAME document. The previous failure is not
+    overwritten either: it stays on its own `ingest_jobs` row, error and all, so
+    `--report` can still show what went wrong the first time.
+
+    Status goes back to `pending`, so a document that is queued does not also
+    claim to have failed. If the retry fails again the worker writes `failed`
+    back (`_record_failure` demotes anything that is not `ready`/`archived`),
+    and if it succeeds `replace_chunks` writes `ready`.
+
+    One session per document, exactly as `create_ingest_targets` does, so a
+    target that raises cannot roll back the ones already requeued beside it —
+    the OLE2 file failing again must not stop the rest of the batch.
+    """
+    outcome = RetryOutcome(selected=len(targets))
+    pending = 0
+    for target in targets:
+        try:
+            async with Session() as session:
+                await jobs_repo.enqueue(session, document_id=target.document_id)
+                await session.execute(
+                    update(Document)
+                    .where(Document.id == target.document_id)
+                    .values(status=STATUS_PENDING)
+                )
+                await session.commit()
+                outcome.requeued += 1
+                pending += 1
+        except jobs_repo.JobConflict:
+            # A job appeared between the select and the insert. Concurrency, not
+            # idempotence — the same distinction `create_ingest_targets` draws.
+            outcome.conflict_job += 1
+        except Exception as exc:  # noqa: BLE001 - one bad target, recorded
+            outcome.errors.append(
+                f"{target.content_sha256[:12]}: {type(exc).__name__}: {exc}"
+            )
+        if pending >= batch:
+            logger.info("corpus retry: %d documents requeued so far", outcome.requeued)
             pending = 0
     return outcome
