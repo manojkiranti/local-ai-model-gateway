@@ -104,8 +104,11 @@ the schema. Point the one variable at the scratch DB:
 ```
 DATABASE_URL=postgresql+asyncpg://gateway:<pw>@host.docker.internal:5432/local_ai_gateway_p4
 ```
-`local_ai_gateway_p4` is at `b1bea6ac36c5` = this branch's head, so that upgrade
-is a no-op today. Verify before trusting that: `alembic current` against p4.
+The **laptop's** `local_ai_gateway_p4` is at `b1bea6ac36c5` = this branch's head,
+so that upgrade is a no-op there. Do not carry that over: on the GPU server p4
+has never been inspected and **may not exist at all** (`docs/nrb-integration.md`
+§19.1). Create it if absent, then verify with `alembic current` against p4 before
+trusting the no-op — a first `upgrade head` on an empty database is not one.
 
 **2. The worker needs npttf2utf, and it is OFF by default.**
 ```bash
@@ -132,7 +135,14 @@ different process, different config home (`docs/server-and-models.md` §3).
 Nothing in this stack ingests a corpus on boot. The worker polls `ingest_jobs`
 and does nothing until a row appears; `scripts/nrb_rag_ingest.py` is what
 enqueues the Phase 6B sample, and it refuses to run unless `DATABASE_URL` names
-`local_ai_gateway_p4`.
+`local_ai_gateway_p4`. It enqueues **8 hard-coded blobs** and has no corpus
+scope — and it aborts on an already-ingested blob instead of skipping, so a
+second `--ingest` needs `--reset` (`docs/nrb-integration.md` §19.3).
+
+**This whole section is validated in containers on a laptop, never on the GPU
+server** (§18, §19.1). Verify a worker image by running a known blob and reading
+its route split — every way an NRB deployment loses text still reports the job
+`succeeded`.
 
 ## Still TODO (deferred)
 - **`generated_files/`** — with `docker run` it's a dir inside the container

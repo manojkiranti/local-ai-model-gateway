@@ -3254,3 +3254,158 @@ correct on all 250 chunks, but `RetrievedChunk` (`app/rag/retrieval.py`) carries
 no metadata field, so `search_department_docs` cites title + page + doc id and
 **cannot cite the extraction route**. Nothing was changed here — surfacing it is
 a retrieval-layer decision that belongs with Phase 8's citation format.
+
+## 19. The GPU-server run, and how the pipeline re-runs
+
+**Date:** 2026-08-17. **Scope:** two things, neither of which changed any code.
+A second attempt at the live-server deployment, which **did not begin** because
+its own precondition is unmet; and a read of the pipeline's re-run behaviour —
+what a repeat pass skips, what it redoes, and what a corpus-scale run would
+still need. Working tree clean at `ec780fa` throughout; nothing was committed
+from the deployment attempt because nothing was changed.
+
+### 19.1 The server was not reached, again — and this is now a hard prerequisite
+
+The task was gated on *"this task begins only if the actual GPU server is
+reachable."* It is not. Every access route was checked rather than assumed from
+the previous attempt:
+
+| Check | Result |
+|---|---|
+| `hostname` | `manoj-hp` — the laptop |
+| `~/.ssh/` | **empty** — no keys, no `config`, no `known_hosts` |
+| `ssh-add -l` | *"The agent has no identities"* |
+| `docker context ls` | only `default` → local socket; `DOCKER_HOST` unset |
+| VPN / mesh | none — `tailscale` not installed, only `wlo1` up |
+| `/etc/hosts` | no server entry |
+| `nvidia-smi` | **RTX 4050, 6 GB** — not 2× A40 |
+| addresses in `.env*`, `docs/`, `DOCKER.md` | only `127.0.0.1` and the Docker bridge |
+
+`known_hosts` being absent is the strongest single signal: this environment has
+never contacted the server. **No laptop deployment testing was repeated** — §18
+already covers what containers can prove here, and repeating it would add
+nothing.
+
+**What unblocks it:** a host address, an SSH key installed for it (the keypair
+does not exist yet), and the SSH user. A `Host` entry in `~/.ssh/config` is the
+right shape, since `docs/server-and-models.md` deliberately keeps the address
+out of the repository. Failing that, the Step 1–3 inspection commands are pure
+reads and can be run by hand with their output pasted back.
+
+Two server facts are worth flagging *before* anyone runs it, because both have
+been assumed and neither is evidenced: `local_ai_gateway_p4` is known to exist
+**on the laptop** — there is no evidence it was ever created on the server, and
+§18.7's expected revision came from the laptop database; and
+`OLLAMA_CONTEXT_LENGTH=32768` is confirmed on the **laptop's** systemd unit, not
+on `nic_ollama`.
+
+### 19.2 What a repeat pass skips, and what it redoes
+
+Read from the code, because "is it idempotent" has a different answer at each
+stage and the differences are the operationally interesting part.
+
+| Stage | Driver | Repeats work? |
+|---|---|---|
+| 1. Catalog sync | `scripts/nrb_sync.py` | **No** — second run all-zero |
+| 2. Download | `scripts/nrb_fetch.py` | **No** — resumable |
+| 3. Extract + classify | `scripts/nrb_extract.py` | **No** — per `(blob, version)` |
+| 4. Recovery (convert/OCR) | inside the worker | **Yes — every ingest** |
+| 5. RAG ingest | `ingest_jobs` + worker | **No, but it aborts rather than skips** |
+
+**Nothing is scheduled.** There is no cron, systemd timer or in-process
+scheduler anywhere in the repository. Stages 1–3 are manual CLI passes; the only
+long-running process is `app.rag.worker`, which polls `ingest_jobs`. "Run weekly
+and pick up what NRB published" is not built.
+
+**Sync** re-reads the REST API every run — it must, that is how new documents
+are discovered — but writes only rows whose `metadata_hash` changed.
+
+**Fetch** selects `fetch_status = 'pending'` in id order
+(`catalog.select_fetch_targets`, `catalog.py:765`). Fetched files are excluded
+*by construction*: the status list only ever holds `pending`, plus `failed`
+under `--retry-failed`. Commits every 25 files, so an interrupt keeps its
+progress and the next pass takes the *next* files.
+
+**Extract** selects fetched blobs with no extraction row at this
+`extractor_version` — a `NOT EXISTS` at `catalog.py:1059-1064`, `DISTINCT ON
+(content_sha256)`. Bumping `native-2` → `native-3` makes the corpus selectable
+again, deliberately; `--force` is development-only.
+
+**Recovery is the stage that repeats, and it is the expensive one.**
+`rag.parse_nrb_to_chunks` (`app/nrb/rag.py:270`) calls `recover_blob`, which
+calls `extraction.extract_file` **fresh** (`rag.py:180`) and re-runs conversion
+and OCR from the blob on disk. It does not read `nrb_extractions` at all. Two
+consequences, and the second is not obvious:
+
+1. Re-ingesting a document re-runs OCR at ~2–4 s/page. Invisible over 8 blobs;
+   not invisible over the corpus.
+2. **`nrb_extractions` is evidence, not an input.** Running `nrb_extract.py` is
+   *not* a prerequisite for ingestion and its rows are not consulted by it. The
+   Phase 6A/6B tables measure the classifier; the ingest path re-derives the same
+   judgment independently. They agree because they run the same code, not
+   because one reads the other.
+
+**Ingest is the only real job system.** `documents` + `ingest_jobs`, and
+`worker.py:312` polls `jobs.claim_next` (`FOR UPDATE SKIP LOCKED`). A job exists
+once per enqueue; finished documents are never re-scanned. Duplicate protection
+is the partial unique index `ux_documents_active_content` on
+`(department_id, content_hash)` excluding archived rows, so one blob cannot be
+indexed twice in a department.
+
+### 19.3 Three things Phase 7 has to build, found by reading the re-run path
+
+None of these is a defect in what exists — they are the parts a corpus run
+needs that an 8-blob smoke test never exercised.
+
+1. **There is no corpus ingest driver.** `scripts/nrb_rag_ingest.py` is a smoke
+   test: 8 hard-coded blobs, a guard refusing any database but
+   `local_ai_gateway_p4`, no `--section`/`--all` scope. And it calls
+   `create_document` (`scripts/nrb_rag_ingest.py:181`) without catching
+   `DocumentConflict`, so a second `--ingest` without `--reset` **aborts on the
+   first already-ingested blob** instead of skipping it. The database stays
+   correct; the run just stops. A driver needs the same treatment fetch and
+   extract already have — a scope argument, skip-what-exists, and resumability.
+2. **Recovery output is not cached.** Deciding whether to persist recovered page
+   text (a new table, or `nrb_extractions` columns) is a Phase 7 call. It is a
+   real trade: caching makes re-ingest cheap but adds a second place where
+   recovered text can go stale against a converter change, and the version
+   discipline that protects `nrb_extractions` would have to cover it too.
+3. **There is no supersession link.** If NRB republishes a circular, sync and
+   fetch produce new bytes → a new `content_sha256` → a *new* `documents` row.
+   Nothing archives the old one, because `documents.metadata.blob_sha256` is
+   written by the script but never read back. Both versions would accumulate and
+   retrieval would return either. The catalog already knows which source the file
+   came from; the missing piece is a reconciliation between `nrb_files` and the
+   `documents` rows minted from them.
+
+### 19.4 Evaluation & Improvement
+
+**Success metric.** For §19.1, binary: the server inspection either ran or it
+did not, and it did not. For §19.2, the metric that matters at corpus scale is
+**re-run cost** — a second pass over an unchanged corpus should approach zero
+work at stages 1–3 and should not re-OCR anything at stages 4–5.
+
+**Eval.** Stages 1–3 already have one and it passes: sync's second run is
+all-zero, fetch's exhausted scope selects 0, extract's `NOT EXISTS` selects 0.
+Stage 5 has no eval because the driver does not exist; the test to write with it
+is *ingest the same scope twice, assert the second pass creates zero documents
+and zero jobs and raises nothing*. That test currently fails by construction.
+
+**Feedback capture.** `nrb_sync_runs` records every sync's counters;
+`nrb_files.fetch_status` and `nrb_extractions` are the per-item record for
+stages 2–3; `ingest_jobs` holds per-job status, error and timing for stage 5. No
+new capture is proposed here.
+
+**Review loop.** Before any corpus-scale ingest, and again after the first one —
+re-run cost is only measurable once there is a corpus in the index.
+
+### 19.5 The gate
+
+Unchanged from §17.8 and §18.6, plus one addition: **server access is now a
+stated prerequisite**, not a step. The deployment task cannot be attempted again
+until a host, a key and a user exist in the working environment.
+
+Still outstanding and untouched by this session: the Nepali semantic review of
+the §15 pack (conversion *correctness* remains unmeasured), `075bf12eb087`'s
+broken-ToUnicode native text (§17.6, a `native-3` + new cohort), the npttf2utf
+GPL-3.0 distribution decision, and full-corpus retrieval quality.

@@ -193,9 +193,19 @@ record, and re-deriving state from code or chat history has gone wrong before.
   idempotently, files download with magic-byte verification into
   content-addressed storage, every fetched blob is parsed and classified, and
   each PDF page is routable to native text, the guarded converter or OCR
-  (`app/nrb/recovery.py`). **Nothing is chunked, embedded, searchable or even
-  persisted from that routing yet** — Phase 7 (chunk+embed) and the
-  `search_nrb_documents` tool are not started.
+  (`app/nrb/recovery.py`). Eight named blobs have been chunked, embedded and
+  retrieved end-to-end (250 chunks, scratch DB, §17/§18.7). **The CORPUS is not
+  ingested** — Phase 7 needs a scoped, resumable ingest driver that does not yet
+  exist, and the `search_nrb_documents` tool (Phase 8) is not started.
+- **Each pipeline stage has its own answer to "is it idempotent", and stage 4 is
+  the odd one.** Sync is all-zero on a second run; fetch selects only `pending`
+  (excluded by the status column, not a `WHERE`); extract selects blobs with no
+  row at this `extractor_version`. But **recovery re-runs on every ingest** —
+  `rag.parse_nrb_to_chunks` calls `extraction.extract_file` fresh and never reads
+  `nrb_extractions`, so conversion and OCR are recomputed each time and that
+  table is *evidence, not an input to ingestion*. Nothing is scheduled anywhere:
+  stages 1–3 are manual CLI passes and the only daemon is `app.rag.worker`.
+  Details and the three Phase 7 gaps are `docs/nrb-integration.md` §19.
 - Extraction identity is `(content_sha256, extractor_version)`. `native-1` and
   `native-2` rows coexist deliberately, so an old measurement stays reproducible.
   A classifier change means a NEW version, never an edit in place.

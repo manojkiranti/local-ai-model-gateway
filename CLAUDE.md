@@ -92,9 +92,17 @@ already carried citation provenance. It found a FOURTH text-trust failure mode
 (`कार्ाालर्` for कार्यालय — a broken ToUnicode CMap), which native-2 calls clean
 because it asks "is this Devanagari", not "is it spelled right". Recorded, not
 fixed (that is a native-3 + new cohort).
+**Deployment is validated in CONTAINERS ONLY (§18) — the GPU server has never
+been reached (§19.1, re-checked 2026-08-17).** This working environment has no
+SSH key, no `known_hosts`, no server address and no remote Docker context, so
+`nic_ollama`/`nic_postgres`/the A40s and even whether `local_ai_gateway_p4`
+exists *there* are all unverified. Server access is a **prerequisite**, not a
+step: don't re-run laptop deployment testing in its place.
 **The NRB CORPUS is still not ingested and `search_nrb_documents` (Phase 8) does
 not exist** — the 6B gate and its recommendations are §11.9, §12.10, §13.11,
-§14.7, §15.9, §16.10 and §17.8. The roadmap was renumbered when Phase 4 was scoped down to
+§14.7, §15.9, §16.10, §17.8 and §19.5. Phase 7's three known gaps are §19.3
+(no scoped ingest driver, recovery output not cached, no supersession link).
+The roadmap was renumbered when Phase 4 was scoped down to
 persistence; read that doc before touching anything NRB-related instead of
 re-deriving status from chat history.
 
@@ -541,6 +549,24 @@ events (`token`/`tool_call`/`tool_result`/`done`) + the new id in the
   handed. The overlay repoints **all three** services at `.env.docker.p4` so they
   cannot disagree about which database they mean, and flips the GPL flag on.
   Never bring the base stack up for NRB work.
+- **"Is the NRB pipeline idempotent" has a different answer at every stage, and
+  `nrb_extractions` is NOT an input to ingestion.** Sync is all-zero on a second
+  run; fetch selects `fetch_status='pending'` only (excluded by the status
+  column, not a `WHERE` someone can forget); extract selects blobs with no row at
+  this `extractor_version` (`catalog.py:1059-1064`). But **recovery re-runs on
+  every ingest** — `rag.parse_nrb_to_chunks` calls `extraction.extract_file`
+  fresh (`app/nrb/rag.py:180`) and reads no stored classification, so conversion
+  and OCR are recomputed (~2–4 s/page) each time. Running `nrb_extract.py` is
+  therefore *not* a prerequisite for ingesting; the two paths agree because they
+  run the same code, not because one consults the other. **Nothing is scheduled**
+  — no cron, no timer, no in-process scheduler; stages 1–3 are manual CLI passes
+  and the only daemon is `app.rag.worker` polling `ingest_jobs`. Three gaps a
+  corpus run must close first, all §19.3: `scripts/nrb_rag_ingest.py` is an
+  8-blob smoke test that **aborts on `DocumentConflict` rather than skipping**
+  (so a second `--ingest` without `--reset` stops at the first existing blob),
+  recovered text is not persisted anywhere, and a republished NRB file mints a
+  SECOND `documents` row with nothing archiving the first
+  (`metadata.blob_sha256` is written but never read back).
 - **`app/nrb/catalog.py` uses Core statements, never `update(Model)`, and that is
   load-bearing.** `nrb_sources` maps the attribute `meta` onto the column named
   `metadata` (declarative reserves `metadata`). A Core insert wants the key
