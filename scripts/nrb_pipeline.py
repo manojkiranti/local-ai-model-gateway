@@ -7,15 +7,30 @@
 
     ... scripts/nrb_pipeline.py --status            # the most recent run
     ... scripts/nrb_pipeline.py --status --run 12   # one run, reconciled
+    ... scripts/nrb_pipeline.py --department nrb-p7 --limit 5 --run-now
 
 THIS SCRIPT CONTAINS NO PIPELINE LOGIC, ON PURPOSE
-    It parses arguments, calls `pipeline.start`, and prints. The admin API and
-    any future schedule will call the same function with the same
-    `PipelineScope`, so there is one implementation of the sequence and one
-    place where its safety rules live. The older stage scripts
+    It parses arguments, calls `pipeline.request_run` (and `execute_run` with
+    `--run-now`), and prints. The admin API, this CLI and any future schedule all
+    come through the same two service functions with the same `PipelineScope`, so
+    there is one implementation of the sequence and one place where its safety
+    rules live. The older stage scripts
     (`nrb_sync.py`, `nrb_fetch.py`, `nrb_extract.py`,
     `nrb_rag_ingest_corpus.py`) are unchanged and remain the right tools for
     diagnosing a single stage.
+
+IT QUEUES; IT DOES NOT EXECUTE (unless you say `--run-now`)
+    By default this requests a run exactly as the API does — one `queued` row via
+    `pipeline.request_run` — and prints its id. The staging is
+    `app/nrb/runner.py`'s:
+
+        .venv/bin/python -m app.nrb.runner       # sync -> fetch -> extract -> enqueue
+
+    `--run-now` requests AND executes in this process, by calling
+    `pipeline.execute_run` immediately afterwards. That is the same two service
+    functions the runner calls, in the same order — not a second orchestration
+    path — and it is what makes a laptop session convenient. It takes the same
+    advisory lock, so it refuses if a runner is already working.
 
 ENQUEUEING IS NOT FINISHING
     The run ends `awaiting_jobs` whenever it queued anything: the RAG worker is
@@ -117,6 +132,9 @@ async def main() -> int:
                          "refresh — see scripts/nrb_recovery_cache.py --purge)")
     ap.add_argument("--all", action="store_true",
                     help="the whole catalog — say it explicitly")
+    ap.add_argument("--run-now", action="store_true",
+                    help="also EXECUTE the run in this process instead of "
+                         "leaving it for `python -m app.nrb.runner`")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--trigger", default="cli", choices=("cli", "api", "schedule"))
     ap.add_argument("--requested-by")
@@ -179,10 +197,15 @@ async def main() -> int:
             return 2
 
         try:
-            run = await pipeline.start(
+            run = await pipeline.request_run(
                 scope, trigger=args.trigger, requested_by=args.requested_by,
-                engine=engine, session_factory=Session, dry_run=args.dry_run,
+                session_factory=Session,
             )
+            if args.run_now:
+                run = await pipeline.execute_run(
+                    run.id, engine=engine, session_factory=Session,
+                    dry_run=args.dry_run,
+                )
         except pipeline.PipelineBusy as busy:
             print(f"\n{busy}", file=sys.stderr)
             if busy.run:
@@ -190,6 +213,9 @@ async def main() -> int:
             return 3
 
         _render(run)
+        if not args.run_now:
+            print("\n  queued. A RUNNER MUST EXECUTE IT:  "
+                  ".venv/bin/python -m app.nrb.runner")
         if args.json:
             Path(args.json).write_text(json.dumps(run.as_dict(), indent=2))
         return 0 if run.status != pipeline.PIPELINE_FAILED else 1

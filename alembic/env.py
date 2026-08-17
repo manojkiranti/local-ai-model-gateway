@@ -43,6 +43,9 @@ _AUTOGEN_SKIP_INDEXES = {
     # the expression nor the WHERE clause, so it proposes dropping and
     # recreating it on every drift check. Same reason as the two above.
     "ux_documents_nrb_current_source",
+    # Singleton-row idiom: UNIQUE over the constant `(true)`, partial on the
+    # active statuses. Neither half is reflectable either.
+    "ux_nrb_pipeline_runs_one_active",
 }
 
 

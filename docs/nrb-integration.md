@@ -4820,3 +4820,200 @@ quality, native-2 (not modified; native-3 not started), the recovery-cache
 versioning, supersession semantics, the frozen Phase 6A/6B evidence, the Phase 7
 cohort, the `ri*` scratch-DB debris, and server access (§19.1) — this is still
 the laptop.
+
+## 26. Phase 7 step 6 — orchestration leaves the HTTP request
+
+**Date:** 2026-08-17. **Scope:** the execution boundary. `POST /v1/nrb/runs` now
+durably accepts a request and returns; a dedicated process stages it. **What this
+is not:** a UI, a scheduler, a task queue library, or any change to what the RAG
+worker owns.
+
+### 26.1 The problem §25 exposed
+
+`POST` executed the whole orchestration inline, because that is what made
+`PipelineBusy` answerable in the response. So a request including `sync` held an
+HTTP connection open for minutes while it read ~190 pages of a central bank's
+REST API — and worse than the latency, an accepted run lived only in the
+gateway's memory until it finished. A restart lost it silently.
+
+### 26.2 Admission and execution are now two service functions
+
+```
+pipeline.request_run(scope, trigger, requested_by)   →  a `queued` row. Returns.
+pipeline.execute_run(run_id)                         →  claim, stage, record.
+```
+
+`POST` calls the first and nothing else — measured **78 ms** live against the
+scratch database. `app/nrb/runner.py` calls the second. `pipeline.start` survives
+as the explicit composition of the two, used by `scripts/nrb_pipeline.py
+--run-now` and by tests, and **never by the API** — a source-level test fails if
+the router so much as mentions it.
+
+The RAG worker's half is untouched: recovery, the versioned recovery cache,
+chunking, embedding and supersession remain `app.rag.worker`'s. Two processes,
+two jobs, and that split is still why the API image needs neither Docling nor an
+OCR stack.
+
+### 26.3 The lifecycle, with a real `queued` state
+
+```
+queued ──(runner claims)──► running ──┬─ queued nothing ─► succeeded|partial|failed
+   │                           │      └─ queued N jobs ──► awaiting_jobs ──►
+   │                           │                             reconcile() ──► terminal
+   └─(nothing runs it yet;     └─(process dies)─► swept `failed` by the next
+      blocks new requests)         process that can prove none is alive
+```
+
+`queued` was deliberately absent in §23 — "a status nothing can produce would
+make a UI show a state that never resolves" — and it earns its place now that
+something really does sit in front of the orchestrator. `queued` is also a
+**stage**, so an unclaimed run does not have to claim a stage it has not reached;
+`stage='sync'` on a run nobody has started would read as a sync in progress.
+
+### 26.4 Migration `f4c1a90b7d62` — required by existing constraints
+
+`down_revision` `1fb5a0d183d6`. No column added, no data rewritten. It exists
+because `nrb_pipeline_runs` carries three CHECKs that enumerate exact strings, and
+all three forbid the new lifecycle: `ck_nrb_pipeline_runs_status` (the `queued`
+status), `ck_nrb_pipeline_runs_stage` (the `queued` stage), and
+`ck_nrb_pipeline_runs_finished`, whose predicate lists the statuses that must
+have a NULL `finished_at`. Editing a CHECK's vocabulary is DDL or nothing — which
+is exactly the rule CLAUDE.md already states.
+
+It also adds **`ux_nrb_pipeline_runs_one_active`**: `UNIQUE` over the constant
+`(true)` restricted to `('queued','running','awaiting_jobs')` — the singleton-row
+idiom. Admission left the orchestrator, so `POST` inserts without taking the
+advisory lock (it must return in milliseconds), and two simultaneous requests
+could both pass a plain SELECT gate. The gate still runs, because it is what
+produces the useful 409 body; the index is what makes the gate not have to be
+correct. A lost race surfaces as `IntegrityError` → caught → answered with the
+run that won. Same posture as `ux_documents_active_content`.
+
+The deferred lineage (`d4a91f2c7b3e`) is untouched, nothing is stamped, and the
+merge revision is still required and still not solved here.
+
+### 26.5 The runner
+
+`app/nrb/runner.py`, run as `python -m app.nrb.runner`, in `app.rag.worker`'s
+restrained style: sweep, poll, execute, sleep, and signal handling. It contains
+**no locking, no transitions and no stage logic** — every safety property belongs
+to the service.
+
+It runs on the **gateway image**, not the worker image: `sync` and `fetch` are
+httpx, `extract` is pypdf/openpyxl/python-docx (all in `requirements.txt`), and
+the RAG stage copies bytes and inserts rows. Re-verified that
+`import app.nrb.runner, app.main` pulls in none of
+docling/torch/rapidocr/onnxruntime/npttf2utf. Compose gains one `nrb-runner`
+service — same image as `gateway`, different command — and the p4 overlay points
+it at the scratch env file alongside the other three.
+
+Exclusion is unchanged in mechanism: `execute_run` holds `PIPELINE_LOCK_KEY` for
+the whole orchestration, and the claim itself is `SELECT … FOR UPDATE SKIP
+LOCKED` on the one row, so two runners pass over each other rather than both
+running it.
+
+### 26.6 A deadlock the review caught, and `recover_abandoned`
+
+Moving admission behind the singleton index introduced a failure the tests found
+before the design settled: a run left `running` by a killed runner **occupies the
+only active slot**, so nothing new can be accepted — and `execute_run`'s own
+sweep cannot help, because it only runs when there is a `queued` run to execute,
+and none can be created. One crash would have wedged the pipeline permanently.
+
+`pipeline.recover_abandoned` is the fix: take the lock, sweep `running` corpses,
+settle `awaiting_jobs` runs whose jobs have all finished, release. It is called
+**unconditionally, before looking for work**, by every process that is able to
+orchestrate — `runner.run_once` and `pipeline.start`. `LockBusy` means a runner
+genuinely is orchestrating, so there is nothing abandoned to find: not an error,
+not a wait. Holding the lock is still what makes the sweep sound with no timeout
+to tune.
+
+### 26.7 The normalized busy response
+
+One envelope for every outcome, so a client branches on `started` alone:
+
+```json
+{"started": true,  "run": {…}, "detail": null}    // 202, a queued run
+{"started": false, "run": {…}, "detail": "…"}     // 409, the active run
+{"started": false, "run": null, "detail": "…"}    // 409, lock held, no row yet
+```
+
+The third line is the case §25 answered with a different body (`HTTPException`'s
+`{"detail": …}`) — a second schema for a client to parse, over a window measured
+in milliseconds. `RunOut | None` normalises it. The locking was **not** redesigned
+to eliminate that window.
+
+### 26.8 The CLI
+
+`scripts/nrb_pipeline.py` now **queues by default** and prints the runner command;
+`--run-now` requests and then executes in-process. That is `request_run` followed
+by `execute_run` — the same two service functions in the same order the runner
+uses, not a second orchestration path. `--status` is unchanged. The stage-specific
+scripts are untouched and remain the right tools for diagnosing one stage.
+
+### 26.9 Tests
+
+**37 pipeline + 20 API = 57**, all passing, plus `test_nrb_corpus_ingest.py` (18)
+and the Docling import guard as the two narrow neighbours this could cross.
+
+New: requesting a run executes nothing (the stage recorder is empty and no
+document is created); a queued run is readable through a session the requester
+never touched and is exactly what `claim_next` finds; the runner claims it and
+drives `queued → running → awaiting_jobs`; a second `_claim` returns None;
+executing a run that is no longer queued is a no-op; a queued run refuses a
+second request **and** the database refuses the state directly; a crashed runner
+blocks admission until `sweep_abandoned` clears it, then admission works again; a
+run that stages nothing is terminal on the spot with frozen job counts; and the
+scope survives the process boundary (`scope['key_list']` — `as_dict` stores
+`keys` as a count, right for a status view and useless for execution, and a
+silent widening from one key to "everything matching the other bounds" is exactly
+the scope creep the `--all` guard exists to prevent).
+
+Updated for the deliberate contract change: the API tests now assert admission
+rather than completion, and stand in for the runner with `_run_it(run_id)` when a
+test needs a run to have happened. The busy tests cover the queued gate, the
+awaiting gate and the null-run case.
+
+Live: `POST` returned **202 in 78 ms**; a second `POST` returned **409** naming
+run 373 as `queued`; `GET /v1/nrb/status` reported it as `active_run`; the real
+runner claimed it, logged `run 373 -> succeeded`, and afterwards `active_run` was
+null and a third `POST` was accepted. The exercise department was removed and
+`nrb-p7` is unchanged at 30 ready / 1 failed.
+
+### 26.10 Evaluation & Improvement (Phase 7 step 6)
+
+**Success metric.** Two. `POST` returns in well under a second regardless of the
+stages requested — measured at 78 ms for a four-stage request. And no accepted
+run is lost: acceptance is a committed row before the response is written.
+
+**Eval.** 57 focused tests, pass/fail: 57/57. The live sequence above scored on
+five transitions: 5/5. Not evaluated: two runner replicas under real contention
+(covered only by the lock and the SKIP LOCKED claim in tests), and behaviour when
+a runner is absent for a long time — a queued run simply waits, which is correct
+but means a UI must distinguish "queued" from "queued and nobody is running".
+
+**Feedback capture.** `nrb_pipeline_runs` now records the whole lifecycle
+including the accepted-but-unclaimed window; the runner logs each transition.
+Nothing new is stored.
+
+**Review loop.** With the UI, which is the first thing that will care whether
+`queued` needs a "no runner detected" signal; and again before cron, which is
+the caller that can queue faster than a runner drains.
+
+### 26.11 The gate
+
+**Ready for the thin UI.** Trigger is fast and durable, the lifecycle has a state
+for every real condition, a crash cannot wedge admission, and one envelope covers
+every trigger outcome.
+
+**Not started, and not to be started without a decision:** the UI, cron/systemd
+(the runner is the process it would trigger through, not replace), the
+`RAG_DOCS_DIR` duplication (§20.7 item 2 — still required before full-corpus
+ingest), recovery-refresh scheduling, Phase 8's `search_nrb_documents`, any
+corpus-scale ingest, and GPU-server deployment.
+
+Unchanged and untouched: the Nepali semantic review, §17.6's broken-ToUnicode
+native text, the npttf2utf GPL-3.0 distribution decision, full-corpus retrieval
+quality, native-2, the recovery-cache versioning, supersession semantics, the
+frozen Phase 6A/6B evidence, the Phase 7 cohort, the `ri*` scratch-DB debris, and
+server access (§19.1).

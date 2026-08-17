@@ -63,6 +63,29 @@ services:
       - rag_documents:/app/rag_documents          # SAME volume the gateway writes
       - worker_cache:/home/appuser/.cache         # persist Docling models
 
+  nrb-runner:
+    # NRB pipeline staging: sync -> fetch -> extract -> RAG enqueue, and nothing
+    # else. It runs on the GATEWAY image on purpose — httpx, pypdf, openpyxl and
+    # python-docx are all in requirements.txt, and it must NOT acquire Docling or
+    # an OCR stack. Recovery, chunking, embedding and supersession stay the
+    # `worker` service's; these two processes have two jobs.
+    #
+    # Same image, different command: the API accepts runs, this executes them, so
+    # a gateway restart cannot lose an accepted one.
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["python", "-m", "app.nrb.runner"]
+    env_file: .env.docker
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    volumes:
+      - rag_documents:/app/rag_documents          # the RAG stage copies into it
+
 volumes:
   gateway_files:
   rag_documents:

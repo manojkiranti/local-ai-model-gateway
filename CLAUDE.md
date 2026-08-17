@@ -142,9 +142,15 @@ carrying the active run — both the advisory lock and the durable
 `catalog_counts` + `fetch_counts` + `corpus.nrb_rag_counts`). Admin-only via the
 existing `require_admin`; **the API cannot start a full-corpus run** — a bounded
 scope is required (422) and `all_files` is not a field (`extra="forbid"`);
-`--all` stays CLI-only. Staging is SYNCHRONOUS in the request (that is what makes
-`PipelineBusy` answerable), but recovery/chunk/embed remain the worker's, so the
-API still never parses or embeds. **UI and cron are NOT implemented.**
+`--all` stays CLI-only. **Phase 7 step 6 (2026-08-17, §26): orchestration LEFT the HTTP request.**
+`POST` calls `pipeline.request_run` → one `queued` row → 202 in ~78 ms; the
+staging runs in `python -m app.nrb.runner` (`app/nrb/runner.py`, gateway image,
+compose service `nrb-runner`) via `pipeline.execute_run`. `pipeline.start` is
+just those two composed and is used by `scripts/nrb_pipeline.py --run-now` and
+tests, NEVER by the API. Migration `f4c1a90b7d62` adds the `queued`
+status/stage (three CHECK vocabularies forbade it) and
+`ux_nrb_pipeline_runs_one_active` (UNIQUE over the constant `(true)` on the three
+active statuses). **UI and cron are NOT implemented.**
 The roadmap was renumbered when Phase 4 was scoped down to
 persistence; read that doc before touching anything NRB-related instead of
 re-deriving status from chat history.
@@ -852,14 +858,19 @@ events (`token`/`tool_call`/`tool_result`/`done`) + the new id in the
   ends `awaiting_jobs`, NOT succeeded; `pipeline.reconcile` (callable from any
   process, after the orchestrator has exited) computes the terminal status, and
   **waiting beats every other signal**. A second trigger gets `PipelineBusy`
-  carrying the active run rather than a duplicate — and `awaiting_jobs` counts as
-  ACTIVE (§24.3, reversing §23.5): the lock is released when orchestration
+  carrying the active run rather than a duplicate — and `queued` (§26) as well as
+  `awaiting_jobs` counts as ACTIVE (§24.3, reversing §23.5): the lock is released when orchestration
   returns while the jobs outlive it, so exclusion is the durable ROW, checked
   under the lock after `sweep_abandoned` and `settle_waiting`. That second call
   is not optional — without it a run whose jobs finished but which nobody polled
   would block every future trigger forever. **A terminal run's job counts are
   FROZEN into `counters['jobs']`** when it leaves the active states, so later
-  work on the same documents cannot rewrite finished history (§24.2). `retry_failed` defaults False
+  work on the same documents cannot rewrite finished history (§24.2).
+  **`pipeline.recover_abandoned` must be called before looking for work**, by
+  every process that can orchestrate: a run left `running` by a killed runner
+  occupies the singleton active slot, so nothing can be accepted AND no queued
+  run can appear to trigger `execute_run`'s own sweep — one crash would wedge the
+  pipeline permanently (§26.6). `retry_failed` defaults False
   and is NOT a recovery refresh — purging cached unresolved recoveries is a
   separate explicit command.
 - **A failed replacement must never remove the last good version, and one

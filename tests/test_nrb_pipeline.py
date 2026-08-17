@@ -31,6 +31,7 @@ from typing import Any
 
 import pytest
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
@@ -997,11 +998,347 @@ def test_the_active_run_gate_reads_both_active_statuses():
     `PIPELINE_STATUSES` without deciding which side of this line it falls on, the
     gate would silently let a second orchestrator through.
     """
-    from app.nrb.models import PIPELINE_STATUSES
+    from app.nrb.models import PIPELINE_ACTIVE_STATUSES, PIPELINE_QUEUED, PIPELINE_STATUSES
 
-    active = {PIPELINE_RUNNING, PIPELINE_AWAITING}
+    active = {PIPELINE_QUEUED, PIPELINE_RUNNING, PIPELINE_AWAITING}
     terminal = {PIPELINE_SUCCEEDED, PIPELINE_PARTIAL, PIPELINE_FAILED}
     assert active | terminal == set(PIPELINE_STATUSES)
     assert not active & terminal
+    # And the shared constant the gate, the sweep boundary and the singleton
+    # index all read is exactly that active set — three places that must not
+    # drift from each other.
+    assert set(PIPELINE_ACTIVE_STATUSES) == active
     # And the run row's own CHECK agrees about which are unfinished.
     assert all(pipeline.resolve_status({}, {s: 1}) for s in ("queued", "running"))
+
+
+# --------------------------------------------------------------------------- #
+# Phase 7 step 6: admission is durable and orchestration left the request.
+#
+# `request_run` inserts a `queued` row and executes nothing; `execute_run`
+# claims it and stages it; `app/nrb/runner.py` is the loop that pairs them.
+# --------------------------------------------------------------------------- #
+def test_requesting_a_run_executes_nothing_and_leaves_it_queued(tmp_path, monkeypatch):
+    """The whole point of the split: acceptance costs one INSERT.
+
+    Before this, `POST /v1/nrb/runs` ran the stages inline, so a request that
+    included `sync` held an HTTP connection open for minutes while it read ~190
+    pages of a central bank's REST API. Admission must touch none of that.
+    """
+    calls: list[str] = []
+    _stub_stages(monkeypatch, calls)
+    _patch_store(monkeypatch, tmp_path)
+
+    async def body(session, Session, engine):
+        await _department(session)
+        await _blob(session, tmp_path, b"one", key="https://www.nrb.org.np/a.pdf")
+        await session.commit()
+
+        run = await pipeline.request_run(
+            pipeline.PipelineScope(department=DEPT_CODE, limit=10),
+            trigger="api", requested_by="admin@example.com",
+            session_factory=Session,
+        )
+        docs = (
+            await session.execute(
+                text("SELECT count(*) FROM documents d JOIN departments dp "
+                     "  ON dp.id = d.department_id WHERE dp.code = :c"),
+                {"c": DEPT_CODE},
+            )
+        ).scalar_one()
+        return run, calls, docs
+
+    run, calls, docs = _run(body)
+    assert run.status == "queued" and run.stage == "queued"
+    assert run.trigger == "api" and run.requested_by == "admin@example.com"
+    assert run.started_at is None and run.finished_at is None
+    assert calls == []          # no sync, no fetch, no extract
+    assert docs == 0            # and no rag enqueue either
+
+
+def test_a_queued_run_survives_the_requesting_session(tmp_path, monkeypatch):
+    """It is a committed row, not a task in a process's memory.
+
+    This is what makes a 202 honest: the gateway can die immediately afterwards
+    and the accepted run is still there for a runner to pick up. Read back
+    through a session the requester never touched.
+    """
+    _stub_stages(monkeypatch, [])
+    _patch_store(monkeypatch, tmp_path)
+
+    async def body(session, Session, engine):
+        await _department(session)
+        await session.commit()
+        run = await pipeline.request_run(
+            pipeline.PipelineScope(department=DEPT_CODE, limit=3, sections=("circulars",)),
+            session_factory=Session,
+        )
+        # A brand-new session — the "API restarted" simulation, as far as a
+        # rolled-back test transaction can go.
+        async with Session() as fresh:
+            reread = await pipeline.get_run(fresh, run.id)
+            queued_id = await pipeline.claim_next(Session)
+            await fresh.rollback()
+        return run, reread, queued_id
+
+    run, reread, queued_id = _run(body)
+    assert reread is not None
+    assert reread.status == "queued"
+    assert reread.scope["sections"] == ["circulars"]
+    assert reread.scope["limit"] == 3
+    assert queued_id == run.id          # a runner would find exactly this one
+
+
+def test_the_runner_claims_a_queued_run_and_transitions_it(tmp_path, monkeypatch):
+    """queued -> running -> awaiting_jobs, driven by `runner.run_once`.
+
+    The runner is exercised rather than `execute_run` directly, because the loop
+    is where "poll, then hand the id to the service" has to be right.
+    """
+    calls: list[str] = []
+    _stub_stages(monkeypatch, calls)
+    _patch_store(monkeypatch, tmp_path)
+
+    async def body(session, Session, engine):
+        from app.nrb import runner
+
+        await _department(session)
+        await _blob(session, tmp_path, b"one", key="https://www.nrb.org.np/a.pdf")
+        await session.commit()
+        requested = await pipeline.request_run(
+            pipeline.PipelineScope(department=DEPT_CODE, limit=10),
+            session_factory=Session,
+        )
+        monkeypatch.setattr(
+            runner, "async_sessionmaker", lambda *a, **kw: Session
+        )
+        did = await runner.run_once(engine, get_settings())
+        idle = await runner.run_once(engine, get_settings())
+        async with Session() as s:
+            after = await pipeline.get_run(s, requested.id)
+            await s.rollback()
+        return did, idle, after, calls
+
+    did, idle, after, calls = _run(body)
+    assert did is True and idle is False        # one run, then an empty queue
+    assert calls == ["sync", "fetch", "extract"]
+    assert after.status == PIPELINE_AWAITING
+    assert after.stage == "waiting"
+    assert after.started_at is not None
+    assert after.jobs == {"queued": 1}
+
+
+def test_a_second_runner_cannot_claim_the_same_run(tmp_path, monkeypatch):
+    """`FOR UPDATE SKIP LOCKED` on the one row: the loser gets None and moves on.
+
+    Asserted on `_claim` directly, because that is the transition. The advisory
+    lock already stops two runners ORCHESTRATING at once; this is what stops two
+    of them believing they own the same row.
+    """
+    _stub_stages(monkeypatch, [])
+    _patch_store(monkeypatch, tmp_path)
+
+    async def body(session, Session, engine):
+        await _department(session)
+        await session.commit()
+        run = await pipeline.request_run(
+            pipeline.PipelineScope(department=DEPT_CODE, limit=1),
+            session_factory=Session,
+        )
+        first = await pipeline._claim(Session, run.id)
+        second = await pipeline._claim(Session, run.id)
+        async with Session() as s:
+            after = await pipeline.get_run(s, run.id)
+            await s.rollback()
+        return first, second, after
+
+    first, second, after = _run(body)
+    assert first is not None          # the claimer gets the scope back
+    assert first.department == DEPT_CODE
+    assert second is None             # no longer `queued`
+    assert after.status == PIPELINE_RUNNING
+
+
+def test_executing_a_run_that_is_no_longer_queued_is_a_no_op(tmp_path, monkeypatch):
+    """`_claim` returning None means "not my work", and nothing is re-run.
+
+    Reached whenever the row moved on between the poll and the claim: another
+    runner took it, or the sweep failed it. Asserted against an already-terminal
+    run, which is the case that cannot be confused with anything else — a
+    `running` row would be swept first, because holding the lock proves no
+    orchestrator is alive.
+    """
+    calls: list[str] = []
+    _stub_stages(monkeypatch, calls)
+    _patch_store(monkeypatch, tmp_path)
+
+    async def body(session, Session, engine):
+        await _department(session)
+        await session.commit()
+        run = await pipeline.start(
+            pipeline.PipelineScope(department=DEPT_CODE, keys=("nothing",)),
+            engine=engine, session_factory=Session,
+        )
+        assert run.status == PIPELINE_SUCCEEDED
+        calls.clear()
+        view = await pipeline.execute_run(
+            run.id, engine=engine, session_factory=Session
+        )
+        return view, calls
+
+    view, calls = _run(body)
+    assert calls == []                         # no stage ran twice
+    assert view.status == PIPELINE_SUCCEEDED   # returned untouched
+
+
+def test_a_queued_run_refuses_a_second_request(tmp_path, monkeypatch):
+    """`queued` is an active update, so admission refuses — and the index agrees.
+
+    Two guards, and the test proves both: the SELECT gate (which produces the
+    useful `PipelineBusy` body) and `ux_nrb_pipeline_runs_one_active`, which is
+    what makes the gate not have to win a race.
+    """
+    _stub_stages(monkeypatch, [])
+    _patch_store(monkeypatch, tmp_path)
+
+    async def body(session, Session, engine):
+        await _department(session)
+        await session.commit()
+        first = await pipeline.request_run(
+            pipeline.PipelineScope(department=DEPT_CODE, limit=1),
+            session_factory=Session,
+        )
+        with pytest.raises(pipeline.PipelineBusy) as excinfo:
+            await pipeline.request_run(
+                pipeline.PipelineScope(department=DEPT_CODE, limit=1),
+                session_factory=Session,
+            )
+        # And the database refuses the state directly, gate or no gate.
+        with pytest.raises(IntegrityError):
+            await session.execute(
+                text(
+                    "INSERT INTO nrb_pipeline_runs (trigger, status, stage, scope, "
+                    " counters) VALUES ('api', 'queued', 'queued', '{}'::jsonb, "
+                    " '{}'::jsonb)"
+                )
+            )
+            await session.flush()
+        await session.rollback()
+        return first, excinfo.value
+
+    first, busy = _run(body)
+    assert busy.run is not None and busy.run.id == first.id
+    assert busy.run.status == "queued"
+
+
+def test_a_runner_crash_mid_run_is_recovered_by_the_next_one(tmp_path, monkeypatch):
+    """The existing sweep, now also unblocking ADMISSION.
+
+    A run left `running` by a killed runner used to only make a status view lie.
+    Now it also occupies the singleton index, so nothing could ever be accepted
+    again — which is why `execute_run` sweeps BEFORE it claims. Holding the lock
+    is still what makes the sweep sound with no timeout.
+    """
+    _stub_stages(monkeypatch, [])
+    _patch_store(monkeypatch, tmp_path)
+
+    async def body(session, Session, engine):
+        await _department(session)
+        await session.commit()
+        run = await pipeline.request_run(
+            pipeline.PipelineScope(department=DEPT_CODE, limit=1),
+            session_factory=Session,
+        )
+        await pipeline._claim(Session, run.id)      # ...and then the runner dies
+
+        # Nothing can be accepted while the corpse holds the active slot.
+        with pytest.raises(pipeline.PipelineBusy):
+            await pipeline.request_run(
+                pipeline.PipelineScope(department=DEPT_CODE, limit=1),
+                session_factory=Session,
+            )
+
+        # A new runner starts. Its sweep clears the corpse...
+        async with Session() as s:
+            swept = await pipeline.sweep_abandoned(s)
+            await s.commit()
+        # ...and admission works again.
+        fresh = await pipeline.request_run(
+            pipeline.PipelineScope(department=DEPT_CODE, limit=1),
+            session_factory=Session,
+        )
+        async with Session() as s:
+            corpse = await pipeline.get_run(s, run.id)
+            await s.rollback()
+        return swept, corpse, fresh
+
+    swept, corpse, fresh = _run(body)
+    assert swept == 1
+    assert corpse.status == PIPELINE_FAILED
+    assert "did not finish" in corpse.error
+    assert fresh.status == "queued"
+
+
+def test_a_run_that_stages_nothing_becomes_terminal_without_a_runner_wait(
+    tmp_path, monkeypatch
+):
+    """Queued nothing, so nothing to wait for: terminal on the spot."""
+    _stub_stages(monkeypatch, [])
+    _patch_store(monkeypatch, tmp_path)
+
+    async def body(session, Session, engine):
+        await _department(session)
+        await session.commit()
+        run = await pipeline.request_run(
+            pipeline.PipelineScope(department=DEPT_CODE, keys=("no-such-key",)),
+            session_factory=Session,
+        )
+        view = await pipeline.execute_run(
+            run.id, engine=engine, session_factory=Session
+        )
+        return view
+
+    view = _run(body)
+    assert view.status == PIPELINE_SUCCEEDED
+    assert view.stage == "done"
+    assert view.jobs == {}
+    assert view.counters["jobs"] == {}      # frozen, per §24.2
+    assert view.finished_at is not None
+
+
+def test_the_scope_survives_the_process_boundary(tmp_path, monkeypatch):
+    """The runner is a different PROCESS, so the scope has to travel as data.
+
+    `as_dict` stores `keys` as a COUNT — right for a status view, useless for
+    execution — so the verbatim list rides in `scope['key_list']`. If that broke,
+    a keyed run would silently widen to "everything matching the other bounds",
+    which is exactly the kind of quiet scope creep the CLI's `--all` guard exists
+    to prevent.
+    """
+    _stub_stages(monkeypatch, [])
+    _patch_store(monkeypatch, tmp_path)
+
+    async def body(session, Session, engine):
+        await _department(session)
+        await _blob(session, tmp_path, b"one", key="https://www.nrb.org.np/a.pdf")
+        await _blob(session, tmp_path, b"two", key="https://www.nrb.org.np/b.pdf")
+        await session.commit()
+        run = await pipeline.request_run(
+            pipeline.PipelineScope(
+                department=DEPT_CODE, keys=("https://www.nrb.org.np/a.pdf",),
+                retry_failed=True, extensions=("pdf",),
+            ),
+            session_factory=Session,
+        )
+        assert run.scope["keys"] == 1        # a count on the row
+        view = await pipeline.execute_run(
+            run.id, engine=engine, session_factory=Session
+        )
+        return view
+
+    view = _run(body)
+    # One key in scope, so exactly one blob was staged — not both.
+    assert view.counters["rag"]["scope_blobs"] == 1
+    assert view.counters["rag"]["created"] == 1
+    assert view.scope["retry_failed"] is True
+    assert view.scope["extensions"] == ["pdf"]

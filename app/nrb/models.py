@@ -79,9 +79,11 @@ __all__ = [
     "NRBPipelineRunJob",
     "NRBRecovery",
     "NRBRecoveryUnit",
+    "PIPELINE_ACTIVE_STATUSES",
     "PIPELINE_AWAITING",
     "PIPELINE_FAILED",
     "PIPELINE_PARTIAL",
+    "PIPELINE_QUEUED",
     "PIPELINE_RUNNING",
     "PIPELINE_STAGES",
     "PIPELINE_STATUSES",
@@ -1086,21 +1088,34 @@ class NRBRecoveryUnit(Base):
 # --------------------------------------------------------------------------- #
 PIPELINE_TRIGGERS = ("cli", "api", "schedule")
 
-# `queued` is deliberately absent: there is no queue in front of the
-# orchestrator. A run exists because something is running it, or because it
-# finished. Inventing a state nothing can produce would make the future UI show
-# a status that never resolves.
+# `queued` earns its place as of Phase 7 step 6: there IS now something in front
+# of the orchestrator. `POST /v1/nrb/runs` durably ACCEPTS a request and returns,
+# and `app/nrb/runner.py` claims it later — so a run really can exist that
+# nothing is executing yet. (It was deliberately absent while the only caller ran
+# the stages inline; a status nothing could produce would have made a UI show a
+# state that never resolves.)
+PIPELINE_QUEUED = "queued"                # accepted and durable; not yet claimed
 PIPELINE_RUNNING = "running"              # orchestrating; the advisory lock is held
 PIPELINE_AWAITING = "awaiting_jobs"       # staging done, RAG jobs still in flight
 PIPELINE_SUCCEEDED = "succeeded"
 PIPELINE_PARTIAL = "partial"              # finished, with item-level failures
 PIPELINE_FAILED = "failed"                # a stage raised, or every job failed
 PIPELINE_STATUSES = (
-    PIPELINE_RUNNING, PIPELINE_AWAITING, PIPELINE_SUCCEEDED,
+    PIPELINE_QUEUED, PIPELINE_RUNNING, PIPELINE_AWAITING, PIPELINE_SUCCEEDED,
     PIPELINE_PARTIAL, PIPELINE_FAILED,
 )
 
-PIPELINE_STAGES = ("sync", "fetch", "extract", "rag", "waiting", "done")
+# The three statuses that mean "an NRB update is in progress". Named once here
+# because three places need exactly this set and must not drift: the durable
+# admission gate, the runner's sweep boundary, and the singleton index below.
+PIPELINE_ACTIVE_STATUSES = (PIPELINE_QUEUED, PIPELINE_RUNNING, PIPELINE_AWAITING)
+
+# `queued` is a stage as well as a status, so a run waiting to be claimed does
+# not have to claim a stage it has not reached. Setting `stage='sync'` on an
+# unclaimed run would read, to a UI, as a sync in progress.
+PIPELINE_STAGES = (
+    "queued", "sync", "fetch", "extract", "rag", "waiting", "done",
+)
 
 
 class NRBPipelineRun(Base):
@@ -1145,8 +1160,30 @@ class NRBPipelineRun(Base):
         ),
         # A finished run must say when, and an unfinished one must not claim to.
         CheckConstraint(
-            "(finished_at IS NULL) = (status IN ('running', 'awaiting_jobs'))",
+            "(finished_at IS NULL) = "
+            + _in_list("status", PIPELINE_ACTIVE_STATUSES),
             name="ck_nrb_pipeline_runs_finished",
+        ),
+        # AT MOST ONE ACTIVE NRB UPDATE, as a database invariant.
+        #
+        # A unique index over a CONSTANT expression is the singleton-row idiom:
+        # every row matching the predicate produces the same key, so the second
+        # one is rejected. It exists because admission moved out of the
+        # orchestrator: `POST` now inserts a `queued` row without taking the
+        # advisory lock (it must return in milliseconds), so two simultaneous
+        # requests could both pass a plain SELECT gate. The gate still runs — it
+        # is what produces the useful 409 body — and this is what makes the gate
+        # unnecessary to be correct.
+        #
+        # Hand-written in migration f4c1a90b7d62 and excluded from autogenerate
+        # comparison (`alembic/env.py`), like the HNSW and NRB-current-source
+        # indexes: Alembic reflects neither a constant expression nor a partial
+        # predicate.
+        Index(
+            "ux_nrb_pipeline_runs_one_active",
+            text("(true)"),
+            unique=True,
+            postgresql_where=text(_in_list("status", PIPELINE_ACTIVE_STATUSES)),
         ),
         # "Is an update running?" — the one query a UI polls.
         Index("ix_nrb_pipeline_runs_status", "status"),

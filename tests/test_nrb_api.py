@@ -4,18 +4,25 @@ Same shape as `test_rag_documents_api.py`: register/login through the real auth
 router, take `admin@example.com` as the admin (the first registered user is one),
 and skip rather than fail if the database or that assumption is unavailable.
 
+THE POST NO LONGER STAGES ANYTHING
+    Since Phase 7 step 6, `POST /v1/nrb/runs` durably ACCEPTS a request — one
+    `queued` row — and returns 202. The stages run in `app/nrb/runner.py`, a
+    separate process. So the assertions here are about ADMISSION: that a run
+    becomes queued, that nothing executed inside the request, and that a second
+    request is refused. Anything that needs a run to have RUN calls
+    `_run_it(run_id)`, which is what the runner would do.
+
 WHAT IS STUBBED
     The three upstream stages, because they reach a central bank's website,
-    download gigabytes and parse hundreds of documents — and because a `POST`
-    stages synchronously, so an unstubbed `sync` would make the request take
-    minutes. `app.nrb.pipeline` itself is NOT stubbed: the router's whole job is
-    to call it, and these tests are about the HTTP contract over the real service
-    (real advisory lock, real run rows, real active-run gate).
+    download gigabytes and parse hundreds of documents. `app.nrb.pipeline` itself
+    is NOT stubbed: the router's whole job is to call it, and these tests are
+    about the HTTP contract over the real service (real run rows, real advisory
+    lock, real active-run gate, real singleton index).
 
     The RAG stage is real but has nothing to select — the tests use a department
-    with no catalog blobs in scope — so runs settle immediately and no ingest job
-    is created. That keeps these tests about the API and leaves the lifecycle
-    itself to `test_nrb_pipeline.py`.
+    with no catalog blobs in scope — so an executed run settles immediately and
+    no ingest job is created. That keeps these tests about the API and leaves the
+    lifecycle itself to `test_nrb_pipeline.py`.
 """
 
 from __future__ import annotations
@@ -128,6 +135,33 @@ def _cleanup(code: str) -> None:
     asyncio.run(go())
 
 
+def _run_it(run_id: int):
+    """Execute a queued run out-of-band, exactly as the runner would.
+
+    The API only ever queues now, so any test that needs a run to have happened
+    has to stand in for `app/nrb/runner.py`. It calls the same service function
+    the runner calls — `pipeline.execute_run` — and nothing else.
+    """
+    import asyncio
+
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    from app.config import get_settings
+    from app.nrb import pipeline
+
+    async def go():
+        engine = create_async_engine(get_settings().database_url)
+        Session = async_sessionmaker(engine, expire_on_commit=False)
+        try:
+            return await pipeline.execute_run(
+                run_id, engine=engine, session_factory=Session
+            )
+        finally:
+            await engine.dispose()
+
+    return asyncio.run(go())
+
+
 def _trigger(client, headers, code, **overrides):
     body = {
         "department": code,
@@ -177,7 +211,15 @@ def test_a_member_cannot_read_operational_status_either(env):
 # --------------------------------------------------------------------------- #
 # The trigger.
 # --------------------------------------------------------------------------- #
-def test_an_admin_trigger_returns_202_with_the_run(env, stub_stages):
+def test_an_admin_trigger_returns_202_after_accepting_and_running_nothing(
+    env, stub_stages
+):
+    """THE property this step exists for: acceptance is durable and instant.
+
+    Before, this handler executed sync, fetch, extract and the enqueue inline, so
+    a request including `sync` held the connection open for minutes. Now it
+    inserts one `queued` row. The stage recorder is the proof: empty.
+    """
     client, admin, _member, code = env
     resp = _trigger(client, admin, code)
     assert resp.status_code == 202
@@ -189,14 +231,17 @@ def test_an_admin_trigger_returns_202_with_the_run(env, stub_stages):
     assert run["requested_by"] == "admin@example.com"
     assert run["department"] == code
     assert run["id"] > 0
-    # The stages really ran, in the pipeline's order, driven by the service.
-    assert stub_stages == ["sync", "fetch", "extract"]
-    assert run["counters"]["sync"] == {"sync_ran": 1}
-    # Nothing was in scope, so there is nothing to wait for.
-    assert run["status"] == "succeeded"
-    assert run["jobs"] == {}
+    # Accepted, not executed.
+    assert run["status"] == "queued" and run["stage"] == "queued"
+    assert run["counters"] == {} and run["jobs"] == {}
+    assert run["started_at"] is None and run["finished_at"] is None
     assert run["scope"]["retry_failed"] is False
-    assert run["finished_at"]
+    assert stub_stages == []      # nothing ran inside the request
+
+    # ...and a runner then does the work, off the request path.
+    executed = _run_it(run["id"])
+    assert stub_stages == ["sync", "fetch", "extract"]
+    assert executed.status == "succeeded"
 
 
 def test_retry_failed_is_carried_through_to_the_service(env, stub_stages):
@@ -216,8 +261,9 @@ def test_a_subset_of_stages_can_be_requested(env, stub_stages):
     client, admin, _member, code = env
     resp = _trigger(client, admin, code, stages=["rag"])
     assert resp.status_code == 202
-    assert stub_stages == []                       # no upstream stage ran
     assert resp.json()["run"]["scope"]["stages"] == ["rag"]
+    _run_it(resp.json()["run"]["id"])
+    assert stub_stages == []                       # and none ran on execution
 
 
 # --------------------------------------------------------------------------- #
@@ -282,73 +328,45 @@ def test_an_unknown_stage_is_refused(env, stub_stages):
 # --------------------------------------------------------------------------- #
 # PipelineBusy — 409 with the active run, not a 500.
 # --------------------------------------------------------------------------- #
-def test_a_busy_pipeline_returns_409_carrying_the_active_run(env, stub_stages,
-                                                             monkeypatch):
-    """Both exclusion mechanisms look identical to a client, and neither is a 500.
+def test_a_queued_run_makes_a_second_trigger_a_409_with_that_run(env, stub_stages):
+    """The durable gate, over HTTP, with no lock held by anyone.
 
-    Forced through the service's own exception so the router is tested rather
-    than the lock: `pipeline.start` raises `PipelineBusy(run)` both when another
-    orchestrator holds the advisory lock and when a durable run is still
-    `running`/`awaiting_jobs`. The body is the SAME schema as a 202, with
-    `started: false`, so a client parses one shape.
+    `queued` is an active NRB update: accepted, not yet executed. A second
+    request must not create a parallel one, and the answer must be that run — so
+    a UI can point at it rather than showing an error.
     """
     client, admin, _member, code = env
     first = _trigger(client, admin, code)
     assert first.status_code == 202
-    active_id = first.json()["run"]["id"]
+    run_id = first.json()["run"]["id"]
 
-    from app.nrb import pipeline as pipeline_mod
-
-    # Build the RunView the service would have handed back, from the real row.
-    import asyncio
-
-    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-
-    from app.config import get_settings
-
-    async def load():
-        engine = create_async_engine(get_settings().database_url)
-        Session = async_sessionmaker(engine, expire_on_commit=False)
-        try:
-            async with Session() as session:
-                view = await pipeline_mod.get_run(session, active_id)
-                await session.rollback()
-            return view
-        finally:
-            await engine.dispose()
-
-    _view = asyncio.run(load())
-    _view.status = pipeline_mod.PIPELINE_AWAITING     # pretend it is still active
-
-    async def raise_busy(scope, **kwargs):
-        raise pipeline_mod.PipelineBusy(_view)
-
-    monkeypatch.setattr(pipeline_mod, "start", raise_busy)
-    resp = _trigger(client, admin, code)
-
-    assert resp.status_code == 409
-    body = resp.json()
+    second = _trigger(client, admin, code)
+    assert second.status_code == 409
+    body = second.json()
     assert body["started"] is False
-    assert body["run"]["id"] == active_id
-    assert body["run"]["status"] == "awaiting_jobs"
-    # Same schema as the 202 body — a client needs no second parser.
-    assert set(body) == {"started", "run"}
+    assert body["run"]["id"] == run_id
+    assert body["run"]["status"] == "queued"
+    assert "already in progress" in body["detail"]
+    # ONE schema for both outcomes: the 202 and the 409 differ in values only.
+    assert set(body) == {"started", "run", "detail"}
     assert set(body["run"]) == set(first.json()["run"])
+    assert stub_stages == []
 
 
 def test_a_second_trigger_is_refused_while_a_run_is_awaiting_jobs(
     env, stub_stages, monkeypatch
 ):
-    """The durable gate, end to end through HTTP, with no lock held.
+    """The other durable active state, also with no lock held.
 
-    The first request has returned, so its advisory lock is gone; only the
-    `awaiting_jobs` row stands between the second trigger and duplicate work.
-    A run is forced into that state by leaving a queued job associated with it.
+    The runner has finished staging and exited; only the `awaiting_jobs` row —
+    its documents mid-ingest in the RAG worker — stands between the second
+    trigger and duplicate work.
     """
     client, admin, _member, code = env
     first = _trigger(client, admin, code, stages=["rag"])
     assert first.status_code == 202
     run_id = first.json()["run"]["id"]
+    _run_it(run_id)
 
     import asyncio
 
@@ -414,10 +432,39 @@ def test_a_second_trigger_is_refused_while_a_run_is_awaiting_jobs(
     assert stub_stages == []      # nothing ran
 
 
+def test_lock_only_contention_uses_the_same_busy_shape_with_a_null_run(
+    env, monkeypatch
+):
+    """The normalized rare case: busy, but there is no run to name yet.
+
+    A runner can hold the advisory lock in the instant before its own row is
+    visible. That used to be the one path with a DIFFERENT body (`{"detail": …}`
+    from an HTTPException), which is a second schema for a client to parse over a
+    window measured in milliseconds. Now it is the same envelope with
+    `run: null`, so `started` is the only field a caller must branch on.
+    """
+    from app.nrb import pipeline as pipeline_mod
+
+    async def raise_bare_busy(scope, **kwargs):
+        raise pipeline_mod.PipelineBusy(None)
+
+    monkeypatch.setattr(pipeline_mod, "request_run", raise_bare_busy)
+
+    client, admin, _member, code = env
+    resp = _trigger(client, admin, code)
+    assert resp.status_code == 409
+    body = resp.json()
+    assert body["started"] is False
+    assert body["run"] is None
+    assert "already in progress" in body["detail"]
+    assert set(body) == {"started", "run", "detail"}
+
+
 # --------------------------------------------------------------------------- #
 # Reading runs.
 # --------------------------------------------------------------------------- #
 def test_reading_a_run_returns_the_durable_view(env, stub_stages):
+    """And a queued run is readable immediately — the 202 is not a promise."""
     client, admin, _member, code = env
     run_id = _trigger(client, admin, code).json()["run"]["id"]
 
@@ -426,7 +473,7 @@ def test_reading_a_run_returns_the_durable_view(env, stub_stages):
     run = resp.json()
     assert run["id"] == run_id
     assert run["trigger"] == "api"
-    assert run["status"] == "succeeded"
+    assert run["status"] == "queued"
     assert set(run) == {
         "id", "trigger", "requested_by", "status", "stage", "department",
         "scope", "counters", "error", "jobs", "created_at", "started_at",
@@ -442,8 +489,10 @@ def test_reading_a_terminal_run_twice_returns_the_same_thing(env, stub_stages):
     """
     client, admin, _member, code = env
     run_id = _trigger(client, admin, code).json()["run"]["id"]
+    _run_it(run_id)                     # the runner finishes it
     first = client.get(f"/v1/nrb/runs/{run_id}", headers=admin).json()
     second = client.get(f"/v1/nrb/runs/{run_id}", headers=admin).json()
+    assert first["status"] == "succeeded"
     assert first == second
     assert first["finished_at"] == second["finished_at"]
 
@@ -467,9 +516,18 @@ def test_overall_status_composes_the_existing_helpers(env, stub_stages):
     body = resp.json()
     assert set(body) == {"active_run", "latest_run", "catalog", "files", "rag"}
 
-    # Nothing is active: the run settled on return.
-    assert body["active_run"] is None
+    # A QUEUED run is active: it is an accepted update nothing has run yet, and
+    # a UI must show it as in progress rather than as nothing happening.
+    assert body["active_run"] is not None
+    assert body["active_run"]["id"] == run_id
+    assert body["active_run"]["status"] == "queued"
     assert body["latest_run"]["id"] >= run_id
+
+    # Once a runner has taken it, nothing is active any more.
+    _run_it(run_id)
+    after = client.get("/v1/nrb/status", headers=admin).json()
+    assert after["active_run"] is None
+    assert after["latest_run"]["status"] == "succeeded"
 
     # Catalog and file blocks are the same numbers the CLI prints.
     assert {"sources", "files"} <= set(body["catalog"])
@@ -486,7 +544,7 @@ def test_overall_status_composes_the_existing_helpers(env, stub_stages):
 def test_status_can_be_narrowed_to_one_department(env, stub_stages):
     """The `rag` block narrows; the catalog does not, because it is global."""
     client, admin, _member, code = env
-    _trigger(client, admin, code)
+    _run_it(_trigger(client, admin, code).json()["run"]["id"])
     whole = client.get("/v1/nrb/status", headers=admin).json()
     scoped = client.get(f"/v1/nrb/status?department={code}", headers=admin).json()
     assert scoped["rag"]["ready"] <= whole["rag"]["ready"]
@@ -554,5 +612,9 @@ def test_the_router_contains_no_orchestration_and_no_subprocess():
         "subprocess", "advisory_lock", "run_sync", "run_fetch", "run_extract",
         "create_ingest_targets", "requeue_failed", "sweep_abandoned",
         "resolve_status", "scripts/",
+        # And it must not execute a run either: `start` and `execute_run` stage
+        # inline, which is exactly what moving orchestration out of the request
+        # removed. The API accepts; the runner executes.
+        "pipeline.start", "execute_run",
     ):
         assert forbidden not in code, f"router should not reference {forbidden}"

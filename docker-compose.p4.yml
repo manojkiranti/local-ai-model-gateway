@@ -8,7 +8,8 @@
 # (CLAUDE.md), and "remember to edit the env file first" is not a control — it
 # is a thing you forget once. This overlay makes the scratch target explicit and
 # reviewable: it swaps the env file for `.env.docker.p4` on ALL THREE services,
-# so migrate, gateway and worker cannot disagree about which database they mean.
+# so migrate, gateway, worker and nrb-runner cannot disagree about which database
+# they mean.
 #
 # `.env.docker.p4` is untracked (`.env.*` is gitignored). Create it from
 # `.env.docker.example` with:
@@ -36,4 +37,7 @@ services:
     build:
       args:
         INSTALL_LEGACY_FONT: "true"
+    env_file: .env.docker.p4
+
+  nrb-runner:
     env_file: .env.docker.p4

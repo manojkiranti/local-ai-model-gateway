@@ -19,10 +19,13 @@ from .pipeline import STAGES
 class RunOut(BaseModel):
     """One pipeline run. Exactly `pipeline.RunView.as_dict()`.
 
-    `status` is one of `running` / `awaiting_jobs` / `succeeded` / `partial` /
-    `failed`, and the middle-of-the-list one is the important one for a UI:
-    **staging finished, the RAG worker has not.** `jobs` is frozen once the run
-    is terminal (§24.2), so polling a finished run never changes what it says.
+    `status` walks `queued` → `running` → `awaiting_jobs` → `succeeded` /
+    `partial` / `failed`, and the two middle states are the ones a UI has to tell
+    apart: `running` is the pipeline runner staging, `awaiting_jobs` is **staging
+    finished, the RAG worker has not**. `queued` means accepted and durable but
+    not yet claimed — the state that exists because `POST` no longer stages
+    inline. `jobs` is frozen once the run is terminal (§24.2), so polling a
+    finished run never changes what it says.
     """
 
     model_config = ConfigDict(from_attributes=True)
@@ -102,15 +105,23 @@ class RunTriggerIn(BaseModel):
 
 
 class RunTriggerOut(BaseModel):
-    """The trigger's answer, and the SAME shape whether it started or not.
+    """The trigger's answer, and ONE shape for every outcome.
 
-    `started=false` with a `run` means an NRB update was already in progress and
-    this is it — returned with 409 rather than 500, and with the identical body
-    schema so a client parses one thing.
+    `started=true` (202) means the request was durably accepted and `run` is the
+    `queued` row a runner will pick up. `started=false` (409) means an NRB update
+    was already in progress.
+
+    `run` is OPTIONAL only for one rare case, and normalising it is why this field
+    is nullable rather than the router having a second response body: another
+    runner can hold the advisory lock in the instant before its own row is
+    visible, so there is genuinely no run to name yet. `detail` carries the
+    explanation then. A client reads `started` first and `run` if it is there —
+    never two schemas, and never a 500.
     """
 
     started: bool
-    run: RunOut
+    run: RunOut | None = None
+    detail: str | None = None
 
 
 class NRBStatusOut(BaseModel):

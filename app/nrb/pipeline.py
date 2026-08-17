@@ -79,6 +79,7 @@ from typing import Any, Sequence
 
 from sqlalchemy import String, cast, func, literal, select, update
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from ..rag.models import (
@@ -90,9 +91,11 @@ from ..rag.models import (
 )
 from .locks import PIPELINE_LOCK_KEY, LockBusy, advisory_lock
 from .models import (
+    PIPELINE_ACTIVE_STATUSES,
     PIPELINE_AWAITING,
     PIPELINE_FAILED,
     PIPELINE_PARTIAL,
+    PIPELINE_QUEUED,
     PIPELINE_RUNNING,
     PIPELINE_SUCCEEDED,
     NRBPipelineRun,
@@ -108,10 +111,15 @@ __all__ = [
     "PipelineBusy",
     "PipelineScope",
     "RunView",
+    "PIPELINE_QUEUED",
     "active_run",
+    "claim_next",
+    "execute_run",
     "get_run",
     "latest_run",
+    "recover_abandoned",
     "reconcile",
+    "request_run",
     "settle_waiting",
     "start",
     "sweep_abandoned",
@@ -343,14 +351,18 @@ async def latest_run(session: AsyncSession) -> RunView | None:
 async def active_run(
     session: AsyncSession,
     *,
-    statuses: tuple[str, ...] = (PIPELINE_RUNNING, PIPELINE_AWAITING),
+    statuses: tuple[str, ...] = PIPELINE_ACTIVE_STATUSES,
 ) -> RunView | None:
     """The NRB update currently in progress, if any.
 
-    Both non-terminal statuses by default, because both mean "an update is in
-    progress": `running` is an orchestrator mid-flight, `awaiting_jobs` is its
-    documents mid-ingest (§24.3). Callers that specifically want the LOCK holder
-    — which is `running` by definition, since a waiting run holds no lock — pass
+    All THREE non-terminal statuses by default, because each is an update in
+    progress: `queued` is accepted and waiting for a runner, `running` is an
+    orchestrator mid-flight, `awaiting_jobs` is its documents mid-ingest
+    (§24.3). The set is `models.PIPELINE_ACTIVE_STATUSES`, shared with the
+    singleton index so the gate and the constraint cannot disagree.
+
+    Callers that specifically want the LOCK holder — `running` by definition,
+    since neither a queued nor a waiting run holds one — pass
     `statuses=(PIPELINE_RUNNING,)`.
     """
     row = (
@@ -467,6 +479,44 @@ async def settle_waiting(session: AsyncSession) -> int:
     return still_waiting
 
 
+async def recover_abandoned(
+    engine: AsyncEngine | None = None,
+    session_factory: async_sessionmaker[AsyncSession] | None = None,
+) -> int:
+    """Clear what a dead process left behind. Returns how many runs were swept.
+
+    THE UNWEDGING STEP, and it has to be callable without any work to do.
+    Admission is now guarded by `ux_nrb_pipeline_runs_one_active`, so a run left
+    `running` by a killed runner occupies the only active slot — and
+    `execute_run`'s own sweep cannot help, because it only runs when there is a
+    `queued` run to execute and no `queued` run can be created while the corpse
+    is there. That is a deadlock, and this is what breaks it: every process that
+    is *able* to orchestrate calls this before it looks for work.
+
+    Takes the advisory lock, which is what makes the sweep sound with no timeout
+    to tune: an orchestrator is alive IFF it holds the key, so if we got it, any
+    `running` row is a corpse. `LockBusy` means a runner IS orchestrating — there
+    is nothing abandoned to find, so it is not an error and not a wait.
+
+    `settle_waiting` runs too, so a run whose jobs all finished stops occupying
+    the slot even if nobody ever polled it. Between them, no unobserved failure
+    can permanently prevent the next update.
+    """
+    from ..db.session import SessionLocal, engine as app_engine
+
+    engine = engine or app_engine
+    Session = session_factory or SessionLocal
+    try:
+        async with advisory_lock(engine, PIPELINE_LOCK_KEY, what="NRB recovery"):
+            async with Session() as session:
+                swept = await sweep_abandoned(session)
+                await settle_waiting(session)
+                await session.commit()
+            return swept
+    except LockBusy:
+        return 0
+
+
 async def sweep_abandoned(session: AsyncSession) -> int:
     """Fail every run still `running`. Only ever called while holding the lock.
 
@@ -498,26 +548,162 @@ async def sweep_abandoned(session: AsyncSession) -> int:
 # --------------------------------------------------------------------------- #
 # The orchestration.
 # --------------------------------------------------------------------------- #
-async def _open_run(
-    Session, *, trigger: str, requested_by: str | None, scope: PipelineScope
-) -> int:
+def _scope_from_row(row: NRBPipelineRun) -> PipelineScope:
+    """Rebuild the requested scope from the stored row.
+
+    The runner is a different PROCESS from the requester, so the scope has to
+    survive as data. `PipelineScope.as_dict` stores `keys` as a COUNT rather than
+    18k strings, which is right for a status view and useless here — so the
+    verbatim key list travels in `scope['key_list']`, written by `request_run`
+    and read only here. Everything else round-trips as itself.
+    """
+    stored = dict(row.scope or {})
+    return PipelineScope(
+        department=row.department,
+        stages=tuple(stored.get("stages") or STAGES),
+        keys=tuple(stored.get("key_list") or ()),
+        sections=tuple(stored.get("sections") or ()),
+        owners=tuple(stored.get("owners") or ()),
+        years=tuple(int(y) for y in (stored.get("years") or ())),
+        resource_types=tuple(stored.get("resource_types") or ()),
+        extensions=tuple(stored.get("extensions") or ()),
+        limit=stored.get("limit"),
+        retry_failed=bool(stored.get("retry_failed")),
+        all_files=bool(stored.get("all_files")),
+    )
+
+
+async def _claim(Session, run_id: int) -> PipelineScope | None:
+    """Take this run from `queued` to `running`, or return None.
+
+    `FOR UPDATE SKIP LOCKED` on the one row, the same shape `jobs.claim_next`
+    uses: two runners polling the same queue pass over each other rather than
+    blocking, and the loser sees `queued` gone and moves on. The advisory lock
+    already means only one runner orchestrates at a time; this is what makes the
+    CLAIM itself unambiguous, and it is what keeps the transition atomic even for
+    a caller that skipped the lock.
+    """
+    async with Session() as session:
+        row = (
+            await session.execute(
+                select(NRBPipelineRun)
+                .where(
+                    NRBPipelineRun.id == run_id,
+                    NRBPipelineRun.status == PIPELINE_QUEUED,
+                )
+                .with_for_update(skip_locked=True)
+                .execution_options(populate_existing=True)
+            )
+        ).scalar_one_or_none()
+        if row is None:
+            return None
+        scope = _scope_from_row(row)
+        row.status = PIPELINE_RUNNING
+        row.stage = scope.stages[0] if scope.stages else "done"
+        row.started_at = datetime.now(timezone.utc)
+        row.heartbeat_at = datetime.now(timezone.utc)
+        await session.commit()
+    return scope
+
+
+async def claim_next(Session) -> int | None:
+    """The oldest `queued` run's id, or None. The runner's poll.
+
+    Reads only — the claim itself is `_claim`, inside `execute_run` and under the
+    advisory lock. Splitting them keeps the runner loop free of any transition:
+    it asks what is waiting, then asks the service to run it.
+    """
+    async with Session() as session:
+        run_id = (
+            await session.execute(
+                select(NRBPipelineRun.id)
+                .where(NRBPipelineRun.status == PIPELINE_QUEUED)
+                .order_by(NRBPipelineRun.created_at, NRBPipelineRun.id)
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        await session.rollback()
+    return run_id
+
+
+async def request_run(
+    scope: PipelineScope,
+    *,
+    trigger: str = "cli",
+    requested_by: str | None = None,
+    session_factory: async_sessionmaker[AsyncSession] | None = None,
+) -> RunView:
+    """DURABLY ACCEPT an update request. Fast, and it executes nothing.
+
+    THE admission point — the API, the CLI and a future schedule all come
+    through here, so there is one definition of "an update was requested" and one
+    place the admission rule lives. It inserts a `queued` row and returns; the
+    stages are `app/nrb/runner.py`'s to execute.
+
+    Why it takes no advisory lock: this runs inside an HTTP request and must
+    return in milliseconds, while the lock is held for the whole of a run's
+    orchestration (minutes, once `sync` is involved). Taking it here would make
+    the API's answer depend on whether a runner happened to be mid-flight, which
+    is exactly the coupling that made the previous synchronous design a problem.
+
+    So admission is guarded twice, on purpose:
+
+      * the SELECT gate below, which is what produces the useful `PipelineBusy`
+        carrying the run already in progress; and
+      * `ux_nrb_pipeline_runs_one_active`, a UNIQUE index over a constant
+        restricted to the active statuses, which is what makes the gate not have
+        to be correct. Two simultaneous requests both passing the SELECT end with
+        one insert and one `IntegrityError` — caught below and answered exactly as
+        a lost race should be, with the run that won.
+
+    `settle_waiting` runs first for the reason it always does: a run whose jobs
+    have all finished but which nobody polled must stop counting as active, or
+    the first unobserved completion wedges every later request.
+    """
+    from ..db.session import SessionLocal
+
+    Session = session_factory or SessionLocal
+
+    async with Session() as session:
+        await settle_waiting(session)
+        await session.commit()
+
+    async with Session() as session:
+        active = await active_run(session)
+        await session.rollback()
+    if active is not None:
+        raise PipelineBusy(active)
+
     async with Session() as session:
         row = NRBPipelineRun(
             trigger=trigger,
             requested_by=requested_by,
-            status=PIPELINE_RUNNING,
-            stage=scope.stages[0] if scope.stages else "done",
+            status=PIPELINE_QUEUED,
+            stage=PIPELINE_QUEUED,
             department=scope.department,
-            scope=scope.as_dict(),
+            # `key_list` is the verbatim scope for the RUNNER to read back;
+            # `as_dict`'s `keys` stays a count, which is what a status view wants.
+            scope={**scope.as_dict(), "key_list": list(scope.keys)},
             counters={},
-            started_at=datetime.now(timezone.utc),
-            heartbeat_at=datetime.now(timezone.utc),
         )
         session.add(row)
-        await session.flush()
-        run_id = row.id
+        try:
+            await session.flush()
+        except IntegrityError:
+            # Lost the race to the singleton index. Not an error to the caller —
+            # the same answer the gate would have given a moment earlier.
+            await session.rollback()
+            winner = await active_run(session)
+            await session.rollback()
+            raise PipelineBusy(winner) from None
+        view = _view(row)
         await session.commit()
-    return run_id
+
+    logger.info(
+        "NRB pipeline run %s accepted (%s, stages=%s, dept=%s)",
+        view.id, trigger, ",".join(scope.stages), scope.department,
+    )
+    return view
 
 
 async def _mark_stage(Session, run_id: int, stage: str, counters: dict) -> None:
@@ -599,24 +785,30 @@ async def _finish(
         await session.commit()
 
 
-async def start(
-    scope: PipelineScope,
+async def execute_run(
+    run_id: int,
     *,
-    trigger: str = "cli",
-    requested_by: str | None = None,
     engine: AsyncEngine | None = None,
     session_factory: async_sessionmaker[AsyncSession] | None = None,
     dry_run: bool = False,
 ) -> RunView:
-    """Run the pipeline once. Returns the run as it stands when staging ends.
+    """Execute one ALREADY-ACCEPTED run: claim it, stage it, record it.
 
-    Raises `PipelineBusy`, carrying the run in progress, when an NRB update is
-    already active. That is TWO conditions, not one: another orchestrator holding
-    the lock, and — because the lock is released the moment orchestration returns
-    while the jobs it queued outlive it — a durable run still in `running` or
-    `awaiting_jobs`. It does not wait and does not queue: waiting would let a
-    cron pile up behind a slow manual run, and an API wants to answer "already
-    running, here it is" immediately.
+    The second half of the pair. `request_run` admitted the request and returned;
+    this is what `app/nrb/runner.py` calls to actually do it, holding the advisory
+    lock for the whole of it so two runners can never orchestrate at once.
+
+    Returns the run as it stands when staging ends — usually `awaiting_jobs`,
+    because the RAG worker owns everything after the enqueue.
+
+    Three ways it declines to do the work, none of them an error:
+
+      * `LockBusy` from the lock — another runner is mid-flight. Raised as
+        `PipelineBusy` carrying that runner's `running` row.
+      * the run is no longer `queued` — another runner claimed it between the
+        poll and the claim, or the sweep failed it. `_claim` returns None and the
+        current row is returned untouched.
+      * `run_id` does not exist.
 
     A stage that RAISES ends the run `failed` with the stage named, and stops —
     later stages would be operating on a corpus state the failed stage was
@@ -624,8 +816,9 @@ async def start(
     anything; they surface in the counters and make the run `partial`.
 
     The searchable corpus is untouched by any failure here. This function
-    creates and enqueues; it never archives, never deletes and never writes a
-    chunk.
+    creates and enqueues; it never recovers, never embeds, never archives and
+    never writes a chunk — that division is why the RAG worker exists and is not
+    changed by moving orchestration into a process of its own.
     """
     from ..db.session import SessionLocal, engine as app_engine
     from . import corpus as corpus_mod
@@ -635,41 +828,32 @@ async def start(
 
     engine = engine or app_engine
     Session = session_factory or SessionLocal
+    scope = PipelineScope()
 
     try:
         async with advisory_lock(engine, PIPELINE_LOCK_KEY, what="NRB pipeline"):
-            # Order is load-bearing.
-            #
-            # 1. Sweep runs left `running` by a dead orchestrator. Safe with no
-            #    timeout precisely because we hold the lock: an orchestrator is
-            #    alive IFF it holds this key.
-            # 2. Reconcile every `awaiting_jobs` run, so one whose jobs have all
-            #    finished stops counting as active. Without this, step 3 would
-            #    wedge the pipeline on a run nobody happened to poll.
-            # 3. Refuse if an update is STILL active. `awaiting_jobs` is an
-            #    active NRB update: its documents are mid-ingest, and a second
-            #    orchestrator would stage more work on top of a corpus state the
-            #    first one has not finished establishing. The advisory lock alone
-            #    cannot express this — it is released when orchestration returns,
-            #    while the jobs outlive it by design — so the durable row is what
-            #    decides, and the lock is what makes checking-then-inserting
-            #    atomic against a concurrent starter.
+            # Sweep runs left `running` by a dead orchestrator BEFORE claiming.
+            # Safe with no timeout precisely because we hold the lock: an
+            # orchestrator is alive IFF it holds this key, so a `running` row is
+            # a corpse. It must happen before the claim, or a crashed run would
+            # keep the singleton index occupied and nothing could ever be
+            # accepted again.
             async with Session() as session:
                 await sweep_abandoned(session)
-                await settle_waiting(session)
                 await session.commit()
-            async with Session() as session:
-                active = await active_run(session)
-                await session.rollback()
-            if active is not None:
-                raise PipelineBusy(active)
 
-            run_id = await _open_run(
-                Session, trigger=trigger, requested_by=requested_by, scope=scope
-            )
+            claimed = await _claim(Session, run_id)
+            if claimed is None:
+                # Someone else claimed it, or it is no longer `queued` at all
+                # (swept, or already run). Not this runner's work.
+                async with Session() as session:
+                    view = await get_run(session, run_id)
+                    await session.rollback()
+                return view  # type: ignore[return-value]
+            scope = claimed
             logger.info(
-                "NRB pipeline run %s started (%s, stages=%s, dept=%s)",
-                run_id, trigger, ",".join(scope.stages), scope.department,
+                "NRB pipeline run %s started (stages=%s, dept=%s)",
+                run_id, ",".join(scope.stages), scope.department,
             )
             selection = scope.selection()
             queued = 0
@@ -758,3 +942,38 @@ async def start(
         view = await get_run(session, run_id)
         await session.rollback()
     return view  # type: ignore[return-value]
+
+
+async def start(
+    scope: PipelineScope,
+    *,
+    trigger: str = "cli",
+    requested_by: str | None = None,
+    engine: AsyncEngine | None = None,
+    session_factory: async_sessionmaker[AsyncSession] | None = None,
+    dry_run: bool = False,
+) -> RunView:
+    """Request a run AND execute it here. `request_run` then `execute_run`.
+
+    The synchronous convenience, and deliberately nothing more than those two
+    calls in that order — so it is not a third orchestration path, it is the
+    same one without the process boundary. Used by
+    `scripts/nrb_pipeline.py --run-now` (a laptop session wants the answer, not a
+    daemon) and by tests.
+
+    **The API never calls this.** `POST /v1/nrb/runs` calls `request_run` and
+    returns; staging is `app/nrb/runner.py`'s. That separation is the whole point
+    of Phase 7 step 6 — a request that included `sync` used to hold an HTTP
+    connection open for minutes — and collapsing it back here would undo it.
+    """
+    # Same first move a runner makes: this process is able to orchestrate, so it
+    # is the one that can prove nothing else is and clear a corpse out of the
+    # active slot. Without it, one crashed run would refuse every later request.
+    await recover_abandoned(engine=engine, session_factory=session_factory)
+    view = await request_run(
+        scope, trigger=trigger, requested_by=requested_by,
+        session_factory=session_factory,
+    )
+    return await execute_run(
+        view.id, engine=engine, session_factory=session_factory, dry_run=dry_run
+    )
