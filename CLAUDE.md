@@ -164,6 +164,15 @@ re-deriving status from chat history.
 - Migrations: `.venv/bin/alembic revision --autogenerate -m "msg"` then `.venv/bin/alembic upgrade head`
 - Tests: `.venv/bin/pytest`
 - Config via `.env` (see `.env.example`). `DATABASE_URL` and `JWT_SECRET` are required.
+- **Three long-running processes, three jobs.** The API accepts work; neither of
+  the other two is optional if NRB is in use, and an accepted run just sits
+  `queued` without them:
+  ```
+  .venv/bin/uvicorn app.main:app --port 8000    # accepts (never parses/embeds)
+  .venv/bin/python -m app.nrb.runner            # NRB staging: sync→fetch→extract→enqueue
+  .venv/bin/python -m app.rag.worker            # recovery→chunk→embed→supersession
+  ```
+  For NRB work every one of them needs `DATABASE_URL=…/local_ai_gateway_p4`.
 
 ## Postgres (local dev)
 Local PG17 via TCP. Superuser: `postgres`/`postgres` on 127.0.0.1:5432 (peer auth
@@ -205,9 +214,17 @@ order, persisting NOTHING itself, run via `scripts/nrb_recover.py`);
 (`nrb_recoveries`/`nrb_recovery_units`; the ONLY file that persists recovered
 text, reached from `worker._load_chunks` via `chunks_for_blob`, operated by
 `scripts/nrb_recovery_cache.py --stats/--reuse-check/--purge`);
-`pipeline` = Phase 7 step 4, the shared runner (`nrb_pipeline_runs` /
-`nrb_pipeline_run_jobs`; calls the stage services, never a subprocess; run via
-`scripts/nrb_pipeline.py`); `supersession` = Phase 7 step 3, which version of a logical NRB source is
+`pipeline` = Phase 7 steps 4+6, the shared orchestration SERVICE
+(`nrb_pipeline_runs` / `nrb_pipeline_run_jobs`; `request_run` admits a `queued`
+run, `execute_run` claims and stages it, `start` = both composed, `reconcile`
+/`recover_abandoned` are the recovery pair; calls the stage services, never a
+subprocess); `runner` = the PROCESS that executes them
+(`python -m app.nrb.runner`, gateway image, compose service `nrb-runner`; a poll
+loop and nothing else — no locking, transitions or stage logic);
+`router`+`schemas` = the thin admin API (`/v1/nrb/*`, admin-only via
+`require_admin`; the ONLY model-facing-adjacent HTTP surface NRB has, and it
+calls one service per handler);
+`supersession` = Phase 7 step 3, which version of a logical NRB source is
 searchable (logical identity = `documents.metadata.comparison_key`; called from
 `worker._activate` INSIDE the replacement transaction; exercised by
 `scripts/nrb_supersession_exercise.py`); `rag` = the ONLY
@@ -977,3 +994,13 @@ truncation). File follow-ups (pagination, orphan cleanup of root-level
 pre-scoping files). Client-side stream cancellation/abort.
 Deployment hardening (firewall internal deps to the gateway IP) is deferred by
 the user for now.
+
+**NRB, in the order they became unblocked** (full reasoning in
+`docs/nrb-integration.md` §26.11): the thin admin UI over `/v1/nrb/*`; then
+cron/systemd (which triggers *through* `pipeline.request_run` — it does not
+replace the runner); the `RAG_DOCS_DIR` duplication decision, which is still the
+gate on any full-corpus ingest (§20.7 item 2); Phase 8 `search_nrb_documents`;
+and GPU-server deployment, still blocked on §19.1 (no host, no key, no SSH user
+in this environment). Two known-and-recorded, not fixed: `075bf12eb087`'s
+broken-ToUnicode text layer (a `native-3` + new cohort, §17.6) and the Nepali
+semantic review of the §15 pack — **conversion correctness is still unmeasured**.
