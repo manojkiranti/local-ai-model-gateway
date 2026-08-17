@@ -1231,6 +1231,84 @@ def test_a_queued_run_refuses_a_second_request(tmp_path, monkeypatch):
     assert busy.run.status == "queued"
 
 
+def test_two_admissions_that_both_pass_the_gate_are_arbitrated_by_the_index(
+    tmp_path, monkeypatch
+):
+    """The lost race itself: the index refuses, and the loser gets `PipelineBusy`.
+
+    The test above proves the two guards SEPARATELY — the SELECT gate turning a
+    second request away, and the database refusing the state when handed it
+    directly. Neither reaches `request_run`'s `except IntegrityError`, which is
+    the code that turns a lost race into the same answer the gate would have
+    given a moment earlier.
+
+    THE INTERLEAVING IS FORCED, DELIBERATELY. Both callers have to observe an
+    empty gate before either inserts, and hoping two `asyncio.gather`'d calls
+    happen to interleave that way gives a test that quietly goes through the GATE
+    whenever they do not — asserting nothing about the handler while looking like
+    it does. So the gate is blinded for exactly its two observations, which is
+    precisely what a real race makes true (both SELECTed before either
+    INSERTed), and the handler's own winner lookup — the third call — runs for
+    real. Blinding that one too would answer with `run: None` and every
+    assertion below would still pass.
+
+    Two independent connections are NOT the way to write this: the loser's
+    INSERT blocks on the winner's uncommitted row, and this harness's outer
+    transaction is never committed, so it would hang rather than fail.
+    """
+    calls: list[str] = []
+    _stub_stages(monkeypatch, calls)
+    _patch_store(monkeypatch, tmp_path)
+
+    real_active_run = pipeline.active_run
+    gate_observations: list[str] = []
+
+    async def blind_gate(session, **kwargs):
+        # Calls 1 and 2 are the two gates. Call 3 is the handler resolving the
+        # winner after its rollback, and that one must see the truth.
+        if len(gate_observations) < 2:
+            gate_observations.append("blind")
+            return None
+        return await real_active_run(session, **kwargs)
+
+    monkeypatch.setattr(pipeline, "active_run", blind_gate)
+    scope = pipeline.PipelineScope(department=DEPT_CODE, limit=1)
+
+    async def body(session, Session, engine):
+        from sqlalchemy import select
+
+        from app.nrb.models import PIPELINE_ACTIVE_STATUSES, NRBPipelineRun
+
+        await _department(session)
+        await session.commit()
+        winner = await pipeline.request_run(scope, session_factory=Session)
+        with pytest.raises(pipeline.PipelineBusy) as excinfo:
+            await pipeline.request_run(scope, session_factory=Session)
+        active_ids = set(
+            (
+                await session.execute(
+                    select(NRBPipelineRun.id).where(
+                        NRBPipelineRun.status.in_(PIPELINE_ACTIVE_STATUSES)
+                    )
+                )
+            ).scalars().all()
+        )
+        return winner, excinfo.value, active_ids
+
+    winner, busy, active_ids = _run(body)
+
+    # Both gates were blind, so the only thing that can have refused the second
+    # request is `ux_nrb_pipeline_runs_one_active`.
+    assert gate_observations == ["blind", "blind"]
+    # And the loser was ANSWERED, not crashed: an unhandled `IntegrityError`
+    # would not have been caught by `pytest.raises(PipelineBusy)` above.
+    assert busy.run is not None and busy.run.id == winner.id
+    assert busy.run.status == "queued"
+    # Exactly one active run exists — the winner. Nothing was admitted twice.
+    assert active_ids == {winner.id}
+    assert calls == []
+
+
 def test_a_runner_crash_mid_run_is_recovered_by_the_next_one(tmp_path, monkeypatch):
     """The existing sweep, now also unblocking ADMISSION.
 

@@ -460,6 +460,54 @@ def test_lock_only_contention_uses_the_same_busy_shape_with_a_null_run(
     assert set(body) == {"started", "run", "detail"}
 
 
+def test_a_lost_admission_race_answers_409_with_the_winner_not_500(
+    env, stub_stages, monkeypatch
+):
+    """The lost race over HTTP: the normalized envelope, never a raw 500.
+
+    `test_a_queued_run_makes_a_second_trigger_a_409_with_that_run` above is the
+    same outcome reached through the SELECT gate. This one reaches it through
+    `ux_nrb_pipeline_runs_one_active`, which is the guard that actually holds when
+    two admissions overlap — the gate is blinded for exactly one observation, so
+    the second POST really does get past it and collide with the winner's
+    committed row instead of being turned away.
+
+    Without `request_run`'s `except IntegrityError`, the violation would surface
+    as a 500 and a client would read a database error for an ordinary "an update
+    is already running". The handler's own winner lookup is the second call and
+    runs for real, which is what lets a UI point at the run that won.
+    """
+    from app.nrb import pipeline as pipeline_mod
+
+    client, admin, _member, code = env
+    first = _trigger(client, admin, code)
+    assert first.status_code == 202
+    run_id = first.json()["run"]["id"]
+
+    real_active_run = pipeline_mod.active_run
+    gate_observations: list[str] = []
+
+    async def blind_once(session, **kwargs):
+        if not gate_observations:
+            gate_observations.append("blind")
+            return None
+        return await real_active_run(session, **kwargs)
+
+    monkeypatch.setattr(pipeline_mod, "active_run", blind_once)
+
+    second = _trigger(client, admin, code)
+    # The gate really was passed — this is the index's refusal, not the gate's.
+    assert gate_observations == ["blind"]
+    assert second.status_code == 409
+    body = second.json()
+    assert set(body) == {"started", "run", "detail"}
+    assert body["started"] is False
+    assert body["run"]["id"] == run_id
+    assert body["run"]["status"] == "queued"
+    assert "already in progress" in body["detail"]
+    assert stub_stages == []
+
+
 # --------------------------------------------------------------------------- #
 # Reading runs.
 # --------------------------------------------------------------------------- #
