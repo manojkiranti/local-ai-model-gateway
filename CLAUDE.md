@@ -25,8 +25,12 @@ instead of guessing the environment; update it when any of it changes.
 exists only on `feat/rag-source-citations` — which is **deferred, not abandoned**
 (user's decision, `docs/nrb-integration.md` §9.10). So on this branch `alembic
 current` against the dev DB fails by design. Do **not** "fix" it with `alembic
-stamp`, by dropping `chat_messages.sources`, or by recreating the DB; the lineage
-gets reconciled before NRB is merged, not before it is built.
+stamp`, by dropping `chat_messages.sources`, or by recreating the DB. The §9.10
+point-4 decision is now **made (§27, 2026-08-17): citations stays deferred and NRB
+merges FIRST** as a single clean linear head — there is no reconciliation to do on
+this branch (the graph is already one head off `main`, proven `base→head` on p4
+with zero reference to `d4a91f2c7b3e`), and the stranded dev-DB stamp is the
+citations owner's to resolve when citations is un-deferred, never NRB's.
 `DATABASE_URL=…/local_ai_gateway_p4` for every NRB sync, fetch and DB test.
 
 **NRB integration status/roadmap lives in `docs/nrb-integration.md`** —

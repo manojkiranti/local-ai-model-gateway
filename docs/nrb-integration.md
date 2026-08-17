@@ -5017,3 +5017,97 @@ native text, the npttf2utf GPL-3.0 distribution decision, full-corpus retrieval
 quality, native-2, the recovery-cache versioning, supersession semantics, the
 frozen Phase 6A/6B evidence, the Phase 7 cohort, the `ri*` scratch-DB debris, and
 server access (§19.1).
+
+## 27. Alembic lineage — the §9.10 point-4 decision is made (no reconciliation needed on this branch)
+
+**Date:** 2026-08-17. **Question §9.10 point 4 left open:** what happens to the
+deferred citations lineage when NRB is merged. **Decision (the user's):** citations
+**stays deferred** and NRB merges **first**. **Consequence:** there is nothing to
+reconcile in the migration GRAPH on `feat/nrb-sitemap` — it is already a single
+clean linear head on top of `main`, and the only divergence artifact is one stamped
+database, which stays exactly as §9.10 point 5 requires.
+
+### 27.1 The topology, re-measured (git only, no DB)
+
+Both feature branches fork from the SAME commit — `main`'s head `c33c0fd56028`
+(add rag tables):
+
+```
+main head = c33c0fd56028
+     ├── feat/nrb-sitemap ──► 9a1c4f7b2e05 → 2b7f5c9d1a34 → b1bea6ac36c5
+     │                        → 714264eba2fd → 8f2d1c05a7b4 → 1fb5a0d183d6
+     │                        → f4c1a90b7d62 (HEAD)      [7 NRB migrations, linear]
+     └── feat/rag-source-citations ──► d4a91f2c7b3e (chat_messages.sources)  [DEFERRED]
+```
+
+`9a1c4f7b2e05.down_revision = c33c0fd56028` and `d4a91f2c7b3e.down_revision =
+c33c0fd56028` — the two are **siblings off `main`**, confirming §9.11. There is no
+fork *on this branch*; `alembic heads` prints exactly one.
+
+### 27.2 The decision, and how it revises §9.11
+
+§9.11's *preferred* route was **citations-first**: land `feat/rag-source-citations`
+on `main`, then rebase `feat/nrb-sitemap` and re-point `9a1c4f7b2e05` at
+`d4a91f2c7b3e`. Its whole rationale was that the dev DB is already stamped at
+`d4a91f2c7b3e`, so citations-first lets that database later apply exactly the NRB
+migrations with **zero** special handling.
+
+That route requires **un-deferring citations now**, which §9.10 declines. So the
+order flips to **NRB-first**, which is the only route consistent with keeping
+citations deferred. It agrees with §9.11 on the thing that matters — **no Alembic
+merge revision, ever** (the graph stays linear) — and differs only in order and in
+one accepted cost: the dev DB stays stranded at `d4a91f2c7b3e` until citations is
+picked up. It already is stranded; NRB dev/test runs on `local_ai_gateway_p4`; the
+dev DB carries **no** NRB schema. Nothing gets worse, and §9.10 point 5 still holds
+in full — no stamp, no drop, no recreate, no editing `d4a91f2c7b3e`.
+
+### 27.3 Proof the NRB-first merge is clean (run 2026-08-17)
+
+* **Offline, script only.** `alembic upgrade head --sql` resolves `base → head`,
+  emits all **12** revisions (main's 5 + NRB's 7) in order, exit 0, and references
+  `d4a91f2c7b3e` **zero** times. The chain is self-contained.
+* **On a real Postgres.** `local_ai_gateway_p4` sits at `f4c1a90b7d62`, reached via
+  this exact chain, so every NRB migration has already applied cleanly on top of
+  `main`'s baseline against a live database.
+* **Schema disjointness.** p4 has **no** `chat_messages.sources` column — the
+  deferred schema never leaked into NRB's database. The two lineages are disjoint in
+  the graph AND on disk.
+
+### 27.4 The runbook
+
+**Merging NRB to `main` (citations deferred):** `main` is at `c33c0fd56028`;
+`feat/nrb-sitemap` is 7 linear migrations ahead. The merge adds a single linear
+head — **no merge revision, no rebase of `9a1c4f7b2e05`** (that rebase belongs to
+§9.11's citations-first route, which this decision does not take). A database being
+upgraded must be at `c33c0fd56028` or an earlier ancestor, **not** at
+`d4a91f2c7b3e`; a database stamped at the sibling revision (the current dev DB) is
+handled by the citations step below, not by the NRB merge. Verify a real DB reaches
+`f4c1a90b7d62`, and — per §18 — verify a worker by its route split on a known blob,
+never by migration success.
+
+**Un-deferring citations later (the citations owner's, not NRB's):** rebase
+`d4a91f2c7b3e` so its `down_revision` becomes the then-current `main` head, turning
+the sibling into a descendant — no merge revision, because by then there is one
+head to sit on. The dev DB, already at `d4a91f2c7b3e` with the `sources` column but
+no NRB schema, is the only database that then needs care, and it is reconciled *at
+that point* by whoever owns citations. This is the step §9.10 point 4 defers; NRB
+does not touch it.
+
+### 27.5 Evaluation & Improvement (Alembic lineage)
+
+**Success metric.** Merging `feat/nrb-sitemap` to `main` yields exactly one Alembic
+head, and a database at `main`'s baseline reaches it with `alembic upgrade head` and
+no missing-revision error. Proxy for SQLs only; nothing here is user-facing.
+
+**Eval.** Two checks, both 2026-08-17: offline `base→head` resolution (12/12
+revisions, 0 references to `d4a91f2c7b3e`) and a live Postgres already at head via
+the chain (p4). Both pass. Not evaluated, by design: the citations-side dev-DB
+reconciliation, which is out of scope until citations is un-deferred.
+
+**Feedback capture.** `alembic heads` (must stay 1) and `alembic history` are the
+standing signals; a second head appearing off any point other than the current head
+is the regression this section guards against. No new store.
+
+**Review loop.** At the NRB→`main` merge (execute §27.4), and again if citations is
+un-deferred. If a future branch adds a migration off a point other than the current
+single head, §27.1's topology is stale and must be re-measured before merging.
