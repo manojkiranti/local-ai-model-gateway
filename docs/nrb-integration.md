@@ -19,9 +19,10 @@ build-only so far — see §11).
 | 4 | Persistent catalog + idempotent metadata sync | **Done, live-run twice 2026-08-14** — §9 |
 | 5 | Attachment download → MIME validation → SHA-256 → local storage | **Done, live-fetched 2026-08-14** — §10 |
 | 6A | Native extraction + quality profiling (**no OCR**) | **Done, live-profiled 2026-08-15** — 400-file benchmark fetched, 381 extracted, pypdf-vs-Docling calibrated — §11 |
-| 6B | OCR / legacy-font strategy, chosen from 6A's evidence | **Task 1 (conversion) evaluated, NOT deployed — §12. Task 2 (`native-2` routing classifier) MEASURED and recommended 2026-08-15 — §13.** Conversion routing + OCR strategy still not started |
-| 7 | Chunk + embed into the existing `documents`/`document_chunks` pipeline | Not started |
-| 8 | `search_nrb_documents` tool | Not started |
+| 6B | OCR / legacy-font strategy, chosen from 6A's evidence | **Done** — Task 1 conversion evaluated (§12), Task 2 `native-2` validated on a frozen holdout (§13–15), Task 3 holdout (§14–15), Task 4 page-level routing + PP-OCRv5 fallback implemented (§16), Task 5 NRB text in dept RAG on a sample (§17). Conversion CORRECTNESS still `awaiting_nepali_review` (§15) |
+| 7 | Chunk + embed into the existing `documents`/`document_chunks` pipeline | **Done (steps 1–6)** — corpus ingest driver + frozen cohort (§20), retry + versioned recovery cache (§21), supersession (§22), shared pipeline service + durable run rows (§23–24), thin admin API `/v1/nrb/*` (§25), runner process (§26). Alembic head `f4c1a90b7d62` |
+| 8 | NRB document search | **Done (§29)** — via the existing `search_department_docs` (NOT a separate `search_nrb_documents`): `RetrievedChunk` carries chunk+doc metadata, citations show the extraction route + a "machine-recovered — VERIFY" caveat for OCR/legacy pages + source URL & published date. Proven on the sample |
+| — | **The corpus is NOT ingested** | The one remaining step is a *run*, not code: §27 (Alembic), §28 (`RAG_DOCS_DIR`) and §29 all cleared the structural gates, so a full-corpus ingest needs only the go-ahead. GPU-server deployment still blocked on §19.1 |
 
 **The roadmap was renumbered when Phase 4 was specified.** It previously read
 "Phase 4 = documents through the RAG pipeline (download/parse/chunk/embed), Phase
