@@ -4396,6 +4396,10 @@ runs are never swept: they hold no lock, they are legitimately unfinished, and
 their jobs are still draining. `heartbeat_at` advances at each stage boundary
 for observability and nothing depends on it.
 
+**Revised by the §24 lifecycle review:** `awaiting_jobs` *does* block a second
+trigger. The paragraph below as originally written ("does NOT block a new run")
+was the wrong call — see §24.3.
+
 ### 23.6 Scoping and retry
 
 `PipelineScope` carries every bound the stage services already accept — keys,
@@ -4511,3 +4515,107 @@ quality, native-2 (not modified; native-3 not started), the recovery-cache
 versioning, supersession semantics, the frozen Phase 6A/6B evidence, the Phase 7
 cohort (not re-run, not expanded), the `ri*` scratch-DB debris, and server access
 (§19.1) — this is still the laptop.
+
+## 24. Pipeline lifecycle review — two invariants a status API will lean on
+
+**Date:** 2026-08-17. **Scope:** one focused review of `app/nrb/pipeline.py` and
+the run/job models, and the two smallest fixes it justified. No new table, no
+migration, no HTTP.
+
+### 24.1 What was already safe, and why that was not enough
+
+The scenario the review started from — *`--retry-failed` reuses `ingest_jobs` row
+J, J's status changes, and Run A's history changes with it* — **cannot happen
+today, and the premise is worth stating precisely**: `jobs.enqueue` always
+INSERTs, so a retry creates a NEW job against the existing document rather than
+reviving the old one; `claim_next` only touches `queued` rows and `sweep_stale`
+only `running` ones. A terminal job row is therefore never mutated.
+
+So the invariant held — but **derivatively**, borrowed from `app/rag/jobs.py`
+rather than held here, and `_job_counts` recomputed a terminal run's counts from
+live rows on every read. Two ways that goes wrong:
+
+1. A future in-place retry (or any `UPDATE ingest_jobs` by hand) would silently
+   rewrite a finished run's history.
+2. **Reachable today:** if anything raises *after* `_record_jobs` has associated
+   the jobs — a database blip in `_mark_stage` — the run is recorded `failed`
+   while its jobs are still `queued`. They then drain, and the run would keep
+   `status = failed` while its job counts drifted to `succeeded: N`: a
+   self-contradictory row for a UI to render.
+
+### 24.2 The fix — freeze the counts when the run leaves the active states
+
+`_freeze` is one JSONB key, `counters['jobs']`, stamped by both terminal paths
+(`reconcile`'s transition out of `awaiting_jobs`, and `_finish` for the
+stage-failure and queued-nothing paths). `_job_counts` returns the stamp for a
+terminal run and queries live only while the run is `running`/`awaiting_jobs`.
+
+No migration and no second table: `counters` is already the bounded per-stage
+integer rollup, and `jobs` is the one key not contributed by a stage — hence its
+name. Runs written before this change carry no stamp and fall back to the live
+query, which is correct for them precisely because their jobs are terminal and
+immutable.
+
+`reconcile` on a terminal run remains a no-op that never rewrites `finished_at`;
+a status endpoint will poll it on every request.
+
+### 24.3 `awaiting_jobs` now blocks a second trigger — a reversed decision
+
+§23.5 said an `awaiting_jobs` run "does NOT block a new run", on the grounds that
+every stage is idempotent. That was wrong, and the review reversed it: a waiting
+run's documents are mid-ingest, and a second orchestrator would stage more work
+on top of a corpus state the first has not finished establishing.
+
+**The advisory lock cannot express this.** It is released the moment
+orchestration returns, while the jobs it queued outlive it by design. So
+exclusion is now the durable row, and `start` does three things in a
+load-bearing order, all while holding the lock:
+
+1. `sweep_abandoned` — fail runs left `running` by a dead orchestrator. Safe with
+   no timeout because holding the lock proves none is alive.
+2. `settle_waiting` — reconcile every `awaiting_jobs` run. **This is what stops
+   the new rule becoming a trap:** `reconcile` only advances a run when somebody
+   reads it, so a run whose jobs had all finished but which nobody polled would
+   otherwise block every future trigger forever. A stale wait now costs one
+   query, not an operator.
+3. Refuse with `PipelineBusy` if a run is *still* `running` or `awaiting_jobs`,
+   carrying that run so a future endpoint can return it.
+
+Holding the lock across check-then-insert is what makes this safe against a
+concurrent starter; the lock is still the mechanism, just no longer the whole
+answer.
+
+### 24.4 Tests — 28 in `tests/test_nrb_pipeline.py`, all passing
+
+Five added, two existing ones corrected for the reversed decision:
+
+- a terminal run reports what happened *during it*: Run A fails, Run B retries
+  the same document and succeeds, **and the old job row is then flipped to
+  `succeeded` by hand** — Run A still reads `failed` / `{failed: 1}` on two
+  successive reads, with `finished_at` unmoved;
+- a run that goes terminal with jobs in flight freezes `{queued: 1}` and does not
+  drift to `{succeeded: 1}` once the worker drains them;
+- a waiting run blocks a second trigger with **no lock held**, returns itself in
+  `PipelineBusy`, runs zero stages, and is not swept;
+- a waiting run whose jobs all finished does not wedge the pipeline — the next
+  `start` settles it to `succeeded` and proceeds;
+- the active/terminal status split is asserted against `PIPELINE_STATUSES`, so
+  adding a status without deciding which side of the gate it falls on fails here.
+
+Corrected: the second-unchanged-run test now drains the first pass before
+triggering the second (the honest sequence); the sweep test no longer plants an
+`awaiting_jobs` row, because `settle_waiting` legitimately settles a waiting run
+that has no jobs — a separate test now covers a *genuinely* waiting one.
+
+Only `app/nrb/pipeline.py` changed, so only the pipeline suite was run, plus a
+live CLI smoke: a `--stage rag` pass over the 31-key cohort reported
+`already_current=31`, settled `succeeded` immediately, and stamped
+`counters.jobs = {}`.
+
+### 24.5 The gate
+
+Unchanged from §23.11, with both invariants now held here rather than inherited:
+**the lifecycle is safe enough for the thin admin API.** A terminal run is
+immutable history, an active update — in either of its two states — refuses a
+duplicate, and a crashed orchestrator is recoverable without a timeout. The
+endpoints are still **not implemented**.

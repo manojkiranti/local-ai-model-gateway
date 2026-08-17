@@ -254,6 +254,11 @@ def test_a_second_unchanged_run_does_no_upstream_work_and_queues_nothing(
         scope = pipeline.PipelineScope(department=DEPT_CODE, limit=10)
 
         first = await pipeline.start(scope, engine=engine, session_factory=Session)
+        # The worker drains the first pass before the second is triggered. That
+        # ordering is not incidental: `awaiting_jobs` is an active update and a
+        # second trigger during it gets `PipelineBusy` (asserted separately).
+        await _set_jobs(session, first.id, "succeeded")
+        await session.commit()
         second = await pipeline.start(scope, engine=engine, session_factory=Session)
         return first, second
 
@@ -312,29 +317,27 @@ def test_a_run_abandoned_by_a_dead_orchestrator_is_swept_by_the_next_one(
 ):
     """Holding the lock is proof no orchestrator is alive, so no timeout is needed.
 
-    A run left `running` by a killed process would otherwise sit there forever
-    and make a status view lie. `awaiting_jobs` runs are deliberately NOT swept:
-    they hold no lock, they are legitimately unfinished, and their jobs are
-    still being drained by the worker.
+    A run left `running` by a killed process would otherwise sit there forever,
+    make a status view lie and — now that `awaiting_jobs` and `running` both
+    block a new trigger — wedge the pipeline permanently. The sweep happens
+    AFTER the lock is obtained and before the active-run gate, which is what
+    makes a crashed orchestrator recoverable rather than fatal.
     """
     _stub_stages(monkeypatch, [])
     _patch_store(monkeypatch, tmp_path)
 
     async def body(session, Session, engine):
         await _department(session)
-        planted = {}
-        for status, stage in (("running", "fetch"), ("awaiting_jobs", "waiting")):
-            planted[status] = (
-                await session.execute(
-                    text(
-                        "INSERT INTO nrb_pipeline_runs (trigger, status, stage, "
-                        " scope, counters, started_at) VALUES "
-                        "('cli', :s, :g, '{}'::jsonb, '{}'::jsonb, now()) "
-                        "RETURNING id"
-                    ),
-                    {"s": status, "g": stage},
+        planted = (
+            await session.execute(
+                text(
+                    "INSERT INTO nrb_pipeline_runs (trigger, status, stage, "
+                    " scope, counters, started_at) VALUES "
+                    "('cli', 'running', 'fetch', '{}'::jsonb, '{}'::jsonb, now()) "
+                    "RETURNING id"
                 )
-            ).scalar_one()
+            )
+        ).scalar_one()
         await session.commit()
 
         fresh = await pipeline.start(
@@ -348,23 +351,22 @@ def test_a_run_abandoned_by_a_dead_orchestrator_is_swept_by_the_next_one(
             (
                 await session.execute(
                     text("SELECT id, status FROM nrb_pipeline_runs WHERE id = ANY(:i)"),
-                    {"i": [planted["running"], planted["awaiting_jobs"], fresh.id]},
+                    {"i": [planted, fresh.id]},
                 )
             ).all()
         )
         error = (
             await session.execute(
                 text("SELECT error FROM nrb_pipeline_runs WHERE id = :i"),
-                {"i": planted["running"]},
+                {"i": planted},
             )
         ).scalar_one()
         return planted, fresh, rows, error
 
     planted, fresh, rows, error = _run(body)
-    assert rows[planted["running"]] == PIPELINE_FAILED
+    assert rows[planted] == PIPELINE_FAILED
     assert "did not finish" in error
-    assert rows[planted["awaiting_jobs"]] == PIPELINE_AWAITING   # untouched
-    assert rows[fresh.id] == PIPELINE_SUCCEEDED                  # the run we made
+    assert rows[fresh.id] == PIPELINE_SUCCEEDED   # the crash did not wedge us
 
 
 # --------------------------------------------------------------------------- #
@@ -758,3 +760,248 @@ def test_waiting_beats_every_other_signal():
     assert pipeline.resolve_status(
         {"fetch": {"failed": 5}}, {"queued": 1, "failed": 3}
     ) == PIPELINE_AWAITING
+
+
+# --------------------------------------------------------------------------- #
+# Lifecycle review (follow-up to §23): the two invariants a status API will
+# depend on and that neither the lock nor the job table enforces on its own.
+# --------------------------------------------------------------------------- #
+def test_a_terminal_run_reports_what_happened_during_it_not_what_happened_after(
+    tmp_path, monkeypatch
+):
+    """A finished run is HISTORY. Later work on the same documents cannot edit it.
+
+    Run A queues a job, the job fails, Run A settles `failed`. Later a retry
+    ingests the same document successfully. Run A must still say `failed` with
+    one failed job — otherwise a status view would rewrite the past, and "which
+    update broke the corpus" becomes unanswerable.
+
+    Note what makes the naive version of this safe today and why it is not
+    relied on: `jobs.enqueue` always INSERTs, so a retry creates a NEW job row
+    rather than reviving the old one, and `claim_next`/`sweep_stale` only touch
+    `queued`/`running` rows. The freeze holds the invariant HERE instead of
+    borrowing it from `app/rag/jobs.py`.
+    """
+    _stub_stages(monkeypatch, [])
+    _patch_store(monkeypatch, tmp_path)
+
+    async def body(session, Session, engine):
+        await _department(session)
+        await _blob(session, tmp_path, b"one", key="https://www.nrb.org.np/a.pdf")
+        await session.commit()
+        scope = pipeline.PipelineScope(department=DEPT_CODE, limit=10)
+
+        run_a = await pipeline.start(scope, engine=engine, session_factory=Session)
+        job_a = (
+            await session.execute(
+                text("SELECT job_id FROM nrb_pipeline_run_jobs WHERE run_id = :r"),
+                {"r": run_a.id},
+            )
+        ).scalar_one()
+        await _set_jobs(session, run_a.id, "failed")
+        await session.execute(
+            text("UPDATE documents SET status = 'failed' WHERE department_id IN "
+                 "(SELECT id FROM departments WHERE code = :c)"),
+            {"c": DEPT_CODE},
+        )
+        await session.commit()
+        async with Session() as s:
+            settled = await pipeline.reconcile(s, run_a.id)
+            await s.commit()
+
+        # Run B retries the same DOCUMENT and succeeds.
+        run_b = await pipeline.start(
+            pipeline.PipelineScope(department=DEPT_CODE, limit=10, retry_failed=True),
+            engine=engine, session_factory=Session,
+        )
+        await _set_jobs(session, run_b.id, "succeeded")
+        await session.commit()
+        async with Session() as s:
+            b_view = await pipeline.reconcile(s, run_b.id)
+            await s.commit()
+
+        # ...and, belt and braces, the old job row is mutated directly, which is
+        # the thing an in-place retry would do.
+        await session.execute(
+            text("UPDATE ingest_jobs SET status = 'succeeded' WHERE id = :i"),
+            {"i": job_a},
+        )
+        await session.commit()
+
+        async with Session() as s:
+            after = await pipeline.get_run(s, run_a.id)
+            again = await pipeline.reconcile(s, run_a.id)
+            await s.commit()
+        return settled, b_view, after, again
+
+    settled, b_view, after, again = _run(body)
+    assert settled.status == PIPELINE_FAILED and settled.jobs == {"failed": 1}
+    assert b_view.status == PIPELINE_SUCCEEDED and b_view.jobs == {"succeeded": 1}
+    # Run A, read twice, after the underlying job row was flipped to succeeded.
+    assert after.status == PIPELINE_FAILED
+    assert after.jobs == {"failed": 1}
+    assert again.status == PIPELINE_FAILED
+    assert again.jobs == {"failed": 1}
+    assert after.finished_at == again.finished_at        # never rewritten
+
+
+def test_a_run_that_goes_terminal_with_jobs_in_flight_freezes_them_as_they_were(
+    tmp_path, monkeypatch
+):
+    """The one path that reaches the defect without an in-place retry.
+
+    If anything raises AFTER `_record_jobs` has associated the jobs, the run is
+    recorded `failed` while they are still `queued`. They then drain — and
+    without the freeze the run would keep its `failed` status while its job
+    counts drifted to `succeeded`, which is a self-contradictory row for a UI to
+    render.
+    """
+    _stub_stages(monkeypatch, [])
+    _patch_store(monkeypatch, tmp_path)
+
+    real_mark = pipeline._mark_stage
+
+    async def explode_after_recording(Session, run_id, stage, counters):
+        if stage == "rag":
+            raise RuntimeError("database blip after the jobs were recorded")
+        return await real_mark(Session, run_id, stage, counters)
+
+    monkeypatch.setattr(pipeline, "_mark_stage", explode_after_recording)
+
+    async def body(session, Session, engine):
+        await _department(session)
+        await _blob(session, tmp_path, b"one", key="https://www.nrb.org.np/a.pdf")
+        await session.commit()
+
+        run = await pipeline.start(
+            pipeline.PipelineScope(department=DEPT_CODE, limit=10),
+            engine=engine, session_factory=Session,
+        )
+        assert run.status == PIPELINE_FAILED
+        assert run.jobs == {"queued": 1}          # frozen mid-flight, honestly
+
+        # The worker drains it anyway — the job is real and was queued.
+        await _set_jobs(session, run.id, "succeeded")
+        await session.commit()
+        async with Session() as s:
+            after = await pipeline.get_run(s, run.id)
+            await s.commit()
+        return run, after
+
+    run, after = _run(body)
+    assert after.status == PIPELINE_FAILED
+    assert after.jobs == {"queued": 1}            # NOT {"succeeded": 1}
+    assert after.counters["jobs"] == {"queued": 1}
+
+
+def test_a_waiting_run_blocks_a_second_trigger_and_is_not_swept(
+    tmp_path, monkeypatch
+):
+    """`awaiting_jobs` is still an active NRB update.
+
+    The advisory lock cannot express this: it is released the moment
+    orchestration returns, while the jobs it queued outlive it by design. So the
+    durable row is what refuses the second trigger, and the second trigger gets
+    the WAITING run back — which is what an admin endpoint needs to return. It
+    must also not be swept as abandoned; only `running` rows are.
+    """
+    calls: list[str] = []
+    _stub_stages(monkeypatch, calls)
+    _patch_store(monkeypatch, tmp_path)
+
+    async def body(session, Session, engine):
+        await _department(session)
+        await _blob(session, tmp_path, b"one", key="https://www.nrb.org.np/a.pdf")
+        await session.commit()
+        scope = pipeline.PipelineScope(department=DEPT_CODE, limit=10)
+
+        first = await pipeline.start(scope, engine=engine, session_factory=Session)
+        assert first.status == PIPELINE_AWAITING
+        calls.clear()
+
+        # No lock is held now — orchestration returned — and the trigger must
+        # still be refused.
+        with pytest.raises(pipeline.PipelineBusy) as excinfo:
+            await pipeline.start(scope, engine=engine, session_factory=Session)
+
+        still = (
+            await session.execute(
+                text("SELECT status FROM nrb_pipeline_runs WHERE id = :i"),
+                {"i": first.id},
+            )
+        ).scalar_one()
+        return first, excinfo.value, still, calls
+
+    first, busy, still, calls = _run(body)
+    assert calls == []                       # not one stage ran
+    assert busy.run is not None
+    assert busy.run.id == first.id
+    assert busy.run.status == PIPELINE_AWAITING
+    assert still == PIPELINE_AWAITING        # not swept, not failed
+
+
+def test_a_waiting_run_whose_jobs_all_finished_does_not_wedge_the_pipeline(
+    tmp_path, monkeypatch
+):
+    """The trap the blocking rule would otherwise set.
+
+    `reconcile` only advances a run when somebody reads it. So a run whose jobs
+    have all finished but which nobody polled would block every future trigger
+    forever. `settle_waiting` runs inside the lock, immediately before the
+    active-run gate, so a stale wait costs one query rather than an operator.
+    """
+    calls: list[str] = []
+    _stub_stages(monkeypatch, calls)
+    _patch_store(monkeypatch, tmp_path)
+
+    async def body(session, Session, engine):
+        await _department(session)
+        await _blob(session, tmp_path, b"one", key="https://www.nrb.org.np/a.pdf")
+        await _blob(session, tmp_path, b"two", key="https://www.nrb.org.np/b.pdf")
+        await session.commit()
+
+        first = await pipeline.start(
+            pipeline.PipelineScope(department=DEPT_CODE, keys=(
+                "https://www.nrb.org.np/a.pdf",
+            )),
+            engine=engine, session_factory=Session,
+        )
+        assert first.status == PIPELINE_AWAITING
+        # The worker finished, and NOBODY asked about the run.
+        await _set_jobs(session, first.id, "succeeded")
+        await session.commit()
+
+        second = await pipeline.start(
+            pipeline.PipelineScope(department=DEPT_CODE, keys=(
+                "https://www.nrb.org.np/b.pdf",
+            )),
+            engine=engine, session_factory=Session,
+        )
+        async with Session() as s:
+            settled = await pipeline.get_run(s, first.id)
+            await s.rollback()
+        return second, settled
+
+    second, settled = _run(body)
+    assert settled.status == PIPELINE_SUCCEEDED     # settled by the next start
+    assert settled.jobs == {"succeeded": 1}
+    assert second.status == PIPELINE_AWAITING       # the new run really ran
+    assert second.counters["rag"]["created"] == 1
+
+
+def test_the_active_run_gate_reads_both_active_statuses():
+    """Stated as a property, so a future edit to one status list is caught.
+
+    `running` and `awaiting_jobs` are exactly the non-terminal statuses, and both
+    mean "an NRB update is in progress". If a status were added to
+    `PIPELINE_STATUSES` without deciding which side of this line it falls on, the
+    gate would silently let a second orchestrator through.
+    """
+    from app.nrb.models import PIPELINE_STATUSES
+
+    active = {PIPELINE_RUNNING, PIPELINE_AWAITING}
+    terminal = {PIPELINE_SUCCEEDED, PIPELINE_PARTIAL, PIPELINE_FAILED}
+    assert active | terminal == set(PIPELINE_STATUSES)
+    assert not active & terminal
+    # And the run row's own CHECK agrees about which are unfinished.
+    assert all(pipeline.resolve_status({}, {s: 1}) for s in ("queued", "running"))

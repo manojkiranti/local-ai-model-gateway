@@ -840,7 +840,14 @@ events (`token`/`tool_call`/`tool_result`/`done`) + the new id in the
   ends `awaiting_jobs`, NOT succeeded; `pipeline.reconcile` (callable from any
   process, after the orchestrator has exited) computes the terminal status, and
   **waiting beats every other signal**. A second trigger gets `PipelineBusy`
-  carrying the active run rather than a duplicate. `retry_failed` defaults False
+  carrying the active run rather than a duplicate — and `awaiting_jobs` counts as
+  ACTIVE (§24.3, reversing §23.5): the lock is released when orchestration
+  returns while the jobs outlive it, so exclusion is the durable ROW, checked
+  under the lock after `sweep_abandoned` and `settle_waiting`. That second call
+  is not optional — without it a run whose jobs finished but which nobody polled
+  would block every future trigger forever. **A terminal run's job counts are
+  FROZEN into `counters['jobs']`** when it leaves the active states, so later
+  work on the same documents cannot rewrite finished history (§24.2). `retry_failed` defaults False
   and is NOT a recovery refresh — purging cached unresolved recoveries is a
   separate explicit command.
 - **A failed replacement must never remove the last good version, and one

@@ -8,6 +8,7 @@ is the application service that already existed and is already tested.
     start(scope)
       ├─ advisory lock (locks.PIPELINE_LOCK_KEY) — or return the run in progress
       ├─ sweep any run left `running` by a dead orchestrator
+      ├─ reconcile every `awaiting_jobs` run, then refuse if one is STILL waiting
       ├─ open an nrb_pipeline_runs row
       ├─ sync     -> sync.run_sync          (nrb_sync_runs is its detailed record)
       ├─ fetch    -> fetch.run_fetch        (nrb_fetch_runs)
@@ -47,9 +48,14 @@ EXCLUSION, AND WHY A CRASH CANNOT WEDGE IT
     to tune. `heartbeat_at` is advanced at each stage boundary for observability
     — it is not the liveness test, and nothing depends on it.
 
-    A run in `awaiting_jobs` does NOT hold the lock and does NOT block a new
-    run. Its jobs drain independently and every stage is idempotent, so a second
-    pass while the first is still indexing is safe and mostly free.
+    **`awaiting_jobs` still blocks a new run, and the lock cannot express that.**
+    The lock is released the moment orchestration returns, while the jobs it
+    queued outlive it by design — so exclusion is the DURABLE row, checked while
+    holding the lock (which is what makes check-then-insert atomic against a
+    concurrent starter). A second trigger gets `PipelineBusy` naming the waiting
+    run. Every `awaiting_jobs` run is reconciled first (`settle_waiting`), so one
+    whose jobs have all finished stops counting as active rather than wedging the
+    pipeline until somebody polls it.
 
 WHAT THIS DELIBERATELY DOES NOT DO
     It does not recover, chunk or embed: that is the worker's, through the
@@ -105,6 +111,7 @@ __all__ = [
     "get_run",
     "latest_run",
     "reconcile",
+    "settle_waiting",
     "start",
     "sweep_abandoned",
 ]
@@ -242,8 +249,9 @@ def _view(row: NRBPipelineRun, jobs: dict[str, int] | None = None) -> RunView:
 # --------------------------------------------------------------------------- #
 # Reading runs.
 # --------------------------------------------------------------------------- #
-async def _job_counts(session: AsyncSession, run_id: int) -> dict[str, int]:
-    """This run's OWN jobs, by status. The explicit relation, never a time window."""
+async def _live_job_counts(session: AsyncSession, run_id: int) -> dict[str, int]:
+    """This run's OWN jobs, by CURRENT status. The explicit relation, never a
+    time window."""
     rows = (
         await session.execute(
             select(IngestJob.status, func.count())
@@ -253,6 +261,55 @@ async def _job_counts(session: AsyncSession, run_id: int) -> dict[str, int]:
         )
     ).all()
     return {status: count for status, count in rows}
+
+
+async def _job_counts(
+    session: AsyncSession, run_id: int, *, row: NRBPipelineRun | None = None
+) -> dict[str, int]:
+    """A run's job counts: FROZEN once the run is terminal, live before that.
+
+    A terminal run must describe what happened during THAT run, not the current
+    state of the rows it happened to touch. So `_freeze_jobs` stamps the counts
+    into `counters['jobs']` at the moment the run leaves `awaiting_jobs`/
+    `running`, and from then on this returns the stamp.
+
+    Two paths make the live query wrong for a terminal run, and only the second
+    is reachable today:
+
+    1. **A reused job row.** `jobs.enqueue` always INSERTs, so `--retry-failed`
+       creates a NEW job against the existing document rather than reviving the
+       old one, and `claim_next`/`sweep_stale` only ever touch `queued`/`running`
+       rows. A terminal job is therefore never mutated — which is why the live
+       query gave the right answer, but by borrowing an invariant from
+       `app/rag/jobs.py` rather than holding one here. A future in-place retry
+       would silently rewrite history.
+    2. **A run that went terminal with jobs still in flight.** Reachable now: if
+       anything raises after `_record_jobs` has associated the jobs (a database
+       blip in `_mark_stage`), the run is recorded `failed` while its jobs are
+       still `queued`. They then drain, and a run frozen at `failed` would start
+       reporting `succeeded: N`.
+
+    Freezing closes both. It costs one JSONB key of bounded integers on a column
+    that is already the per-stage rollup — no migration, and no second table.
+    """
+    if row is not None and row.status not in (PIPELINE_RUNNING, PIPELINE_AWAITING):
+        frozen = (row.counters or {}).get("jobs")
+        if isinstance(frozen, dict):
+            return {k: int(v) for k, v in frozen.items()}
+    return await _live_job_counts(session, run_id)
+
+
+def _with_frozen_jobs(counters: dict[str, Any], jobs: dict[str, int]) -> dict[str, Any]:
+    """`counters` with this run's final job counts stamped in.
+
+    Written into the counters JSONB rather than a new column so the freeze is one
+    small change to an existing bounded rollup. `counters['jobs']` is the only
+    key not contributed by a stage, which is why it is named for the thing it
+    describes rather than for a stage.
+    """
+    merged = dict(counters or {})
+    merged["jobs"] = {k: int(v) for k, v in jobs.items()}
+    return merged
 
 
 async def get_run(session: AsyncSession, run_id: int) -> RunView | None:
@@ -265,7 +322,7 @@ async def get_run(session: AsyncSession, run_id: int) -> RunView | None:
     ).scalar_one_or_none()
     if row is None:
         return None
-    return _view(row, await _job_counts(session, run_id))
+    return _view(row, await _job_counts(session, run_id, row=row))
 
 
 async def latest_run(session: AsyncSession) -> RunView | None:
@@ -277,14 +334,18 @@ async def latest_run(session: AsyncSession) -> RunView | None:
             .execution_options(populate_existing=True)
         )
     ).scalar_one_or_none()
-    return None if row is None else _view(row, await _job_counts(session, row.id))
+    return None if row is None else _view(
+        row, await _job_counts(session, row.id, row=row)
+    )
 
 
-async def _active_run(session: AsyncSession) -> RunView | None:
+async def _active_run(
+    session: AsyncSession, *, statuses: tuple[str, ...] = (PIPELINE_RUNNING,)
+) -> RunView | None:
     row = (
         await session.execute(
             select(NRBPipelineRun)
-            .where(NRBPipelineRun.status == PIPELINE_RUNNING)
+            .where(NRBPipelineRun.status.in_(statuses))
             .order_by(NRBPipelineRun.id.desc())
             .limit(1)
             .execution_options(populate_existing=True)
@@ -351,19 +412,48 @@ async def reconcile(session: AsyncSession, run_id: int) -> RunView | None:
     ).scalar_one_or_none()
     if row is None:
         return None
-    jobs = await _job_counts(session, run_id)
     if row.status != PIPELINE_AWAITING:
-        return _view(row, jobs)
+        # Terminal already: return the frozen history, and do NOT rewrite
+        # `finished_at`. A status endpoint polls this on every request, and a run
+        # that kept moving its own completion time would make "how long did the
+        # update take" unanswerable.
+        return _view(row, await _job_counts(session, run_id, row=row))
 
+    jobs = await _live_job_counts(session, run_id)
     status = resolve_status(dict(row.counters or {}), jobs)
     if status == PIPELINE_AWAITING:
         return _view(row, jobs)
     row.status = status
     row.stage = "done"
     row.finished_at = datetime.now(timezone.utc)
+    # THE freeze. From here on this run reports these numbers, whatever later
+    # runs do to the documents it touched.
+    row.counters = _with_frozen_jobs(row.counters, jobs)
     await session.flush()
     logger.info("NRB pipeline run %s finished: %s (jobs %s)", run_id, status, jobs)
     return _view(row, jobs)
+
+
+async def settle_waiting(session: AsyncSession) -> int:
+    """Reconcile every `awaiting_jobs` run. Returns how many are STILL waiting.
+
+    Called while holding the lock, immediately before deciding whether a new run
+    may start. Without it, `awaiting_jobs` blocking a new run would be a trap: a
+    run whose jobs all finished but which nobody ever asked about would wedge the
+    pipeline forever, because `reconcile` only advances a run when someone reads
+    it. Reconciling here means a stale wait costs one query, not an operator.
+    """
+    ids = (
+        await session.execute(
+            select(NRBPipelineRun.id).where(NRBPipelineRun.status == PIPELINE_AWAITING)
+        )
+    ).scalars().all()
+    still_waiting = 0
+    for run_id in ids:
+        view = await reconcile(session, run_id)
+        if view is not None and view.status == PIPELINE_AWAITING:
+            still_waiting += 1
+    return still_waiting
 
 
 async def sweep_abandoned(session: AsyncSession) -> int:
@@ -466,18 +556,35 @@ async def _record_jobs(
 async def _finish(
     Session, run_id: int, *, status: str, error: str | None = None
 ) -> None:
+    """Move a run out of `running`, freezing its job counts if that is terminal.
+
+    The freeze matters most on the failure path, which is the one place a run can
+    go terminal while its jobs are still in flight: if anything raises after
+    `_record_jobs` has associated them, they are `queued` at this moment and will
+    drain afterwards. Stamping them here is what stops a run recorded `failed`
+    from later reporting `succeeded: N`.
+    """
     async with Session() as session:
-        values: dict[str, Any] = {"status": status, "heartbeat_at": func.now()}
+        row = (
+            await session.execute(
+                select(NRBPipelineRun)
+                .where(NRBPipelineRun.id == run_id)
+                .with_for_update()
+                .execution_options(populate_existing=True)
+            )
+        ).scalar_one()
+        row.status = status
+        row.heartbeat_at = datetime.now(timezone.utc)
         if error is not None:
-            values["error"] = error[:4000]
-        if status in (PIPELINE_AWAITING,):
-            values["stage"] = "waiting"
+            row.error = error[:4000]
+        if status == PIPELINE_AWAITING:
+            row.stage = "waiting"
         else:
-            values["stage"] = "done"
-            values["finished_at"] = func.now()
-        await session.execute(
-            update(NRBPipelineRun).where(NRBPipelineRun.id == run_id).values(**values)
-        )
+            row.stage = "done"
+            row.finished_at = datetime.now(timezone.utc)
+            row.counters = _with_frozen_jobs(
+                row.counters, await _live_job_counts(session, run_id)
+            )
         await session.commit()
 
 
@@ -492,8 +599,11 @@ async def start(
 ) -> RunView:
     """Run the pipeline once. Returns the run as it stands when staging ends.
 
-    Raises `PipelineBusy` (carrying the run in progress) if another orchestrator
-    holds the lock. It does not wait and does not queue: waiting would let a
+    Raises `PipelineBusy`, carrying the run in progress, when an NRB update is
+    already active. That is TWO conditions, not one: another orchestrator holding
+    the lock, and — because the lock is released the moment orchestration returns
+    while the jobs it queued outlive it — a durable run still in `running` or
+    `awaiting_jobs`. It does not wait and does not queue: waiting would let a
     cron pile up behind a slow manual run, and an API wants to answer "already
     running, here it is" immediately.
 
@@ -517,9 +627,33 @@ async def start(
 
     try:
         async with advisory_lock(engine, PIPELINE_LOCK_KEY, what="NRB pipeline"):
+            # Order is load-bearing.
+            #
+            # 1. Sweep runs left `running` by a dead orchestrator. Safe with no
+            #    timeout precisely because we hold the lock: an orchestrator is
+            #    alive IFF it holds this key.
+            # 2. Reconcile every `awaiting_jobs` run, so one whose jobs have all
+            #    finished stops counting as active. Without this, step 3 would
+            #    wedge the pipeline on a run nobody happened to poll.
+            # 3. Refuse if an update is STILL active. `awaiting_jobs` is an
+            #    active NRB update: its documents are mid-ingest, and a second
+            #    orchestrator would stage more work on top of a corpus state the
+            #    first one has not finished establishing. The advisory lock alone
+            #    cannot express this — it is released when orchestration returns,
+            #    while the jobs outlive it by design — so the durable row is what
+            #    decides, and the lock is what makes checking-then-inserting
+            #    atomic against a concurrent starter.
             async with Session() as session:
                 await sweep_abandoned(session)
+                await settle_waiting(session)
                 await session.commit()
+            async with Session() as session:
+                active = await _active_run(
+                    session, statuses=(PIPELINE_RUNNING, PIPELINE_AWAITING)
+                )
+                await session.rollback()
+            if active is not None:
+                raise PipelineBusy(active)
 
             run_id = await _open_run(
                 Session, trigger=trigger, requested_by=requested_by, scope=scope
@@ -604,6 +738,8 @@ async def start(
                     status=resolve_status(row.counters if row else {}, {}),
                 )
     except LockBusy:
+        # Another orchestrator is mid-flight. Report ITS run, which is `running`
+        # by definition — a waiting run holds no lock.
         async with Session() as session:
             active = await _active_run(session)
             await session.rollback()
