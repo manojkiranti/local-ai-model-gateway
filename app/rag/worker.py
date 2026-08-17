@@ -133,6 +133,24 @@ async def _snapshot_document(Session, document_id: str) -> DocSnapshot | None:
 
 
 def _document_path(snap: DocSnapshot, settings: Settings) -> Path:
+    # An NRB document's bytes are NOT copied into RAG_DOCS_DIR (§28). They live,
+    # content-addressed, in the NRB filestore that Phase 5 downloaded — one source
+    # of truth, no per-corpus duplication. The filestore key is RECONSTRUCTED from
+    # the content hash rather than read from `storage_key`, so a row created under
+    # the old copy scheme (whose `storage_key` is a RAG_DOCS_DIR uuid) still
+    # resolves without a migration or a re-ingest. `storage_key_for` applies the
+    # SAME extension normalisation the fetch stage did, so the reconstructed key is
+    # exactly the blob on disk. The import is local so the API image never loads
+    # `app.nrb` — the same rule the NRB parse branch in `_load_chunks` follows.
+    if snap.meta.get("origin") == "nrb":
+        from ..nrb import filestore
+
+        key = filestore.storage_key_for(content_hash_or_sha(snap), snap.file_type)
+        nrb_path: Path = filestore.resolve_path(key)
+        if not nrb_path.exists():
+            raise ParseError(f"nrb blob missing in filestore: {key}")
+        return nrb_path
+
     if not snap.storage_key:
         raise ParseError(f"document {snap.id} has no storage_key")
     path: Path = resolve_storage_path(snap.storage_key, settings.rag_docs_dir)

@@ -60,7 +60,6 @@ from pathlib import Path  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # noqa: E402
 
-from app.config import get_settings  # noqa: E402
 from app.nrb import corpus  # noqa: E402
 from app.rag import repository as dept_repo  # noqa: E402
 
@@ -214,7 +213,6 @@ async def main() -> int:
     args = ap.parse_args()
 
     url = _guard()
-    settings = get_settings()
     engine = create_async_engine(url)
     Session = async_sessionmaker(engine, expire_on_commit=False)
     try:
@@ -267,7 +265,6 @@ async def main() -> int:
             department_code=dept_code,
             retry_failed=args.retry_failed,
             dry_run=args.dry_run,
-            rag_docs_dir=settings.rag_docs_dir,
             **scope,
         )
         summary, outcome, retry_outcome = result.summary, result.ingest, result.retry

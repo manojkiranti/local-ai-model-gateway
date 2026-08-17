@@ -240,7 +240,7 @@ def test_a_second_pass_selects_nothing_creates_nothing_and_raises_nothing(
         assert len(first) == 3
         out1 = await corpus.create_ingest_targets(
             Session, department_id=dept.id, department_code=DEPT_CODE,
-            targets=first, rag_docs_dir=str(tmp_path / "rag"),
+            targets=first,
         )
         assert (out1.created, out1.conflict_document, out1.errors) == (3, 0, [])
 
@@ -249,7 +249,7 @@ def test_a_second_pass_selects_nothing_creates_nothing_and_raises_nothing(
         assert second == []
         out2 = await corpus.create_ingest_targets(
             Session, department_id=dept.id, department_code=DEPT_CODE,
-            targets=second, rag_docs_dir=str(tmp_path / "rag"),
+            targets=second,
         )
         assert out2.created == 0
         assert out2.conflict_document == 0   # skipped by the anti-join, not caught
@@ -286,7 +286,7 @@ def test_every_created_document_gets_exactly_one_queued_job(tmp_path, monkeypatc
         targets = await corpus.select_ingest_targets(session, department_id=dept.id)
         out = await corpus.create_ingest_targets(
             Session, department_id=dept.id, department_code=DEPT_CODE,
-            targets=targets, rag_docs_dir=str(tmp_path / "rag"),
+            targets=targets,
         )
         assert out.created == 1
         row = (
@@ -306,6 +306,46 @@ def test_every_created_document_gets_exactly_one_queued_job(tmp_path, monkeypatc
         assert row["sha"] == hashlib.sha256(b"one").hexdigest()
         assert row["title"] == "X"          # NRB's title, not the filename
         assert row["status"] == "queued"
+
+    _run(body)
+
+
+def test_ingest_writes_no_rag_copy_and_records_the_filestore_key(
+    tmp_path, monkeypatch
+):
+    """The §28 decision: NRB bytes are NOT duplicated into RAG_DOCS_DIR.
+
+    Ingest must create the row and the job WITHOUT writing a second copy of the
+    bytes, and the document's `storage_key` must be the content-addressed
+    filestore key — exactly what `worker._document_path` reconstructs from the
+    hash to find the one copy that exists.
+    """
+    _patch_store(monkeypatch, tmp_path)
+
+    async def body(session, Session):
+        dept = await _department(session)
+        sha = await _blob(session, tmp_path, b"no copy please",
+                          key="https://www.nrb.org.np/c.pdf", title="C")
+        await session.commit()
+        targets = await corpus.select_ingest_targets(session, department_id=dept.id)
+        out = await corpus.create_ingest_targets(
+            Session, department_id=dept.id, department_code=DEPT_CODE,
+            targets=targets,
+        )
+        assert out.created == 1
+
+        # No RAG_DOCS_DIR tree was created at all — nothing was copied.
+        assert not (tmp_path / "rag").exists()
+
+        storage_key = (
+            await session.execute(
+                text("SELECT storage_key FROM documents WHERE department_id = :d"),
+                {"d": dept.id},
+            )
+        ).scalar_one()
+        # It is the filestore key, i.e. the blob that already exists on disk.
+        assert storage_key == f"{sha[:2]}/{sha}.pdf"
+        assert (tmp_path / storage_key).exists()
 
     _run(body)
 
@@ -332,7 +372,7 @@ def test_two_catalog_keys_sharing_bytes_select_as_one_document(tmp_path, monkeyp
         assert len(targets) == 1
         out = await corpus.create_ingest_targets(
             Session, department_id=dept.id, department_code=DEPT_CODE,
-            targets=targets, rag_docs_dir=str(tmp_path / "rag"),
+            targets=targets,
         )
         assert (out.created, out.conflict_document) == (1, 0)
 
@@ -380,7 +420,7 @@ def test_an_archived_document_is_selected_again(tmp_path, monkeypatch):
         targets = await corpus.select_ingest_targets(session, department_id=dept.id)
         out = await corpus.create_ingest_targets(
             Session, department_id=dept.id, department_code=DEPT_CODE,
-            targets=targets, rag_docs_dir=str(tmp_path / "rag"),
+            targets=targets,
         )
         assert out.created == 1
         assert await corpus.select_ingest_targets(session, department_id=dept.id) == []
@@ -425,15 +465,17 @@ def test_a_document_created_between_select_and_insert_is_a_conflict(
 
         out = await corpus.create_ingest_targets(
             Session, department_id=dept.id, department_code=DEPT_CODE,
-            targets=targets, rag_docs_dir=str(tmp_path / "rag"),
+            targets=targets,
         )
         assert (out.created, out.conflict_document) == (0, 1)
         assert out.errors == []
-        # The file written before the insert failed must not be left behind.
-        written = list((tmp_path / "rag" / DEPT_CODE).glob("*")) if (
-            tmp_path / "rag" / DEPT_CODE
-        ).exists() else []
-        assert written == []
+        # No RAG_DOCS_DIR copy is ever written now (§28), so there is no orphan
+        # to leave behind...
+        assert not (tmp_path / "rag").exists()
+        # ...and, the point of the change: the shared filestore blob must SURVIVE
+        # the conflict. It is Phase 5's, referenced by the row that won the race,
+        # and this stage must never delete it.
+        assert (tmp_path / f"{sha[:2]}/{sha}.pdf").exists()
 
     _run(body)
 
@@ -455,7 +497,7 @@ def test_a_missing_blob_is_counted_and_the_batch_continues(tmp_path, monkeypatch
         assert len(targets) == 2
         out = await corpus.create_ingest_targets(
             Session, department_id=dept.id, department_code=DEPT_CODE,
-            targets=targets, rag_docs_dir=str(tmp_path / "rag"),
+            targets=targets,
         )
         assert (out.created, out.missing_blob) == (1, 1)
         assert len(out.errors) == 1
@@ -547,7 +589,7 @@ async def _ingest_one(session, Session, dept, tmp_path, body: bytes, key: str,
     targets = await corpus.select_ingest_targets(session, department_id=dept.id)
     out = await corpus.create_ingest_targets(
         Session, department_id=dept.id, department_code=DEPT_CODE,
-        targets=targets, rag_docs_dir=str(tmp_path / "rag"),
+        targets=targets,
     )
     assert out.created == len(targets)
     return out.documents

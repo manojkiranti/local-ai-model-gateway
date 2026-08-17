@@ -261,9 +261,10 @@ def test_only_an_nrb_marked_document_takes_the_nrb_branch(tmp_path, monkeypatch)
     in a thread, with no session and no NRB import.
     """
     import asyncio
+    import hashlib
 
     from app.config import get_settings
-    from app.nrb import recovery_cache
+    from app.nrb import filestore, recovery_cache
     from app.rag import worker
 
     called: list[str] = []
@@ -280,9 +281,18 @@ def test_only_an_nrb_marked_document_takes_the_nrb_branch(tmp_path, monkeypatch)
     monkeypatch.setattr(recovery_cache, "chunks_for_blob", fake_nrb)
 
     settings = get_settings()
+    # Generic doc: a real file under RAG_DOCS_DIR, exactly as an upload has.
     stored = pathlib.Path(settings.rag_docs_dir) / "test-branch.pdf"
     stored.parent.mkdir(parents=True, exist_ok=True)
     stored.write_bytes(b"%PDF-1.4\n")
+    # NRB doc: NO rag copy (§28). Its bytes live in the filestore, resolved by
+    # content hash — so point the filestore at tmp and put the blob there.
+    monkeypatch.setattr(filestore, "base_dir", lambda: tmp_path)
+    body = b"%PDF-1.4\nnrb\n"
+    sha = hashlib.sha256(body).hexdigest()
+    blob = tmp_path / filestore.storage_key_for(sha, "pdf")
+    blob.parent.mkdir(parents=True, exist_ok=True)
+    blob.write_bytes(body)
     try:
         plain = worker.DocSnapshot(
             id="d1", department_id=1, file_type="pdf",
@@ -290,8 +300,8 @@ def test_only_an_nrb_marked_document_takes_the_nrb_branch(tmp_path, monkeypatch)
         )
         nrb = worker.DocSnapshot(
             id="d2", department_id=1, file_type="pdf",
-            storage_key="test-branch.pdf", status="pending",
-            content_hash="a" * 64, meta={"origin": "nrb"},
+            storage_key=f"{sha[:2]}/{sha}.pdf", status="pending",
+            content_hash=sha, meta={"origin": "nrb"},
         )
         asyncio.run(worker._load_chunks(None, plain, settings))
         asyncio.run(worker._load_chunks(None, nrb, settings))

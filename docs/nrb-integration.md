@@ -3587,11 +3587,13 @@ indexed**.
    file that is right; for a transient failure it is not, and there is currently
    no `--retry-failed` (fetch has one). Recorded, not fixed: the fix is a
    deliberate scope decision, not a bug patch.
-2. **`RAG_DOCS_DIR` duplication, now measured.** 31 documents cost **31 MB**
-   copied out of a 455 MB blob store. Trivial here, ~8.6 GB at corpus scale, and
-   still the open decision from §19/§4 of the plan — copy, symlink, or teach the
-   NRB branch to resolve from `filestore` (which restructures
-   `_load_chunks_sync`, since it resolves the path *before* the NRB branch).
+2. **`RAG_DOCS_DIR` duplication — DECIDED and removed (§28, 2026-08-17).** 31
+   documents cost 31 MB copied out of a 455 MB blob store, ~8.6 GB at corpus
+   scale. The decision (the user's) is **resolve from the filestore**: NRB bytes
+   are no longer copied, and the worker reads them content-addressed from
+   `NRB_FILES_DIR`. See §28. (The fear that this "restructures `_load_chunks_sync`"
+   was outdated — the NRB/generic split had already moved to `_load_chunks`, so it
+   was a one-function change to `_document_path`.)
 3. **The route split on blindly-drawn documents is native-dominated** — 628
    native chunks against 350 converted and 51 OCR'd. The anchors are legacy-heavy
    *by construction*, so this is the first split measured on documents chosen
@@ -5111,3 +5113,81 @@ is the regression this section guards against. No new store.
 **Review loop.** At the NRB→`main` merge (execute §27.4), and again if citations is
 un-deferred. If a future branch adds a migration off a point other than the current
 single head, §27.1's topology is stale and must be re-measured before merging.
+
+## 28. `RAG_DOCS_DIR` duplication removed — NRB bytes resolve from the filestore
+
+**Date:** 2026-08-17. **§20.7 item 2, decided:** how an NRB document's bytes reach
+the RAG worker. **Decision (the user's):** resolve them from the content-addressed
+NRB filestore. Stop copying.
+
+### 28.1 What was duplicated, and why it was a smell not just disk
+
+`corpus.py` minted a fresh `RAG_DOCS_DIR` key per blob and **re-wrote bytes that
+already exist**, content-addressed and deduplicated, in `NRB_FILES_DIR` (Phase 5).
+31 MB for the 31-document cohort; ~8.6 GB at corpus scale, doubling the filestore.
+Trivial disk on the target hardware — but it is a **second source of truth** for
+the same bytes, with its own lifecycle to keep consistent, and a second copy in
+every future storage tier (`storage.py` anticipates `storage_key` becoming an
+object-storage bucket key; a copy means uploading every NRB blob twice).
+
+### 28.2 The three routes, and why resolve-from-filestore
+
+* **Copy (status quo)** — zero code, but the duplication above, forever.
+* **Symlink** — near-zero disk, but `resolve_storage_path` calls `.resolve()`,
+  which follows a symlink to a target OUTSIDE `RAG_DOCS_DIR` and trips the
+  traversal guard, so it needs resolver rework anyway; and symlinks are
+  filesystem-only, breaking the object-storage-key design. Rejected.
+* **Resolve from filestore** — one source of truth, ~0 extra disk at any scale,
+  object-storage-safe. Chosen.
+
+### 28.3 The change (no schema, no migration)
+
+* `worker._document_path` is origin-aware: an NRB document resolves its bytes from
+  the filestore by RECONSTRUCTING the key from the content hash —
+  `filestore.resolve_path(storage_key_for(content_hash, file_type))` — not by
+  reading `storage_key`. `storage_key_for` applies the same extension
+  normalisation the fetch stage used, so the reconstructed key is exactly the blob
+  on disk. Resolving by HASH (not by `storage_key`) is what lets the frozen 31-doc
+  p4 cohort — created under the copy scheme, carrying a `RAG_DOCS_DIR` uuid
+  `storage_key` — keep resolving with **no migration and no re-ingest**.
+* `corpus.py` stops minting a key and writing a copy; it records the filestore key
+  in `documents.storage_key` (portable, and exactly what the resolver
+  reconstructs). Its two conflict-compensation `delete_document` calls are gone:
+  there is no RAG copy to clean, and the filestore blob is Phase 5's shared,
+  content-addressed artifact — **never this stage's to delete**. The now-dead
+  `rag_docs_dir` parameter is removed from `run_rag_enqueue`/`create_ingest_targets`
+  and its two callers (`scripts/nrb_rag_ingest_corpus.py`, `pipeline.py` never
+  passed it).
+* **No `app/rag/router.py` change.** The archive endpoint (`DELETE …/documents/{id}`)
+  removes chunks and keeps the row and the file — it deletes no file at all, and
+  supersession's `archive_document` is the same. So there was no post-creation
+  file-deletion path to guard; the only `delete_document` calls are upload-path
+  compensation, which NRB never takes.
+* The local `from ..nrb import filestore` inside `_document_path` keeps `app.rag`
+  free of an import-time dependency on `app.nrb` — the same rule the NRB parse
+  branch in `_load_chunks` already follows. Verified: `import app.main` loads none
+  of docling/torch/rapidocr/onnxruntime.
+
+### 28.4 Evaluation & Improvement
+
+**Success metric.** An NRB corpus ingest of N blobs writes **0** bytes into
+`RAG_DOCS_DIR` and the worker still parses every one, resolving from the filestore.
+Proxy for SQLs; nothing here is user-facing.
+
+**Eval.** New `tests/test_nrb_document_resolution.py` (4): NRB resolves from the
+filestore; a legacy rag-style `storage_key` still resolves by hash (the cohort
+survives); a missing blob is a `ParseError` naming the key; a generic document is
+unchanged. `tests/test_nrb_corpus_ingest.py` gains a headline test — ingest writes
+no rag copy and records the filestore key — and its conflict test now asserts the
+shared blob SURVIVES a `DocumentConflict`. 127 passing across the corpus, worker,
+recovery-cache, supersession, rag-ingest and pipeline suites; the API-image
+docling-import guard still holds. NOT run, by the standing constraints: the 31-doc
+cohort re-ingest, a full-corpus ingest, and any live worker route-split.
+
+**Feedback capture.** Nothing new stored. The §18 verification signal is unchanged
+— read the route split on a known blob, never job success — and it now doubles as
+the check that filestore resolution works end to end.
+
+**Review loop.** On the first real corpus ingest (the route split is the evidence),
+and if `documents.storage_key` semantics are ever reused for a non-NRB origin whose
+bytes are NOT in the filestore.

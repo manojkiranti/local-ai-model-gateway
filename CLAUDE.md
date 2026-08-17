@@ -128,9 +128,11 @@ exercise (`scripts/nrb_supersession_exercise.py`, all checks passed).
 **The NRB CORPUS is still not ingested and `search_nrb_documents` (Phase 8) does
 not exist** — the 6B gate and its recommendations are §11.9, §12.10, §13.11,
 §14.7, §15.9, §16.10, §17.8, §19.5, §20.9, §21.10 and §22.12. Phase 7's
-remaining gap is the `RAG_DOCS_DIR` duplication decision (§20.7 item 2), still
-required before full-corpus ingest; the recovery cache and supersession no
-longer are. **The admin API / run-status work is the next unblocked step.**
+`RAG_DOCS_DIR` duplication gate is now **DECIDED and removed (§28): NRB bytes
+resolve from the filestore, no copy** — so nothing structural blocks a
+full-corpus ingest anymore (the recovery cache and supersession already didn't).
+**The retrieval-metadata change + Phase 8 `search_nrb_documents` is the next
+unblocked step; the thin admin UI lives in a separate frontend repo.**
 **Phase 7 step 4 is DONE (2026-08-17, §23):** the §22.10 sync defect is FIXED
 (state ownership — see the gotcha below), and `app/nrb/pipeline.py` is the ONE
 orchestration path (`sync → fetch → extract → rag enqueue`) that the CLI, the
@@ -1000,11 +1002,13 @@ Deployment hardening (firewall internal deps to the gateway IP) is deferred by
 the user for now.
 
 **NRB, in the order they became unblocked** (full reasoning in
-`docs/nrb-integration.md` §26.11): the thin admin UI over `/v1/nrb/*`; then
-cron/systemd (which triggers *through* `pipeline.request_run` — it does not
-replace the runner); the `RAG_DOCS_DIR` duplication decision, which is still the
-gate on any full-corpus ingest (§20.7 item 2); Phase 8 `search_nrb_documents`;
-and GPU-server deployment, still blocked on §19.1 (no host, no key, no SSH user
-in this environment). Two known-and-recorded, not fixed: `075bf12eb087`'s
+`docs/nrb-integration.md` §26.11): the thin admin UI over `/v1/nrb/*` (built in a
+SEPARATE frontend repo, `local-ai-model-frontend`); then cron/systemd (which
+triggers *through* `pipeline.request_run` — it does not replace the runner);
+Phase 8 `search_nrb_documents` (needs the §18.7 retrieval-metadata change first —
+`RetrievedChunk` carries no metadata, so route/page cannot be cited); and
+GPU-server deployment, still blocked on §19.1 (no host, no key, no SSH user in
+this environment). The `RAG_DOCS_DIR` duplication decision is **DONE (§28,
+resolve-from-filestore)** and no longer gates a full-corpus ingest. Two known-and-recorded, not fixed: `075bf12eb087`'s
 broken-ToUnicode text layer (a `native-3` + new cohort, §17.6) and the Nepali
 semantic review of the §15 pack — **conversion correctness is still unmeasured**.

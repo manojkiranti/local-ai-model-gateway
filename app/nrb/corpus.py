@@ -93,7 +93,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..rag import documents as docs_repo
 from ..rag import jobs as jobs_repo
-from ..rag import storage
 from ..rag.models import (
     JOB_QUEUED,
     JOB_RUNNING,
@@ -453,7 +452,6 @@ async def create_ingest_targets(
     department_id: int,
     department_code: str,
     targets: Sequence[IngestTarget],
-    rag_docs_dir: str,
     batch: int = BATCH,
     cohort: str | None = None,
 ) -> IngestOutcome:
@@ -483,8 +481,11 @@ async def create_ingest_targets(
             )
             continue
 
-        key = storage.mint_storage_key(department_code, target.filename or "blob.bin")
-        storage.write_document(data, key, rag_docs_dir)
+        # NO second copy. The bytes stay in the content-addressed NRB filestore
+        # (their one source of truth); the worker resolves them there by content
+        # hash (§28, `worker._document_path`). `storage_key` records the filestore
+        # key for portability — it is exactly what that resolver reconstructs, and
+        # it is never written under RAG_DOCS_DIR.
         try:
             async with Session() as session:
                 doc = await docs_repo.create_document(
@@ -494,7 +495,7 @@ async def create_ingest_targets(
                     source="upload",
                     file_type=(target.extension or "").lower() or "bin",
                     content_hash=content_hash,
-                    storage_key=key,
+                    storage_key=target.storage_key,
                     file_name=target.filename,
                 )
                 doc.meta = {
@@ -511,14 +512,14 @@ async def create_ingest_targets(
                 outcome.jobs.append((job.id, doc.id))
                 pending += 1
         except docs_repo.DocumentConflict:
-            # Raced, not idempotent — see the module docstring. The file we just
-            # wrote is now an orphan, so compensate exactly as the upload route
-            # does.
+            # Raced, not idempotent — see the module docstring. Nothing to
+            # compensate: no RAG_DOCS_DIR copy was written, and the filestore blob
+            # is Phase 5's shared, content-addressed artifact — never this stage's
+            # to delete (another source, another department, or the fetch stage
+            # itself references it).
             outcome.conflict_document += 1
-            storage.delete_document(key, rag_docs_dir)
         except jobs_repo.JobConflict:
             outcome.conflict_job += 1
-            storage.delete_document(key, rag_docs_dir)
         if pending >= batch:
             logger.info("corpus ingest: %d documents queued so far", outcome.created)
             pending = 0
@@ -725,7 +726,6 @@ async def run_rag_enqueue(
     limit: int | None = None,
     retry_failed: bool = False,
     dry_run: bool = False,
-    rag_docs_dir: str | None = None,
     create_department: bool = True,
 ) -> RagStageResult:
     """Classify the scope, create what is missing, optionally requeue failures.
@@ -740,13 +740,12 @@ async def run_rag_enqueue(
     operation entirely (`scripts/nrb_recovery_cache.py --purge`), never a side
     effect of an update.
 
-    `dry_run` classifies and reports without creating a document, copying a file
-    or enqueuing a job — the same promise `nrb_fetch.py --dry-run` makes.
+    `dry_run` classifies and reports without creating a document or enqueuing a
+    job — the same promise `nrb_fetch.py --dry-run` makes. (No file is ever
+    copied: NRB bytes are resolved from the filestore, §28.)
     """
-    from ..config import get_settings
     from ..rag import repository as dept_repo
 
-    docs_dir = rag_docs_dir or get_settings().rag_docs_dir
     scope = dict(
         keys=keys, sections=sections, owners=owners, years=years,
         resource_types=resource_types, extensions=extensions, limit=limit,
@@ -791,7 +790,7 @@ async def run_rag_enqueue(
     if targets:
         result.ingest = await create_ingest_targets(
             Session, department_id=dept_id, department_code=dept_code,
-            targets=targets, rag_docs_dir=docs_dir,
+            targets=targets,
         )
     return result
 
