@@ -140,6 +140,32 @@ class Document(Base):
             unique=True,
             postgresql_where=text("status <> 'archived'"),
         ),
+        # AT MOST ONE CURRENT VERSION per logical NRB source (Phase 7 step 3).
+        # NRB republishes the same file at the same URL with new bytes, which is
+        # a new `content_hash` and therefore a second row that
+        # `ux_documents_active_content` is perfectly happy with. This is the
+        # index that says only one of them may be SEARCHABLE.
+        #
+        # `metadata->>'comparison_key'` is the catalog's own logical file
+        # identity (`app/nrb/supersession.py` explains why not page_url and why
+        # never a title). Rows without it index as NULL and never conflict, so
+        # ordinary uploads and pre-Phase-7 documents are untouched.
+        #
+        # Declared here AND hand-written in migration 8f2d1c05a7b4, then
+        # excluded from autogenerate comparison in `alembic/env.py` — Alembic
+        # cannot reflect a JSONB expression index, so without the exclusion
+        # every drift check proposes dropping and recreating it. Same treatment
+        # as the HNSW/GIN indexes, for the same reason.
+        Index(
+            "ux_documents_nrb_current_source",
+            "department_id",
+            text("(metadata ->> 'comparison_key')"),
+            unique=True,
+            postgresql_where=text(
+                "status = 'ready' AND metadata ->> 'origin' = 'nrb'"
+                " AND metadata ->> 'comparison_key' IS NOT NULL"
+            ),
+        ),
         Index("ix_documents_department", "department_id"),
         Index("ix_documents_status", "status"),
     )

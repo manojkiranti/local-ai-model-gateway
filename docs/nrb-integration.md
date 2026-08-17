@@ -3970,3 +3970,272 @@ native text, the npttf2utf GPL-3.0 distribution decision, full-corpus retrieval
 quality, native-2 (not modified; native-3 not started), the frozen Phase 6A/6B
 evidence, the Phase 7 cohort (not re-run, not expanded), the `ri*` scratch-DB
 debris, and server access (§19.1) — this is still the laptop.
+
+## 22. Phase 7 step 3 — supersession: which version of an NRB document is current
+
+**Date:** 2026-08-17. **Scope:** the lifecycle that lets a republished NRB file
+replace the one currently being searched, without ever leaving the corpus with
+nothing to search. **What this is not:** an API, a scheduler, a corpus ingest, or
+a re-run of the 31-document cohort.
+
+### 22.1 The rule, and why it is one transaction rather than two commits
+
+A is serving, B is the candidate.
+
+```
+B fails at ANY stage   →  A is still searchable. Nothing was archived.
+B succeeds             →  B is current, A is archived.
+```
+
+This is not achieved by ordering two commits carefully. It is achieved by doing
+the archive of A and the activation of B in **one transaction** — the one
+`ingest.replace_chunks` already owns — so a failure anywhere in it takes the
+archive with it. `app/rag/worker._activate` is that transaction.
+
+Promotion runs *before* `replace_chunks` inside it, which looks backwards and is
+not: `replace_chunks` flips B to `ready`, and the new unique index would refuse
+that while A is still `ready`. Archiving A first is what makes the flip legal,
+inside a transaction where "first" is invisible to everyone else. And reaching
+that transaction at all means B already recovered, chunked and embedded
+successfully — the expensive, failure-prone work is behind it and the vectors
+are in memory.
+
+### 22.2 The logical source identity is `comparison_key`
+
+`nrb_files.comparison_key` — the percent-decoded attachment URL, unique in the
+catalog by `ux_nrb_files_comparison_key`, already written onto every NRB
+document's `metadata` by both ingest drivers. It identifies the FILE across
+versions of its bytes. No new field, no fuzzy matching, no migration for it.
+
+| candidate | verdict |
+|---|---|
+| `content_sha256` / `content_hash` | identifies the **version**, not the source — the whole reason this phase exists |
+| `page_url` / `nrb_sources.url_key` | **concrete collision:** a post can carry two attachments (a circular plus its annex — §3 measured 0.7% of posts). Both share one `page_url`, so promoting the circular would archive the annex |
+| title / filename / date / text similarity | never. NRB publishes near-identical Devanagari titles across years and 3 documents have no title at all |
+
+**Two catalog keys that share bytes.** Deduplication is by bytes:
+`select_ingest_targets` does `DISTINCT ON (content_sha256)` keeping the lowest
+`nrb_files.id`, so N aliases of one blob produce ONE document carrying the
+representative's `comparison_key`. They therefore share one logical identity,
+chosen deterministically rather than by whichever pass ran first. If those
+aliases later diverge, each becomes its own logical source from that point and
+neither supersedes the other — the honest outcome, since they are no longer the
+same file. No duplicate recovery work either way: recovery is keyed on bytes.
+
+### 22.3 Schema — one index, no new column
+
+Migration **`8f2d1c05a7b4`**, `down_revision` **`714264eba2fd`** (this branch's
+actual head; `d4a91f2c7b3e` untouched, nothing stamped, the future merge
+revision still required and still not solved here).
+
+```sql
+CREATE UNIQUE INDEX ux_documents_nrb_current_source
+    ON documents (department_id, ((metadata ->> 'comparison_key')))
+ WHERE status = 'ready'
+   AND metadata ->> 'origin' = 'nrb'
+   AND metadata ->> 'comparison_key' IS NOT NULL
+```
+
+The logical identity, the version identity and the current/archived state all
+already existed on `documents`. What JSONB alone could not do is **refuse** two
+current versions of one source: `ux_documents_active_content` is keyed on
+`content_hash`, and two versions of a republished circular have two different
+hashes, so it is satisfied by precisely the state this phase exists to prevent.
+Row locking in `supersession.py` serialises two promoting workers; the index is
+what makes the invariant a property of the database rather than of that file
+continuing to be correct — the same posture as the composite chunk FK and the
+status CHECKs.
+
+Partial and expression-based, so it touches nothing else: a row without the key
+indexes as NULL and never conflicts, leaving ordinary uploads, typed text and
+pre-Phase-7 NRB documents exactly as they were. Verified before creation against
+`local_ai_gateway_p4`: 39 NRB documents, all carrying a `comparison_key`, zero
+duplicate `(department, key)` pairs among `ready` rows. Declared on the model,
+hand-written in the migration, and added to `_AUTOGEN_SKIP_INDEXES` — Alembic
+reflects neither the expression nor the `WHERE`, so without the exclusion every
+drift check proposes dropping it. Same treatment as the HNSW/GIN indexes.
+
+### 22.4 Candidate creation, and what the driver now reports
+
+Selection is **still** anti-joined on `content_hash`, and that is right: it is
+the version identity and it is what makes a repeat pass free. What it cannot do
+is express supersession — new bytes are a hash nobody has indexed either way. So
+`corpus.summarise_scope` classifies the scope by logical key and the report names
+the three cases separately:
+
+```
+scope names 31 catalog keys / 31 blobs
+  already_current        31
+  new_source             0
+  replacement_candidate  0   (supersede their predecessor only if their ingest succeeds)
+  retry_failed           1
+```
+
+`already_current` reuses the exact predicate the anti-join uses, so the two can
+never disagree about the same blob. Nothing in the driver archives anything —
+promotion happens at the end of a successful ingest, in the worker's own
+transaction, precisely so a candidate that never succeeds cannot retire the
+version that is serving.
+
+### 22.5 Ordering, and what the catalog does not give us
+
+**Reported explicitly, as asked.** `nrb_files` holds one `content_sha256` per key
+and **overwrites it in place**. It keeps no history of prior versions, so there
+is no catalog-side version number, sequence or timestamp to order B against C.
+
+What exists is the order in which our own driver OBSERVED each version —
+`documents.created_at`, tie-broken by `id` — and because the driver is the only
+thing that mints these rows and the catalog only ever offers the current version,
+that order faithfully records catalog succession. **It is our record, not NRB's.**
+A stronger guarantee would need the catalog to retain superseded shas per key
+(a `nrb_file_versions` table), which is a Phase 4 change and is not made here.
+
+Job completion order is explicitly not used:
+
+- a document promotes itself over strictly **older** siblings only;
+- if a strictly **newer** sibling is already `ready`, it archives **itself**.
+
+Both halves are needed. Without the first, a late-finishing B would archive C.
+Without the second, B would go live after C and stay there.
+
+A consequence worth stating: a newer successful version archives an older
+`failed` one too, so **a superseded failure is no longer retryable**
+(`select_retry_targets` requires `failed`, not `archived`). An operator cannot
+resurrect a stale revision after the fact. That also means the self-archive
+branch is defensive rather than routine — the normal flow archives the older
+candidate before it could try. It is kept because the state is still reachable by
+a hand-repaired database, and the alternative is an IntegrityError that reads as
+a bug rather than as a decision.
+
+### 22.6 Failure behaviour, proved
+
+| failure | outcome |
+|---|---|
+| recovery raises on B | `_activate` is never reached; job `failed`, B `failed`, **A untouched and `ready`** |
+| embedding raises on B | same — the failure is before the transaction |
+| the activation transaction fails midway (after the archive, before the chunks) | **rollback un-archives A**; A `ready`, B `pending`, no `superseded_by` written |
+| worker crashes before B is ready | the stale sweep fails the job; A untouched |
+| B is archived mid-ingest by a newer C | `replace_chunks`' existing `DocumentGone` guard refuses; C stays current |
+| B retried later and succeeds | only then is A archived |
+
+The third row is the one that needed a test rather than an argument, and it has
+one (`test_a_failure_inside_the_activation_transaction_rolls_the_archive_back`,
+which forces a dimension mismatch between the archive and the chunk write).
+
+### 22.7 Retrieval
+
+Already correct, and confirmed rather than changed: `app/rag/retrieval.py:96`
+filters `WHERE doc.status = 'ready'`, and `archive_document` deletes the chunks
+outright. Two independent mechanisms, both of which already excluded an archived
+version. No ranking change, no reranking, no `search_nrb_documents`. The
+supersession tests assert it through the **production `_SEARCH_SQL`** rather than
+a paraphrase.
+
+### 22.8 Tests — 19, all passing
+
+`tests/test_nrb_supersession.py`, in the existing rolled-back-transaction style
+and scoped to a test-only department so the shared scratch database's debris
+(§20.7 item 4) is irrelevant. Covers all 15 required properties: A active; the
+unchanged second run zero-work; new bytes reported as a replacement candidate;
+A serving while B is pending; recovery failure, activation failure and the
+transaction rollback all leaving A active; successful promotion; retrieval
+returning B and never A; `--retry-failed` promoting only on success; a post-
+promotion run selecting nothing; the database refusing two current versions;
+both B-then-C orders; a different logical source (the annex) never superseded;
+catalog rows, blobs and recovery rows all surviving; and a non-NRB document's
+lifecycle unchanged.
+
+**One test is not transactional and says so:** the two-worker race needs two real
+connections, so it commits into its own department and removes it in a `finally`.
+Two workers activate B and C concurrently; exactly one version ends `ready`, it
+is the newest, and the original is archived.
+
+Suites: NRB **1,100 passed / 3 skipped**; RAG regression **260 passed, 1 failed**
+— `test_department_filter_restricts_the_set`, the pre-existing §20.7 item 4
+dirty-database assertion, reproduced unchanged and not worked around; everything
+else **425 passed / 2 skipped**.
+
+### 22.9 The controlled real-data exercise
+
+`scripts/nrb_supersession_exercise.py` — four generated PDFs under one
+`comparison_key`, driven by the real corpus driver, the real
+`app.rag.worker` (real recovery, real embedding) and the production retrieval
+SQL. Synthetic on purpose and it is the stronger choice: the whole exercise is
+about version ORDER and no real catalog record has one, so replaying successive
+versions would mean mutating real catalog evidence. **ALL CHECKS PASSED:**
+
+| step | result |
+|---|---|
+| ALPHA ingested | `new_source`, current, retrievable |
+| BRAVO published | `replacement_candidate` (not `new_source`); ALPHA still current |
+| BRAVO's ingest FAILS | BRAVO `failed`; **ALPHA still current and still retrievable** |
+| `--retry-failed` BRAVO | succeeds → BRAVO current, ALPHA archived + `superseded_by`, retrieval returns BRAVO only |
+| CHARLIE FAILS | BRAVO still current and retrievable |
+| DELTA succeeds | DELTA current; the still-failed CHARLIE archived by it and **no longer retryable**; retrieval returns DELTA only |
+| history | all 4 blobs on disk, the catalog row intact, and the recovery rows of the archived versions kept |
+
+The department, the catalog row and the jobs are removed at the end (and by
+`--cleanup`). Timings are not reported: they are laptop VRAM-spill embedding
+figures (§18.5) and mean nothing about a server.
+
+### 22.10 A defect found while inspecting the catalog, and NOT fixed here
+
+`records.file_from_attachment` always builds a `FileRecord` with
+`fetch_status = FETCH_PENDING`, and `catalog.FileState.differs_from` compares
+`fetch_status` — so **a re-sync after a fetch pass marks every already-fetched
+file `changed` and writes `pending` back over it** (`_file_values` includes the
+column; `update_files` applies it). Measured directly, not inferred.
+
+Consequence: the next fetch pass would re-download the entire 8.6 GB corpus.
+It is **not** a supersession-correctness problem — identical bytes hash
+identically, so `content_sha256` does not move and the driver's anti-join still
+skips them — but it makes "NRB republished this file" indistinguishable from "we
+re-synced", and it must be fixed before any scheduled re-sync. The fix is to
+stop `differs_from` comparing `fetch_status`/`blocked_reason` (they are OUR
+state, not upstream facts) or to carry the existing state onto the record before
+diffing. Left alone deliberately: it is a Phase 4/5 change with its own test
+surface, and folding it into a supersession commit would hide it.
+
+### 22.11 Evaluation & Improvement (Phase 7 step 3)
+
+**Success metric.** Zero windows without a current version. Concretely: after
+any sequence of publishes, failures and retries, exactly one `ready` document
+exists per logical source and it is the newest successfully indexed one. The
+unique index makes the first half unfalsifiable at the database level; the
+second half is what the tests and the exercise measure.
+
+**Eval.** Two labelled sets. 19 focused tests scored pass/fail: 19/19. The
+four-revision real-data exercise scored on 17 assertions across six lifecycle
+steps: 17/17. Not evaluated: retrieval QUALITY after a supersession — the
+exercise proves the right *document* comes back, not that it ranks well, and
+§15's semantic verdicts remain `awaiting_nepali_review`.
+
+**Feedback capture.** `documents.metadata.superseded_by` / `superseded_at` are
+the per-document record of what replaced what; `--report` shows current versus
+superseded counts per department; the worker logs the promotion outcome
+(`ready` / `promoted` / `superseded`) per job.
+
+**Review loop.** Before the admin API is built, and again after the first real
+republication is observed in production — the ordering caveat in §22.5 is the
+thing to revisit then, because it is the only part of this design resting on our
+own record rather than on NRB's.
+
+### 22.12 The gate
+
+Step 3 is done. **The Phase 7 backend state machine is now safe enough for the
+admin API and run-status work**: discovery, fetch, recovery, ingest, retry and
+supersession are all idempotent or explicitly opt-in, all failures are
+fail-closed, and every transition is recorded in a queryable row. The API was
+**not started**.
+
+**Not started, and not to be started without a decision:** the admin trigger and
+status API, any scheduler or cron, the `RAG_DOCS_DIR` duplication (§20.7 item 2 —
+still required before full-corpus ingest), Phase 8's `search_nrb_documents`, any
+corpus-scale ingest, and the §22.10 sync fix.
+
+Unchanged and untouched: the Nepali semantic review, §17.6's broken-ToUnicode
+native text, the npttf2utf GPL-3.0 distribution decision, full-corpus retrieval
+quality, native-2 (not modified; native-3 not started), the recovery-cache
+versioning, the frozen Phase 6A/6B evidence, the Phase 7 cohort (not re-run, not
+expanded), the `ri*` scratch-DB debris, and server access (§19.1) — this is still
+the laptop.

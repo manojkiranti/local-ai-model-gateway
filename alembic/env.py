@@ -36,7 +36,14 @@ target_metadata = Base.metadata
 # on every run. They ARE declared on the model (so autogenerate knows they
 # exist) and created by hand in the migration; this only excludes them from
 # comparison.
-_AUTOGEN_SKIP_INDEXES = {"ix_chunks_embedding", "ix_chunks_tsv"}
+_AUTOGEN_SKIP_INDEXES = {
+    "ix_chunks_embedding",
+    "ix_chunks_tsv",
+    # A partial UNIQUE index over a JSONB expression. Alembic reflects neither
+    # the expression nor the WHERE clause, so it proposes dropping and
+    # recreating it on every drift check. Same reason as the two above.
+    "ux_documents_nrb_current_source",
+}
 
 
 def _include_object(obj, name, type_, reflected, compare_to) -> bool:

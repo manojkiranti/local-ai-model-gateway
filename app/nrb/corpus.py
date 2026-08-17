@@ -18,6 +18,27 @@ WHAT IT SELECTS FROM, AND WHAT IT REFUSES TO LOOK AT
     Recovery reuse, when it lands, comes from a new versioned recovery cache —
     never from `nrb_extractions`, and never from a pre-filter here.
 
+"ALREADY CURRENT" IS NOT "SOME DOCUMENT HAS THESE BYTES"
+    Selection is still anti-joined on `content_hash`, and that is right: it is
+    the VERSION identity and it is what makes a repeat pass free. But it cannot
+    express supersession. When NRB republishes a file at the same URL with new
+    bytes, the anti-join sees a hash it has never indexed and selects it —
+    correctly — and what it selects is a *replacement candidate*, not a new
+    source. The two are the same work and a very different event, so
+    `summarise_scope` classifies them and the report names them separately:
+
+        already_current        this blob's bytes are already the active version
+        new_source             no version of this logical source is indexed here
+        replacement_candidate  another version IS indexed; this one replaces it
+                               once its ingest succeeds
+
+    The classification is by `metadata->>'comparison_key'`, the catalog's own
+    logical file identity — see `app/nrb/supersession.py` for why that field and
+    not `page_url`, and for what happens when two catalog keys share bytes.
+    Nothing here archives anything: **promotion happens at the end of a
+    successful ingest, in the worker's own transaction**, precisely so that a
+    candidate which never succeeds cannot retire the version that is serving.
+
 TWO WAYS A DOCUMENT IS ALREADY PRESENT, AND THEY MEAN DIFFERENT THINGS
     `select_ingest_targets` anti-joins the scope against `documents` in the
     target department, so the ordinary "I ran this yesterday" case selects
@@ -86,6 +107,7 @@ from . import filestore
 from .catalog import bounded_keys
 from .models import NRBFile, NRBSource, NRBSourceFile
 from .rag import NRB_ORIGIN
+from .supersession import LOGICAL_KEY_FIELD
 
 logger = logging.getLogger("app.nrb.corpus")
 
@@ -94,10 +116,12 @@ __all__ = [
     "IngestOutcome",
     "RetryOutcome",
     "RetryTarget",
+    "ScopeSummary",
     "create_ingest_targets",
     "requeue_failed",
     "select_ingest_targets",
     "select_retry_targets",
+    "summarise_scope",
 ]
 
 # Commit cadence. Matches `fetch.py`'s: an interrupt keeps its progress, and the
@@ -270,6 +294,110 @@ async def select_ingest_targets(
             )
         )
     return targets
+
+
+@dataclass
+class ScopeSummary:
+    """What a scope means against what is already indexed. Report-only.
+
+    Counted over BLOBS (distinct `content_sha256`), the same unit
+    `select_ingest_targets` selects, so `new_source + replacement_candidate`
+    equals the number of documents a run would create and `already_current`
+    is the rest.
+    """
+
+    scope_blobs: int = 0
+    already_current: int = 0
+    new_source: int = 0
+    replacement_candidate: int = 0
+    retry_failed: int = 0
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "scope_blobs": self.scope_blobs,
+            "already_current": self.already_current,
+            "new_source": self.new_source,
+            "replacement_candidate": self.replacement_candidate,
+            "retry_failed": self.retry_failed,
+        }
+
+
+async def summarise_scope(
+    session: AsyncSession,
+    *,
+    department_id: int,
+    keys: Sequence[str] | None = None,
+    sections: Sequence[str] | None = None,
+    owners: Sequence[str] | None = None,
+    years: Sequence[int] | None = None,
+    resource_types: Sequence[str] | None = None,
+    extensions: Sequence[str] | None = None,
+    limit: int | None = None,
+) -> ScopeSummary:
+    """Classify every blob in scope against what this department already holds.
+
+    One query per bucket rather than one per blob. `already_current` reuses the
+    exact predicate `select_ingest_targets` anti-joins on, so the two can never
+    report different things about the same blob; the split of the remainder is
+    by logical source, which is what makes "a new NRB document" and "a new
+    version of one we have" distinguishable at all.
+    """
+    scope = dict(
+        keys=keys, sections=sections, owners=owners, years=years,
+        resource_types=resource_types, extensions=extensions,
+    )
+    base = (
+        select(NRBFile.content_sha256, NRBFile.comparison_key)
+        .where(
+            NRBFile.fetch_status == "fetched",
+            NRBFile.content_sha256.isnot(None),
+            NRBFile.storage_key.isnot(None),
+        )
+        .distinct(NRBFile.content_sha256)
+        .order_by(NRBFile.content_sha256, NRBFile.id)
+    )
+    base = _scoped_files(base, **scope)
+    if limit is not None:
+        base = base.limit(limit)
+    rows = (await session.execute(base)).all()
+
+    summary = ScopeSummary(scope_blobs=len(rows))
+    if not rows:
+        return summary
+
+    hashes = {
+        h for h in (
+            await session.execute(
+                select(Document.content_hash).where(
+                    Document.department_id == department_id,
+                    Document.status != STATUS_ARCHIVED,
+                    Document.content_hash.in_([r[0] for r in rows]),
+                )
+            )
+        ).scalars()
+    }
+    indexed_keys = {
+        k for k in (
+            await session.execute(
+                select(Document.meta[LOGICAL_KEY_FIELD].astext).where(
+                    Document.department_id == department_id,
+                    Document.status != STATUS_ARCHIVED,
+                    Document.meta["origin"].astext == NRB_ORIGIN,
+                    Document.meta[LOGICAL_KEY_FIELD].astext.in_(
+                        [r[1] for r in rows]
+                    ),
+                )
+            )
+        ).scalars()
+    }
+    for sha, key in rows:
+        if sha in hashes:
+            summary.already_current += 1
+        elif key in indexed_keys:
+            summary.replacement_candidate += 1
+        else:
+            summary.new_source += 1
+    return summary
 
 
 async def _titles_for(

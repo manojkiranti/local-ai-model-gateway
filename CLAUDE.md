@@ -115,11 +115,24 @@ RECOVERY CACHE) are DONE (2026-08-17, §21).** `--retry-failed` requeues a
 verified on 4 real blobs / 56 units at **0 npttf2utf calls and 0 PP-OCR calls**
 on the second pass, chunk counts unchanged (1/2/9/75 = §18.7's), plus a real
 worker re-ingest logging `warm … 4 reused, converter 0, ocr 0`.
+**Phase 7 step 3 (SUPERSESSION) is DONE (2026-08-17, §22).** A republished NRB
+file's new version becomes current only when its ingest SUCCEEDS, in the same
+transaction that archives the old one (`app/nrb/supersession.py`,
+`worker._activate`, migration `8f2d1c05a7b4`); a failed candidate never retires
+the version that is serving. Proved by 19 tests and a four-revision real-data
+exercise (`scripts/nrb_supersession_exercise.py`, all checks passed).
 **The NRB CORPUS is still not ingested and `search_nrb_documents` (Phase 8) does
 not exist** — the 6B gate and its recommendations are §11.9, §12.10, §13.11,
-§14.7, §15.9, §16.10, §17.8, §19.5, §20.9 and §21.10. Phase 7's remaining gaps
-are the supersession link and the `RAG_DOCS_DIR` duplication decision (§19.3,
-§20.7) — the recovery cache no longer is.
+§14.7, §15.9, §16.10, §17.8, §19.5, §20.9, §21.10 and §22.12. Phase 7's
+remaining gap is the `RAG_DOCS_DIR` duplication decision (§20.7 item 2), still
+required before full-corpus ingest; the recovery cache and supersession no
+longer are. **The admin API / run-status work is the next unblocked step.**
+**A sync defect is recorded and NOT fixed (§22.10): `differs_from` compares
+`fetch_status`, and `file_from_attachment` always builds `pending`, so a
+re-sync after a fetch marks every fetched file changed and writes `pending`
+back — the next fetch would re-download 8.6 GB.** Not a supersession-correctness
+problem (identical bytes hash identically) but it must be fixed before any
+scheduled re-sync.
 The roadmap was renumbered when Phase 4 was scoped down to
 persistence; read that doc before touching anything NRB-related instead of
 re-deriving status from chat history.
@@ -173,7 +186,11 @@ order, persisting NOTHING itself, run via `scripts/nrb_recover.py`);
 `recovery_cache` = Phase 7 step 2, the versioned recovery cache
 (`nrb_recoveries`/`nrb_recovery_units`; the ONLY file that persists recovered
 text, reached from `worker._load_chunks` via `chunks_for_blob`, operated by
-`scripts/nrb_recovery_cache.py --stats/--reuse-check/--purge`); `rag` = the ONLY
+`scripts/nrb_recovery_cache.py --stats/--reuse-check/--purge`);
+`supersession` = Phase 7 step 3, which version of a logical NRB source is
+searchable (logical identity = `documents.metadata.comparison_key`; called from
+`worker._activate` INSIDE the replacement transaction; exercised by
+`scripts/nrb_supersession_exercise.py`); `rag` = the ONLY
 seam between NRB and department RAG (`parse_nrb_to_chunks`, reached from
 `worker._load_chunks_sync` via `documents.metadata.origin == "nrb"`; chunks per
 PAGE, route in `document_chunks.metadata`, exercised by
@@ -793,6 +810,27 @@ events (`token`/`tool_call`/`tool_result`/`done`) + the new id in the
   `chat_sessions.department_id` are both `ON DELETE RESTRICT` — deleting a
   department must not silently rewrite an old HR session into a general one.
   `departments.is_active = false` is the only retirement path.
+- **A failed replacement must never remove the last good version, and one
+  transaction is what guarantees it.** NRB republishes; new bytes are a new
+  `content_hash`, so `ux_documents_active_content` is perfectly happy with two
+  versions and cannot express "which one is current". `ux_documents_nrb_current_source`
+  — a PARTIAL UNIQUE index over `(department_id, metadata->>'comparison_key')`
+  where `status='ready' AND origin='nrb'` — is what says only one may be
+  SEARCHABLE. The logical identity is **`comparison_key`** (the catalog's own
+  unique attachment URL), never `content_sha256` (that is the VERSION), never
+  `page_url` (a post can carry a circular AND its annex — promoting one would
+  archive the other), and never a title/filename/date. `worker._activate`
+  archives the old version and activates the new one in ONE transaction, with
+  the archive FIRST (the index would refuse two `ready` rows otherwise), so any
+  failure rolls the archive back too. Ordering is `documents.created_at` +
+  `id` — OUR observation order, because `nrb_files` overwrites `content_sha256`
+  in place and keeps no version history (§22.5); job completion order is never
+  used, so a document supersedes only strictly OLDER siblings and archives
+  ITSELF if a newer one is already `ready`. A newer success also archives an
+  older `failed` row, which is why **a superseded failure is not retryable**.
+  Supersession touches `documents` only: `nrb_files`, blobs, `nrb_recoveries`
+  and `nrb_extractions` are evidence and are never purged, and an archived
+  version's recovery stays cached.
 - **Both RAG unique indexes are PARTIAL, deliberately.**
   `ux_documents_active_content` excludes `archived` rows, or archiving a document
   (which deletes its chunks but keeps the row for audit) would permanently block

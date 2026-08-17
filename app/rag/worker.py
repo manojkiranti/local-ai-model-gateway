@@ -262,6 +262,69 @@ async def _record_failure(Session, job, exc: Exception) -> None:
     log.warning("ingest failed for %s: %s", job.document_id, exc)
 
 
+async def _activate(Session, snap: DocSnapshot, chunks, vectors, settings):
+    """Make this document the searchable one — ONE transaction. `(written, outcome)`.
+
+    For everything except an NRB corpus document this is exactly what it always
+    was: `replace_chunks` and commit. The NRB branch adds supersession, and the
+    ORDER inside the transaction is the whole safety property.
+
+    An NRB file republished with new bytes produces a SECOND `documents` row
+    (new `content_hash`), so the old version A and the candidate B coexist, and
+    A must keep serving until B is proven good. "Proven good" is *here*: recover,
+    chunk and embed have all completed and the vectors are in memory. So the
+    archive of A and the activation of B go in one transaction — if anything in
+    it fails, the rollback un-archives A for free. There is no ordering of two
+    commits that would be as safe, and no window in which a failed replacement
+    has removed the last good version.
+
+    Promotion runs BEFORE `replace_chunks` rather than after, which is not
+    backwards: `replace_chunks` flips B to `ready`, and
+    `ux_documents_nrb_current_source` would refuse that while A is still `ready`.
+    Archiving A first is what makes the flip legal, inside a transaction where
+    "first" is invisible to everyone else.
+
+    The third outcome is a candidate that LOST. If a newer version of the same
+    source is already `ready`, B's chunks are never written — it is archived on
+    arrival. The job still succeeded; its work was done and a newer version had
+    already won.
+    """
+    is_nrb = snap.meta.get("origin") == "nrb"
+    async with Session() as session:
+        promotion = None
+        if is_nrb:
+            from ..nrb import supersession
+
+            promotion = await supersession.promote(session, document_id=snap.id)
+            if promotion.superseded_by is not None:
+                await supersession.archive_self(
+                    session,
+                    document_id=snap.id,
+                    superseded_by=promotion.superseded_by,
+                )
+                await session.commit()
+                log.info(
+                    "superseded on arrival: %s lost to newer %s",
+                    snap.id, promotion.superseded_by,
+                )
+                return 0, "superseded"
+
+        written = await ingest.replace_chunks(
+            session,
+            document_id=snap.id,
+            department_id=snap.department_id,
+            chunks=chunks,
+            embeddings=vectors,
+            embed_model=settings.rag_embed_model,
+            embed_dim=settings.rag_embed_dim,
+        )
+        await session.commit()
+
+    if promotion is not None and promotion.supersedes:
+        return written, "promoted"
+    return written, "ready"
+
+
 async def process_job(Session, client, settings: Settings, job) -> None:
     """Run one job to completion, recording the outcome on both rows."""
     snap = await _snapshot_document(Session, job.document_id)
@@ -274,6 +337,7 @@ async def process_job(Session, client, settings: Settings, job) -> None:
     )
     failure: Exception | None = None
     written = total = 0
+    outcome = "ready"
 
     try:
         # --- slow work: NO transaction open, off the event loop ---
@@ -294,17 +358,7 @@ async def process_job(Session, client, settings: Settings, job) -> None:
         )
 
         # --- short atomic replacement, its own transaction ---
-        async with Session() as session:
-            written = await ingest.replace_chunks(
-                session,
-                document_id=snap.id,
-                department_id=snap.department_id,
-                chunks=chunks,
-                embeddings=vectors,
-                embed_model=settings.rag_embed_model,
-                embed_dim=settings.rag_embed_dim,
-            )
-            await session.commit()
+        written, outcome = await _activate(Session, snap, chunks, vectors, settings)
 
     except Exception as exc:  # noqa: BLE001 - one job must never kill the loop
         # ParseError / StorageError / EmbeddingError / DocumentGone / ValueError
@@ -327,7 +381,7 @@ async def process_job(Session, client, settings: Settings, job) -> None:
             chunks_total=total, chunks_done=written,
         )
         await session.commit()
-    log.info("ingested %s (%d chunks)", snap.id, written)
+    log.info("ingested %s (%d chunks, %s)", snap.id, written, outcome)
 
 
 async def run_once(engine: AsyncEngine, client, settings: Settings) -> bool:

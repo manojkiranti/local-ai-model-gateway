@@ -140,6 +140,21 @@ async def do_report(Session, dept_id: int) -> None:
                 {"dept": dept_id},
             )
         ).mappings().all()
+        superseded = (
+            await session.execute(
+                text(
+                    """
+                    SELECT count(*) FILTER (WHERE d.status = 'archived'
+                                        AND d.metadata ? 'superseded_by') AS superseded,
+                           count(*) FILTER (WHERE d.status = 'ready') AS current
+                      FROM documents d
+                     WHERE d.department_id = :dept
+                       AND d.metadata->>'origin' = 'nrb'
+                    """
+                ),
+                {"dept": dept_id},
+            )
+        ).mappings().first()
         failed = (
             await session.execute(
                 text(
@@ -163,6 +178,10 @@ async def do_report(Session, dept_id: int) -> None:
     print("--- jobs ---")
     for r in jobs:
         print(f"  {r['status']:<10} {r['n']:>4}")
+    if superseded:
+        print("--- nrb versions ---")
+        print(f"  current (ready)    {superseded['current']}")
+        print(f"  superseded         {superseded['superseded']}")
     print("--- chunks by route ---")
     for r in routes:
         print(f"  {str(r['route']):<22} {r['chunks']:>6} chunks over {r['docs']} documents")
@@ -240,6 +259,9 @@ async def main() -> int:
             limit=args.limit,
         )
         async with Session() as session:
+            summary = await corpus.summarise_scope(
+                session, department_id=dept_id, **scope
+            )
             targets = await corpus.select_ingest_targets(
                 session, department_id=dept_id, **scope
             )
@@ -252,8 +274,15 @@ async def main() -> int:
             )
             await session.rollback()
 
-        print(f"\nscope names {len(keys)} catalog keys; "
-              f"{len(targets)} blobs selected (not already in {dept_code})")
+        summary.retry_failed = len(retries)
+        print(f"\nscope names {len(keys)} catalog keys / {summary.scope_blobs} blobs")
+        print(f"  already_current        {summary.already_current}")
+        print(f"  new_source             {summary.new_source}")
+        print(f"  replacement_candidate  {summary.replacement_candidate}"
+              "   (supersede their predecessor only if their ingest succeeds)")
+        if args.retry_failed:
+            print(f"  retry_failed           {summary.retry_failed}")
+        print(f"\n{len(targets)} blobs selected (not already current in {dept_code})")
         for t in targets:
             print(f"  {t.content_sha256[:12]} .{(t.extension or '?'):<5} "
                   f"{t.title[:64]}")
