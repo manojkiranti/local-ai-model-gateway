@@ -3409,3 +3409,233 @@ Still outstanding and untouched by this session: the Nepali semantic review of
 the §15 pack (conversion *correctness* remains unmeasured), `075bf12eb087`'s
 broken-ToUnicode native text (§17.6, a `native-3` + new cohort), the npttf2utf
 GPL-3.0 distribution decision, and full-corpus retrieval quality.
+
+## 20. Phase 7 step 1 — the corpus ingest driver (31 documents, scratch DB)
+
+**Date:** 2026-08-17. **Scope:** the driver that turns catalog blobs into queued
+ingest jobs, its frozen validation cohort, and one live run. **What this is
+not:** a benchmark, a retrieval measurement, or a corpus ingest. It answers one
+question — *does a scoped, resumable, enqueue-only driver put the right
+documents in the index and stay a no-op on a second pass?* — and it is still the
+laptop, still `local_ai_gateway_p4`.
+
+Two decisions were taken before any code (user, 2026-08-17) and both are load
+bearing:
+
+1. **~30 documents covering native, legacy conversion, OCR, mixed PDFs and
+   spreadsheets, plus exactly one unsupported OLE2 file** to prove failure
+   isolation. Not to be expanded into a benchmark.
+2. **`nrb_extractions` must not pre-filter the driver** — no join, no import, no
+   query. Recovery reuse will come from a new *versioned recovery cache*, never
+   from the Phase 6 evidence table.
+
+### 20.1 The tension in decision 2, and how the cohort resolves it
+
+Route coverage is knowledge that exists only in Phase 6 evidence: the catalog
+knows filename, MIME and section, never what came out of the parser. So a cohort
+that covers five routes cannot be drawn from the catalog alone.
+
+The resolution is that cohort selection is a **one-time offline act, frozen into
+a committed file**, and the driver reads only that file. `nrb_extractions` never
+enters the driver's import graph, query path or runtime dependencies — it
+informed which 31 keys were written down, once. Three roles, drawn three
+different ways (`scripts/nrb_p7_cohort.py` → `docs/nrb/phase7-validation-cohort.json`,
+`cohort_sha256 f2d36b4c…`):
+
+| role | n | how drawn |
+|---|---:|---|
+| anchor | 8 | hand-picked: the §17/§18.7 blobs, the only route-aware part |
+| unknown | 22 | **blind** — ranked by `sha256(seed + content_sha256)`, no extraction evidence consulted |
+| unsupported | 1 | one OLE2 `.xls` (§15.2), to prove a failed job isolates |
+
+Coverage is guaranteed by the anchors, not by the draw. That is the honest way
+round: a blind draw cannot guarantee it, and a route-aware draw of all 31 would
+put Phase 6 evidence at the centre of the cohort instead of its edge.
+
+**"Blind" means blind to ROUTE, not unrestricted.** The draw is scoped to
+`extension IN ('pdf','xlsx','docx')` — catalog data, what NRB served — because
+without it a random draw pulls images and OLE2 files and "exactly one
+unsupported file" stops being true. And the pool is the **570 blobs that happen
+to be fetched**, assembled by the Phase 6A benchmark, the 6B holdout and the
+core fetch. That is not a random sample of 18,266 files, so **this cohort
+supports no population claim about NRB** and the route split below must not be
+read as one. Most of its members do have extraction rows from those earlier
+passes; *unknown* means this cohort did not look, not that nobody ever has.
+
+**It is deliberately not a `manifest`.** `manifest.build_manifest` takes a
+`Sample` and certifies *sampling reproducibility*, admitting no second path by
+which a key can enter. A hand-picked cohort has no sampling provenance to
+certify, so it gets a plain ordered key list with its own sha256 instead —
+enough to prove the driver ran on the cohort that was committed.
+
+### 20.2 The driver
+
+`app/nrb/corpus.py` (logic) + `scripts/nrb_rag_ingest_corpus.py` (CLI). The
+8-blob smoke test `scripts/nrb_rag_ingest.py` is untouched and still guards
+§17/§18.7.
+
+- **Refuses to run without a scope**, like `nrb_fetch.py`. `--cohort` / `--key` /
+  `--section` / `--owner` / `--year` / `--extension` / `--limit` compose; `--all`
+  is the explicit way to mean the whole fetched catalog.
+- **Selection is catalog-only**: `fetch_status = 'fetched'`,
+  `DISTINCT ON (content_sha256)` with the lowest id as representative, stable
+  order. Two catalog keys sharing bytes are ONE document — selecting both would
+  inflate the conflict count with something that is not a conflict.
+- **Skip-what-exists is an anti-join**, not an exception handler:
+  `documents.content_hash` is `sha256(bytes)` and so is `nrb_files.content_sha256`,
+  so the ordinary "I ran this yesterday" case selects nothing in one query. The
+  anti-join repeats `ux_documents_active_content`'s own `status <> 'archived'`
+  predicate, because an archived document must stay re-ingestable — skipping it
+  would make archiving permanent.
+- **`DocumentConflict` is still caught, but it means RACED**, not "already
+  done", and is counted separately. A nonzero conflict count is evidence of
+  concurrency, not of idempotence. The file written before the failed insert is
+  compensated exactly as the upload route does.
+- **Enqueue-only, always.** No in-process drain: that races the deployed worker,
+  and `SKIP LOCKED` means the two split the scope rather than collide — quietly
+  measuring neither.
+- **Resumable**: per-document sessions, batch logging every 25. An interrupt
+  keeps its progress because the anti-join no longer selects what committed.
+
+`tests/test_nrb_corpus_ingest.py` — 10 tests, all passing — locks the second-pass
+property, the shared-bytes collapse, archived re-ingest, raced-conflict counting,
+`fetched`-only selection, per-department dedup, missing-blob isolation, and a
+source-level guard (via `ast`, so the module's own prose about the rule does not
+trip it) that `nrb_extractions` / `NRBExtraction` / `extractor_version` never
+appear in the driver's code.
+
+### 20.3 The run
+
+`--department nrb-p7` (a NEW department, so §17/§18.7's 250 chunks stay intact
+as comparable evidence), cohort scope, drained by a real
+`python -m app.rag.worker`. All five recovery dependencies verified present
+first — npttf2utf, rapidocr, onnxruntime, docling, pypdf, plus the lexicon —
+because §18's whole lesson is that their absence produces a *clean-looking*
+deployment.
+
+**31 keys → 31 blobs selected → 31 documents created in 0.2 s.** Zero conflicts,
+zero missing blobs, zero hash mismatches.
+
+| | docs | chunks |
+|---|---:|---:|
+| ready | 30 | 1,029 |
+| failed | 1 | 0 |
+
+| route | chunks | documents |
+|---|---:|---:|
+| `native` | 628 | 8 |
+| `legacy_conversion` | 350 | 18 |
+| `ocr` | 51 | 6 |
+
+Wall clock **2,271 s (37.9 min)** for 31 documents; mean 73.3 s, max 983.3 s
+(`e75f209d1db7`, *Annual Report 2067-68 (Nepali)*, 342 chunks — a third of the
+whole cohort's output in one file). **These are laptop VRAM-spill figures
+(§18.5) and are not a server estimate.**
+
+Anchors accounted for 8 documents / 250 chunks; the 22 blind unknowns plus the
+OLE2 file for 23 documents / 779 chunks.
+
+### 20.4 The anchors reproduce §18.7 exactly — 8/8
+
+| blob | §18.7 chunks | now | routes | pages |
+|---|---:|---:|---|---|
+| `075bf12eb087` | 4 | **4** | native | 1–2 |
+| `1a9b6321aa61` | 1 | **1** | legacy_conversion | 1 |
+| `268bcfe86d03` | 1 | **1** | legacy_conversion | 1 |
+| `3d2eca8b9f95` | 2 | **2** | ocr | 1 |
+| `c298efaf1f16` | 4 | **4** | ocr | 1–3 |
+| `e08988860534` | 75 | **75** | legacy_conversion + ocr | 1–50 |
+| `7820b1f49fc1` | 9 | **9** | legacy_conversion | 1–4 |
+| `8df7b02f8a13` | 154 | **154** | legacy_conversion | 1–46 |
+
+Every count, route and page range identical, through a different driver, into a
+different department. The mixed document still keeps its OCR'd page 1 beside 49
+converted pages.
+
+### 20.5 The second pass is a no-op, live
+
+```
+scope names 31 catalog keys; 0 blobs selected (not already in nrb-p7)
+nothing to do: every blob in scope is already ingested here.
+```
+
+Exit 0, nothing created, nothing raised — the property the 8-blob smoke test
+does **not** have (§19.3: it calls `create_document` with no handler and aborts
+on the first existing blob). This is what makes an interrupted corpus pass
+resumable rather than restartable.
+
+### 20.6 The failure case did its job
+
+The OLE2 file failed **mid-run**, not last: at the 17-minute mark the queue
+stood at 24 succeeded / 1 failed / 5 queued / 1 running, and the remaining
+documents ingested normally afterwards. Its recorded reason is specific enough
+to act on rather than a bare "parse failed":
+
+```
+no indexable text: unsupported/no_native_parser, plan no_recovery, 0 pages
+```
+
+Which is §16's fail-closed rule reaching the far end of the pipeline intact: no
+parser, no recovery plan, no text, an explicit failed job, and **nothing
+indexed**.
+
+### 20.7 What this run found
+
+1. **A `failed` document is never re-selected.** The anti-join excludes
+   everything that is not `archived`, so the OLE2 file — and any transiently
+   failed document — stays out of a later pass. For a permanently unparseable
+   file that is right; for a transient failure it is not, and there is currently
+   no `--retry-failed` (fetch has one). Recorded, not fixed: the fix is a
+   deliberate scope decision, not a bug patch.
+2. **`RAG_DOCS_DIR` duplication, now measured.** 31 documents cost **31 MB**
+   copied out of a 455 MB blob store. Trivial here, ~8.6 GB at corpus scale, and
+   still the open decision from §19/§4 of the plan — copy, symlink, or teach the
+   NRB branch to resolve from `filestore` (which restructures
+   `_load_chunks_sync`, since it resolves the path *before* the NRB branch).
+3. **The route split on blindly-drawn documents is native-dominated** — 628
+   native chunks against 350 converted and 51 OCR'd. The anchors are legacy-heavy
+   *by construction*, so this is the first split measured on documents chosen
+   without route knowledge. **It is not a corpus estimate** (§20.1's pool
+   caveat) and must not be quoted as one.
+4. **Pre-existing test debris in `local_ai_gateway_p4`.** 190 documents in `ri*`
+   departments dating from 2026-08-14, with `storage_key = 'k'`, committed by the
+   RAG re-ingest integration tests rather than rolled back. Four carried stale
+   `queued` jobs, which this run's worker claimed and failed instantly. That
+   debris is also why `tests/test_rag_reingest_integration.py::
+   test_department_filter_restricts_the_set` fails on any non-empty database — it
+   asserts an *unscoped* document count of exactly 2. Pre-existing, unrelated to
+   NRB, reported and not fixed.
+
+### 20.8 Evaluation & Improvement (Phase 7 step 1)
+
+**Success metric.** Re-run cost, and correctness of what lands. A second pass
+over an unchanged scope must create zero documents and zero jobs; the anchors
+must reproduce §18.7 per document. Both hold. Still a proxy for SQLs — nothing
+here is user-facing.
+
+**Eval.** The 8 anchors are the labelled set, scored per document on chunk count
+and route: **8/8 agreement**. The second-pass-zero property has an automated
+test that failed by construction before this work and passes now. What is *not*
+evaluated: whether the 779 chunks from the unknowns are correct — no Nepali
+reader has seen them, and §15's semantic verdicts remain `awaiting_nepali_review`.
+
+**Feedback capture.** `ingest_jobs` holds per-job status, error, attempts and
+timing; `documents.chunk_count` and `document_chunks.metadata` hold route,
+page and `extractor_version` per chunk. `--json` writes the enqueue counters.
+`--report` re-reads all of it without touching the queue.
+
+**Review loop.** Before any scope expansion, and again after the recovery cache
+lands (which changes re-run cost, the metric above). The check that matters
+stays §18's: read the route split on known blobs, never job success.
+
+### 20.9 The gate
+
+Step 1 is done. **Not started, and not to be started without a decision:** the
+versioned recovery cache (step 2 — its key is a composite recovery version, NOT
+`extractor_version`, and it must cache unresolved pages with their reason or
+every withheld page re-runs OCR forever), the supersession link (§19.3), the
+`RAG_DOCS_DIR` duplication decision, and any corpus-scale ingest.
+
+Unchanged and untouched: the Nepali semantic review, §17.6's broken-ToUnicode
+native text, the npttf2utf GPL-3.0 distribution decision, full-corpus retrieval
+quality, and server access (§19.1) — this run is still the laptop.

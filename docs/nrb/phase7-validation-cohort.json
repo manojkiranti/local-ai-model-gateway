@@ -1,0 +1,344 @@
+{
+  "schema_version": 1,
+  "purpose": "Phase 7 step 1 — validation of the corpus ingest driver. NOT a benchmark: it measures whether the driver works, not how well extraction or retrieval performs, and its pool is the fetched blobs rather than a corpus sample.",
+  "drawn_at": "2026-08-17T02:38:58+00:00",
+  "seed": "nrb-phase7-validation-2026-08-17",
+  "draw_rule": "rank by sha256(seed + ':' + content_sha256), ascending, over DISTINCT ON (content_sha256) fetched rows",
+  "pool": {
+    "definition": "nrb_files.fetch_status = 'fetched'",
+    "supported_extensions": [
+      "pdf",
+      "xlsx",
+      "docx"
+    ],
+    "unsupported_extensions": [
+      "doc",
+      "xls"
+    ],
+    "supported_blobs": 510,
+    "unsupported_blobs": 31,
+    "fetched_rows": 570,
+    "caveat": "the fetched set was assembled by the Phase 6A benchmark, the 6B holdout and the core fetch. It is not a random sample of the 18,266-file corpus and supports no population claim."
+  },
+  "counts": {
+    "anchor": 8,
+    "unknown": 22,
+    "unsupported": 1,
+    "supported_total": 30,
+    "total": 31
+  },
+  "cohort_sha256": "f2d36b4c64ca0eaf06292b0833b059c500cec2cbdf646dbb92b1631a0aa0c25e",
+  "entries": [
+    {
+      "role": "anchor",
+      "content_sha256": "075bf12eb087de606229fc7ff845536a1ffd1bce7d4083a547a77be6a8dae6a4",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/08/11.1-TCSP-circular.pdf",
+      "extension": "pdf",
+      "filename": "11.1-TCSP-circular.pdf",
+      "why": "clean native Unicode PDF, 2 pages (§17.6: its own text layer is corrupt at the codepoint level — recorded, not fixed)",
+      "expected": {
+        "chunks": 4,
+        "route": "native",
+        "source": "§18.7"
+      }
+    },
+    {
+      "role": "anchor",
+      "content_sha256": "1a9b6321aa6124efdd618348ef1184f9dd5e57549c5ff0f7479b09226e986866",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/01/karbahi_release_20690328.pdf",
+      "extension": "pdf",
+      "filename": "karbahi_release_20690328.pdf",
+      "why": "embedded Preeti+Bishall, deterministic conversion",
+      "expected": {
+        "chunks": 1,
+        "route": "legacy_conversion",
+        "source": "§18.7"
+      }
+    },
+    {
+      "role": "anchor",
+      "content_sha256": "268bcfe86d03e9ef684b47f17345a5c0b8e072cdc92f71efca45d6c9e29937b2",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/List_of_Circular-397.pdf",
+      "extension": "pdf",
+      "filename": "List_of_Circular-397.pdf",
+      "why": "embedded Preeti circular 2007, PARTIAL recovery",
+      "expected": {
+        "chunks": 1,
+        "route": "legacy_conversion",
+        "source": "§18.7"
+      }
+    },
+    {
+      "role": "anchor",
+      "content_sha256": "3d2eca8b9f951ecda27129f3fc7e90c503eb1e84802797d6e9833fdae6d39e39",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Indian-Currency-Loan-by-Commercial-Bank_notice20181225.pdf",
+      "extension": "pdf",
+      "filename": "Indian-Currency-Loan-by-Commercial-Bank_notice20181225.pdf",
+      "why": "300 dpi scan, no embedded font, PP-OCRv5",
+      "expected": {
+        "chunks": 2,
+        "route": "ocr",
+        "source": "§18.7"
+      }
+    },
+    {
+      "role": "anchor",
+      "content_sha256": "c298efaf1f16a8e8f10424636769a8a7effe1eba81bbfcd0a1328a6924764156",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/03/Lagani-Notice-2078.12.10-2.pdf",
+      "extension": "pdf",
+      "filename": "Lagani-Notice-2078.12.10-2.pdf",
+      "why": "no text layer at all, PP-OCRv5, 3 pages",
+      "expected": {
+        "chunks": 4,
+        "route": "ocr",
+        "source": "§18.7"
+      }
+    },
+    {
+      "role": "anchor",
+      "content_sha256": "e089888605343b7d01ba84de7a0255f019e77eb7e6eb7c8de5ecee2c7a66dde5",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/02/7_2080-81_Foreign-Investment-Loan-Bylaw-2.pdf",
+      "extension": "pdf",
+      "filename": "7_2080-81_Foreign-Investment-Loan-Bylaw-2.pdf",
+      "why": "THE mixed document: p1 OCR, p2-50 conversion",
+      "expected": {
+        "chunks": 75,
+        "route": "ocr+legacy_conversion",
+        "source": "§18.7"
+      }
+    },
+    {
+      "role": "anchor",
+      "content_sha256": "7820b1f49fc13cf44b5b89ed6f6dfda0cb10af4fa2c043d64d2c181082888bec",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/07/NRB-Samachar_Jeth-20770317.pdf",
+      "extension": "pdf",
+      "filename": "NRB-Samachar_Jeth-20770317.pdf",
+      "why": "stripped font names /CIDFont+F1..F6, stays eligible",
+      "expected": {
+        "chunks": 9,
+        "route": "legacy_conversion",
+        "source": "§18.7"
+      }
+    },
+    {
+      "role": "anchor",
+      "content_sha256": "8df7b02f8a13fd34db917f6bc2e2f29656c5b97de7ac85e9f4f331c9f9c12d65",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/03/Economic-activities-tables-Annual-2076.77.xlsx",
+      "extension": "xlsx",
+      "filename": "Economic-activities-tables-Annual-2076.77.xlsx",
+      "why": "Preeti-encoded workbook, per-CELL conversion",
+      "expected": {
+        "chunks": 154,
+        "route": "legacy_conversion",
+        "source": "§18.7"
+      }
+    },
+    {
+      "role": "unknown",
+      "content_sha256": "8f3abee401344bf8202aab65a24bf6d5e41414803dba70ad1af83ae0ba46f477",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/06/Progress-Report-Chaitra-2078-2.xlsx",
+      "extension": "xlsx",
+      "filename": "Progress-Report-Chaitra-2078-2.xlsx",
+      "why": "drawn blind: ranked by sha256(seed+content_sha256), no extraction evidence consulted",
+      "expected": null
+    },
+    {
+      "role": "unknown",
+      "content_sha256": "3eef44674475da7dd55e9f10da27e306e79f5a7154457fdd605beb71cada0b78",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/12/Press-Release-on-DFL_Darchula-1.pdf",
+      "extension": "pdf",
+      "filename": "Press-Release-on-DFL_Darchula-1.pdf",
+      "why": "drawn blind: ranked by sha256(seed+content_sha256), no extraction evidence consulted",
+      "expected": null
+    },
+    {
+      "role": "unknown",
+      "content_sha256": "70b0d415dcf306bc6640027aa64dbfd236418611b1806477fcdd232430af4fc3",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/2_Procedure-Procedure.pdf",
+      "extension": "pdf",
+      "filename": "2_Procedure-Procedure.pdf",
+      "why": "drawn blind: ranked by sha256(seed+content_sha256), no extraction evidence consulted",
+      "expected": null
+    },
+    {
+      "role": "unknown",
+      "content_sha256": "c7d0f1762ef2bfc679065b726bca7dd61507f026a30ed475f494d558d3ef57c9",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/CMES_-Annual_-2072-73-Nepali-1.pdf",
+      "extension": "pdf",
+      "filename": "CMES_-Annual_-2072-73-Nepali-1.pdf",
+      "why": "drawn blind: ranked by sha256(seed+content_sha256), no extraction evidence consulted",
+      "expected": null
+    },
+    {
+      "role": "unknown",
+      "content_sha256": "e75f209d1db780d821ba9d58734cb6c88ea4bd5ac9252e7c5999e283b4bc666f",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/09/in_Nepali-2067-68.pdf",
+      "extension": "pdf",
+      "filename": "in_Nepali-2067-68.pdf",
+      "why": "drawn blind: ranked by sha256(seed+content_sha256), no extraction evidence consulted",
+      "expected": null
+    },
+    {
+      "role": "unknown",
+      "content_sha256": "121b0de258adb6769d65c595ae71ca63c827e6491c3ce4cd071ac4bc408db56b",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/officer-open-74.4.-9-10-11.pdf",
+      "extension": "pdf",
+      "filename": "officer-open-74.4.-9-10-11.pdf",
+      "why": "drawn blind: ranked by sha256(seed+content_sha256), no extraction evidence consulted",
+      "expected": null
+    },
+    {
+      "role": "unknown",
+      "content_sha256": "b3b7f8690ce9a411553a32e6cbc625b11e28a099802aa437bc4fd87517d7794f",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/NRBSID-Lilam-Notice-20750227.pdf",
+      "extension": "pdf",
+      "filename": "NRBSID-Lilam-Notice-20750227.pdf",
+      "why": "drawn blind: ranked by sha256(seed+content_sha256), no extraction evidence consulted",
+      "expected": null
+    },
+    {
+      "role": "unknown",
+      "content_sha256": "7e322a82803a5d0717e94eea1f7ff765494febc2e5091b6ab099e1474db9940b",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Monetary_Policy_in_English-2015-16_Full_Text.pdf",
+      "extension": "pdf",
+      "filename": "Monetary_Policy_in_English-2015-16_Full_Text.pdf",
+      "why": "drawn blind: ranked by sha256(seed+content_sha256), no extraction evidence consulted",
+      "expected": null
+    },
+    {
+      "role": "unknown",
+      "content_sha256": "c6d5fd12dd3b30a1896d3abed7cd96a6c3d55467aafe34e7b7208410083f34b6",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/06/Circular-13-Final-to-upload.pdf",
+      "extension": "pdf",
+      "filename": "Circular-13-Final-to-upload.pdf",
+      "why": "drawn blind: ranked by sha256(seed+content_sha256), no extraction evidence consulted",
+      "expected": null
+    },
+    {
+      "role": "unknown",
+      "content_sha256": "36e118bdc2e342a4dcc82962193978cf82b0b84aa5a36306546c87318fc5e648",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/11/भूकम्प-प्रभावित-घरपरिवारलाई-आवासीय-घर-पुनर्निमाणका-२०७२.pdf",
+      "extension": "pdf",
+      "filename": "भूकम्प-प्रभावित-घरपरिवारलाई-आवासीय-घर-पुनर्निमाणका-२०७२.pdf",
+      "why": "drawn blind: ranked by sha256(seed+content_sha256), no extraction evidence consulted",
+      "expected": null
+    },
+    {
+      "role": "unknown",
+      "content_sha256": "c71b6f18e1bd723bcc92c8af7a9593bc926b844b84c1104028c29b25f9db8352",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/09/RTI_NRB-Report_2078-Asar.pdf",
+      "extension": "pdf",
+      "filename": "RTI_NRB-Report_2078-Asar.pdf",
+      "why": "drawn blind: ranked by sha256(seed+content_sha256), no extraction evidence consulted",
+      "expected": null
+    },
+    {
+      "role": "unknown",
+      "content_sha256": "8f8570f37a8dea027550d9e66fdc18570d2d760e8c3f947f4b65800568066b11",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/11/Commercial-Bank-News-1-1.pdf",
+      "extension": "pdf",
+      "filename": "Commercial-Bank-News-1-1.pdf",
+      "why": "drawn blind: ranked by sha256(seed+content_sha256), no extraction evidence consulted",
+      "expected": null
+    },
+    {
+      "role": "unknown",
+      "content_sha256": "d41674e35b167b643b8056d118175110548d9fa40f8cef4e4a1e0b9271a30ed7",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/02/NRB-Samachar_Fagun_2081.pdf",
+      "extension": "pdf",
+      "filename": "NRB-Samachar_Fagun_2081.pdf",
+      "why": "drawn blind: ranked by sha256(seed+content_sha256), no extraction evidence consulted",
+      "expected": null
+    },
+    {
+      "role": "unknown",
+      "content_sha256": "d503895a7abc90a79e579ffb8ca54fc980374c8c585ccb15c1aa4f899bee461e",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Ownership_Structure_of_Government_Securities-2071-06Asoj.pdf",
+      "extension": "pdf",
+      "filename": "Ownership_Structure_of_Government_Securities-2071-06Asoj.pdf",
+      "why": "drawn blind: ranked by sha256(seed+content_sha256), no extraction evidence consulted",
+      "expected": null
+    },
+    {
+      "role": "unknown",
+      "content_sha256": "e0b19b88ecb13ff94c0ccf39b548149df32434d8096842bd014c4c6ccf380dab",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/09/Subsidised-Loan-as-on-end-of-Shrawan2078-.pdf",
+      "extension": "pdf",
+      "filename": "Subsidised-Loan-as-on-end-of-Shrawan2078-.pdf",
+      "why": "drawn blind: ranked by sha256(seed+content_sha256), no extraction evidence consulted",
+      "expected": null
+    },
+    {
+      "role": "unknown",
+      "content_sha256": "5a82c814e06e7b91e70dbb189179b6dbe57fd7df1bc1512209e3ed2188562d61",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/01/payment_and_settlement_act_2075.pdf",
+      "extension": "pdf",
+      "filename": "payment_and_settlement_act_2075.pdf",
+      "why": "drawn blind: ranked by sha256(seed+content_sha256), no extraction evidence consulted",
+      "expected": null
+    },
+    {
+      "role": "unknown",
+      "content_sha256": "5d1b06d3c5d7319e818d2f7785a6c3aa4760f761d309d5ee9c86d956df5ee937",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/List_of_Circular-497.pdf",
+      "extension": "pdf",
+      "filename": "List_of_Circular-497.pdf",
+      "why": "drawn blind: ranked by sha256(seed+content_sha256), no extraction evidence consulted",
+      "expected": null
+    },
+    {
+      "role": "unknown",
+      "content_sha256": "5d43529f72fc6d59e75d26d92acff9d2f9b8113261610090105ecb885be96d35",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Study_Reports-Agricultural_Credit_and_Its_Impact_on_Farm_Productivity_A_Case_Study_of_Kailali_District.pdf",
+      "extension": "pdf",
+      "filename": "Study_Reports-Agricultural_Credit_and_Its_Impact_on_Farm_Productivity_A_Case_Study_of_Kailali_District.pdf",
+      "why": "drawn blind: ranked by sha256(seed+content_sha256), no extraction evidence consulted",
+      "expected": null
+    },
+    {
+      "role": "unknown",
+      "content_sha256": "5fd84d3ef113246ef4a923b85e93a0acfbb3bab303acd1663d1c025ebe044a60",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/01/Security.pdf",
+      "extension": "pdf",
+      "filename": "Security.pdf",
+      "why": "drawn blind: ranked by sha256(seed+content_sha256), no extraction evidence consulted",
+      "expected": null
+    },
+    {
+      "role": "unknown",
+      "content_sha256": "28869ce86a0a44bd724ae185d4f633d3e60cef8f6c29bf81a1a5901a208fc9ae",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/07/ज्ञान-आदानप्रदान-कार्यक्रम-सम्पन्न.pdf",
+      "extension": "pdf",
+      "filename": "ज्ञान-आदानप्रदान-कार्यक्रम-सम्पन्न.pdf",
+      "why": "drawn blind: ranked by sha256(seed+content_sha256), no extraction evidence consulted",
+      "expected": null
+    },
+    {
+      "role": "unknown",
+      "content_sha256": "36661db8f086da2314ee11b5cae8658d0e410948833dc328e74a8e447021cfe7",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/01/progress-report.xlsx",
+      "extension": "xlsx",
+      "filename": "progress-report.xlsx",
+      "why": "drawn blind: ranked by sha256(seed+content_sha256), no extraction evidence consulted",
+      "expected": null
+    },
+    {
+      "role": "unknown",
+      "content_sha256": "fa37454a07573e4234f78bc5b2c4aee8781ea0757c9bec0cbce725a5ed5b84f9",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/03/Press-note-FIU-Annual-Report-_Final...pdf",
+      "extension": "pdf",
+      "filename": "Press-note-FIU-Annual-Report-_Final...pdf",
+      "why": "drawn blind: ranked by sha256(seed+content_sha256), no extraction evidence consulted",
+      "expected": null
+    },
+    {
+      "role": "unsupported",
+      "content_sha256": "c434f463d6381e01d71c1c56aa237bd58be507ed0d0a30499d69e49248b28713",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Progress_Report_Of_Chaitra2074.xls",
+      "extension": "xls",
+      "filename": "Progress_Report_Of_Chaitra2074.xls",
+      "why": "OLE2, no parser (§15.2) — proves a failed job isolates and the batch continues",
+      "expected": null
+    }
+  ]
+}

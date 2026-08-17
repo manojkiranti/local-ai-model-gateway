@@ -72,6 +72,10 @@ project's environment.
 .venv/bin/python scripts/nrb_fetch.py --core        # download + verify bytes
 .venv/bin/python scripts/nrb_extract.py --extractor-version native-2
 .venv/bin/python scripts/nrb_recover.py <blob> --plan-only   # page routing, no DB
+# Queue catalog blobs for RAG ingest (enqueue only — a worker must drain them):
+.venv/bin/python scripts/nrb_rag_ingest_corpus.py --department nrb-p7 \
+    --cohort docs/nrb/phase7-validation-cohort.json
+.venv/bin/python -m app.rag.worker                  # the process that ingests
 ```
 
 Port convention is fixed: this gateway uses `8000`; the sibling
@@ -194,9 +198,19 @@ record, and re-deriving state from code or chat history has gone wrong before.
   content-addressed storage, every fetched blob is parsed and classified, and
   each PDF page is routable to native text, the guarded converter or OCR
   (`app/nrb/recovery.py`). Eight named blobs have been chunked, embedded and
-  retrieved end-to-end (250 chunks, scratch DB, §17/§18.7). **The CORPUS is not
-  ingested** — Phase 7 needs a scoped, resumable ingest driver that does not yet
-  exist, and the `search_nrb_documents` tool (Phase 8) is not started.
+  retrieved end-to-end (250 chunks, scratch DB, §17/§18.7), and Phase 7 step 1 —
+  the scoped, resumable, enqueue-only ingest driver — is built and validated on
+  31 documents (§20). **The CORPUS is still not ingested**, the versioned
+  recovery cache and the supersession link do not exist, and the
+  `search_nrb_documents` tool (Phase 8) is not started.
+- The corpus ingest driver is `app/nrb/corpus.py` +
+  `scripts/nrb_rag_ingest_corpus.py`, and it selects from the CATALOG ONLY. It
+  must never consult `nrb_extractions` — that table is Phase 6 evidence, not an
+  ingestion input, and a driver filtering on it would make every future ingest
+  depend on a measurement pass having run first. An AST-level test enforces it.
+  It refuses to run unscoped, skips existing documents by anti-join, counts
+  `DocumentConflict` as a RACE rather than a skip, and never drains its own
+  queue — that would race the deployed worker.
 - **Each pipeline stage has its own answer to "is it idempotent", and stage 4 is
   the odd one.** Sync is all-zero on a second run; fetch selects only `pending`
   (excluded by the status column, not a `WHERE`); extract selects blobs with no

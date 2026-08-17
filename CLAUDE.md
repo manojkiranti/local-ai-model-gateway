@@ -98,10 +98,20 @@ SSH key, no `known_hosts`, no server address and no remote Docker context, so
 `nic_ollama`/`nic_postgres`/the A40s and even whether `local_ai_gateway_p4`
 exists *there* are all unverified. Server access is a **prerequisite**, not a
 step: don't re-run laptop deployment testing in its place.
+**Phase 7 step 1 (the corpus ingest DRIVER) is DONE and validated on 31
+documents (2026-08-17, §20)**: `app/nrb/corpus.py` + `scripts/nrb_rag_ingest_corpus.py`
+select from the catalog ONLY, refuse to run unscoped, skip what exists by
+anti-join, and enqueue without draining — 31 created in 0.2 s, 30 ready / 1,029
+chunks, the one OLE2 file failing mid-run without stopping the batch, a second
+pass selecting 0, and all **8 anchors reproducing §18.7 exactly**. The cohort is
+frozen at `docs/nrb/phase7-validation-cohort.json` (`f2d36b4c…`, 8 route-aware
+anchors + 22 blind + 1 unsupported) and its pool is the 570 FETCHED blobs, so it
+supports **no population claim**.
 **The NRB CORPUS is still not ingested and `search_nrb_documents` (Phase 8) does
 not exist** — the 6B gate and its recommendations are §11.9, §12.10, §13.11,
-§14.7, §15.9, §16.10, §17.8 and §19.5. Phase 7's three known gaps are §19.3
-(no scoped ingest driver, recovery output not cached, no supersession link).
+§14.7, §15.9, §16.10, §17.8, §19.5 and §20.9. Phase 7's remaining gaps are the
+versioned recovery cache, the supersession link and the `RAG_DOCS_DIR`
+duplication decision (§19.3, §20.7).
 The roadmap was renumbered when Phase 4 was scoped down to
 persistence; read that doc before touching anything NRB-related instead of
 re-deriving status from chat history.
@@ -566,7 +576,22 @@ events (`token`/`tool_call`/`tool_result`/`done`) + the new id in the
   (so a second `--ingest` without `--reset` stops at the first existing blob),
   recovered text is not persisted anywhere, and a republished NRB file mints a
   SECOND `documents` row with nothing archiving the first
-  (`metadata.blob_sha256` is written but never read back).
+  (`metadata.blob_sha256` is written but never read back). The FIRST of those is
+  closed by `scripts/nrb_rag_ingest_corpus.py` (§20); the other two are not.
+- **The corpus ingest driver skips by ANTI-JOIN and conflicts mean RACED.**
+  `app/nrb/corpus.py` anti-joins the scope against `documents.content_hash` in
+  the target department — the same number as `nrb_files.content_sha256`, both
+  `sha256(bytes)`, asserted per file rather than assumed — so a repeat pass
+  selects nothing in one query. `DocumentConflict` is still caught, but a nonzero
+  count means **concurrency, not idempotence**, and the two are reported
+  separately. The anti-join repeats `ux_documents_active_content`'s own
+  `status <> 'archived'` predicate, because archiving must stay reversible;
+  the side effect is that a **`failed` document is never re-selected** and there
+  is no `--retry-failed` yet (§20.7). It is **enqueue-only by design** — draining
+  in-process races the deployed worker, and `SKIP LOCKED` makes them split the
+  scope rather than collide. And it must never learn to read `nrb_extractions`:
+  `test_the_driver_never_consults_the_extraction_evidence_table` checks the
+  module's AST (not its text, which explains the rule at length).
 - **`app/nrb/catalog.py` uses Core statements, never `update(Model)`, and that is
   load-bearing.** `nrb_sources` maps the attribute `meta` onto the column named
   `metadata` (declarative reserves `metadata`). A Core insert wants the key
