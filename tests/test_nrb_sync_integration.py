@@ -1270,3 +1270,301 @@ def test_the_lock_is_released_after_a_run_so_the_next_one_can_start():
     first, second, held = asyncio.run(go())
     assert first.status == RUN_PARTIAL and second.status == RUN_PARTIAL
     assert held == 0
+
+
+# --------------------------------------------------------------------------- #
+# State ownership: discovery owns upstream facts, the fetch stage owns
+# operational fetch state. Conflating them meant an unchanged re-sync wrote
+# `pending` over every completed download — see `catalog.FileState`.
+# --------------------------------------------------------------------------- #
+async def _mark_fetched(session, key: str, *, sha: str = "a" * 64,
+                        length: int = 123456) -> None:
+    """What a successful `run_fetch` leaves behind for one file."""
+    await session.execute(
+        text(
+            "UPDATE nrb_files SET fetch_status = 'fetched', content_sha256 = :sha, "
+            "  content_length = :len, storage_key = :store, fetch_attempts = 1, "
+            "  downloaded_at = now() WHERE comparison_key = :k"
+        ),
+        {"sha": sha, "len": length, "store": f"{sha[:2]}/{sha}.pdf", "k": key},
+    )
+    await session.flush()
+
+
+async def _mark_failed(session, key: str, *, error: str = "timeout") -> None:
+    await session.execute(
+        text(
+            "UPDATE nrb_files SET fetch_status = 'failed', fetch_error = :e, "
+            "  fetch_attempts = 1 WHERE comparison_key = :k"
+        ),
+        {"e": error, "k": key},
+    )
+    await session.flush()
+
+
+def test_sync_fetch_sync_leaves_the_fetched_file_fetched():
+    """THE regression. An unchanged re-sync must not undo a completed download.
+
+    `file_record` always builds a candidate with `fetch_status='pending'`, and
+    `differs_from` used to compare that column — so every fetched row read as
+    changed and `pending` was written back over it. The next fetch pass would
+    then re-download the whole corpus (8.6 GB) and overwrite every
+    `content_sha256`, which also made "NRB republished this file"
+    indistinguishable from "we ran a sync".
+    """
+    async def go(session):
+        await apply(session, discovery_for([wp_post()]))
+        row = (await files(session))[0]
+        await _mark_fetched(session, row.comparison_key)
+        second = await apply(session, discovery_for([wp_post()]))
+        return second, (await files(session))[0]
+
+    second, row = _run(go)
+    assert row.fetch_status == "fetched"
+    assert row.content_sha256 == "a" * 64          # the pointer survived
+    assert row.storage_key
+    assert second.counters["files_updated"] == 0   # not a change at all
+    assert second.counters["files_unchanged"] == 1
+    assert second.counters["files_refetch_queued"] == 0
+
+
+def test_an_unchanged_second_sync_does_not_make_a_downloaded_blob_selectable():
+    """The consequence that actually costs money, asserted at the selector.
+
+    `select_fetch_targets` filters on `fetch_status IN ('pending', …)`, so the
+    bug was invisible in the sync's own counters and only showed up as the
+    fetcher offering to download files it already had.
+    """
+    async def go(session):
+        await apply(session, discovery_for([wp_post()]))
+        row = (await files(session))[0]
+        await _mark_fetched(session, row.comparison_key)
+        await apply(session, discovery_for([wp_post()]))
+        return await catalog.select_fetch_targets(session)
+
+    assert _run(go) == []
+
+
+def test_a_failed_fetch_is_not_silently_converted_back_to_pending():
+    """`failed` is operational state too, and it means something.
+
+    Silently promoting it to `pending` would make an ordinary sync retry every
+    permanent failure on every run, which is exactly what `--retry-failed`
+    exists to make an explicit decision.
+    """
+    async def go(session):
+        await apply(session, discovery_for([wp_post()]))
+        row = (await files(session))[0]
+        await _mark_failed(session, row.comparison_key)
+        second = await apply(session, discovery_for([wp_post()]))
+        after = (await files(session))[0]
+        plain = await catalog.select_fetch_targets(session)
+        retry = await catalog.select_fetch_targets(session, retry_failed=True)
+        return second, after, plain, retry
+
+    second, row, plain, retry = _run(go)
+    assert row.fetch_status == "failed"
+    assert row.fetch_error == "timeout"
+    assert second.counters["files_updated"] == 0
+    assert plain == []                             # not retried by default
+    assert len(retry) == 1                         # ...but --retry-failed sees it
+
+
+def test_nrb_replacing_the_bytes_behind_a_url_queues_a_refetch():
+    """The one catalog change that SHOULD invalidate fetch state.
+
+    A different `filesize` at the same `comparison_key` means the bytes we hold
+    are not the bytes NRB now serves. Going back to `pending` is what makes the
+    fetcher download the new version, which mints a new `content_sha256` and is
+    the trigger the §22 supersession lifecycle needs. The content columns are
+    kept: those bytes are still on disk and still referenced by the document
+    currently being served.
+    """
+    async def go(session):
+        await apply(session, discovery_for([wp_post()]))
+        row = (await files(session))[0]
+        await _mark_fetched(session, row.comparison_key)
+
+        base = wp_post()
+        republished = wp_post(
+            acf={**base["acf"],
+                 "document_file": wp_file(DEVANAGARI_FILE, filesize=999999)}
+        )
+        second = await apply(session, discovery_for([republished]))
+        after = (await files(session))[0]
+        return second, after, await catalog.select_fetch_targets(session)
+
+    second, row, targets = _run(go)
+    assert row.fetch_status == "pending"
+    assert row.reported_bytes == 999999
+    assert row.content_sha256 == "a" * 64      # the old version is still pointed at
+    assert row.storage_key
+    assert second.counters["files_refetch_queued"] == 1
+    assert len(targets) == 1                   # the fetcher will take it
+
+
+def test_a_new_attachment_id_at_the_same_url_also_queues_a_refetch():
+    async def go(session):
+        await apply(session, discovery_for([wp_post()]))
+        await _mark_fetched(session, (await files(session))[0].comparison_key)
+        base = wp_post()
+        swapped = wp_post(
+            acf={**base["acf"], "document_file": wp_file(DEVANAGARI_FILE, ID=7777)}
+        )
+        await apply(session, discovery_for([swapped]))
+        return (await files(session))[0]
+
+    row = _run(go)
+    assert (row.fetch_status, row.wp_attachment_id) == ("pending", 7777)
+
+
+def test_metadata_becoming_available_is_not_a_replacement():
+    """`None -> 123456` is NRB starting to report a size, not a changed file.
+
+    Without this guard the first sync after WordPress began populating
+    `filesize` would re-download a large part of the corpus, which is precisely
+    the failure being fixed, arriving by a different route.
+    """
+    async def go(session):
+        base = wp_post()
+        sizeless = wp_post(
+            acf={**base["acf"],
+                 "document_file": wp_file(DEVANAGARI_FILE, filesize="")}
+        )
+        await apply(session, discovery_for([sizeless]))
+        row = (await files(session))[0]
+        assert row.reported_bytes is None
+        await _mark_fetched(session, row.comparison_key)
+        second = await apply(session, discovery_for([wp_post()]))   # size appears
+        return second, (await files(session))[0]
+
+    second, row = _run(go)
+    assert row.reported_bytes == 123456            # the fact was recorded
+    assert row.fetch_status == "fetched"           # ...without a re-download
+    assert second.counters["files_refetch_queued"] == 0
+
+
+def test_an_ordinary_metadata_change_leaves_the_fetch_state_alone():
+    """A retyped MIME is a fact, not a new file."""
+    async def go(session):
+        await apply(session, discovery_for([wp_post()]))
+        await _mark_fetched(session, (await files(session))[0].comparison_key)
+        base = wp_post()
+        retyped = wp_post(
+            acf={**base["acf"],
+                 "document_file": wp_file(
+                     DEVANAGARI_FILE, mime_type="application/vnd.ms-excel")}
+        )
+        second = await apply(session, discovery_for([retyped]))
+        return second, (await files(session))[0]
+
+    second, row = _run(go)
+    assert second.counters["files_updated"] == 1
+    assert row.reported_mime_type == "application/vnd.ms-excel"
+    assert row.fetch_status == "fetched"
+    assert second.counters["files_refetch_queued"] == 0
+
+
+def _guard_verdict(monkeypatch, verdict):
+    """Make the host guard return `verdict` for every URL.
+
+    A file's blocked-ness cannot change by URL alone — `comparison_key` includes
+    the scheme and host, so an http/https move or a host move is a DIFFERENT
+    file, not the same one changing status. What really flips a verdict is the
+    GUARD changing: `NRB_ALLOWED_HOSTS` being edited, or a release tightening
+    `check_url`. That is the operational event these two tests reproduce.
+    """
+    from app.nrb import records as records_mod
+
+    monkeypatch.setattr(
+        records_mod, "check_url", lambda url, **kw: verdict
+    )
+
+
+def test_a_file_that_becomes_unfetchable_is_blocked_unless_already_fetched(
+    monkeypatch,
+):
+    """A host-guard verdict IS discovery's to make — with one exception.
+
+    A row already `fetched` is left entirely alone: the bytes are verified, on
+    disk and referenced by `documents` and the recovery cache, and
+    `corpus.select_ingest_targets` requires `fetched`, so flipping it would
+    silently drop the file out of RAG selection. Recording the reason while
+    keeping `fetched` is not a middle path either —
+    `ck_nrb_files_blocked_reason` makes that state unrepresentable, which is the
+    database agreeing that a blocked reason belongs to a blocked row.
+    """
+    async def go(session):
+        second_url = "https://www.nrb.org.np/uploads/second.pdf"
+        base = wp_post()
+        other = wp_post(
+            id=9099, link="https://www.nrb.org.np/bfr/c-99/", slug="c-99",
+            acf={**base["acf"], "document_file": wp_file(second_url)},
+        )
+        await apply(session, discovery_for([wp_post(), other]))
+        await _mark_fetched(session, second_url, sha="b" * 64)
+
+        _guard_verdict(monkeypatch, "host not allowed")
+        result = await apply(session, discovery_for([wp_post(), other]))
+        return result, {r.comparison_key: r for r in await files(session)}
+
+    result, rows = _run(go)
+    was_pending = next(r for k, r in rows.items() if "second" not in k)
+    was_fetched = next(r for k, r in rows.items() if "second" in k)
+    assert was_pending.fetch_status == FETCH_BLOCKED_HOST
+    assert was_pending.blocked_reason == "host not allowed"
+    assert was_fetched.fetch_status == "fetched"     # keeps its bytes
+    assert was_fetched.content_sha256 == "b" * 64
+    assert was_fetched.blocked_reason is None        # the CHECK forbids the rest
+    assert result.counters["files_refetch_queued"] == 0
+
+
+def test_a_file_that_becomes_fetchable_again_returns_to_pending(monkeypatch):
+    """The guard loosening is a real upstream change, and `pending` is correct."""
+    async def go(session):
+        _guard_verdict(monkeypatch, "host not allowed")
+        await apply(session, discovery_for([wp_post()]))
+        assert (await files(session))[0].fetch_status == FETCH_BLOCKED_HOST
+
+        _guard_verdict(monkeypatch, None)
+        result = await apply(session, discovery_for([wp_post()]))
+        return result, (await files(session))[0]
+
+    result, row = _run(go)
+    assert row.fetch_status == FETCH_PENDING
+    assert row.blocked_reason is None
+    assert result.counters["files_refetch_queued"] == 1
+
+
+def test_the_fetch_transition_is_pure_and_says_nothing_by_default():
+    """The rule, unit-tested without a database.
+
+    Every branch names the upstream field that justified it, and the default is
+    silence — which is the property every regression above depends on.
+    """
+    from app.nrb.attachments import extract_attachments
+    from app.nrb.records import file_record
+
+    found, _ = extract_attachments(wp_post(), base_url="https://www.nrb.org.np/")
+    record = file_record(found[0])
+    common = dict(
+        comparison_key=record.comparison_key, source_url=record.source_url,
+        filename=record.filename, reported_mime_type=record.reported_mime_type,
+        extension=record.extension, resource_type=record.resource_type,
+        type_source=record.type_source, reported_bytes=record.reported_bytes,
+        wp_attachment_id=record.wp_attachment_id, host=record.host,
+    )
+    for status in ("pending", "fetched", "failed"):
+        state = catalog.FileState(id=1, fetch_status=status, blocked_reason=None,
+                                  **common)
+        assert state.fetch_transition(record) == {}, status
+        assert state.differs_from(record) is False, status
+
+    # And the one field-driven exception, still without a database.
+    replaced = catalog.FileState(
+        id=1, fetch_status="fetched", blocked_reason=None,
+        **{**common, "reported_bytes": (record.reported_bytes or 0) + 1},
+    )
+    assert replaced.fetch_transition(record) == {
+        "fetch_status": FETCH_PENDING, "fetch_error": None
+    }

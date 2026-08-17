@@ -159,7 +159,27 @@ class SourceIndex:
 
 @dataclass(frozen=True)
 class FileState:
-    """An existing `nrb_files` row, and whether upstream has changed it."""
+    """An existing `nrb_files` row, and whether upstream has changed it.
+
+    TWO OWNERS, AND CONFLATING THEM WAS A REAL BUG
+        Most columns here are **upstream facts** owned by discovery: what NRB
+        says about the file. `fetch_status`/`blocked_reason`/`fetch_error` are
+        **operational state** owned by the fetch stage: what we have actually
+        managed to download.
+
+        `differs_from` used to compare `fetch_status` — against a candidate
+        `FileRecord` whose `fetch_status` is *always* the constructor default
+        `pending` (`records.file_record`). So every successfully fetched row read
+        as "changed" on the next sync and `_file_values` wrote `pending` back
+        over it, which made the whole corpus selectable for download again. The
+        second-sync-is-all-zero invariant held only while nothing had been
+        fetched yet, which is exactly the state Phase 4 was tested in.
+
+        The fix is not to drop one comparison. It is to give the two kinds of
+        column different rules: `differs_from` compares upstream facts ONLY, and
+        an operational column changes only through `fetch_transition` below,
+        which names the upstream field that justifies it.
+    """
 
     id: int
     comparison_key: str
@@ -176,12 +196,16 @@ class FileState:
     blocked_reason: str | None
 
     def differs_from(self, record: FileRecord) -> bool:
-        """Whether any upstream fact about this file changed.
+        """Whether any upstream FACT about this file changed.
 
         Compared field by field rather than through a second hash: a file has a
         handful of fields, all of them upstream facts, so the comparison IS the
         explanation of what changed. (Sources need a hash because the payload
         includes nested taxonomy and extras.)
+
+        `fetch_status` and `blocked_reason` are deliberately absent — they are
+        ours, not NRB's. See the class docstring, and `fetch_transition` for the
+        only route by which a sync may move them.
         """
         return (
             self.source_url != record.source_url
@@ -193,9 +217,82 @@ class FileState:
             or self.reported_bytes != record.reported_bytes
             or self.wp_attachment_id != record.wp_attachment_id
             or self.host != record.host
-            or self.fetch_status != record.fetch_status
-            or self.blocked_reason != record.blocked_reason
         )
+
+    def fetch_transition(self, record: FileRecord) -> dict[str, Any]:
+        """The operational columns a sync may legitimately move, and why.
+
+        Returns `{}` — leave the fetch state exactly as it is — for the ordinary
+        case, including "we already downloaded this and nothing upstream
+        changed". Only three situations justify touching it, and each names the
+        upstream field that decided it:
+
+        **1. It became unfetchable.** The host guard (`records.file_record`, the
+        same `check_url` the fetcher uses) now refuses this URL. A row that has
+        NOT been fetched becomes `blocked_host`, so it stops being selectable.
+
+        A row that HAS been fetched is left completely alone. Two reasons, and
+        the second is the database's: flipping it would silently drop the file
+        out of RAG selection (`corpus.select_ingest_targets` requires `fetched`)
+        even though its bytes are verified, on disk and referenced by
+        `documents` and the recovery cache; and `ck_nrb_files_blocked_reason`
+        makes the compromise — keep `fetched`, record the reason — literally
+        unrepresentable, because a reason may exist only on a `blocked_host`
+        row. There is also nothing to do about it: the download already
+        happened and will never be attempted again.
+
+        **2. It became fetchable again.** It was blocked and is not any more —
+        NRB moved it to https, or off `uat.`. That is a real upstream change and
+        `pending` is the correct new state.
+
+        **3. Upstream REPLACED the resource.** WordPress reports a different
+        `filesize` or a different attachment id at the same URL. That means the
+        bytes behind this `comparison_key` are not the bytes we have, so the
+        file goes back to `pending` and the fetcher will download the new
+        version — which mints a new `content_sha256` and is the trigger the
+        Phase 7 supersession lifecycle (§22) has been waiting for.
+
+        Two guards on rule 3, both deliberate. It fires only when BOTH values
+        are known: `None -> 12345` is metadata becoming available, not a file
+        changing, and treating it as a replacement would re-download a large
+        part of the corpus the first time NRB started reporting sizes. And the
+        content columns are **not** cleared — same reasoning as
+        `fetch._row_for`: those bytes are still on disk, still hashed and still
+        referenced, and a queued re-download must not erase the pointer to the
+        version currently being served.
+        """
+        now_blocked = record.blocked_reason is not None
+        was_blocked = self.fetch_status == FETCH_BLOCKED_HOST
+
+        if now_blocked and not was_blocked:
+            if self.fetch_status == FETCH_FETCHED:
+                return {}
+            return {
+                "fetch_status": FETCH_BLOCKED_HOST,
+                "blocked_reason": record.blocked_reason,
+            }
+        if was_blocked and not now_blocked:
+            return {"fetch_status": FETCH_PENDING, "blocked_reason": None}
+        if now_blocked and self.blocked_reason != record.blocked_reason:
+            # Same verdict, different explanation (a different guard fired).
+            return {"blocked_reason": record.blocked_reason}
+
+        if self.fetch_status in (FETCH_FETCHED, FETCH_FAILED) and _replaced_upstream(
+            self, record
+        ):
+            return {"fetch_status": FETCH_PENDING, "fetch_error": None}
+        return {}
+
+
+def _replaced_upstream(state: FileState, record: FileRecord) -> bool:
+    """Did NRB put DIFFERENT bytes behind this URL? Both values must be known."""
+    for before, after in (
+        (state.reported_bytes, record.reported_bytes),
+        (state.wp_attachment_id, record.wp_attachment_id),
+    ):
+        if before is not None and after is not None and before != after:
+            return True
+    return False
 
 
 async def load_source_index(session: AsyncSession) -> SourceIndex:
@@ -271,7 +368,14 @@ async def load_relationships(
 # --------------------------------------------------------------------------- #
 # Files
 # --------------------------------------------------------------------------- #
-def _file_values(record: FileRecord) -> dict[str, Any]:
+def _file_facts(record: FileRecord) -> dict[str, Any]:
+    """The upstream facts about one file. NO operational fetch state.
+
+    Deliberately not a full column set: `fetch_status`, `blocked_reason` and
+    `fetch_error` are ours, and a metadata reconciliation that wrote them from a
+    freshly built candidate would overwrite a completed download with the
+    constructor's `pending` — see `FileState`.
+    """
     return {
         "comparison_key": record.comparison_key,
         "source_url": record.source_url,
@@ -283,6 +387,18 @@ def _file_values(record: FileRecord) -> dict[str, Any]:
         "reported_bytes": record.reported_bytes,
         "wp_attachment_id": record.wp_attachment_id,
         "host": record.host,
+    }
+
+
+def _file_values(record: FileRecord) -> dict[str, Any]:
+    """Facts plus the INITIAL fetch state, for an insert only.
+
+    A brand new row's operational state legitimately comes from discovery: the
+    host guard has just decided whether it is fetchable at all, and there is no
+    prior state to preserve.
+    """
+    return {
+        **_file_facts(record),
         "fetch_status": record.fetch_status,
         "blocked_reason": record.blocked_reason,
     }
@@ -321,27 +437,37 @@ async def insert_files(
 
 async def update_files(
     session: AsyncSession,
-    changed: Sequence[tuple[int, FileRecord]],
+    changed: Sequence[tuple[int, FileRecord, dict[str, Any]]],
     *,
     seen_at: datetime,
     run_id: int | None,
 ) -> None:
-    """Apply upstream changes to known files, by primary key."""
+    """Apply upstream changes to known files, by primary key.
+
+    Each entry is `(id, record, transition)`, where `transition` is
+    `FileState.fetch_transition`'s answer — usually `{}`. Rows are grouped by
+    their key set before executing, exactly as `record_fetch_outcomes` does and
+    for the same reason: executemany requires identical keys per batch, and these
+    deliberately differ (most rows write facts only; a few also move
+    `fetch_status`).
+    """
     if not changed:
         return
     table = NRBFile.__table__
     statement = table.update().where(table.c.id == bindparam("_id"))
-    rows = [
-        {
+    groups: dict[tuple[str, ...], list[dict[str, Any]]] = {}
+    for file_id, record, transition in changed:
+        row = {
             "_id": file_id,
-            **_file_values(record),
+            **_file_facts(record),
+            **transition,
             "last_seen_at": seen_at,
             "last_sync_run_id": run_id,
         }
-        for file_id, record in changed
-    ]
-    for start in range(0, len(rows), BATCH):
-        await session.execute(statement, rows[start : start + BATCH])
+        groups.setdefault(tuple(sorted(row)), []).append(row)
+    for group in groups.values():
+        for start in range(0, len(group), BATCH):
+            await session.execute(statement, group[start : start + BATCH])
 
 
 async def touch_files(

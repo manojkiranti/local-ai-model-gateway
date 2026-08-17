@@ -66,12 +66,13 @@ from . import catalog
 from .discovery import Discovery, discover_corpus
 from .locks import SYNC_LOCK_KEY, LockBusy, advisory_lock
 from .models import (
+    FETCH_PENDING,
     METADATA_STATUS_REST,
     RUN_COMPLETED,
     RUN_FAILED,
     RUN_PARTIAL,
 )
-from .records import SourceRecord, build_source_records
+from .records import FileRecord, SourceRecord, build_source_records
 
 logger = logging.getLogger("app.nrb.sync")
 
@@ -144,6 +145,7 @@ def _counters() -> dict[str, int]:
         "files_created": 0,
         "files_updated": 0,
         "files_unchanged": 0,
+        "files_refetch_queued": 0,
         "blocked_files": 0,
         "relationships_created": 0,
         "relationships_removed": 0,
@@ -215,16 +217,26 @@ async def reconcile(
 
     file_index = await catalog.load_file_index(session)
     new_files = [rec for key, rec in file_records.items() if key not in file_index]
-    changed_files = [
-        (file_index[key].id, rec)
-        for key, rec in file_records.items()
-        if key in file_index and file_index[key].differs_from(rec)
-    ]
-    unchanged_files = [
-        file_index[key].id
-        for key, rec in file_records.items()
-        if key in file_index and not file_index[key].differs_from(rec)
-    ]
+    # A known file needs writing when an upstream FACT changed, or when a real
+    # upstream change justifies moving its operational fetch state
+    # (`FileState.fetch_transition` — a host becoming blocked or unblocked, or
+    # NRB replacing the bytes behind the URL). "The candidate says pending" is
+    # NOT a change: that is the constructor default, and treating it as one used
+    # to write `pending` over every completed download on every sync.
+    changed_files: list[tuple[int, FileRecord, dict[str, Any]]] = []
+    unchanged_files: list[int] = []
+    refetch_queued = 0
+    for key, rec in file_records.items():
+        state = file_index.get(key)
+        if state is None:
+            continue
+        transition = state.fetch_transition(rec)
+        if state.differs_from(rec) or transition:
+            changed_files.append((state.id, rec, transition))
+            if transition.get("fetch_status") == FETCH_PENDING:
+                refetch_queued += 1
+        else:
+            unchanged_files.append(state.id)
 
     inserted_files = await catalog.insert_files(
         session, new_files, seen_at=seen_at, run_id=run_id
@@ -238,6 +250,12 @@ async def reconcile(
     counters["files_created"] = len(inserted_files)
     counters["files_updated"] = len(changed_files)
     counters["files_unchanged"] = len(unchanged_files)
+    # How many known files were put back in the download queue because upstream
+    # replaced them or unblocked them. Reported separately from `files_updated`
+    # because it is the only file counter with a COST attached, and because a
+    # nonzero value on a routine sync is the signal that NRB republished
+    # something (§22's supersession trigger).
+    counters["files_refetch_queued"] = refetch_queued
     await commit()
     logger.info(
         "NRB sync: files reconciled — %d new, %d changed, %d unchanged, %d blocked",
