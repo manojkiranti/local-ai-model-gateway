@@ -108,6 +108,7 @@ __all__ = [
     "PipelineBusy",
     "PipelineScope",
     "RunView",
+    "active_run",
     "get_run",
     "latest_run",
     "reconcile",
@@ -339,9 +340,19 @@ async def latest_run(session: AsyncSession) -> RunView | None:
     )
 
 
-async def _active_run(
-    session: AsyncSession, *, statuses: tuple[str, ...] = (PIPELINE_RUNNING,)
+async def active_run(
+    session: AsyncSession,
+    *,
+    statuses: tuple[str, ...] = (PIPELINE_RUNNING, PIPELINE_AWAITING),
 ) -> RunView | None:
+    """The NRB update currently in progress, if any.
+
+    Both non-terminal statuses by default, because both mean "an update is in
+    progress": `running` is an orchestrator mid-flight, `awaiting_jobs` is its
+    documents mid-ingest (§24.3). Callers that specifically want the LOCK holder
+    — which is `running` by definition, since a waiting run holds no lock — pass
+    `statuses=(PIPELINE_RUNNING,)`.
+    """
     row = (
         await session.execute(
             select(NRBPipelineRun)
@@ -648,9 +659,7 @@ async def start(
                 await settle_waiting(session)
                 await session.commit()
             async with Session() as session:
-                active = await _active_run(
-                    session, statuses=(PIPELINE_RUNNING, PIPELINE_AWAITING)
-                )
+                active = await active_run(session)
                 await session.rollback()
             if active is not None:
                 raise PipelineBusy(active)
@@ -741,7 +750,7 @@ async def start(
         # Another orchestrator is mid-flight. Report ITS run, which is `running`
         # by definition — a waiting run holds no lock.
         async with Session() as session:
-            active = await _active_run(session)
+            active = await active_run(session, statuses=(PIPELINE_RUNNING,))
             await session.rollback()
         raise PipelineBusy(active) from None
 

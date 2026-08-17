@@ -119,6 +119,7 @@ __all__ = [
     "RagStageResult",
     "ScopeSummary",
     "create_ingest_targets",
+    "nrb_rag_counts",
     "run_rag_enqueue",
     "requeue_failed",
     "select_ingest_targets",
@@ -793,3 +794,81 @@ async def run_rag_enqueue(
             targets=targets, rag_docs_dir=docs_dir,
         )
     return result
+
+
+async def nrb_rag_counts(
+    session: AsyncSession, *, department_code: str | None = None
+) -> dict[str, Any]:
+    """NRB's readiness on the RAG side. Read-only, derived, no new state.
+
+    Three questions an operator (and the future admin UI) actually asks: how many
+    NRB documents are searchable, how many failed, and is anything still in
+    flight. Everything here is counted from `documents` / `ingest_jobs` — the
+    authoritative tables — filtered to `metadata->>'origin' = 'nrb'` so an
+    ordinary department upload never appears in an NRB status view.
+
+    `superseded` is the §22 lifecycle made visible: an archived NRB document
+    carrying `superseded_by` was replaced by a newer version, which is a healthy
+    outcome and must not be read as a failure. Archived rows WITHOUT that key are
+    ordinary admin archives and are counted separately for the same reason.
+
+    Deliberately NOT included: `nrb_extractions` counts. That table is Phase 6
+    classifier evidence, nothing on the ingestion path reads it (§19.3, §20.1),
+    and putting it in an operational status view would invite a reader to treat
+    it as pipeline state.
+    """
+    where = "d.metadata->>'origin' = :origin"
+    params: dict[str, Any] = {"origin": NRB_ORIGIN}
+    if department_code:
+        where += " AND dp.code = :dept"
+        params["dept"] = department_code
+
+    documents = dict(
+        (
+            await session.execute(
+                text(
+                    "SELECT d.status, count(*) FROM documents d "
+                    "  JOIN departments dp ON dp.id = d.department_id "
+                    f" WHERE {where} GROUP BY 1"
+                ),
+                params,
+            )
+        ).all()
+    )
+    jobs = dict(
+        (
+            await session.execute(
+                text(
+                    "SELECT j.status, count(*) FROM ingest_jobs j "
+                    "  JOIN documents d ON d.id = j.document_id "
+                    "  JOIN departments dp ON dp.id = d.department_id "
+                    f" WHERE {where} GROUP BY 1"
+                ),
+                params,
+            )
+        ).all()
+    )
+    extra = (
+        await session.execute(
+            text(
+                "SELECT count(*) FILTER (WHERE d.metadata ? 'superseded_by') "
+                "         AS superseded, "
+                "       coalesce(sum(d.chunk_count) FILTER "
+                "         (WHERE d.status = 'ready'), 0) AS chunks, "
+                "       count(DISTINCT dp.code) AS departments "
+                "  FROM documents d JOIN departments dp ON dp.id = d.department_id "
+                f" WHERE {where}"
+            ),
+            params,
+        )
+    ).mappings().one()
+
+    return {
+        "documents": {k: int(v) for k, v in documents.items()},
+        "jobs": {k: int(v) for k, v in jobs.items()},
+        "ready": int(documents.get("ready", 0)),
+        "failed": int(documents.get("failed", 0)),
+        "superseded": int(extra["superseded"]),
+        "chunks": int(extra["chunks"]),
+        "departments": int(extra["departments"]),
+    }

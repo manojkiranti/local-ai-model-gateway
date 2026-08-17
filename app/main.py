@@ -15,6 +15,7 @@ from .files.store import file_store
 from .history.router import router as sessions_router
 from .mcp.client import MCPClient
 from .mcp.router import router as mcp_router
+from .nrb.router import router as nrb_router
 from .ollama.client import OllamaClient, OllamaError
 from .rag.jobs_router import router as ingest_jobs_router
 from .rag.router import router as departments_router
@@ -98,3 +99,6 @@ app.include_router(files_router)
 app.include_router(sessions_router)
 app.include_router(departments_router)
 app.include_router(ingest_jobs_router)
+# NRB operations (admin): pipeline trigger + run/status. Thin — every handler
+# calls one `app.nrb.pipeline` service and shapes the answer.
+app.include_router(nrb_router)

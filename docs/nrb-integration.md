@@ -4619,3 +4619,204 @@ Unchanged from §23.11, with both invariants now held here rather than inherited
 immutable history, an active update — in either of its two states — refuses a
 duplicate, and a crashed orchestrator is recoverable without a timeout. The
 endpoints are still **not implemented**.
+
+## 25. Phase 7 step 5 — the thin NRB admin API
+
+**Date:** 2026-08-17. **Scope:** three admin endpoints over the pipeline service
+built in §23–§24. **What this is not:** a UI, a scheduler, a dashboard framework,
+or a second source of truth. No migration.
+
+### 25.1 Routes and the conventions reused
+
+| route | purpose |
+|---|---|
+| `POST /v1/nrb/runs` | trigger an update — 202 with the run, 409 with the active one |
+| `GET /v1/nrb/runs/{id}` | one run, reconciled through the service if still waiting |
+| `GET /v1/nrb/status` | operational state for the future admin UI |
+
+`app/nrb/router.py` + `app/nrb/schemas.py`, mounted in `app/main.py` beside the
+other routers. Everything is the repository's existing machinery, nothing
+NRB-specific: `APIRouter(prefix="/v1/nrb", tags=["nrb"])`,
+`Depends(require_admin)` from `app/auth/dependencies.py`, `Depends(get_session)`,
+Pydantic v2 models with `ConfigDict`, `HTTPException` with `status.HTTP_*`, and
+202 for accepted work as the document upload route already does. **No NRB auth
+was invented.**
+
+Authorization is therefore the existing two-layer one, asserted in both
+directions: no credentials → **401** from the shared `HTTPBearer`; valid
+credentials without the admin role → **403 "Admin privileges required"** from
+`require_admin`. An ordinary member cannot trigger ingestion, and the refusal
+happens before any stage runs.
+
+### 25.2 Thin means thin
+
+Each handler parses a request, calls **one** application service, and shapes the
+answer. `pipeline.start` still owns the sequence, the advisory lock, the durable
+run row, the active-run gate and the status arithmetic; `pipeline.reconcile` owns
+the terminal verdict. Nothing shells out — the CLI and the router are two callers
+of one implementation. A source-level test asserts the router never references
+`subprocess`, `advisory_lock`, `run_sync`/`run_fetch`/`run_extract`,
+`create_ingest_targets`, `requeue_failed`, `sweep_abandoned` or `resolve_status`,
+because "thin" is a property that erodes quietly.
+
+One service function was added and one was promoted:
+
+- `corpus.nrb_rag_counts` — NRB's RAG readiness, counted from `documents` /
+  `ingest_jobs` filtered to `metadata->>'origin' = 'nrb'`. It exists because the
+  equivalent queries lived only in a script's `do_report`.
+- `pipeline.active_run` — was `_active_run`; now public and defaulting to **both**
+  non-terminal statuses, which is the "is an update in progress" question the
+  status endpoint and the trigger gate both ask.
+
+### 25.3 POST semantics
+
+Request is a deliberate SUBSET of `PipelineScope`: `department`, `stages`, the
+six bounds, `limit`, `retry_failed`. `extra="forbid"`, so an unknown field is a
+422 rather than being silently dropped. `trigger` is recorded as `api` and
+`requested_by` as the admin's email — the reason those columns exist.
+
+Response is the same envelope either way, so a client needs one parser:
+
+```json
+{"started": true,  "run": { …RunOut… }}   // 202
+{"started": false, "run": { …RunOut… }}   // 409, this is the run already active
+```
+
+**Staging is synchronous in the request, and that is a consequence of the
+requirement that `PipelineBusy` be answerable in the response.** A `rag`-only
+pass over a named cohort is sub-second; a `sync` is minutes, because it reads
+~190 pages of NRB's REST API. What is *not* synchronous is recovery, chunking and
+embedding — those remain the separate worker's, so the run comes back
+`awaiting_jobs` and the client polls. **The API still never parses or embeds**,
+and `import app.main` was re-verified to pull in none of
+docling/torch/rapidocr/onnxruntime/npttf2utf.
+
+Moving staging off-request belongs with the scheduler step and is not built.
+
+### 25.4 `PipelineBusy` → 409, never 500
+
+Both exclusion mechanisms produce one externally understandable meaning:
+
+- another orchestrator holds the advisory lock (`running`), and
+- a durable run is still `running` or `awaiting_jobs` — the lock is released the
+  moment staging returns while its jobs outlive it (§24.3).
+
+`pipeline.start` raises `PipelineBusy` carrying the run for both, so both become
+**409** with `started: false` and that run in the body. A caller retries later or
+polls the run; it never needs to know which fired. The one degenerate case — the
+lock held but no durable row yet naming the holder, i.e. a run opening at that
+instant — is the same 409 with a plain `detail`, because there is no run to hand
+back.
+
+### 25.5 Status payload
+
+Four blocks, every number somebody else's. Live against the scratch database:
+
+```json
+{
+  "active_run": null,
+  "latest_run": { "id": 115, "trigger": "cli", "status": "succeeded", … },
+  "catalog": { "sources": 18577, "active_sources": 18577, "files": 18266,
+               "blocked_files": 600, "duplicate_comparison_keys": 0, … },
+  "files":   { "pending": 17666, "fetched": 570, "failed": 27, "blocked": 3,
+               "distinct_blobs": 569, "bytes_on_disk": 474782059 },
+  "rag":     { "documents": {"ready": 38, "failed": 1},
+               "jobs": {"succeeded": 39, "failed": 2},
+               "ready": 38, "failed": 1, "superseded": 0,
+               "chunks": 1279, "departments": 2 }
+}
+```
+
+`catalog` and `files` are `catalog.catalog_counts` / `catalog.fetch_counts` — the
+same numbers `nrb_sync.py` and `nrb_fetch.py` print. `rag` is
+`corpus.nrb_rag_counts`. `active_run` is the field a UI leans on: non-null means
+a trigger would be refused, and it is **the same run a 409 would return**, so the
+UI can grey out its own button from the status poll. Waiting runs are settled
+first (`pipeline.settle_waiting`), so an update whose jobs finished but which
+nobody polled does not show as active forever. `?department=` narrows only the
+`rag` block; the catalog is global.
+
+**Deliberately absent: `nrb_extractions` counts.** That table is Phase 6
+classifier evidence, nothing on the ingestion path reads it (§19.3, §20.1), and
+putting it in an operational view would invite a reader to treat it as pipeline
+state.
+
+### 25.6 Full-corpus safety
+
+Three layers, none of them a permission that could be granted:
+
+1. `RunTriggerIn` **requires a bound** — keys, sections, owners, years,
+   resource_types, extensions or limit. An unbounded request is a **422** naming
+   what is missing, not a 403.
+2. `all_files` is **not a field**, and `extra="forbid"` means sending it is a 422
+   rather than a silently ignored parameter. The router passes `all_files=False`
+   unconditionally.
+3. `--all` remains **CLI-only**, where an operator at a terminal is making a
+   considered decision. §20.7 item 2 (`RAG_DOCS_DIR` duplication) is still open
+   and is still the thing that must be decided before any full-corpus run.
+
+### 25.7 Tests
+
+`tests/test_nrb_api.py` — **19 tests, all passing** (47 with the pipeline suite).
+Real Postgres + `TestClient` + the real auth router, in the style of
+`test_rag_documents_api.py`. The three upstream stages are stubbed (network,
+gigabytes, CPU — and a `POST` stages synchronously); `app.nrb.pipeline` is **not**
+stubbed, because calling it is the router's entire job.
+
+Covered: member 403 with nothing run, anonymous 401, member barred from status;
+202 shape with `trigger=api`/`requested_by`, stage order driven through the
+service, and counters surfacing; `retry_failed` carried through and defaulting
+off; a stage subset; the unbounded 422; `all_files` refused by `extra="forbid"`;
+rag-without-department and unknown-stage 422s; 409 carrying the active run with
+the identical body schema; **a second trigger refused while a run is
+`awaiting_jobs` with no lock held**; run read-back shape; a terminal run read
+twice returning byte-identical JSON including `finished_at`; 404 for an unknown
+run; the status envelope and its four blocks; `?department=` narrowing only
+`rag`; `active_run` reporting the run a trigger would be refused for; and the
+source-level thinness guard.
+
+Narrow affected tests also run: `test_nrb_corpus_ingest.py` (18 passed — the AST
+guard still holds after adding `nrb_rag_counts`) and
+`test_docling_is_not_imported_at_module_scope`. No full suite, no corpus, no live
+sync, no OCR, no cohort re-ingest.
+
+### 25.8 Evaluation & Improvement (Phase 7 step 5)
+
+**Success metric.** An operator (later, a UI) can trigger a bounded update, learn
+that one is already running, and read enough state to decide what to do next —
+without SSH, without the CLI, and without any endpoint being able to start a
+full-corpus run by accident.
+
+**Eval.** 19 API tests scored pass/fail: 19/19, plus a live `GET /v1/nrb/status`
+against the scratch database returning the payload above. Not evaluated: latency
+under a real `sync` (the request would last minutes — measured only as a design
+consequence, not a benchmark), and anything about concurrent HTTP callers beyond
+the single-run gate the pipeline suite already covers.
+
+**Feedback capture.** `nrb_pipeline_runs.trigger`/`requested_by` now record that
+an API caller asked and who they were; the router logs a refused trigger with the
+active run's id. Nothing new is stored.
+
+**Review loop.** When the UI is built — the status payload's shape is a guess at
+what a UI needs, and the first real one will say which fields are missing and
+which are noise. And again before a scheduler, which is also when staging should
+move off-request.
+
+### 25.9 The gate
+
+**Ready for the thin UI.** Three endpoints, one auth pattern, one envelope for
+the trigger, an `active_run` a UI can poll to keep its own button honest, and a
+terminal run whose JSON does not change under polling.
+
+**Not started, and not to be started without a decision:** the UI itself, any
+cron or systemd timer (and with it moving staging off-request), the
+`RAG_DOCS_DIR` duplication (§20.7 item 2 — still required before full-corpus
+ingest), recovery-refresh scheduling, Phase 8's `search_nrb_documents`, and any
+corpus-scale ingest.
+
+Unchanged and untouched: the Nepali semantic review, §17.6's broken-ToUnicode
+native text, the npttf2utf GPL-3.0 distribution decision, full-corpus retrieval
+quality, native-2 (not modified; native-3 not started), the recovery-cache
+versioning, supersession semantics, the frozen Phase 6A/6B evidence, the Phase 7
+cohort, the `ri*` scratch-DB debris, and server access (§19.1) — this is still
+the laptop.

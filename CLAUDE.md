@@ -133,8 +133,18 @@ orchestration path (`sync → fetch → extract → rag enqueue`) that the CLI, 
 future admin API and a future schedule all call, with a durable
 `nrb_pipeline_runs` identity, advisory-lock exclusion and an explicit run→job
 relation. Migration `1fb5a0d183d6`. Run it via `scripts/nrb_pipeline.py`
-(`--status` reconciles). **The backend is ready for the admin trigger/status
-endpoints; they are NOT implemented.**
+(`--status` reconciles).
+**Phase 7 step 5 is DONE (2026-08-17, §25): the thin admin API.**
+`POST /v1/nrb/runs` (202 `{started, run}`, or **409 with the SAME envelope**
+carrying the active run — both the advisory lock and the durable
+`running`/`awaiting_jobs` gate mean one thing to a client),
+`GET /v1/nrb/runs/{id}`, `GET /v1/nrb/status` (active/latest run +
+`catalog_counts` + `fetch_counts` + `corpus.nrb_rag_counts`). Admin-only via the
+existing `require_admin`; **the API cannot start a full-corpus run** — a bounded
+scope is required (422) and `all_files` is not a field (`extra="forbid"`);
+`--all` stays CLI-only. Staging is SYNCHRONOUS in the request (that is what makes
+`PipelineBusy` answerable), but recovery/chunk/embed remain the worker's, so the
+API still never parses or embeds. **UI and cron are NOT implemented.**
 The roadmap was renumbered when Phase 4 was scoped down to
 persistence; read that doc before touching anything NRB-related instead of
 re-deriving status from chat history.
@@ -236,6 +246,8 @@ process, `router`/`jobs_router` = `/v1/departments` + `/v1/ingest-jobs`).
 ## Endpoints
 Public: `/health`, `POST /auth/register`, `POST /auth/login`.
 Authed (JWT): `GET /users/me`, `GET /users` (admin), `POST /v1/chat`,
+`POST /v1/nrb/runs` (admin, 202 `{started, run}` / 409 same shape when busy),
+`GET /v1/nrb/runs/{id}` (admin), `GET /v1/nrb/status` (admin, `?department=`),
 `GET /v1/tools`, `GET /v1/mcp/status`, `POST /v1/files` (upload .xlsx/.csv/
 .pdf/.docx/.txt/.md/.json → `generated_files` row `source=uploaded`; 400 bad
 ext/corrupt/zip-bomb, 413 over size cap), `GET /v1/files` (caller's files,
