@@ -59,10 +59,19 @@ __all__ = [
     "DocumentProvenance",
     "LEGACY_FONT_HINTS",
     "MAX_XOBJECT_DEPTH",
+    "PAGE_PROVENANCE_VERSION",
     "PageProvenance",
     "is_legacy_font_name",
     "read_pdf_provenance",
 ]
+
+# Bumped BY HAND when the signals below change — the embedded-font keys, the
+# image detection, `LEGACY_FONT_HINTS`, or the XObject walk. It is one of the
+# inputs to `recovery_cache.BASE_VERSION`, because a page's ROUTE is decided on
+# what this module reports: change the answer to "does this page carry a font"
+# and a cached `legacy_conversion` page may no longer belong on that route at
+# all. That is a routing invalidation, not a route-engine one.
+PAGE_PROVENANCE_VERSION = "prov-1"
 
 # The keys that mean "the glyph program is inside this file". Any one of them on
 # a font descriptor makes the font embedded: Type1/CFF, TrueType and OpenType

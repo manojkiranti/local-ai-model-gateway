@@ -63,6 +63,11 @@ class DocSnapshot:
     file_type: str
     storage_key: str | None
     status: str
+    # sha256 of the stored bytes. Carried because it is the NRB recovery
+    # cache's identity — the same number as `nrb_files.content_sha256`
+    # (`app/nrb/corpus.py` asserts it per file rather than assuming it), so the
+    # cache needs no NRB metadata to be present and no second hash to be read.
+    content_hash: str = ""
     # The document's own `metadata`. Read for ONE thing: `origin == "nrb"`, which
     # sends the blob through NRB's page-level extraction routing instead of the
     # generic parser. Snapshotted with the rest so the branch costs no extra
@@ -119,6 +124,7 @@ async def _snapshot_document(Session, document_id: str) -> DocSnapshot | None:
                 file_type=doc.file_type,
                 storage_key=doc.storage_key,
                 status=doc.status,
+                content_hash=doc.content_hash,
                 meta=dict(doc.meta or {}),
             )
         )
@@ -126,45 +132,96 @@ async def _snapshot_document(Session, document_id: str) -> DocSnapshot | None:
         return snap
 
 
-def _load_chunks_sync(snap: DocSnapshot, settings: Settings):
-    """Parse the stored bytes. SYNCHRONOUS and CPU-bound — Docling is not async.
-
-    Called via `asyncio.to_thread` so it cannot block the event loop, which
-    would starve the heartbeat and let the stale sweep kill a healthy job.
-    """
+def _document_path(snap: DocSnapshot, settings: Settings) -> Path:
     if not snap.storage_key:
         raise ParseError(f"document {snap.id} has no storage_key")
     path: Path = resolve_storage_path(snap.storage_key, settings.rag_docs_dir)
     if not path.exists():
         raise ParseError(f"stored file is missing: {snap.storage_key}")
+    return path
 
-    # THE NRB branch, and the only one. An NRB blob is routed per PAGE — native
-    # text kept, an embedded legacy font converted, a scan OCR'd — because its
-    # text layer may be untrustworthy in ways the generic parser has no way to
-    # see. Everything else parses exactly as it always did; the import is local
-    # so `app.rag` acquires no dependency on `app.nrb`.
-    if snap.meta.get("origin") == "nrb":
-        from ..nrb.rag import NrbParseError, parse_nrb_to_chunks
 
-        try:
-            return parse_nrb_to_chunks(
-                path,
-                max_chars=settings.rag_chunk_max_chars,
-                overlap_chars=settings.rag_chunk_overlap_chars,
-            )
-        except NrbParseError as exc:
-            # Same outcome as any other parse failure — a failed job and an
-            # untouched document — but the message names the routing outcome.
-            raise ParseError(str(exc)) from exc
+def _load_chunks_sync(snap: DocSnapshot, settings: Settings):
+    """Parse the stored bytes. SYNCHRONOUS and CPU-bound — Docling is not async.
 
+    Called via `asyncio.to_thread` so it cannot block the event loop, which
+    would starve the heartbeat and let the stale sweep kill a healthy job.
+
+    The GENERIC path only. An NRB document goes through `_load_chunks`, which
+    needs a session for the recovery cache and so cannot live inside a thread.
+    """
     return parse_to_chunks(
-        path,
+        _document_path(snap, settings),
         snap.file_type,
         max_chars=settings.rag_chunk_max_chars,
         overlap_chars=settings.rag_chunk_overlap_chars,
         min_body_chars=settings.rag_chunk_min_body_chars,
         skip_sections=settings.rag_skipped_sections,
     )
+
+
+async def _load_chunks(Session, snap: DocSnapshot, settings: Settings):
+    """Parse one document into chunks, generically or down the NRB path.
+
+    THE NRB branch, and still the only one. An NRB blob is routed per PAGE —
+    native text kept, an embedded legacy font converted, a scan OCR'd — because
+    its text layer may be untrustworthy in ways the generic parser has no way to
+    see. Everything else parses exactly as it always did, in a thread, with no
+    session.
+
+    The NRB side takes a session factory because its recovery is CACHED
+    (`app/nrb/recovery_cache.py`): the row is read before the slow work starts
+    and written after it finishes, so a re-ingest caused by a chunker or
+    embedding change reuses the recovered text instead of re-running npttf2utf
+    and PP-OCRv5. `chunks_for_blob` still does the parse itself in a thread; the
+    session is only open around the two short queries.
+
+    Both imports stay local, so `app.rag` acquires no import-time dependency on
+    `app.nrb` — and the API image, which has neither docling nor an OCR stack,
+    never loads either.
+    """
+    if snap.meta.get("origin") != "nrb":
+        return await asyncio.to_thread(_load_chunks_sync, snap, settings)
+
+    from ..nrb.rag import NrbParseError
+    from ..nrb.recovery_cache import chunks_for_blob
+
+    path = _document_path(snap, settings)
+    try:
+        chunks, report = await chunks_for_blob(
+            Session,
+            path,
+            content_sha256=content_hash_or_sha(snap),
+            max_chars=settings.rag_chunk_max_chars,
+            overlap_chars=settings.rag_chunk_overlap_chars,
+        )
+    except NrbParseError as exc:
+        # Same outcome as any other parse failure — a failed job and an
+        # untouched document — but the message names the routing outcome.
+        raise ParseError(str(exc)) from exc
+
+    if report is not None:
+        # Logged at INFO because this is the §18 verification signal: a worker
+        # is judged by its route split and its reuse, never by job success.
+        log.info(
+            "nrb recovery %s for %s: %d units (%d reused, %d recovered; "
+            "converter %d, ocr %d)",
+            report.outcome, snap.id, report.units_total, report.units_reused,
+            report.units_recovered, report.converter_units, report.ocr_units,
+        )
+    return chunks
+
+
+def content_hash_or_sha(snap: DocSnapshot) -> str:
+    """The blob identity for the recovery cache.
+
+    `documents.content_hash` is `sha256(bytes)` and so is
+    `nrb_files.content_sha256`; `metadata.blob_sha256` is the same value again,
+    written by the ingest driver. `content_hash` is preferred because it is NOT
+    NULL and is maintained by the generic upload path, so the cache works for an
+    NRB-origin document however it was created.
+    """
+    return snap.content_hash or str(snap.meta.get("blob_sha256") or "")
 
 
 async def _heartbeat_loop(Session, job_id: str, interval: float) -> None:
@@ -220,7 +277,7 @@ async def process_job(Session, client, settings: Settings, job) -> None:
 
     try:
         # --- slow work: NO transaction open, off the event loop ---
-        chunks = await asyncio.to_thread(_load_chunks_sync, snap, settings)
+        chunks = await _load_chunks(Session, snap, settings)
         total = len(chunks)
 
         async with Session() as session:

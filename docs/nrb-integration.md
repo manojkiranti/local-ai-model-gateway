@@ -3639,3 +3639,334 @@ every withheld page re-runs OCR forever), the supersession link (§19.3), the
 Unchanged and untouched: the Nepali semantic review, §17.6's broken-ToUnicode
 native text, the npttf2utf GPL-3.0 distribution decision, full-corpus retrieval
 quality, and server access (§19.1) — this run is still the laptop.
+
+## 21. Phase 7 step 1.1 + step 2 — explicit retry, and the versioned recovery cache
+
+**Date:** 2026-08-17. **Scope:** two commits. A `--retry-failed` path for the
+corpus driver, and the recovery cache that makes a re-ingest reuse recovered
+text instead of re-running npttf2utf and PP-OCRv5. **What this is not:** a
+corpus ingest, a cohort re-run, or a benchmark. The 31-document cohort was not
+re-run; the real-data evidence below is four named blobs.
+
+### 21.1 Step 1.1 — the retry, and the three things it cannot reach
+
+§20.7 item 1 recorded the defect: the anti-join excludes every non-`archived`
+document, so a `failed` one is never selected again. Right for the cohort's OLE2
+file, wrong for a transient failure, and there was no way to say which.
+
+`corpus.select_retry_targets` + `corpus.requeue_failed`, behind
+`--retry-failed`. Deliberately a **separate pair of functions**, not a flag
+threaded through the create path, because it does a different thing: it creates
+no `documents` row, copies no file, and only enqueues a job against a document
+that already exists.
+
+Three exclusions, each covering something the others do not:
+
+| exclusion | what it stops |
+|---|---|
+| `status = 'failed'` | a `ready` document being requeued while it is serving; a `pending` one being queued twice (so a second `--retry-failed` before the worker drains is a no-op *before* the job-conflict guard fires); an `archived` one, which the ordinary create path already handles |
+| no active job | a swept `failed` document still holding a `queued` row getting a second worker |
+| join to `nrb_files` | `--retry-failed` silently adopting a failed ordinary upload in the same department |
+
+The document row is reused — same id, `content_hash`, `storage_key`, metadata —
+and status goes back to `pending` so a queued document does not also claim to
+have failed. The previous failure stays on its own `ingest_jobs` row with its
+error, so `--report` still shows what went wrong the first time. One session per
+target, as in `create_ingest_targets`, so a target that raises cannot roll back
+the ones requeued beside it.
+
+**No transient-vs-permanent classifier**, by decision. Which failures are worth
+retrying is an operator's judgement for now, and the flag is explicit precisely
+so it can be. Run against the real scratch database, `--dry-run` correctly named
+the one failed document in the cohort scope (`c434f463d638`, the OLE2 progress
+report) and changed nothing.
+
+8 new tests in `tests/test_nrb_corpus_ingest.py` (17 total, all passing). Two of
+them read `ingest_jobs` **scoped to the test department**: the scratch database
+carries unrelated pre-existing jobs (§20.7 item 4) and an unscoped assertion
+would be about someone else's debris, not about this code.
+
+### 21.2 Step 2 — why the cache key is split in two
+
+One monolithic cache version would work and would be wrong in a specific,
+expensive way: bumping the OCR model would invalidate every deterministic legacy
+conversion in the corpus, and bumping npttf2utf would re-run every scan. So the
+key is split along the only line that matters — *did the ROUTE change, or did
+what the route PRODUCES change?*
+
+**`base_version`**, on `nrb_recoveries`, is the ROUTING identity:
+
+```
+native-2 | recovery-1 | prov-1 | gate=0.8 | unjudged=0.8
+```
+
+the native-2 classifier, `recovery.RECOVERY_ROUTING_VERSION` (the plan ordering
+and `route_page`'s rules), `provenance.PAGE_PROVENANCE_VERSION`, and the two
+gate constants **read live** so editing `CONVERSION_GATE` or
+`legacy_convert.UNJUDGED_MIN_LEGACY_RATIO` changes the key whether or not
+anyone remembered to bump a version string. A change here invalidates the whole
+document, correctly: the routes themselves may now differ, so no unit's cached
+answer is still about the right question.
+
+**`engine_version`**, per unit on `nrb_recovery_units`, is the identity of
+whatever produced that unit's text:
+
+| route | engine version |
+|---|---|
+| `native` | `passthrough/native-2` — parser changes are what `EXTRACTOR_VERSION` is documented to be bumped for, so it is reused rather than tracking pypdf/python-docx/openpyxl separately (which would make an openpyxl release invalidate every PDF) |
+| `legacy_conversion` | `npttf2utf 0.3.7/Preeti/lexicon cc1fec3f2808` |
+| `ocr` | `PP-OCRv5/devanagari/onnxruntime/docling 2.118.1; rapidocr 3.9.2; onnxruntime 1.23.2` |
+
+The lexicon lives in the ENGINE version, not the base: it is a conversion guard,
+so it changes what conversion produces, never where a page is routed.
+
+**An absent dependency renders as `unavailable`, which is a version like any
+other.** That single decision makes fail-closed and selectivity the same
+mechanism: a page recorded `conversion_unavailable` on a deployment without
+npttf2utf — §18's most dangerous failure, because it looks like a clean
+deployment — can never be served once npttf2utf is installed, while its OCR'd
+and native neighbours in the same document are still reused.
+
+Invalidation semantics, as built:
+
+| change | effect |
+|---|---|
+| embedding model | none — recovery does not embed |
+| chunker | none — the cache stores TEXT, not chunks |
+| OCR engine/model | OCR units only |
+| converter / mapping / lexicon | `legacy_conversion` units only |
+| routing / native classifier / either gate | the whole document |
+| blob bytes | a different `content_sha256`, so a different row |
+
+### 21.3 Schema
+
+Migration **`714264eba2fd`**, `down_revision` **`b1bea6ac36c5`** — this branch's
+actual head. Two new tables, no change to any existing one; the autogenerate
+drift check afterwards was empty. Applied and verified against
+`local_ai_gateway_p4` only.
+
+`nrb_recoveries` — one row per `(content_sha256, base_version)`: `family`,
+`plan`, `plan_reason`, `gate_ratio`, `warnings`, `unit_count`.
+`nrb_recovery_units` — one row per unit: `unit_number`, `label`, `route`,
+`reason`, `engine_version`, `ok`, `content`, `error`, `detail` JSONB, with
+`ON DELETE CASCADE` and a unique `(recovery_id, unit_number)`.
+
+Three things worth stating rather than leaving to be discovered:
+
+1. **This table is a document store, and it is the only NRB table that is.**
+   `nrb_extractions` carries `ck_nrb_extractions_preview_is_bounded`
+   specifically to stop it becoming one. Here that is the point — the value of
+   the cache is not re-running 2–4 s/page OCR — so there is no such bound. What
+   is stored is exactly the text `rag.chunks_from_recovery` would chunk:
+   `recovery._withhold` has already run, so the glyph-mapped original of an
+   unresolved unit is not in the database and cannot be resurrected from it.
+2. It is **global and department-agnostic**, keyed by bytes like `nrb_files`.
+   Two departments ingesting the same blob share one recovery. No embedding, no
+   `tsv`, no vector index; retrieval cannot reach it.
+3. Rows under a superseded `base_version` are **kept side by side**, exactly as
+   native-1 and native-2 extraction rows are. Deleting is an explicit operator
+   action (`scripts/nrb_recovery_cache.py --purge`), never a side effect of a
+   write — a cache row is also the record of what was indexed at the time.
+
+**Branch integration is not solved here and must not be.** When
+`feat/rag-source-citations` (stamped `d4a91f2c7b3e`, deferred) and this branch
+meet, Alembic will have two heads and a merge revision will be needed. Nothing
+was stamped, dropped or reconciled.
+
+### 21.4 Granularity — the unit is whatever `recovery.py` already returns
+
+No granularity was invented. A `PageText` is a unit:
+
+- **PDF → per PAGE**, 1-indexed, the same number `provenance`,
+  `read_pdf_pages` and `ocr.ocr_page` use, so a citation needs no translation
+  table. `e08988860534` is the case that makes this necessary: page 1 OCR,
+  pages 2–50 conversion, one document.
+- **XLSX → per SHEET**, in workbook order, sheet name in `label`. Fake page
+  numbers on a spreadsheet would make `document_chunks.page_number` a lie.
+- **DOCX/TXT → unit 1**, one stream.
+
+Non-PDF documents are **all-or-nothing by construction**: every unit of a
+workbook shares one route, so "some units stale" cannot arise there and a stale
+engine falls back to a cold run. Only PDFs have a partial path.
+
+### 21.5 How the lookup integrates, and what `rag.py` now trusts
+
+`recovery.py` remains the semantic owner. Two of its per-unit executors became
+public — `convert_unit` and `ocr_unit` (previously `_converted_page` /
+`_ocr_page`) — so a cache refreshing ONE stale page calls the same function a
+cold run calls, with the same withholding rules. There is no second recovery
+implementation.
+
+```
+worker._load_chunks            (async; branches on metadata.origin == "nrb")
+  └─ recovery_cache.chunks_for_blob
+       ├─ load(session, sha, base_version)      one SELECT, session closed
+       ├─ asyncio.to_thread(rag.recover_and_chunk, ..., cached=…)
+       │    └─ recovery_cache.resolve  →  warm | partial | cold
+       │         ├─ warm     : rebuild PageTexts from rows. Nothing opened.
+       │         ├─ partial  : re-read page texts (pypdf), re-execute ONLY the
+       │         │             stale units via recovery.convert_unit/ocr_unit.
+       │         │             The route, the reason and gate_ratio come from
+       │         │             the cached header — no re-classification.
+       │         └─ cold     : rag.recover_blob, exactly as before
+       │    └─ rag.chunks_from_recovery   ← ONE chunking path, two sources
+       └─ save(...)  unless warm (a warm hit has nothing to write)
+```
+
+`rag.parse_nrb_to_chunks` is unchanged in behaviour and still the no-database
+entry point; `recover_and_chunk` is the new one that accepts a cached recovery
+and returns what produced the chunks. The generic RAG path is untouched: a
+non-NRB document goes straight to `parse_to_chunks` in a thread, with no session
+and no NRB import.
+
+**What `rag.py` now trusts, stated explicitly**, because its docstring used to
+say the classification is re-run rather than read from a stored row. That
+reasoning is not abandoned — it is what the versioning satisfies. A chunk is
+still a function of the bytes, but the function is now NAMED: the row is keyed
+on `sha256(bytes)` AND on a routing version covering the classifier, the routing
+rules, the provenance algorithm and both gates, and each unit additionally
+carries its engine's identity. What is trusted is a **version match**, never the
+row's own claim about itself — `PageText.indexable` is recomputed from
+`(ok, text)` on read rather than stored, so a row cannot assert a trust state
+the current rules would refuse.
+
+`nrb_extractions` is still off the ingestion path. `recovery_cache.py` carries
+the same AST-level guard `corpus.py` does, and the temptation there is stronger
+(that table already holds a classification) — which is why the guard is on both.
+
+### 21.6 Unresolved outcomes are cached, with their reason
+
+`ok = false` with empty text is a first-class cached outcome, not an omission.
+Caching only the successes means a deterministically unrecoverable page re-runs
+OCR on every ingest forever to reach the same conclusion. The reason travels
+with it (`conversion_unavailable`, `conversion_unresolved`, `ocr engine
+unavailable`), the page is still not indexable, and a document with no
+indexable unit still raises the same actionable `NrbParseError` naming the
+routing outcome — a warm hit does not turn a failure into a silent empty
+success.
+
+An `error IS NULL OR ok = false` CHECK keeps a successful unit from carrying an
+error. The converse is deliberately not an invariant: `conversion_unresolved`
+fails *with* text (the guards kept some lines) while an unavailable engine fails
+with none.
+
+A unit whose engine errored **transiently** is cached under a version that has
+not moved, so it is reused until someone decides otherwise. Deciding is
+`scripts/nrb_recovery_cache.py --purge`, a command rather than a heuristic. No
+retry scheduler was built.
+
+### 21.7 The small real-data check — four blobs, two passes
+
+`scripts/nrb_recovery_cache.py --reuse-check`, which wraps the REAL converter
+and OCR engine in counters. Reuse is proved by **zero calls**, not by equal
+output: a converter that ran again and produced the same answer would look
+identical. All five recovery dependencies verified present first (npttf2utf
+0.3.7, rapidocr 3.9.2, onnxruntime 1.23.2, docling 2.118.1, pypdf, lexicon
+`cc1fec3f2808`) — §18's lesson is that their absence produces a *clean-looking*
+run.
+
+| blob | | outcome | units | reused | run | npttf2utf calls | OCR pages | chunks | s |
+|---|---|---|---:|---:|---:|---:|---:|---:|---:|
+| `1a9b6321aa61` legacy | pass 1 | cold | 1 | 0 | 1 | 10 | 0 | 1 | 0.1 |
+| | pass 2 | **warm** | 1 | 1 | 0 | **0** | **0** | 1 | 0.0 |
+| `3d2eca8b9f95` OCR | pass 1 | cold | 1 | 0 | 1 | 0 | 1 | 2 | 6.6 |
+| | pass 2 | **warm** | 1 | 1 | 0 | **0** | **0** | 2 | 0.0 |
+| `7820b1f49fc1` stripped font | pass 1 | cold | 4 | 0 | 4 | 201 | 0 | 9 | 1.1 |
+| | pass 2 | **warm** | 4 | 4 | 0 | **0** | **0** | 9 | 0.0 |
+| `e08988860534` mixed | pass 1 | cold | 50 | 0 | 50 | 1,473 | 1 | 75 | 6.8 |
+| | pass 2 | **warm** | 50 | 50 | 0 | **0** | **0** | 75 | 0.0 |
+
+Second pass: **0 npttf2utf calls, 0 PP-OCR calls**, every document `warm`, chunk
+counts identical. Those counts (1 / 2 / 9 / 75) are also §18.7's and §20.4's for
+these four anchors, unchanged.
+
+**Selective invalidation, on the real mixed document.** `e08988860534`'s cached
+units were aged one route at a time:
+
+| aged | outcome | reused | re-run | npttf2utf calls | OCR pages | chunks |
+|---|---|---:|---:|---:|---:|---:|
+| the 1 OCR unit | partial | 49 | 1 | **0** | 1 | 75 |
+| the 49 conversion units | partial | 1 | 49 | 1,473 | **0** | 75 |
+
+An OCR model change re-runs one page of fifty and touches no conversion; a
+converter change re-runs forty-nine and touches no scan. That is the property
+the two version domains exist for, measured rather than argued.
+
+**End to end through the real worker.** `7820b1f49fc1` was re-ingested into
+`nrb-p7` by `app.rag.worker` itself: `nrb recovery warm for d696be4e6a9e… : 4
+units (4 reused, 0 recovered; converter 0, ocr 0)`, job `succeeded`, chunk count
+9 → 9. That is the main end-to-end property — a re-ingest driven by anything
+downstream reuses the recovery.
+
+**Timings are laptop VRAM-spill figures (§18.5) and are not server estimates.**
+The 46.7 s of that worker run is almost entirely model load and embedding; the
+recovery part of it was the 0.0 s warm hit.
+
+### 21.8 Tests
+
+`tests/test_nrb_recovery_cache.py` — 25 tests, all passing. Most are pure:
+`resolve` takes a `CachedRecovery` and returns a `RecoveredDocument`, so the
+whole staleness matrix is testable in memory with counting stubs; the
+persistence round-trip runs against real Postgres inside a rolled-back
+transaction.
+
+They cover: the converter and OCR each running once and not twice; a mixed PDF
+reusing its OCR and conversion pages independently; an OCR bump invalidating
+only OCR; a converter bump and a lexicon change invalidating only conversion;
+installing a missing converter invalidating only the pages it could not do; a
+routing-version bump invalidating the whole document; **every routing input
+moving the base version**, asserted term by term rather than trusting the format
+string; chunk-size changes not invalidating anything; page order, sheet labels
+and converter/OCR provenance surviving reuse; the withheld original never
+reaching the database; `indexable` being recomputed rather than stored; a
+half-written entry reading as a miss; the generic RAG path never reaching the
+cache; and the AST guard on `nrb_extractions`.
+
+Suites: NRB **1,081 passed, 3 skipped**; RAG regression **260 passed, 1 failed**
+— `test_rag_reingest_integration.py::test_department_filter_restricts_the_set`,
+the pre-existing §20.7 item 4 failure that asserts an unscoped document count of
+exactly 2 against a database with 190 rows of unrelated `ri*` debris. Reproduced
+unchanged, not fixed, not cleaned. Everything else: **425 passed, 2 skipped**.
+
+### 21.9 Evaluation & Improvement (Phase 7 step 2)
+
+**Success metric.** Re-run cost, which §19.4 named and could not yet measure at
+this stage: a second recovery of an unchanged blob must execute zero converter
+and zero OCR invocations. Measured above at 0 and 0 across four blobs and 56
+units. Still a proxy for SQLs — nothing here is user-facing.
+
+**Eval.** Two labelled sets. The 25 focused tests are the invalidation matrix,
+scored pass/fail: 25/25. The four real blobs are the reuse set, scored on engine
+calls and on chunk count against §18.7: 4/4 on both, plus 2/2 on the selective
+invalidation directions. What is **not** evaluated: whether the cached text is
+semantically correct — §15's verdicts remain `awaiting_nepali_review`, and the
+cache faithfully preserves whatever conversion produced, right or wrong.
+
+**Feedback capture.** `nrb_recovery_units` is itself the record: route, engine
+version, `ok` and reason per unit, queryable as a GROUP BY
+(`scripts/nrb_recovery_cache.py --stats`). The worker logs the outcome, reuse
+split and engine-call counts per document at INFO. `ingest_jobs` still holds
+per-job status and error.
+
+**Review loop.** Before any corpus-scale ingest, and again after the first one —
+`--stats` is the check, and the thing to read is the route/engine split, never
+job success (§18).
+
+### 21.10 The gate
+
+Steps 1.1 and 2 are done. Recovery persistence **is** ready for supersession
+work: a republished NRB file already produces a different `content_sha256` and
+therefore a different cache row with no collision, so the supersession task is
+purely about `documents` rows and never about invalidating recovered text.
+Supersession was **not started**.
+
+**Not started, and not to be started without a decision:** the supersession link
+(§19.3 item 3), the `RAG_DOCS_DIR` duplication (§20.7 item 2, measured at 31 MB
+for 31 documents and still open before full-corpus ingest), Phase 8's
+`search_nrb_documents`, and any corpus-scale ingest.
+
+Unchanged and untouched: the Nepali semantic review, §17.6's broken-ToUnicode
+native text, the npttf2utf GPL-3.0 distribution decision, full-corpus retrieval
+quality, native-2 (not modified; native-3 not started), the frozen Phase 6A/6B
+evidence, the Phase 7 cohort (not re-run, not expanded), the `ri*` scratch-DB
+debris, and server access (§19.1) — this is still the laptop.

@@ -60,11 +60,20 @@ would trade a recorded gap for unvalidated text.
 
 WHAT THIS MODULE DOES NOT DO
 ----------------------------
-It does not classify (that is `routing.py`), does not persist (there is no
-recovery table — Phase 7 owns storage), does not chunk or embed, and does not
-decide semantic correctness. **Conversion correctness is still `awaiting_nepali_
-review` (§15), and OCR text is retrieval material, not a transcription** — see
-`ocr.py` on why there is no confidence number here.
+It does not classify (that is `routing.py`), does not persist (`recovery_cache.py`
+owns storage), does not chunk or embed, and does not decide semantic
+correctness. **Conversion correctness is still `awaiting_nepali_review` (§15),
+and OCR text is retrieval material, not a transcription** — see `ocr.py` on why
+there is no confidence number here.
+
+THIS MODULE STAYS THE SEMANTIC OWNER
+    `recovery_cache.py` may skip work; it may not decide differently. The two
+    per-unit executors below are public (`convert_unit`, `ocr_unit`) precisely
+    so a cache refreshing ONE stale page calls the same function a cold run
+    calls, with the same fail-closed rules, rather than growing a second
+    implementation that drifts. `RECOVERY_ROUTING_VERSION` is this module's own
+    hand-bumped identity, and it is what the cache keys its routing decisions
+    on — see `recovery_cache.BASE_VERSION`.
 """
 
 from __future__ import annotations
@@ -92,15 +101,29 @@ __all__ = [
     "PLAN_NONE",
     "PLAN_PAGES",
     "PageText",
+    "RECOVERY_ROUTING_VERSION",
     "ROUTES",
     "ROUTE_LEGACY",
     "ROUTE_NATIVE",
     "ROUTE_OCR",
     "RecoveredDocument",
+    "convert_unit",
+    "ocr_unit",
     "plan_document",
     "recover",
     "route_page",
 ]
+
+# THE ROUTING IDENTITY. Bumped BY HAND when anything in this module could change
+# which route a unit receives — `plan_document`'s ordering, `route_page`'s
+# rules, or the meaning of a plan. It is deliberately NOT bumped for a change
+# that only alters what a route PRODUCES: that is the route engine's identity
+# (`recovery_cache.route_engine_version`), and conflating the two is what makes
+# an OCR model upgrade re-run every deterministic conversion in the corpus.
+#
+# The gate constants below are hashed into the cache's base version separately,
+# so editing `CONVERSION_GATE` cannot be forgotten here.
+RECOVERY_ROUTING_VERSION = "recovery-1"
 
 # --- the per-page routes ---------------------------------------------------- #
 # A closed vocabulary, like `quality.REASONS`: these are counted, reported and
@@ -417,7 +440,7 @@ def _conversion_detail(
     return detail, resolved, unresolved
 
 
-def _converted_page(
+def convert_unit(
     number: int,
     text: str,
     *,
@@ -478,7 +501,7 @@ def _converted_page(
     return PageText(number, ROUTE_LEGACY, reason, recovered, detail=detail)
 
 
-def _ocr_page(
+def ocr_unit(
     number: int, path: Path, *, reason: str, engine: PageOcrEngine | None
 ) -> PageText:
     """OCR one page, or fail closed.
@@ -541,13 +564,13 @@ def _recover_pdf(
         )
         if route == ROUTE_LEGACY:
             out.append(
-                _converted_page(
+                convert_unit(
                     index, text, reason=why, converter=converter, lexicon=lexicon,
                     document_legacy_ratio=plan.gate_ratio or 0.0,
                 )
             )
         elif route == ROUTE_OCR:
-            out.append(_ocr_page(index, path, reason=why, engine=ocr))
+            out.append(ocr_unit(index, path, reason=why, engine=ocr))
         else:
             out.append(PageText(index, ROUTE_NATIVE, why, text))
     return tuple(out), tuple(warnings)
@@ -714,7 +737,7 @@ def recover(
             return RecoveredDocument(
                 result.family, plan.plan, plan.reason, plan.gate_ratio, routed, warnings
             )
-        page = _converted_page(
+        page = convert_unit(
             1, result.text, reason=plan.reason, converter=converter, lexicon=lexicon,
             document_legacy_ratio=plan.gate_ratio or 0.0,
         )

@@ -75,6 +75,10 @@ __all__ = [
     "FETCH_STATUSES",
     "NRBExtraction",
     "NRBFetchRun",
+    "NRBRecovery",
+    "NRBRecoveryUnit",
+    "RECOVERY_PLANS",
+    "RECOVERY_ROUTES",
     "METADATA_STATUSES",
     "METADATA_STATUS_REST",
     "METADATA_STATUS_SITEMAP_ONLY",
@@ -855,4 +859,213 @@ class NRBExtraction(Base):
         server_default=func.now(),
         onupdate=func.now(),
         nullable=False,
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Phase 7 step 2 — the versioned recovery cache.
+#
+# The vocabularies are restated here rather than imported from `recovery.py`,
+# for the same reason `EXTRACTION_STATUSES` is restated: `models.py` is imported
+# by Alembic's autogenerate and by the API image, and `recovery.py` pulls in
+# `legacy_convert`, `provenance` and `ocr`. A CHECK constraint must not drag the
+# OCR stack into a migration. `test_the_cache_vocabularies_match_recovery` keeps
+# the two copies honest.
+# --------------------------------------------------------------------------- #
+RECOVERY_ROUTES = ("native", "legacy_conversion", "ocr")
+RECOVERY_PLANS = ("keep_native", "convert_units", "route_pages", "no_recovery")
+
+
+class NRBRecovery(Base):
+    """One blob's recovered text under one ROUTING version. Content-intrinsic.
+
+    THE PRODUCTION REUSE BOUNDARY, and deliberately not `nrb_extractions`. That
+    table is Phase 6 evidence: it is written by a measurement pass an operator
+    may never have run, it stores no text, and putting it on the ingestion path
+    would make every future ingest depend on a profiling run
+    (`docs/nrb-integration.md` §19, §20.1). This table is written BY ingestion,
+    for ingestion.
+
+    WHAT THIS TABLE IS THAT NO OTHER NRB TABLE IS
+        A document store. `nrb_extractions` has a CHECK
+        (`ck_nrb_extractions_preview_is_bounded`) that exists specifically to
+        stop it becoming one. Here that is the point — the whole value of the
+        cache is not re-running a 2-4 s/page OCR — so there is no such bound,
+        and the inversion is stated rather than left to be discovered. What is
+        stored is exactly the text `rag.chunks_from_recovery` would chunk:
+        `recovery._withhold` has already run, so the glyph-mapped original of an
+        unresolved unit is not here and cannot be resurrected from here.
+
+        It is also GLOBAL and department-agnostic, keyed by bytes like
+        `nrb_files`. Two departments ingesting the same blob share one recovery.
+        It carries no embedding, no `tsv` and no vector index, and nothing in
+        `app/rag/retrieval` can reach it.
+
+    IDENTITY: (content_sha256, base_version)
+        `content_sha256` for the reason `nrb_extractions` uses it — storage is
+        content-addressed, a blob is shared by several catalog rows, and every
+        column here is a function of the bytes alone. New bytes are a new hash
+        and therefore a new row; a cache collision across a republished file is
+        not possible.
+
+        `base_version` is the ROUTING identity (see
+        `recovery_cache.BASE_VERSION`): the native classifier, this module's
+        routing rules, the provenance algorithm and the two gate constants.
+        Anything that could change WHICH ROUTE a unit gets. It is explicitly NOT
+        `extractor_version` alone — that would make a converter upgrade serve
+        stale text — and explicitly NOT the whole dependency set either, because
+        then an OCR model bump would invalidate every deterministic conversion
+        in the corpus. What a route PRODUCES is versioned per unit, on
+        `nrb_recovery_units.engine_version`.
+
+        Rows for a superseded `base_version` are kept side by side, exactly as
+        native-1 and native-2 rows are. Deleting is an explicit operator action
+        (`scripts/nrb_recovery_cache.py --purge`), never a side effect of a
+        write: a cache row is also the record of what was indexed at the time.
+    """
+
+    __tablename__ = "nrb_recoveries"
+    __table_args__ = (
+        CheckConstraint(
+            _in_list("plan", RECOVERY_PLANS), name="ck_nrb_recoveries_plan"
+        ),
+        CheckConstraint(
+            "gate_ratio IS NULL OR (gate_ratio >= 0 AND gate_ratio <= 1)",
+            name="ck_nrb_recoveries_gate_ratio",
+        ),
+        # Identity. `content_sha256` leads so the index also serves the lookup
+        # by blob — which is the hot path, once per ingest.
+        Index(
+            "ux_nrb_recoveries_content_version",
+            "content_sha256",
+            "base_version",
+            unique=True,
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+
+    # Not a foreign key to `nrb_files`, for the same reason `nrb_extractions`
+    # is not: a file row being re-fetched must not orphan a valid recovery OF
+    # THE SAME BYTES.
+    content_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    base_version: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    # --- everything `RecoveredDocument` carries above the unit level ------- #
+    family: Mapped[str] = mapped_column(String(16), nullable=False)
+    plan: Mapped[str] = mapped_column(String(32), nullable=False)
+    plan_reason: Mapped[str] = mapped_column(String(64), nullable=False)
+    # The document's `unit_legacy_ratio` as the router read it. Load-bearing on
+    # a refresh, not decorative: `convert_unit` takes it as
+    # `document_legacy_ratio`, and re-deriving it per page is the exact mistake
+    # §16 warns about (a 1.0-ratio document's page 1 gated on its own three
+    # headings). Storing it is what lets ONE stale page be reconverted without
+    # re-classifying the whole document.
+    gate_ratio: Mapped[float | None] = mapped_column(Float, nullable=True)
+    warnings: Mapped[list] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
+    unit_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class NRBRecoveryUnit(Base):
+    """One recovered unit — a PDF PAGE, a spreadsheet SHEET, or a whole document.
+
+    The unit is whatever `recovery.py` already returns as a `PageText`, never a
+    granularity invented here. For a PDF that is the source page, 1-indexed and
+    the same number `provenance`, `documents.read_pdf_pages` and `ocr.ocr_page`
+    use, so a citation needs no translation table. For a workbook it is the
+    sheet, in workbook order, with the sheet name in `label` — fake page numbers
+    on a spreadsheet would make `document_chunks.page_number` a lie. For a
+    single-stream `.docx`/`.txt` it is unit 1.
+
+    WHY THE ROUTE ENGINE IS VERSIONED HERE AND NOT ON THE HEADER
+        This is the whole selectivity property. `engine_version` is the identity
+        of whatever produced THIS unit's text — npttf2utf + mapping + lexicon
+        fingerprint for a conversion, the PP-OCR model + backend for an OCR
+        page, the extractor for a native passthrough. A unit is reusable when
+        its stored `engine_version` equals the current one for its route, so:
+
+          * a new OCR model makes OCR pages stale and leaves every converted
+            page in the corpus reusable;
+          * a converter or lexicon change makes converted units stale and leaves
+            scanned pages alone;
+          * a routing change bumps `base_version` instead, which invalidates the
+            whole document — correctly, because the ROUTES themselves may differ.
+
+        `e08988860534` is the case that makes this concrete: page 1 is OCR and
+        pages 2-50 are conversion, in one document.
+
+    UNRESOLVED UNITS ARE STORED, WITH THEIR REASON
+        `ok = false` with empty text is a first-class cached outcome, not an
+        omission. Caching only the successes means a deterministically
+        unrecoverable page re-runs OCR on every ingest forever. `indexable` is
+        NOT stored: it is recomputed from `(ok, text)` by `PageText`, so a
+        cache row cannot assert a trust state the current rules would refuse.
+    """
+
+    __tablename__ = "nrb_recovery_units"
+    __table_args__ = (
+        CheckConstraint(
+            _in_list("route", RECOVERY_ROUTES), name="ck_nrb_recovery_units_route"
+        ),
+        # A unit that succeeded must not carry an error. The converse is not an
+        # invariant: `conversion_unresolved` fails with text (the guards kept
+        # some lines) and an unavailable engine fails with none.
+        CheckConstraint(
+            "error IS NULL OR ok = false", name="ck_nrb_recovery_units_error"
+        ),
+        CheckConstraint("unit_number >= 1", name="ck_nrb_recovery_units_number"),
+        Index(
+            "ux_nrb_recovery_units_recovery_number",
+            "recovery_id",
+            "unit_number",
+            unique=True,
+        ),
+        # The §18 verification query — "read the route split, never job success"
+        # — as a plain GROUP BY rather than a JSONB unnest.
+        Index("ix_nrb_recovery_units_route", "route"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    recovery_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("nrb_recoveries.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    unit_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    label: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    route: Mapped[str] = mapped_column(String(24), nullable=False)
+    # Which rule sent it here (`embedded_font`, `no_font_scan_backed`,
+    # `conversion_unavailable`, …). Kept so a refresh can hand `convert_unit`
+    # and `ocr_unit` the same reason a cold run would.
+    reason: Mapped[str] = mapped_column(String(64), nullable=False)
+    engine_version: Mapped[str] = mapped_column(String(255), nullable=False)
+    ok: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    # Post-`_withhold` text. Unbounded on purpose — see `NRBRecovery`.
+    content: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
+    # Exception TYPE plus a short message. Never a stack trace, never a
+    # filesystem path.
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # `PageText.detail` verbatim: converter name/mapping/counts, or OCR
+    # engine/model/version/`authoritative`. This is what `rag._chunk_meta` reads
+    # to build citation provenance, so a reused unit cites identically to a
+    # freshly recovered one.
+    detail: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
     )

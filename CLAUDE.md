@@ -107,11 +107,19 @@ pass selecting 0, and all **8 anchors reproducing §18.7 exactly**. The cohort i
 frozen at `docs/nrb/phase7-validation-cohort.json` (`f2d36b4c…`, 8 route-aware
 anchors + 22 blind + 1 unsupported) and its pool is the 570 FETCHED blobs, so it
 supports **no population claim**.
+**Phase 7 step 1.1 (explicit failed-document retry) and step 2 (the VERSIONED
+RECOVERY CACHE) are DONE (2026-08-17, §21).** `--retry-failed` requeues a
+`failed` document against its EXISTING row (no second `documents` row, `ready`
+/`pending`/`archived` unreachable, no NRB-less document adopted); and
+`app/nrb/recovery_cache.py` + migration `714264eba2fd` make recovery reusable —
+verified on 4 real blobs / 56 units at **0 npttf2utf calls and 0 PP-OCR calls**
+on the second pass, chunk counts unchanged (1/2/9/75 = §18.7's), plus a real
+worker re-ingest logging `warm … 4 reused, converter 0, ocr 0`.
 **The NRB CORPUS is still not ingested and `search_nrb_documents` (Phase 8) does
 not exist** — the 6B gate and its recommendations are §11.9, §12.10, §13.11,
-§14.7, §15.9, §16.10, §17.8, §19.5 and §20.9. Phase 7's remaining gaps are the
-versioned recovery cache, the supersession link and the `RAG_DOCS_DIR`
-duplication decision (§19.3, §20.7).
+§14.7, §15.9, §16.10, §17.8, §19.5, §20.9 and §21.10. Phase 7's remaining gaps
+are the supersession link and the `RAG_DOCS_DIR` duplication decision (§19.3,
+§20.7) — the recovery cache no longer is.
 The roadmap was renumbered when Phase 4 was scoped down to
 persistence; read that doc before touching anything NRB-related instead of
 re-deriving status from chat history.
@@ -161,7 +169,11 @@ production extraction routing (`provenance` reads per-page fonts/images from the
 PDF with **pypdf, no subprocess**; `ocr` is the ONLY file that knows docling's OCR
 stage exists — PP-OCRv5/onnxruntime, lazy import, `requirements-worker.txt`;
 `recovery` routes each page to native/legacy_conversion/ocr and rebuilds in page
-order, persisting NOTHING, run via `scripts/nrb_recover.py`); `rag` = the ONLY
+order, persisting NOTHING itself, run via `scripts/nrb_recover.py`);
+`recovery_cache` = Phase 7 step 2, the versioned recovery cache
+(`nrb_recoveries`/`nrb_recovery_units`; the ONLY file that persists recovered
+text, reached from `worker._load_chunks` via `chunks_for_blob`, operated by
+`scripts/nrb_recovery_cache.py --stats/--reuse-check/--purge`); `rag` = the ONLY
 seam between NRB and department RAG (`parse_nrb_to_chunks`, reached from
 `worker._load_chunks_sync` via `documents.metadata.origin == "nrb"`; chunks per
 PAGE, route in `document_chunks.metadata`, exercised by
@@ -563,21 +575,43 @@ events (`token`/`tool_call`/`tool_result`/`done`) + the new id in the
   `nrb_extractions` is NOT an input to ingestion.** Sync is all-zero on a second
   run; fetch selects `fetch_status='pending'` only (excluded by the status
   column, not a `WHERE` someone can forget); extract selects blobs with no row at
-  this `extractor_version` (`catalog.py:1059-1064`). But **recovery re-runs on
-  every ingest** — `rag.parse_nrb_to_chunks` calls `extraction.extract_file`
-  fresh (`app/nrb/rag.py:180`) and reads no stored classification, so conversion
-  and OCR are recomputed (~2–4 s/page) each time. Running `nrb_extract.py` is
-  therefore *not* a prerequisite for ingesting; the two paths agree because they
-  run the same code, not because one consults the other. **Nothing is scheduled**
-  — no cron, no timer, no in-process scheduler; stages 1–3 are manual CLI passes
-  and the only daemon is `app.rag.worker` polling `ingest_jobs`. Three gaps a
-  corpus run must close first, all §19.3: `scripts/nrb_rag_ingest.py` is an
-  8-blob smoke test that **aborts on `DocumentConflict` rather than skipping**
-  (so a second `--ingest` without `--reset` stops at the first existing blob),
-  recovered text is not persisted anywhere, and a republished NRB file mints a
-  SECOND `documents` row with nothing archiving the first
-  (`metadata.blob_sha256` is written but never read back). The FIRST of those is
-  closed by `scripts/nrb_rag_ingest_corpus.py` (§20); the other two are not.
+  this `extractor_version` (`catalog.py:1059-1064`). Recovery **used to** re-run
+  on every ingest; since §21 it is cached (see the next bullet). Running
+  `nrb_extract.py` is still *not* a prerequisite for ingesting; the two paths
+  agree because they run the same code, not because one consults the other.
+  **Nothing is scheduled** — no cron, no timer, no in-process scheduler; stages
+  1–3 are manual CLI passes and the only daemon is `app.rag.worker` polling
+  `ingest_jobs`. Of §19.3's three gaps, two are now closed —
+  `scripts/nrb_rag_ingest_corpus.py` (§20) and the recovery cache (§21) — and
+  **the supersession link is not**: a republished NRB file still mints a SECOND
+  `documents` row with nothing archiving the first (`metadata.blob_sha256` is
+  written but never read back).
+- **The recovery cache has TWO version domains, and collapsing them is the
+  mistake it exists to avoid.** `nrb_recoveries.base_version` is the ROUTING
+  identity (`native-2|recovery-1|prov-1|gate=0.8|unjudged=0.8` — the classifier,
+  `recovery.RECOVERY_ROUTING_VERSION`, `provenance.PAGE_PROVENANCE_VERSION` and
+  both gate constants, **read live** so editing a gate cannot be forgotten); a
+  change there invalidates the whole document, because the routes themselves may
+  now differ. `nrb_recovery_units.engine_version` is per unit and depends on the
+  route (npttf2utf+mapping+lexicon fingerprint; PP-OCR model+backend+package
+  versions; `passthrough/<extractor_version>`), so an OCR bump re-runs OCR pages
+  only and a converter bump re-runs conversions only — measured on
+  `e08988860534`: 1 of 50 pages, then 49 of 50, never both. **Never key it on
+  `extractor_version` alone** (a converter upgrade would serve stale text) and
+  never on one combined string (an OCR bump would re-run the whole corpus).
+  An ABSENT dependency renders `unavailable`, which is a version like any other
+  — that is what makes fail-closed and selectivity the same mechanism, and it is
+  why installing npttf2utf invalidates exactly the pages it could not do. Three
+  invariants a rewrite must not lose: only post-`_withhold` text is ever stored
+  (the glyph-mapped original is not in the database and cannot be resurrected);
+  `indexable` is **recomputed** from `(ok, text)`, never a column; and unresolved
+  units are cached WITH their reason, or every withheld page re-runs OCR forever.
+  The unit is whatever `recovery.py` returns — PDF page, spreadsheet SHEET (never
+  a fake page number), or unit 1 — and non-PDF documents are all-or-nothing
+  because their units share one route. `recovery.py` stays the semantic owner:
+  a stale unit is refreshed by `recovery.convert_unit`/`ocr_unit`, the same
+  functions a cold run calls. Superseded versions are kept side by side like
+  native-1/native-2; `--purge` is the only removal and it is an operator command.
 - **The corpus ingest driver skips by ANTI-JOIN and conflicts mean RACED.**
   `app/nrb/corpus.py` anti-joins the scope against `documents.content_hash` in
   the target department — the same number as `nrb_files.content_sha256`, both
@@ -586,8 +620,11 @@ events (`token`/`tool_call`/`tool_result`/`done`) + the new id in the
   count means **concurrency, not idempotence**, and the two are reported
   separately. The anti-join repeats `ux_documents_active_content`'s own
   `status <> 'archived'` predicate, because archiving must stay reversible;
-  the side effect is that a **`failed` document is never re-selected** and there
-  is no `--retry-failed` yet (§20.7). It is **enqueue-only by design** — draining
+  the side effect is that a **`failed` document is never re-selected** by the
+  ordinary pass; `--retry-failed` (§21.1) is the only way past it, and it is a
+  SEPARATE pair of functions that creates no document and copies no file — three
+  exclusions (`status='failed'`, no active job, and a join to `nrb_files` so it
+  cannot adopt a non-NRB upload) are each load-bearing. It is **enqueue-only by design** — draining
   in-process races the deployed worker, and `SKIP LOCKED` makes them split the
   scope rather than collide. And it must never learn to read `nrb_extractions`:
   `test_the_driver_never_consults_the_extraction_evidence_table` checks the

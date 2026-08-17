@@ -8,11 +8,36 @@ this through a single explicit branch on `documents.metadata.origin == "nrb"`.
 WHAT IT DOES, AND WHY IN THIS ORDER
     classify (native-2) → route per page (`recovery`) → chunk per page
 
-    The classification is re-run rather than read from `nrb_extractions`,
-    because that table lives in the NRB catalog and a chunk must be a function
-    of the BYTES on disk, not of a row that may have been written by an older
-    extractor version. It is the same pypdf parse the corpus pass already
-    measured, and it is cheap next to embedding.
+    `nrb_extractions` is still never read here, and that has not softened: it is
+    Phase 6 evidence, written by a measurement pass an operator may never have
+    run, and a chunk must not depend on whether someone profiled the corpus
+    first.
+
+    What HAS changed (Phase 7 step 2) is that the classify-and-route half no
+    longer necessarily runs. `recovery_cache` may supply an already-recovered
+    document, and `parse_nrb_to_chunks` will chunk that instead. The reasoning
+    the old docstring gave — "a chunk must be a function of the BYTES on disk,
+    not of a row that may have been written by an older version" — is not
+    abandoned; it is what the cache's versioning exists to satisfy. A chunk is
+    still a function of the bytes, but the function is now NAMED:
+
+        the row is keyed on sha256(bytes) AND on a routing version covering the
+        classifier, the routing rules, the provenance algorithm and both gate
+        constants; and each unit additionally carries the identity of the engine
+        that produced its text — npttf2utf + mapping + lexicon, or the PP-OCR
+        model + backend. Any of those differing yields a cold run for the units
+        it affects.
+
+    What is trusted is therefore a version match, never the row's own claim
+    about itself. `PageText.indexable` is recomputed from `(ok, text)` on read
+    rather than stored, only post-`_withhold` text is ever written, and a reused
+    unit is chunked by the same `chunks_from_recovery` a cold one is. A cache
+    hit cannot resurrect text the current rules would withhold, because that
+    text was never in the cache.
+
+    `recover_blob` below is unchanged and remains the cold path — the scripts
+    and every Phase 6 comparison still call it directly, with no database in
+    sight.
 
 TWO RULES THIS FILE ENFORCES
     **1. Only trustworthy text is indexed.** `PageText.indexable` is the whole
@@ -36,6 +61,7 @@ from __future__ import annotations
 
 import functools
 import logging
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -47,10 +73,13 @@ logger = logging.getLogger("app.nrb.rag")
 __all__ = [
     "NRB_ORIGIN",
     "NrbParseError",
+    "RecoveredChunks",
     "default_lexicon",
     "nrb_dependencies",
     "parse_nrb_to_chunks",
+    "recover_and_chunk",
     "recover_blob",
+    "resolve_dependencies",
     "reset_dependencies",
 ]
 
@@ -164,6 +193,23 @@ def reset_dependencies() -> None:
     nrb_dependencies.cache_clear()
 
 
+def resolve_dependencies(injected: dict[str, Any]) -> dict[str, Any]:
+    """`{converter, lexicon, ocr}` — injected if given, otherwise the cached set.
+
+    Factored out because the cache needs the SAME triple `recover_blob` uses in
+    order to compute the route engine versions. Two resolutions would let the
+    cache key a page against a converter the recovery did not actually use.
+    """
+    if injected:
+        return {
+            "converter": injected.get("converter"),
+            "lexicon": injected.get("lexicon"),
+            "ocr": injected.get("ocr"),
+        }
+    converter, lexicon, ocr = nrb_dependencies()
+    return {"converter": converter, "lexicon": lexicon, "ocr": ocr}
+
+
 def recover_blob(
     path: Path, *, extractor_version: str = "native-2", **injected: Any
 ) -> tuple[extraction.ExtractionResult, recovery.RecoveredDocument]:
@@ -183,15 +229,7 @@ def recover_blob(
         extension=path.suffix.lstrip("."),
         extractor_version=extractor_version,
     )
-    if injected:
-        converter = injected.get("converter")
-        lexicon = injected.get("lexicon")
-        ocr = injected.get("ocr")
-    else:
-        converter, lexicon, ocr = nrb_dependencies()
-    recovered = recovery.recover(
-        path, result, converter=converter, lexicon=lexicon, ocr=ocr
-    )
+    recovered = recovery.recover(path, result, **resolve_dependencies(injected))
     return result, recovered
 
 
@@ -267,24 +305,76 @@ def chunks_from_recovery(
     return renumber(chunks)
 
 
-def parse_nrb_to_chunks(
+@dataclass(frozen=True)
+class RecoveredChunks:
+    """Chunks, plus what produced them — so the caller can cache the recovery.
+
+    `report` is None only when no cache was involved at all.
+    """
+
+    chunks: list[Chunk]
+    recovered: recovery.RecoveredDocument
+    report: Any | None = None
+
+
+def _no_indexable_text(
+    recovered: recovery.RecoveredDocument, classification: str
+) -> NrbParseError:
+    """The actionable failure message. Same wording cold or cached.
+
+    "0 of 4 pages indexable (legacy_conversion 4 unresolved)" is something an
+    operator can act on; "no indexable content" is not. `classification` is the
+    extractor's status/reason where a cold run has it, and the plan's own reason
+    where the answer came from the cache — the plan is what the classification
+    decided, so nothing actionable is lost.
+    """
+    failures = {page.reason for page in recovered.pages if not page.indexable}
+    return NrbParseError(
+        f"no indexable text: {classification}, plan {recovered.plan}, "
+        f"{len(recovered.pages)} pages, routes {recovered.route_counts}, "
+        f"unindexable because {sorted(failures) or ['empty']}"
+    )
+
+
+def recover_and_chunk(
     path: Path,
     *,
     max_chars: int,
     overlap_chars: int,
     extractor_version: str = "native-2",
+    cached: Any | None = None,
     **injected: Any,
-) -> list[Chunk]:
-    """One NRB blob → chunks. THE function the worker calls.
+) -> RecoveredChunks:
+    """One NRB blob → chunks, reusing `cached` for whatever is still current.
 
-    Raises `NrbParseError` when nothing indexable came out, with the routing
-    outcome in the message: "0 of 4 pages indexable (legacy_conversion 4
-    unresolved)" is an actionable report, "no indexable content" is not. A blob
-    whose conversion could not run is a recorded gap — never a document indexed
-    with its glyph-mapped original.
+    THE function the worker calls. `cached` is a
+    `recovery_cache.CachedRecovery` or None; passing None makes this an
+    ordinary cold recovery, which is what every test and script that does not
+    want a database does.
+
+    The cache is consulted for the RECOVERY only. Chunking always runs here, on
+    whichever `RecoveredDocument` came back — which is why a chunk-size change
+    does not invalidate a cached recovery, and why a reused unit and a fresh one
+    are chunked by identical code.
     """
-    result, recovered = recover_blob(
-        path, extractor_version=extractor_version, **injected
+    from . import recovery_cache
+
+    dependencies = resolve_dependencies(injected)
+    result: extraction.ExtractionResult | None = None
+
+    def cold() -> recovery.RecoveredDocument:
+        nonlocal result
+        result, recovered = recover_blob(
+            path, extractor_version=extractor_version, **injected
+        )
+        return recovered
+
+    recovered, report = recovery_cache.resolve(
+        path,
+        cached=cached,
+        extractor_version=extractor_version,
+        cold=cold,
+        **dependencies,
     )
     chunks = chunks_from_recovery(
         recovered,
@@ -293,13 +383,31 @@ def parse_nrb_to_chunks(
         extractor_version=extractor_version,
     )
     if not chunks:
-        failures = {
-            page.reason for page in recovered.pages if not page.indexable
-        }
-        raise NrbParseError(
-            f"no indexable text: {result.status}/{result.reason}, plan "
-            f"{recovered.plan}, {len(recovered.pages)} pages, routes "
-            f"{recovered.route_counts}, unindexable because "
-            f"{sorted(failures) or ['empty']}"
+        classification = (
+            f"{result.status}/{result.reason}" if result is not None
+            else f"cached/{recovered.plan_reason}"
         )
-    return chunks
+        raise _no_indexable_text(recovered, classification)
+    return RecoveredChunks(chunks=chunks, recovered=recovered, report=report)
+
+
+def parse_nrb_to_chunks(
+    path: Path,
+    *,
+    max_chars: int,
+    overlap_chars: int,
+    extractor_version: str = "native-2",
+    **injected: Any,
+) -> list[Chunk]:
+    """One NRB blob → chunks, always cold. The no-database entry point.
+
+    Kept as it was so `scripts/nrb_rag_ingest.py`, the Phase 6 comparisons and
+    every test that has no session keep working unchanged.
+    """
+    return recover_and_chunk(
+        path,
+        max_chars=max_chars,
+        overlap_chars=overlap_chars,
+        extractor_version=extractor_version,
+        **injected,
+    ).chunks

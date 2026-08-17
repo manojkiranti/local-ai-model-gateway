@@ -252,8 +252,18 @@ def test_a_generic_chunk_carries_no_metadata():
 
 def test_only_an_nrb_marked_document_takes_the_nrb_branch(tmp_path, monkeypatch):
     """The worker's single branch, asserted in both directions. A department's
-    ordinary PDF must keep parsing exactly as it did."""
+    ordinary PDF must keep parsing exactly as it did.
+
+    The branch moved from `_load_chunks_sync` to the async `_load_chunks` when
+    the recovery cache landed — the NRB side needs a session, which cannot be
+    opened inside `asyncio.to_thread`. The property is unchanged and so is the
+    generic path: a non-NRB document still goes straight to `parse_to_chunks`
+    in a thread, with no session and no NRB import.
+    """
+    import asyncio
+
     from app.config import get_settings
+    from app.nrb import recovery_cache
     from app.rag import worker
 
     called: list[str] = []
@@ -262,12 +272,12 @@ def test_only_an_nrb_marked_document_takes_the_nrb_branch(tmp_path, monkeypatch)
         called.append("generic")
         return [Chunk(content="x", chunk_index=0)]
 
-    def fake_nrb(path, **kw):
+    async def fake_nrb(Session, path, **kw):
         called.append("nrb")
-        return [Chunk(content="y", chunk_index=0, meta={"origin": "nrb"})]
+        return [Chunk(content="y", chunk_index=0, meta={"origin": "nrb"})], None
 
     monkeypatch.setattr(worker, "parse_to_chunks", fake_generic)
-    monkeypatch.setattr(nrb_rag, "parse_nrb_to_chunks", fake_nrb)
+    monkeypatch.setattr(recovery_cache, "chunks_for_blob", fake_nrb)
 
     settings = get_settings()
     stored = pathlib.Path(settings.rag_docs_dir) / "test-branch.pdf"
@@ -281,10 +291,10 @@ def test_only_an_nrb_marked_document_takes_the_nrb_branch(tmp_path, monkeypatch)
         nrb = worker.DocSnapshot(
             id="d2", department_id=1, file_type="pdf",
             storage_key="test-branch.pdf", status="pending",
-            meta={"origin": "nrb"},
+            content_hash="a" * 64, meta={"origin": "nrb"},
         )
-        worker._load_chunks_sync(plain, settings)
-        worker._load_chunks_sync(nrb, settings)
+        asyncio.run(worker._load_chunks(None, plain, settings))
+        asyncio.run(worker._load_chunks(None, nrb, settings))
     finally:
         stored.unlink(missing_ok=True)
 
