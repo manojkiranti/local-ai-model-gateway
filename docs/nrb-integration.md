@@ -4239,3 +4239,275 @@ quality, native-2 (not modified; native-3 not started), the recovery-cache
 versioning, the frozen Phase 6A/6B evidence, the Phase 7 cohort (not re-run, not
 expanded), the `ri*` scratch-DB debris, and server access (§19.1) — this is still
 the laptop.
+
+## 23. A sync-state fix, and the shared pipeline runner (Phase 7 step 4)
+
+**Date:** 2026-08-17. **Scope:** two commits. The fix for the sync defect §22.10
+recorded, and the one orchestration path the CLI, a future admin API and a
+future schedule will all call. **What this is not:** an HTTP endpoint, a UI, a
+scheduler, or a corpus ingest.
+
+### 23.1 The sync fix — state ownership, not one fewer comparison
+
+`records.file_record` always builds a candidate with `fetch_status='pending'` —
+that is the constructor default, decided by the host guard before anything has
+been downloaded. `FileState.differs_from` compared that column against the
+stored one, so **every successfully fetched row read as "changed" on the next
+sync and `_file_values` wrote `pending` back over it.** The next fetch pass
+would then re-download the whole corpus and overwrite every `content_sha256`.
+
+The second-sync-is-all-zero invariant held only while nothing had been fetched
+yet, which is exactly the state Phase 4 was tested in.
+
+The fix names the two owners:
+
+| columns | owner | how they change |
+|---|---|---|
+| `source_url`, `filename`, `reported_mime_type`, `extension`, `resource_type`, `type_source`, `reported_bytes`, `wp_attachment_id`, `host` | discovery (upstream facts) | `differs_from` → `_file_facts` in the UPDATE |
+| `fetch_status`, `blocked_reason`, `fetch_error` | the fetch stage (operational) | **only** `FileState.fetch_transition` |
+
+`fetch_transition` returns `{}` — leave it alone — for the ordinary case, and
+names the upstream field for each of the three exceptions:
+
+1. **Became unfetchable.** → `blocked_host`, **unless already `fetched`**, which
+   is left completely alone. Its bytes are verified, on disk and referenced by
+   `documents` and the recovery cache; `select_ingest_targets` requires
+   `fetched`, so flipping it would silently drop the file out of RAG selection.
+   Recording the reason while keeping `fetched` is not a middle path either —
+   `ck_nrb_files_blocked_reason` makes that state unrepresentable, which is the
+   database agreeing that a blocked reason belongs to a blocked row.
+2. **Became fetchable again.** → `pending`.
+3. **Upstream REPLACED the resource** — a different `filesize` or a different
+   attachment id at the same `comparison_key` → `pending`, so the fetcher
+   downloads the new version, mints a new `content_sha256` and **triggers the
+   §22 supersession lifecycle**. This is the trigger that was missing.
+
+Two guards on rule 3. It fires only when BOTH values are known: `None → 123456`
+is WordPress starting to report sizes, not a changed file, and treating it as a
+replacement would re-download much of the corpus the first time that happened.
+And the content columns are not cleared — those bytes are still on disk and
+still referenced by the version currently being served, exactly as
+`fetch._row_for` already reasons about a failed attempt.
+
+`update_files` now groups rows by key set before `executemany` (as
+`record_fetch_outcomes` does), because most rows write facts only and a few also
+move the fetch state. New counter **`files_refetch_queued`** — the only file
+counter with a cost attached, and a nonzero value on a routine sync is the
+signal that NRB republished something.
+
+**10 regression tests**, including the headline `sync → fetch → sync`, the
+consequence at the selector (`select_fetch_targets` returns nothing), a failed
+fetch not being silently promoted while `--retry-failed` still sees it, both
+forms of the replacement trigger, the metadata-becoming-available guard, both
+guard-verdict transitions, and a pure unit test of the rule.
+
+### 23.2 The runner — one path, three future callers
+
+`app/nrb/pipeline.py`. The CLI, the admin API and a schedule must not be three
+implementations of the same sequence; they are three callers of `start`.
+**Nothing shells out to a script and no stage is reimplemented** — `run_sync`,
+`run_fetch` and `run_extract` were already application services with injectable
+engines, and the only stage that lived solely in a script was the RAG one, which
+became `corpus.run_rag_enqueue`. `scripts/nrb_rag_ingest_corpus.py` was then
+rewritten to call it, so the two cannot drift.
+
+```
+start(scope)
+  ├─ advisory lock (locks.PIPELINE_LOCK_KEY) — or PipelineBusy carrying the active run
+  ├─ sweep any run left `running` by a dead orchestrator
+  ├─ open an nrb_pipeline_runs row
+  ├─ sync    → sync.run_sync            (nrb_sync_runs stays the detailed record)
+  ├─ fetch   → fetch.run_fetch          (nrb_fetch_runs)
+  ├─ extract → extract.run_extract      (nrb_extractions)
+  ├─ rag     → corpus.run_rag_enqueue   (documents + ingest_jobs)
+  │             …recording WHICH jobs, in nrb_pipeline_run_jobs
+  └─ release the lock → status = awaiting_jobs
+```
+
+It does **not** recover, chunk, embed, archive, purge the recovery cache or
+drain jobs. Recovery reuse stays the worker's through the versioned cache;
+supersession stays the worker's activation transaction (§22) — an orchestrator
+that archived could retire a version before its replacement succeeded.
+
+### 23.3 Schema
+
+Migration **`1fb5a0d183d6`**, `down_revision` **`8f2d1c05a7b4`** (this branch's
+actual head; `d4a91f2c7b3e` untouched, nothing stamped, the merge revision still
+required and still not solved). Two tables, no change to any existing one.
+
+`nrb_pipeline_runs` — `trigger` (cli|api|schedule), `requested_by`, `status`,
+`stage`, `department`, `scope` JSONB, `counters` JSONB, `error`, plus
+`created_at`/`started_at`/`heartbeat_at`/`finished_at`. It is the orchestration
+record and **not a second database**: `nrb_sync_runs`, `nrb_fetch_runs`,
+`nrb_files`, `nrb_extractions`, `documents`, `ingest_jobs` and the recovery
+cache remain the detailed truth for their own stages, and `counters` is a
+bounded per-stage rollup of integers, never a per-document log.
+
+`nrb_pipeline_run_jobs` — `(run_id, job_id, document_id, reason)`. A separate
+table rather than a column on `ingest_jobs`, because that table is shared with
+ordinary department uploads and has no business knowing NRB exists — and because
+a `--retry-failed` job belongs to the run that retried it, not to the run that
+first created the document (hence `reason` = `created` | `retried`).
+
+`queued` is deliberately not a status: there is no queue in front of the
+orchestrator, and inventing a state nothing can produce would make a future UI
+show a status that never resolves.
+
+### 23.4 Lifecycle, and why `awaiting_jobs` exists
+
+```
+running ──(a stage raised)──────────────────────────────► failed
+   │
+   └─(staging done)─┬─ queued nothing ──► succeeded | partial | failed
+                    └─ queued N jobs ───► awaiting_jobs ──reconcile()──►
+                                              succeeded | partial | failed
+```
+
+"The pipeline finished enqueueing" is not "the NRB update completed". The RAG
+worker is a separate process by design, so a run that staged 400 documents is
+not done. `reconcile(run_id)` recomputes the terminal status from **this run's
+own jobs** and is callable from any process at any time — including long after
+the orchestrator exited, which is exactly the crash case.
+
+`resolve_status` is pure and its order matters: **waiting beats everything**
+(one queued job means the run has not finished, whatever else went wrong), then
+succeeded+failed → `partial`, only-failed → `failed`, otherwise `succeeded`.
+Item-level stage failures count toward `partial` too — a fetch that lost one
+file did not fully update the corpus — while a stage that RAISED is recorded as
+`error` and ends the run `failed` immediately.
+
+### 23.5 Locking and crash recovery
+
+A Postgres advisory lock (`PIPELINE_LOCK_KEY = b"NRB_PIPE"`), the mechanism
+`locks.py` already uses for sync, fetch and extract, for the reason given there:
+**it dies with the connection**, so a killed orchestrator leaves nothing to
+clean up. Not an in-process lock, and not a lock row.
+
+A second trigger does not queue and does not wait — it raises `PipelineBusy`
+**carrying the run in progress**, which is the answer an admin endpoint wants to
+return. Each stage still takes its own lock underneath, so a manual
+`nrb_sync.py` running alongside is refused by the sync's lock rather than
+corrupting anything.
+
+The run ROW is a record, not a mutex, so a crashed orchestrator leaves one stuck
+in `running`. The next run sweeps it — safely and **with no timeout to tune**,
+because holding the lock is proof that no orchestrator is alive. `awaiting_jobs`
+runs are never swept: they hold no lock, they are legitimately unfinished, and
+their jobs are still draining. `heartbeat_at` advances at each stage boundary
+for observability and nothing depends on it.
+
+### 23.6 Scoping and retry
+
+`PipelineScope` carries every bound the stage services already accept — keys,
+sections, owners, years, resource types, extensions, limit — plus `stages` (run
+a slice; `sync` is the one stage that cannot be scoped, since it reads NRB's
+whole REST corpus by nature) and `retry_failed`.
+
+`retry_failed` **defaults False**. A routine update — including a future
+scheduled one — must not keep re-attempting a permanently unparseable file. And
+it is explicitly *not* a recovery refresh: unresolved recovery outcomes are
+cached deliberately (§21.6), so a retry re-runs the ingest without re-running
+OCR on a page the pipeline already decided it cannot read. Purging that is a
+separate, explicitly-requested operation
+(`scripts/nrb_recovery_cache.py --purge`) and this task did not build a schedule
+for it.
+
+The CLI **refuses to run unbounded without `--all`**. The code supports an
+incremental complete update — every stage is idempotent — but that is a
+different statement from "we have approved running it on ~19k files", and the
+`RAG_DOCS_DIR` decision (§20.7 item 2) is still open.
+
+### 23.7 CLI
+
+`scripts/nrb_pipeline.py` — parses arguments, calls `pipeline.start`, prints the
+run id, stage counters and job counts, exits non-zero on a failed run and 3 on
+`PipelineBusy`. `--status [--run N]` reconciles and reports. It contains no
+pipeline logic. The existing stage scripts are unchanged and remain the right
+tools for diagnosing one stage.
+
+### 23.8 Tests
+
+`tests/test_nrb_pipeline.py` — **23 tests, all passing**. The three upstream
+stages are stubbed (they reach a central bank's website, download gigabytes and
+parse hundreds of documents; their own suites cover them) and everything below
+is real: run rows, the RAG stage against a real catalog fixture, the job
+association table, the advisory lock on a genuinely separate connection, and the
+status arithmetic.
+
+Covered: stage order; a second unchanged run doing no upstream work and queuing
+nothing; a real second orchestrator getting `PipelineBusy` with zero stages run;
+an abandoned `running` run swept while an `awaiting_jobs` one is not; scope,
+trigger, `requested_by` and counters persisting; **a run counting only its own
+jobs** while a stranger's job created in the same second is ignored; waiting
+while any job is unfinished; succeeded / partial / failed; reconcile being
+idempotent and never rewriting `finished_at`; a stage raising and staging
+nothing; the rag stage refusing without a department; retry off by default and
+on when asked (recorded as `retried`, not `created`); and the generic RAG flow
+being untouched — `ingest_jobs` and `documents` gained no column.
+
+Suites: NRB **1,133 passed / 3 skipped**; RAG regression **260 passed, 1 failed**
+— `test_department_filter_restricts_the_set`, the pre-existing §20.7 item 4
+dirty-database assertion, reproduced unchanged.
+
+### 23.9 The bounded integration exercise
+
+No corpus ingest and no cohort re-run. Two bounded passes against the existing
+`nrb-p7` department:
+
+1. `--stage rag` over the 31-key cohort → `already_current=31`, nothing queued,
+   run **succeeded** immediately. That is the second-run-is-free property on
+   real data.
+2. `--stage rag --retry-failed --trigger api --requested-by admin@example.com`
+   → queued exactly **1** job (the cohort's OLE2 file), run **`awaiting_jobs`**,
+   `rag jobs queued=1`. `--status` before the worker still reported
+   `awaiting_jobs`. One real `app.rag.worker` pass drained it; the file failed
+   again for the right reason (`unsupported/no_native_parser, plan no_recovery`).
+   `--status` then reconciled the run to **`failed`**, `rag jobs failed=1`.
+
+The run counted **1** job, not the 30 other documents' historical jobs, which is
+the explicit relation doing its work. Department state afterwards: 30 `ready` /
+1 `failed` — exactly as before. No timings are reported: they would be laptop
+VRAM-spill figures (§18.5).
+
+### 23.10 Evaluation & Improvement (Phase 7 step 4)
+
+**Success metric.** Two. For the fix: a sync following a fetch must leave zero
+files selectable for download — measured, `select_fetch_targets` returns `[]`.
+For the runner: every question a status view needs (is it running, who asked,
+what scope, which stage, how many queued/ready/failed, did it finish) must be
+answerable from one row plus its job relation, with no time-window guessing.
+
+**Eval.** 10 sync regression tests and 23 pipeline tests, scored pass/fail:
+33/33. The bounded exercise scored on 6 lifecycle assertions: 6/6. Not
+evaluated: behaviour at corpus scale — every number here comes from fixtures and
+a 31-key cohort, and the runner has never orchestrated more than one queued job.
+
+**Feedback capture.** `nrb_pipeline_runs` (status, stage, counters, error,
+timings) and `nrb_pipeline_run_jobs` (which jobs, created vs retried) are the
+record; the stage tables keep their own detail. `--status` and `--json` expose
+it without touching the queue.
+
+**Review loop.** Before the admin API is exposed, and again after the first
+multi-hundred-document run — the counters are designed for a UI that does not
+exist yet, and the first real one will say whether they are the right ones.
+
+### 23.11 The gate
+
+Both tasks are done. **The backend is ready for `POST` admin trigger, `GET` run
+status and `GET` NRB status**: there is one orchestration entry point taking a
+scope and a trigger, a durable run identity that survives the process, DB-backed
+exclusion that a crash cannot wedge, an explicit run→job relation, and a status
+that distinguishes staging from waiting from terminal. The endpoints were **not
+implemented**.
+
+**Not started, and not to be started without a decision:** the HTTP endpoints,
+any UI, any cron or systemd timer, the `RAG_DOCS_DIR` duplication (§20.7 item 2 —
+still required before full-corpus ingest), recovery-refresh scheduling, Phase 8's
+`search_nrb_documents`, and any corpus-scale ingest.
+
+Unchanged and untouched: the Nepali semantic review, §17.6's broken-ToUnicode
+native text, the npttf2utf GPL-3.0 distribution decision, full-corpus retrieval
+quality, native-2 (not modified; native-3 not started), the recovery-cache
+versioning, supersession semantics, the frozen Phase 6A/6B evidence, the Phase 7
+cohort (not re-run, not expanded), the `ri*` scratch-DB debris, and server access
+(§19.1) — this is still the laptop.

@@ -258,23 +258,20 @@ async def main() -> int:
             extensions=args.extension or None,
             limit=args.limit,
         )
-        async with Session() as session:
-            summary = await corpus.summarise_scope(
-                session, department_id=dept_id, **scope
-            )
-            targets = await corpus.select_ingest_targets(
-                session, department_id=dept_id, **scope
-            )
-            retries = (
-                await corpus.select_retry_targets(
-                    session, department_id=dept_id, **scope
-                )
-                if args.retry_failed
-                else []
-            )
-            await session.rollback()
 
-        summary.retry_failed = len(retries)
+        # ONE implementation of the stage, shared with `scripts/nrb_pipeline.py`
+        # and with whatever the admin API becomes: this script parses arguments
+        # and prints, and `corpus.run_rag_enqueue` does the work.
+        result = await corpus.run_rag_enqueue(
+            Session,
+            department_code=dept_code,
+            retry_failed=args.retry_failed,
+            dry_run=args.dry_run,
+            rag_docs_dir=settings.rag_docs_dir,
+            **scope,
+        )
+        summary, outcome, retry_outcome = result.summary, result.ingest, result.retry
+
         print(f"\nscope names {len(keys)} catalog keys / {summary.scope_blobs} blobs")
         print(f"  already_current        {summary.already_current}")
         print(f"  new_source             {summary.new_source}")
@@ -282,54 +279,26 @@ async def main() -> int:
               "   (supersede their predecessor only if their ingest succeeds)")
         if args.retry_failed:
             print(f"  retry_failed           {summary.retry_failed}")
-        print(f"\n{len(targets)} blobs selected (not already current in {dept_code})")
-        for t in targets:
-            print(f"  {t.content_sha256[:12]} .{(t.extension or '?'):<5} "
-                  f"{t.title[:64]}")
-        if args.retry_failed:
-            print(f"\n--retry-failed: {len(retries)} FAILED documents in scope")
-            for r in retries:
-                print(f"  {r.content_sha256[:12]} {r.title[:64]}")
 
         if args.dry_run:
+            print(f"\n{outcome.selected} blobs would be created, "
+                  f"{retry_outcome.selected} failed documents would be requeued")
             print("\n(dry run — nothing created, nothing requeued)")
             return 0
-        if not targets and not retries:
-            print("\nnothing to do: every blob in scope is already ingested here.")
-            await do_report(Session, dept_id)
-            return 0
 
-        retry_outcome = None
-        if retries:
-            retry_outcome = await corpus.requeue_failed(Session, targets=retries)
+        if retry_outcome.requeued:
             print(f"\nrequeued {retry_outcome.requeued} failed documents "
                   f"(same document rows; they may fail again)")
             print(f"  conflict_job       {retry_outcome.conflict_job}")
             for err in retry_outcome.errors:
                 print(f"  !! {err}")
 
-        if not targets:
-            elapsed = round(time.perf_counter() - started, 1)
-            print(f"\nno new blobs to create ({elapsed}s)")
-            print("\nA DEPLOYED WORKER MUST DRAIN THESE:  "
-                  ".venv/bin/python -m app.rag.worker")
-            if args.json:
-                Path(args.json).write_text(json.dumps(
-                    {"department": dept_code, "scope_keys": len(keys),
-                     "created": 0, "elapsed_seconds": elapsed,
-                     "retry": retry_outcome.as_dict() if retry_outcome else None},
-                    ensure_ascii=False, indent=2))
+        elapsed = round(time.perf_counter() - started, 1)
+        if not outcome.selected and not retry_outcome.selected:
+            print("\nnothing to do: every blob in scope is already ingested here.")
+            await do_report(Session, dept_id)
             return 0
 
-        outcome = await corpus.create_ingest_targets(
-            Session,
-            department_id=dept_id,
-            department_code=dept_code,
-            targets=targets,
-            rag_docs_dir=settings.rag_docs_dir,
-            cohort=cohort_sha or None,
-        )
-        elapsed = round(time.perf_counter() - started, 1)
         print(f"\nqueued {outcome.created} documents in {elapsed}s")
         print(f"  selected           {outcome.selected}")
         print(f"  created            {outcome.created}")
@@ -345,7 +314,7 @@ async def main() -> int:
             payload.update(
                 {"department": dept_code, "cohort_sha256": cohort_sha,
                  "scope_keys": len(keys), "elapsed_seconds": elapsed,
-                 "retry": retry_outcome.as_dict() if retry_outcome else None}
+                 "retry": retry_outcome.as_dict()}
             )
             Path(args.json).write_text(json.dumps(payload, ensure_ascii=False, indent=2))
         return 0

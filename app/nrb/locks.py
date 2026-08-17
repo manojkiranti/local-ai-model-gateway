@@ -34,6 +34,7 @@ logger = logging.getLogger("app.nrb.locks")
 __all__ = [
     "EXTRACT_LOCK_KEY",
     "FETCH_LOCK_KEY",
+    "PIPELINE_LOCK_KEY",
     "SYNC_LOCK_KEY",
     "LockBusy",
     "advisory_lock",
@@ -49,6 +50,12 @@ FETCH_LOCK_KEY = int.from_bytes(b"NRB_FTCH", "big")
 # worth refusing — they would select the same pending blobs and race on the
 # `(content_sha256, extractor_version)` upsert.
 EXTRACT_LOCK_KEY = int.from_bytes(b"NRB_XTRC", "big")
+# The whole-pipeline orchestrator. A separate key again, and NOT a substitute for
+# the three above: the pipeline takes this one and each stage still takes its own,
+# so a manual `nrb_sync.py` running alongside an orchestrated run is refused by
+# the sync's lock rather than corrupting it. Holding this key is also the liveness
+# test for a crashed orchestrator — see `pipeline.sweep_abandoned`.
+PIPELINE_LOCK_KEY = int.from_bytes(b"NRB_PIPE", "big")
 
 
 class LockBusy(Exception):

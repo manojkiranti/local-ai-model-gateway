@@ -75,8 +75,18 @@ __all__ = [
     "FETCH_STATUSES",
     "NRBExtraction",
     "NRBFetchRun",
+    "NRBPipelineRun",
+    "NRBPipelineRunJob",
     "NRBRecovery",
     "NRBRecoveryUnit",
+    "PIPELINE_AWAITING",
+    "PIPELINE_FAILED",
+    "PIPELINE_PARTIAL",
+    "PIPELINE_RUNNING",
+    "PIPELINE_STAGES",
+    "PIPELINE_STATUSES",
+    "PIPELINE_SUCCEEDED",
+    "PIPELINE_TRIGGERS",
     "RECOVERY_PLANS",
     "RECOVERY_ROUTES",
     "METADATA_STATUSES",
@@ -1066,6 +1076,159 @@ class NRBRecoveryUnit(Base):
         JSONB, nullable=False, server_default=text("'{}'::jsonb")
     )
 
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Phase 7 step 4 — the shared pipeline runner's durable identity.
+# --------------------------------------------------------------------------- #
+PIPELINE_TRIGGERS = ("cli", "api", "schedule")
+
+# `queued` is deliberately absent: there is no queue in front of the
+# orchestrator. A run exists because something is running it, or because it
+# finished. Inventing a state nothing can produce would make the future UI show
+# a status that never resolves.
+PIPELINE_RUNNING = "running"              # orchestrating; the advisory lock is held
+PIPELINE_AWAITING = "awaiting_jobs"       # staging done, RAG jobs still in flight
+PIPELINE_SUCCEEDED = "succeeded"
+PIPELINE_PARTIAL = "partial"              # finished, with item-level failures
+PIPELINE_FAILED = "failed"                # a stage raised, or every job failed
+PIPELINE_STATUSES = (
+    PIPELINE_RUNNING, PIPELINE_AWAITING, PIPELINE_SUCCEEDED,
+    PIPELINE_PARTIAL, PIPELINE_FAILED,
+)
+
+PIPELINE_STAGES = ("sync", "fetch", "extract", "rag", "waiting", "done")
+
+
+class NRBPipelineRun(Base):
+    """One request to bring the NRB corpus up to date, whoever asked.
+
+    THE ORCHESTRATION RECORD, NOT A SECOND DATABASE
+        `nrb_sync_runs`, `nrb_fetch_runs`, `nrb_files`, `nrb_extractions`,
+        `documents` and `ingest_jobs` remain the detailed source of truth for
+        their own stages. This row answers the questions none of them can:
+        *is an update running, who asked for it, what scope, which stage is it
+        on, and did the whole thing finish.* `counters` is a small rollup for a
+        future status view — per-document detail stays where it already lives.
+
+    WHY IT IS NOT A MUTEX
+        Exclusion is `locks.PIPELINE_LOCK_KEY`, a Postgres advisory lock, for
+        the reason `locks.py` gives: it dies with the connection, so a killed
+        orchestrator leaves nothing to clean up. This row is a RECORD. The
+        consequence is that a crashed run's row would stay `running` forever, so
+        the next run sweeps it — safely, because holding the lock is proof that
+        no orchestrator is alive. `heartbeat_at` is observability, not the
+        liveness test.
+
+    WHY `awaiting_jobs` IS A REAL STATE
+        "The pipeline finished enqueueing" is not "the NRB update completed".
+        The RAG worker is a separate process; a run that staged 400 documents is
+        not done until their jobs are terminal. The run therefore has a state
+        for *waiting*, and `pipeline.reconcile` recomputes the terminal status
+        from `nrb_pipeline_run_jobs` — which means a run survives the
+        orchestrator's process dying while it waits.
+    """
+
+    __tablename__ = "nrb_pipeline_runs"
+    __table_args__ = (
+        CheckConstraint(
+            _in_list("status", PIPELINE_STATUSES), name="ck_nrb_pipeline_runs_status"
+        ),
+        CheckConstraint(
+            _in_list("trigger", PIPELINE_TRIGGERS), name="ck_nrb_pipeline_runs_trigger"
+        ),
+        CheckConstraint(
+            _in_list("stage", PIPELINE_STAGES), name="ck_nrb_pipeline_runs_stage"
+        ),
+        # A finished run must say when, and an unfinished one must not claim to.
+        CheckConstraint(
+            "(finished_at IS NULL) = (status IN ('running', 'awaiting_jobs'))",
+            name="ck_nrb_pipeline_runs_finished",
+        ),
+        # "Is an update running?" — the one query a UI polls.
+        Index("ix_nrb_pipeline_runs_status", "status"),
+        Index("ix_nrb_pipeline_runs_created", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    trigger: Mapped[str] = mapped_column(String(16), nullable=False)
+    # Free text: an operator name, an admin user id, a schedule name. Nullable
+    # because a CLI run on a laptop has nobody to name.
+    requested_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    stage: Mapped[str] = mapped_column(String(16), nullable=False)
+    # The department the RAG stage targets. Nullable: a run may be sync-only.
+    department: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # What was asked for, exactly as the caller expressed it, so a repeat of
+    # "the run that went wrong last Tuesday" is a copy rather than a guess.
+    scope: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+    # A rollup per stage: {"sync": {...}, "fetch": {...}, ...}. Bounded by
+    # construction — every stage contributes a handful of integers, never a
+    # per-document log.
+    counters: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    heartbeat_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    finished_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
+class NRBPipelineRunJob(Base):
+    """A RAG ingest job this run created. The explicit run→job relation.
+
+    Explicit, and not reconstructed from timestamps: the scratch database alone
+    carries 190 unrelated `ri*` documents with stale jobs (§20.7 item 4), and a
+    run that counted jobs "created around the same time" would adopt them and
+    report a failure that is not its own. A run counts exactly the jobs it
+    enqueued, by id.
+
+    A separate table rather than a column on `ingest_jobs`, because the generic
+    job table is shared with ordinary department uploads and has no business
+    knowing NRB exists. It also handles the retry case cleanly: `--retry-failed`
+    enqueues a NEW job against an EXISTING document, and that job belongs to the
+    run that retried it, not to the run that first created the document.
+    """
+
+    __tablename__ = "nrb_pipeline_run_jobs"
+    __table_args__ = (
+        Index(
+            "ux_nrb_pipeline_run_jobs",
+            "run_id",
+            "job_id",
+            unique=True,
+        ),
+        Index("ix_nrb_pipeline_run_jobs_job", "job_id"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    run_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("nrb_pipeline_runs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    job_id: Mapped[str] = mapped_column(
+        String(32), ForeignKey("ingest_jobs.id", ondelete="CASCADE"), nullable=False
+    )
+    # Denormalised for reporting: "which documents did this run touch" without a
+    # second join, and it distinguishes a created document from a retried one.
+    document_id: Mapped[str] = mapped_column(String(32), nullable=False)
+    reason: Mapped[str] = mapped_column(String(16), nullable=False)  # created|retried
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

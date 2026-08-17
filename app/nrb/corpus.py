@@ -116,8 +116,10 @@ __all__ = [
     "IngestOutcome",
     "RetryOutcome",
     "RetryTarget",
+    "RagStageResult",
     "ScopeSummary",
     "create_ingest_targets",
+    "run_rag_enqueue",
     "requeue_failed",
     "select_ingest_targets",
     "select_retry_targets",
@@ -164,6 +166,10 @@ class IngestOutcome:
     missing_blob: int = 0
     errors: list[str] = field(default_factory=list)
     documents: list[tuple[str, str]] = field(default_factory=list)  # (doc_id, sha)
+    # (job_id, document_id) for every job this pass enqueued. Carried so the
+    # pipeline runner can record WHICH jobs are its own: a run that counted jobs
+    # by time window would adopt the scratch database's unrelated debris.
+    jobs: list[tuple[str, str]] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -501,8 +507,8 @@ async def create_ingest_targets(
                 await session.commit()
                 outcome.created += 1
                 outcome.documents.append((doc.id, target.content_sha256))
+                outcome.jobs.append((job.id, doc.id))
                 pending += 1
-                _ = job
         except docs_repo.DocumentConflict:
             # Raced, not idempotent — see the module docstring. The file we just
             # wrote is now an orphan, so compensate exactly as the upload route
@@ -537,6 +543,7 @@ class RetryOutcome:
     requeued: int = 0
     conflict_job: int = 0
     errors: list[str] = field(default_factory=list)
+    jobs: list[tuple[str, str]] = field(default_factory=list)  # (job_id, doc_id)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -634,7 +641,7 @@ async def requeue_failed(
     for target in targets:
         try:
             async with Session() as session:
-                await jobs_repo.enqueue(session, document_id=target.document_id)
+                job = await jobs_repo.enqueue(session, document_id=target.document_id)
                 await session.execute(
                     update(Document)
                     .where(Document.id == target.document_id)
@@ -642,6 +649,7 @@ async def requeue_failed(
                 )
                 await session.commit()
                 outcome.requeued += 1
+                outcome.jobs.append((job.id, target.document_id))
                 pending += 1
         except jobs_repo.JobConflict:
             # A job appeared between the select and the insert. Concurrency, not
@@ -655,3 +663,133 @@ async def requeue_failed(
             logger.info("corpus retry: %d documents requeued so far", outcome.requeued)
             pending = 0
     return outcome
+
+
+# --------------------------------------------------------------------------- #
+# The RAG stage as an APPLICATION service.
+#
+# Everything above is data access and per-item work; this is the stage a caller
+# invokes. It exists because the sequence — resolve the department, classify the
+# scope, create what is missing, optionally requeue failures — lived only inside
+# `scripts/nrb_rag_ingest_corpus.py`, and a future admin endpoint must not shell
+# out to a script to get it. The script is now a thin adapter over this, exactly
+# as `nrb_sync.py` is over `run_sync`.
+# --------------------------------------------------------------------------- #
+@dataclass
+class RagStageResult:
+    """What the RAG stage did, and which jobs are now its caller's to watch."""
+
+    department_id: int
+    department_code: str
+    summary: ScopeSummary
+    ingest: IngestOutcome
+    retry: RetryOutcome
+    dry_run: bool = False
+
+    @property
+    def created_jobs(self) -> list[tuple[str, str]]:
+        return list(self.ingest.jobs)
+
+    @property
+    def retried_jobs(self) -> list[tuple[str, str]]:
+        return list(self.retry.jobs)
+
+    def counters(self) -> dict[str, Any]:
+        """A flat rollup for the run row. Bounded: integers only, no per-item log."""
+        return {
+            "scope_blobs": self.summary.scope_blobs,
+            "already_current": self.summary.already_current,
+            "new_source": self.summary.new_source,
+            "replacement_candidate": self.summary.replacement_candidate,
+            "selected": self.ingest.selected,
+            "created": self.ingest.created,
+            "retry_failed": self.retry.requeued,
+            "conflict_document": self.ingest.conflict_document,
+            "conflict_job": self.ingest.conflict_job + self.retry.conflict_job,
+            "missing_blob": self.ingest.missing_blob,
+            "queued": len(self.ingest.jobs) + len(self.retry.jobs),
+        }
+
+
+async def run_rag_enqueue(
+    Session,
+    *,
+    department_code: str,
+    keys: Sequence[str] | None = None,
+    sections: Sequence[str] | None = None,
+    owners: Sequence[str] | None = None,
+    years: Sequence[int] | None = None,
+    resource_types: Sequence[str] | None = None,
+    extensions: Sequence[str] | None = None,
+    limit: int | None = None,
+    retry_failed: bool = False,
+    dry_run: bool = False,
+    rag_docs_dir: str | None = None,
+    create_department: bool = True,
+) -> RagStageResult:
+    """Classify the scope, create what is missing, optionally requeue failures.
+
+    ENQUEUE-ONLY, still. Nothing is drained here: the deployed worker owns jobs,
+    and a stage that drained in-process would race it (§20.2).
+
+    `retry_failed` is off by default and stays a separate decision. A routine
+    update — including a future scheduled one — must not keep re-attempting a
+    permanently unparseable file, and it must certainly not be the thing that
+    re-runs OCR on cached unresolved recoveries. Refreshing those is a different
+    operation entirely (`scripts/nrb_recovery_cache.py --purge`), never a side
+    effect of an update.
+
+    `dry_run` classifies and reports without creating a document, copying a file
+    or enqueuing a job — the same promise `nrb_fetch.py --dry-run` makes.
+    """
+    from ..config import get_settings
+    from ..rag import repository as dept_repo
+
+    docs_dir = rag_docs_dir or get_settings().rag_docs_dir
+    scope = dict(
+        keys=keys, sections=sections, owners=owners, years=years,
+        resource_types=resource_types, extensions=extensions, limit=limit,
+    )
+
+    async with Session() as session:
+        dept = await dept_repo.get_department_by_code(session, department_code)
+        if dept is None:
+            if not create_department:
+                raise ValueError(f"unknown department {department_code!r}")
+            dept = await dept_repo.create_department(
+                session, code=department_code, name=f"NRB corpus ({department_code})"
+            )
+            await session.flush()
+            logger.info("corpus ingest: created department %s", department_code)
+        dept_id, dept_code = dept.id, dept.code
+        await session.commit()
+
+    async with Session() as session:
+        summary = await summarise_scope(session, department_id=dept_id, **scope)
+        targets = await select_ingest_targets(session, department_id=dept_id, **scope)
+        retries = (
+            await select_retry_targets(session, department_id=dept_id, **scope)
+            if retry_failed else []
+        )
+        await session.rollback()
+
+    summary.retry_failed = len(retries)
+    result = RagStageResult(
+        department_id=dept_id, department_code=dept_code, summary=summary,
+        ingest=IngestOutcome(selected=len(targets)),
+        retry=RetryOutcome(selected=len(retries)),
+        dry_run=dry_run,
+    )
+    if dry_run:
+        return result
+
+    # Retries first: they touch documents that already exist, so a failure there
+    # cannot leave a half-created new document behind.
+    if retries:
+        result.retry = await requeue_failed(Session, targets=retries)
+    if targets:
+        result.ingest = await create_ingest_targets(
+            Session, department_id=dept_id, department_code=dept_code,
+            targets=targets, rag_docs_dir=docs_dir,
+        )
+    return result

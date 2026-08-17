@@ -127,12 +127,14 @@ not exist** — the 6B gate and its recommendations are §11.9, §12.10, §13.11
 remaining gap is the `RAG_DOCS_DIR` duplication decision (§20.7 item 2), still
 required before full-corpus ingest; the recovery cache and supersession no
 longer are. **The admin API / run-status work is the next unblocked step.**
-**A sync defect is recorded and NOT fixed (§22.10): `differs_from` compares
-`fetch_status`, and `file_from_attachment` always builds `pending`, so a
-re-sync after a fetch marks every fetched file changed and writes `pending`
-back — the next fetch would re-download 8.6 GB.** Not a supersession-correctness
-problem (identical bytes hash identically) but it must be fixed before any
-scheduled re-sync.
+**Phase 7 step 4 is DONE (2026-08-17, §23):** the §22.10 sync defect is FIXED
+(state ownership — see the gotcha below), and `app/nrb/pipeline.py` is the ONE
+orchestration path (`sync → fetch → extract → rag enqueue`) that the CLI, the
+future admin API and a future schedule all call, with a durable
+`nrb_pipeline_runs` identity, advisory-lock exclusion and an explicit run→job
+relation. Migration `1fb5a0d183d6`. Run it via `scripts/nrb_pipeline.py`
+(`--status` reconciles). **The backend is ready for the admin trigger/status
+endpoints; they are NOT implemented.**
 The roadmap was renumbered when Phase 4 was scoped down to
 persistence; read that doc before touching anything NRB-related instead of
 re-deriving status from chat history.
@@ -187,7 +189,9 @@ order, persisting NOTHING itself, run via `scripts/nrb_recover.py`);
 (`nrb_recoveries`/`nrb_recovery_units`; the ONLY file that persists recovered
 text, reached from `worker._load_chunks` via `chunks_for_blob`, operated by
 `scripts/nrb_recovery_cache.py --stats/--reuse-check/--purge`);
-`supersession` = Phase 7 step 3, which version of a logical NRB source is
+`pipeline` = Phase 7 step 4, the shared runner (`nrb_pipeline_runs` /
+`nrb_pipeline_run_jobs`; calls the stage services, never a subprocess; run via
+`scripts/nrb_pipeline.py`); `supersession` = Phase 7 step 3, which version of a logical NRB source is
 searchable (logical identity = `documents.metadata.comparison_key`; called from
 `worker._activate` INSIDE the replacement transaction; exercised by
 `scripts/nrb_supersession_exercise.py`); `rag` = the ONLY
@@ -810,6 +814,35 @@ events (`token`/`tool_call`/`tool_result`/`done`) + the new id in the
   `chat_sessions.department_id` are both `ON DELETE RESTRICT` — deleting a
   department must not silently rewrite an old HR session into a general one.
   `departments.is_active = false` is the only retirement path.
+- **Discovery owns upstream FACTS; the fetch stage owns operational state.**
+  `records.file_record` always builds a candidate with `fetch_status='pending'`
+  (the constructor default), so comparing that column in
+  `catalog.FileState.differs_from` made every fetched row look changed and wrote
+  `pending` back over it — a re-sync would have re-downloaded 8.6 GB and
+  overwritten every `content_sha256` (fixed 2026-08-17, §23.1). `differs_from`
+  now compares facts only, an UPDATE writes `_file_facts`, and
+  `fetch_status`/`blocked_reason`/`fetch_error` move ONLY via
+  `FileState.fetch_transition`, which names the upstream field: became blocked
+  (but a **`fetched`** row is left alone — `ck_nrb_files_blocked_reason` makes
+  "fetched + reason" unrepresentable and `select_ingest_targets` needs
+  `fetched`), became unblocked, or **upstream replaced the bytes** (a different
+  `filesize`/attachment id at the same `comparison_key` → `pending`, which is
+  the §22 supersession TRIGGER). That last rule fires only when BOTH values are
+  known — `None → 123456` is metadata arriving, not a new file — and never
+  clears the content columns.
+- **One orchestration path, and enqueueing is not finishing.** `pipeline.start`
+  is what the CLI/API/cron all call; it takes `PIPELINE_LOCK_KEY` (advisory, so
+  a crash frees it), sweeps any run left `running` — safe with **no timeout**
+  because holding the lock proves no orchestrator is alive — runs the stage
+  services in order, and records WHICH jobs it queued in
+  `nrb_pipeline_run_jobs`. That relation is explicit because a time-window query
+  would adopt the scratch DB's 190 unrelated `ri*` jobs. A run that queued work
+  ends `awaiting_jobs`, NOT succeeded; `pipeline.reconcile` (callable from any
+  process, after the orchestrator has exited) computes the terminal status, and
+  **waiting beats every other signal**. A second trigger gets `PipelineBusy`
+  carrying the active run rather than a duplicate. `retry_failed` defaults False
+  and is NOT a recovery refresh — purging cached unresolved recoveries is a
+  separate explicit command.
 - **A failed replacement must never remove the last good version, and one
   transaction is what guarantees it.** NRB republishes; new bytes are a new
   `content_hash`, so `ux_documents_active_content` is perfectly happy with two
