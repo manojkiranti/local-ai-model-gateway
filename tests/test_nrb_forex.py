@@ -324,12 +324,14 @@ def test_schema_has_no_url_or_pagination_parameter():
 
 
 def test_description_routes_documents_away_from_this_tool():
-    """Descriptions are routing prompts: search_nrb_documents will cross-reference
-    this one, so the negative routing must stay here."""
+    """Descriptions are routing prompts: this tool is rates only, and it points
+    NRB policy/circular/directive questions at search_department_docs (§29 — NRB
+    documents are searched there, not by a separate tool)."""
     desc = tool.SPEC.description.lower()
     assert "nepal rastra bank" in desc and "buying" in desc and "selling" in desc
     for negative in ("monetary policy", "circular", "directive", "law", "regulation"):
         assert negative in desc
+    assert "search_department_docs" in desc  # the tool that DOES handle them
     assert "fetch_url" in desc  # don't let the model reach for the generic fetcher
 
 

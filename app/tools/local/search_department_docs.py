@@ -44,6 +44,40 @@ def _clamp_top_k(raw: Any, default: int, ceiling: int) -> int:
     return max(1, min(value, ceiling))
 
 
+# Routes whose text was reconstructed by a machine, not read from a trustworthy
+# text layer. Their figures, dates and names must never be quoted as fact — OCR
+# is explicitly `authoritative: false` (§16.6) and a legacy-font conversion is
+# still unverified by a Nepali reader (§15). The caveat rides on the citation so
+# the model sees it exactly where it would quote the passage.
+_RECOVERED_ROUTES = {"ocr", "legacy_conversion"}
+_VERIFY = "machine-recovered — VERIFY figures, dates and names against the source"
+
+
+def _nrb_provenance(chunk: RetrievedChunk) -> str:
+    """Extra citation lines for an NRB-origin chunk. Empty for anything else.
+
+    Additive by design: a generic upload's citation is untouched. The route and
+    trust caveat come from the CHUNK's metadata (per page), the source URL and
+    published date from the DOCUMENT's — both carried opaquely through retrieval.
+    """
+    cm = chunk.chunk_metadata or {}
+    if cm.get("origin") != "nrb":
+        return ""
+    lines: list[str] = []
+    route = cm.get("route")
+    if route:
+        recovered = route in _RECOVERED_ROUTES or cm.get("authoritative") is False
+        lines.append(f"route: {route}" + (f" — {_VERIFY}" if recovered else ""))
+    dm = chunk.doc_metadata or {}
+    source = dm.get("page_url") or dm.get("source_url")
+    published = dm.get("published_at")
+    if source:
+        lines.append(f"source: {source}" + (f" (published {published})" if published else ""))
+    elif published:
+        lines.append(f"published {published}")
+    return ("\n    " + "\n    ".join(lines)) if lines else ""
+
+
 def _header(index: int, chunk: RetrievedChunk) -> str:
     bits = [f'[{index}] "{chunk.title}"']
     if chunk.page_number is not None:
@@ -51,7 +85,10 @@ def _header(index: int, chunk: RetrievedChunk) -> str:
     if chunk.section:
         bits.append(chunk.section)
     bits.append(f"doc={chunk.document_id}")
-    return " — ".join(bits)
+    # NRB provenance lines are part of the HEADER so the budget machinery reserves
+    # them whole and can never sever them (the same reason the title/page live
+    # here): a trimmed passage stays attributable, a trimmed caveat does not.
+    return " — ".join(bits) + _nrb_provenance(chunk)
 
 
 JOIN = "\n\n"

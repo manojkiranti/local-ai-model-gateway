@@ -22,7 +22,8 @@ tool argument, never from the request body.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import json
+from dataclasses import dataclass, field
 
 from sqlalchemy import text
 
@@ -80,6 +81,13 @@ SELECT c.id            AS chunk_id,
        c.page_number   AS page_number,
        c.section       AS section,
        c.element_type  AS element_type,
+       -- Opaque to retrieval: the chunk's own provenance and the document's,
+       -- carried through verbatim so a caller can render a citation without
+       -- retrieval knowing any origin's metadata schema. The NRB tool reads
+       -- `route`/`authoritative` (chunk) and `page_url`/`published_at` (doc)
+       -- out of these; a generic upload's are simply empty.
+       c.metadata      AS chunk_metadata,
+       doc.metadata    AS doc_metadata,
        fused.rrf_score      AS rrf_score,
        fused.dense_distance AS dense_distance,
        fused.lexical_score  AS lexical_score,
@@ -119,6 +127,32 @@ class RetrievedChunk:
     # instead of a hand-built reproduction.
     dense_rank: int | None
     lexical_rank: int | None
+    # The chunk's `document_chunks.metadata` and its document's `documents.metadata`,
+    # verbatim. Retrieval does not interpret them — an NRB chunk carries `route`
+    # and (for OCR) `authoritative: false` here, and its document carries
+    # `page_url`/`published_at`, which the citation renders as provenance and a
+    # trust caveat. Empty for a generic upload.
+    chunk_metadata: dict = field(default_factory=dict)
+    doc_metadata: dict = field(default_factory=dict)
+
+
+def _as_dict(value: object) -> dict:
+    """A JSONB column, however the driver handed it back, as a dict.
+
+    SQLAlchemy's asyncpg dialect usually decodes JSONB to a Python object, but a
+    raw `text()` SELECT carries no type for the column, so the value can arrive as
+    a JSON string instead. Handle both, and treat anything unexpected as empty
+    rather than raising inside retrieval.
+    """
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str) and value:
+        try:
+            parsed = json.loads(value)
+        except ValueError:
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
+    return {}
 
 
 def _vector_literal(vector: list[float]) -> str:
@@ -187,6 +221,8 @@ async def search_chunks(
             lexical_rank=(
                 None if r["lexical_rank"] is None else int(r["lexical_rank"])
             ),
+            chunk_metadata=_as_dict(r["chunk_metadata"]),
+            doc_metadata=_as_dict(r["doc_metadata"]),
         )
         for r in rows
     ]

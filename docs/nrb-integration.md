@@ -3254,6 +3254,10 @@ correct on all 250 chunks, but `RetrievedChunk` (`app/rag/retrieval.py`) carries
 no metadata field, so `search_department_docs` cites title + page + doc id and
 **cannot cite the extraction route**. Nothing was changed here — surfacing it is
 a retrieval-layer decision that belongs with Phase 8's citation format.
+**RESOLVED in §29 (2026-08-17):** `RetrievedChunk` now carries the chunk's and
+the document's metadata, and `search_department_docs` cites the route plus a
+"machine-recovered — VERIFY" caveat for OCR/legacy pages and the NRB source URL +
+published date.
 
 ## 19. The GPU-server run, and how the pipeline re-runs
 
@@ -5191,3 +5195,81 @@ the check that filestore resolution works end to end.
 **Review loop.** On the first real corpus ingest (the route split is the evidence),
 and if `documents.storage_key` semantics are ever reused for a non-NRB origin whose
 bytes are NOT in the filestore.
+
+## 29. Phase 8 — NRB documents are searchable, and their citations carry the route
+
+**Date:** 2026-08-17. **Decision (the user's):** NRB documents are searched
+through the EXISTING `search_department_docs` tool, not a separate
+`search_nrb_documents`. Phase 8 is therefore the §18.7 citation-format work, not a
+new tool or a new access model.
+
+### 29.1 Why not a separate tool
+
+NRB documents are ingested as ordinary department `documents` with
+`metadata.origin='nrb'` (§17, §20, §28), so they are already retrievable by
+`search_department_docs`. A separate cross-department `search_nrb_documents` would
+have to either hardcode a home department or search across departments — and
+department scope is a **Postgres invariant** (`WHERE department_id = ?` via the
+composite FK, the value from `rag_context`, never a tool argument, so a prompt
+injection has nowhere to put a department). A dedicated tool only earns its place
+if NRB becomes a GLOBAL corpus any user may query regardless of their session
+department; that is a larger product decision, it needs the corpus ingested and a
+home decided, and it can still be layered on later. Deferred, not taken.
+
+The original plan (§1) named a separate `search_nrb_documents`; the forex tool's
+description cross-referenced it. That cross-reference now points at
+`search_department_docs`, which is the tool that actually answers policy/circular/
+directive questions.
+
+### 29.2 What changed (no schema, no migration)
+
+The gap §18.7 measured was narrow: `page_number` was already cited; only the
+extraction ROUTE and the NRB provenance were missing.
+
+* `app/rag/retrieval.py` — the search SELECT now returns `c.metadata` and
+  `doc.metadata`, and `RetrievedChunk` carries them as `chunk_metadata` /
+  `doc_metadata`. Retrieval does **not** interpret them (it knows no origin's
+  schema); a generic upload's are simply empty. `_as_dict` tolerates a JSONB
+  column arriving as either a decoded dict or a JSON string from a raw `text()`
+  SELECT.
+* `app/tools/local/search_department_docs.py` — `_nrb_provenance` adds citation
+  lines for an NRB-origin chunk only: `route: <route>`, with the caveat
+  **"machine-recovered — VERIFY figures, dates and names against the source"** when
+  the route is `ocr`/`legacy_conversion` or the chunk is `authoritative: false`;
+  then `source: <page_url> (published <published_at>)`. Native NRB text gets the
+  route line WITHOUT the caveat — over-warning on trustworthy text trains the
+  model to ignore the warning. The lines are part of the HEADER, so the existing
+  budget machinery reserves them whole and can never sever a caveat.
+* `app/tools/local/get_nrb_forex.py` — the negative-routing clause now names
+  `search_department_docs` as where NRB documents are searched.
+
+The caveat is load-bearing and rests on evidence already in this document: OCR is
+`authoritative: false` (§16.6), a legacy-font conversion is still
+`awaiting_nepali_review` (§15), and even native text can be codepoint-corrupt
+(§17.6). The route on the citation is how a reader — and the model — knows which.
+
+### 29.3 Evaluation & Improvement (Phase 8)
+
+**Success metric.** An NRB passage retrieved through `search_department_docs`
+cites its extraction route and, when the route is machine-recovered, an explicit
+"verify" caveat and the source — so a converted figure is never presented as
+authoritative fact. First proxy for SQLs that is actually user-facing.
+
+**Eval.** `tests/test_search_department_docs.py` gains four cases: an OCR passage
+shows route + verify + source + published; a legacy-conversion passage is
+caveated; a native passage shows the route WITHOUT the caveat; a generic upload's
+citation is unchanged (no route line). Plus the forex routing test now asserts it
+points at `search_department_docs`. 113 passing across the tool, retrieval-
+integration and forex suites. NOT evaluated: whether the recovered TEXT is
+*correct* — that is §15's Nepali review, still open, which is exactly why the
+caveat exists rather than a correctness claim.
+
+**Feedback capture.** The route and trust flag are read from stored
+`document_chunks.metadata` / `documents.metadata`; nothing new is stored. A future
+signal worth capturing is which citations the model actually surfaces to users and
+whether it honours the caveat — that needs the UI and real traffic.
+
+**Review loop.** On the first real corpus ingest (do the citations render on live
+NRB chunks with the expected route split), after the §15 Nepali review (the caveat
+wording may soften for verified conversions), and if a global NRB corpus is ever
+taken up (§29.1).

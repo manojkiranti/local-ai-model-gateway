@@ -125,14 +125,21 @@ transaction that archives the old one (`app/nrb/supersession.py`,
 `worker._activate`, migration `8f2d1c05a7b4`); a failed candidate never retires
 the version that is serving. Proved by 19 tests and a four-revision real-data
 exercise (`scripts/nrb_supersession_exercise.py`, all checks passed).
-**The NRB CORPUS is still not ingested and `search_nrb_documents` (Phase 8) does
-not exist** — the 6B gate and its recommendations are §11.9, §12.10, §13.11,
-§14.7, §15.9, §16.10, §17.8, §19.5, §20.9, §21.10 and §22.12. Phase 7's
-`RAG_DOCS_DIR` duplication gate is now **DECIDED and removed (§28): NRB bytes
-resolve from the filestore, no copy** — so nothing structural blocks a
-full-corpus ingest anymore (the recovery cache and supersession already didn't).
-**The retrieval-metadata change + Phase 8 `search_nrb_documents` is the next
-unblocked step; the thin admin UI lives in a separate frontend repo.**
+**Phase 8 is DONE (§29): NRB documents are searchable through the EXISTING
+`search_department_docs` tool** — no separate `search_nrb_documents` (a
+cross-department tool would fight the department-scope FK invariant; NRB docs are
+department documents with `origin=nrb`). `RetrievedChunk` now carries chunk +
+document metadata, and citations show the extraction route with a
+"machine-recovered — VERIFY" caveat for OCR/legacy pages plus the NRB source URL +
+published date. **The NRB CORPUS is still not ingested** (so this is proven on the
+sample, not the corpus, and recovered-text CORRECTNESS is still §15's open Nepali
+review — the caveat exists precisely because of that). The 6B gate and its
+recommendations are §11.9, §12.10, §13.11, §14.7, §15.9, §16.10, §17.8, §19.5,
+§20.9, §21.10 and §22.12. Phase 7's `RAG_DOCS_DIR` duplication gate is **DECIDED
+and removed (§28): NRB bytes resolve from the filestore, no copy**, so nothing
+structural blocks a full-corpus ingest. **Next unblocked: the actual corpus
+ingest (a run, needs the go-ahead), then cron/systemd; the thin admin UI lives in
+a separate frontend repo.**
 **Phase 7 step 4 is DONE (2026-08-17, §23):** the §22.10 sync defect is FIXED
 (state ownership — see the gotcha below), and `app/nrb/pipeline.py` is the ONE
 orchestration path (`sync → fetch → extract → rag enqueue`) that the CLI, the
@@ -364,10 +371,13 @@ events (`token`/`tool_call`/`tool_result`/`done`) + the new id in the
   instead of rendering an empty table. Buy/sell stay NRB's **strings** (no float
   round-trip, no arithmetic — official figures), and the **unit is always
   printed** (INR is per 100, JPY per 10; dropping it is a 100x error). Range caps:
-  31 days, or 3 without a `currency` (a full day is ~22 rows). Future NRB document
-  search (`search_nrb_documents`, Postgres/pgvector) is a separate tool — the
-  descriptions cross-reference each other, so keep the "not for policies/
-  circulars/directives" clause here.
+  31 days, or 3 without a `currency` (a full day is ~22 rows). NRB DOCUMENT search
+  (policies/circulars/directives) is **`search_department_docs`, not a separate
+  tool** (§29): NRB docs are department documents with `origin=nrb`, and a
+  cross-department tool would fight the department-scope FK invariant. So this
+  tool's negative-routing clause names `search_department_docs`, and that name is
+  asserted by `test_description_routes_documents_away_from_this_tool` — keep the
+  "not for policies/circulars/directives → search_department_docs" clause here.
 - **NRB's sitemap does not tell you what a document IS.** Measured live
   2026-08-13: 19,480 URLs, of which 18,567 are `/{owner}/{slug}/` custom-post-type
   documents whose slug is a Devanagari title. The directive/circular/act
@@ -1003,12 +1013,16 @@ the user for now.
 
 **NRB, in the order they became unblocked** (full reasoning in
 `docs/nrb-integration.md` §26.11): the thin admin UI over `/v1/nrb/*` (built in a
-SEPARATE frontend repo, `local-ai-model-frontend`); then cron/systemd (which
-triggers *through* `pipeline.request_run` — it does not replace the runner);
-Phase 8 `search_nrb_documents` (needs the §18.7 retrieval-metadata change first —
-`RetrievedChunk` carries no metadata, so route/page cannot be cited); and
-GPU-server deployment, still blocked on §19.1 (no host, no key, no SSH user in
-this environment). The `RAG_DOCS_DIR` duplication decision is **DONE (§28,
-resolve-from-filestore)** and no longer gates a full-corpus ingest. Two known-and-recorded, not fixed: `075bf12eb087`'s
-broken-ToUnicode text layer (a `native-3` + new cohort, §17.6) and the Nepali
-semantic review of the §15 pack — **conversion correctness is still unmeasured**.
+SEPARATE frontend repo, `local-ai-model-frontend`); the actual **corpus ingest**
+(a run needing the go-ahead — everything structural is now in place); then
+cron/systemd (which triggers *through* `pipeline.request_run` — it does not
+replace the runner); and GPU-server deployment, still blocked on §19.1 (no host,
+no key, no SSH user in this environment). **Phase 8 is DONE (§29):** NRB documents
+are searched via `search_department_docs` with route-aware, caveated citations —
+no separate `search_nrb_documents`. The `RAG_DOCS_DIR` duplication decision is
+**DONE (§28, resolve-from-filestore)** and the Alembic lineage is **DONE (§27,
+citations stays deferred / NRB merges first)**; neither gates a full-corpus
+ingest. Two known-and-recorded, not fixed: `075bf12eb087`'s broken-ToUnicode text
+layer (a `native-3` + new cohort, §17.6) and the Nepali semantic review of the
+§15 pack — **conversion correctness is still unmeasured** (which is why §29's
+citations carry the machine-recovered "VERIFY" caveat).

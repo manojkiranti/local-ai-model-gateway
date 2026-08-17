@@ -128,6 +128,65 @@ def test_citations_are_preserved(faked):
     assert "Leave Policy > Annual" in out
 
 
+def _nrb_chunk(i, *, route, authoritative=None, page_url="https://www.nrb.org.np/x",
+               published="2024-05-12", title="AML Directive 2081", body="अनुसूची."):
+    chunk_meta = {"origin": "nrb", "route": route}
+    if authoritative is not None:
+        chunk_meta["authoritative"] = authoritative
+    doc_meta = {"origin": "nrb"}
+    if page_url:
+        doc_meta["page_url"] = page_url
+    if published:
+        doc_meta["published_at"] = published
+    return RetrievedChunk(
+        chunk_id=i, document_id=f"nrb{i}", title=title, content=body,
+        page_number=4, section=None, element_type="text",
+        rrf_score=1.0 / (60 + i + 1), dense_distance=0.2, lexical_score=0.5,
+        dense_rank=i, lexical_rank=i,
+        chunk_metadata=chunk_meta, doc_metadata=doc_meta,
+    )
+
+
+def test_an_nrb_ocr_passage_shows_its_route_and_a_trust_caveat(faked):
+    """OCR/legacy text is retrieval material, never authoritative (§16.6). The
+    citation must say so, or the model quotes a machine-recovered figure as fact."""
+    faked["results"] = [_nrb_chunk(1, route="ocr", authoritative=False)]
+    with rag_context(HR):
+        out = _run({"query": "money laundering rules"})
+    assert "AML Directive 2081" in out
+    assert "ocr" in out.lower()
+    assert "verify" in out.lower()           # the trust caveat
+    assert "nrb.org.np" in out               # the source
+    assert "2024-05-12" in out               # published date
+
+
+def test_an_nrb_legacy_conversion_passage_is_also_caveated(faked):
+    faked["results"] = [_nrb_chunk(1, route="legacy_conversion")]
+    with rag_context(HR):
+        out = _run({"query": "directive"})
+    assert "legacy_conversion" in out
+    assert "verify" in out.lower()
+
+
+def test_an_nrb_native_passage_shows_route_without_the_verify_caveat(faked):
+    """Native text was not machine-recovered, so it does not carry the caveat —
+    over-warning on trustworthy text would train the model to ignore the warning."""
+    faked["results"] = [_nrb_chunk(1, route="native")]
+    with rag_context(HR):
+        out = _run({"query": "policy"})
+    assert "native" in out.lower()
+    assert "verify" not in out.lower()
+
+
+def test_a_generic_department_chunk_shows_no_route_line(faked):
+    """The NRB provenance is additive: an ordinary upload's citation is unchanged."""
+    faked["results"] = [_chunk(1)]
+    with rag_context(HR):
+        out = _run({"query": "annual leave"})
+    assert "route:" not in out.lower()
+    assert "verify" not in out.lower()
+
+
 def test_a_chunk_without_a_page_still_cites_its_document(faked):
     faked["results"] = [_chunk(1, page=None)]
     with rag_context(HR):

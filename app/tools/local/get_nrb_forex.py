@@ -311,8 +311,8 @@ SPEC = LocalToolSpec(
         "Rates are quoted per unit of foreign currency and the unit is not always "
         "1 (INR is per 100) — always report the unit, and the date the rates were "
         "published for. Do NOT use this for NRB monetary policy, circulars, "
-        "directives, laws, regulations, notices or reports, and do not use "
-        "fetch_url for NRB rates."
+        "directives, laws, regulations, notices or reports — search those with "
+        "search_department_docs — and do not use fetch_url for NRB rates."
     ),
     parameters={
         "type": "object",
