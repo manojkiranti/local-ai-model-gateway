@@ -4,6 +4,11 @@
 live, what broke and how it was fixed, and what's deliberately not built yet.
 Code-level gotchas stay in `CLAUDE.md` (grep `nrb`); this is the status view.
 
+**Want to RUN it, not read about it? → [`docs/nrb-usage.md`](nrb-usage.md)** —
+the operator runbook: prerequisites, the three processes, how to trigger and
+scope an update, how to read status, and a troubleshooting table for the failures
+that look like success. This file is the *why*; that one is the *how*.
+
 Last verified: **2026-08-15** (Phases 1–5 live-verified 2026-08-14; Phase 6A is
 build-only so far — see §11).
 

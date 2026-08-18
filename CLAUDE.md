@@ -33,6 +33,11 @@ with zero reference to `d4a91f2c7b3e`), and the stranded dev-DB stamp is the
 citations owner's to resolve when citations is un-deferred, never NRB's.
 `DATABASE_URL=…/local_ai_gateway_p4` for every NRB sync, fetch and DB test.
 
+**How to OPERATE the NRB integration lives in `docs/nrb-usage.md`** — the
+runbook (prerequisites, the three processes, triggering/scoping a run, reading
+status, troubleshooting). Point a human there instead of at this file or the
+status doc.
+
 **NRB integration status/roadmap lives in `docs/nrb-integration.md`** —
 Phases 1–4 done and live-verified (forex tool; sitemap inventory; REST document
 inventory; **persistent catalog + idempotent sync**, 18,577 sources / 18,266 files
