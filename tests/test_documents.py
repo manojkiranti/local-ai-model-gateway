@@ -374,10 +374,15 @@ def test_ingest_dispatches_both_families(tmp_path):
 
 
 def test_upload_types_cover_every_supported_extension():
+    """The invariant is unchanged — no extension may be accepted that no family
+    can summarise — but there are now THREE families, images being the third."""
     from app.files import ingest
 
-    assert set(ingest.UPLOAD_TYPES) == ingest.SPREADSHEET_EXTS | ingest.DOCUMENT_EXTS
+    assert set(ingest.UPLOAD_TYPES) == (
+        ingest.SPREADSHEET_EXTS | ingest.DOCUMENT_EXTS | ingest.IMAGE_EXTS
+    )
     assert ".xlsm" not in ingest.UPLOAD_TYPES  # macro-enabled stays out
+    assert ".svg" not in ingest.UPLOAD_TYPES   # active markup stays out
     assert ingest.UPLOAD_TYPES[".pdf"] == "application/pdf"
 
 

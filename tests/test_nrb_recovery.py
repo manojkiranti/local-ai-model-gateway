@@ -759,20 +759,50 @@ def test_spreadsheet_legacy_cells_convert_per_cell_never_per_rendered_row(
 # 6. The dependency boundary.
 # --------------------------------------------------------------------------- #
 def test_the_ocr_stack_is_worker_only():
-    """The API image installs `requirements.txt` and nothing else, so keeping the
-    OCR packages out of it is structural rather than a convention — the same
-    guarantee `requirements-nrb.txt` gives npttf2utf."""
-    api = (REPO / "requirements.txt").read_text().lower()
-    worker = (REPO / "requirements-worker.txt").read_text().lower()
+    """NRB page recovery must be unreachable from the API image.
+
+    The rule that matters is DOCLING: `app/nrb/ocr.py` reaches PP-OCRv5 through
+    it (because its input is a PDF page), and it drags torch + the CUDA stack.
+    None of the three OCR packages is in `requirements.txt`, and the API
+    Dockerfile installs neither the worker nor the NRB requirement set.
+
+    Since image OCR landed (docs/image-ocr.md), the API image CAN optionally
+    carry `rapidocr`+`onnxruntime` via `requirements-ocr.txt` under
+    `--build-arg INSTALL_OCR=true` — for `read_image`, which calls rapidocr
+    directly and never touches docling. That does not weaken this invariant, and
+    the assertion below pins the thing that would: **docling must not be
+    installable into the API image by any path**, so the NRB recovery route
+    cannot run there whatever build flags are set."""
+    def declared(name: str) -> str:
+        """Only the requirement LINES, never the prose.
+
+        These files carry long explanatory comments that legitimately name the
+        packages they exclude — requirements-ocr.txt explains at length why it
+        does NOT pull docling — so a substring check over the whole file asserts
+        something about the documentation rather than about the dependencies.
+        """
+        lines = (REPO / name).read_text().lower().splitlines()
+        return "\n".join(
+            ln for ln in lines if ln.strip() and not ln.strip().startswith("#")
+        )
+
+    api = declared("requirements.txt")
+    worker = declared("requirements-worker.txt")
+    ocr = declared("requirements-ocr.txt")
     dockerfile = (REPO / "Dockerfile").read_text()
 
     for package in ("onnxruntime", "rapidocr", "docling"):
         assert package not in api, f"{package} must not be in the API image"
         assert package in worker
 
+    # The optional image-OCR set may carry the recogniser but NEVER docling/torch:
+    # that is what keeps NRB page recovery a worker-only capability.
+    for package in ("docling", "torch"):
+        assert package not in ocr, f"{package} must not be in requirements-ocr.txt"
+
     assert "requirements-worker.txt" not in dockerfile
     assert "requirements-nrb.txt" not in dockerfile
-    assert "COPY requirements.txt ." in dockerfile
+    assert "COPY requirements.txt requirements-ocr.txt ./" in dockerfile
 
 
 def test_importing_the_router_does_not_import_docling_or_onnxruntime():

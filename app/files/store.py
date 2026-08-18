@@ -31,6 +31,15 @@ PDF_MEDIA_TYPE = "application/pdf"
 CSV_MEDIA_TYPE = "text/csv; charset=utf-8"
 DOCX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
+# Uploaded images (read via the read_image tool). SVG is deliberately absent
+# from the UPLOAD allowlist — SVG_MEDIA_TYPE above is create_chart's OUTPUT
+# type, and accepting active markup on the read path is a different question.
+PNG_MEDIA_TYPE = "image/png"
+JPEG_MEDIA_TYPE = "image/jpeg"
+WEBP_MEDIA_TYPE = "image/webp"
+TIFF_MEDIA_TYPE = "image/tiff"
+BMP_MEDIA_TYPE = "image/bmp"
+
 
 @dataclass
 class FileRecord:

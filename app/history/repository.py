@@ -36,7 +36,8 @@ def make_title(first_message: str) -> str:
 
 def format_attachment_note(attachments: list[dict[str, Any]], *, active: bool = True) -> str:
     """A short note naming files attached to a user message, so the model knows
-    their ids and can call read_document / inspect_excel / read_excel on them.
+    their ids and can call read_document / read_image / inspect_excel /
+    read_excel on them.
     Pure/formatting only — the caller decides the role it is emitted under (see
     `build_context_messages` and `service.open_turn`; both use `user`).
 
@@ -54,8 +55,8 @@ def format_attachment_note(attachments: list[dict[str, Any]], *, active: bool = 
         return "\n".join(lines)
 
     lines = ["Active files for the current request (read documents with "
-             "read_document; for spreadsheets use inspect_excel / read_excel, "
-             "and total them with aggregate_excel):"]
+             "read_document; images with read_image; for spreadsheets use "
+             "inspect_excel / read_excel, and total them with aggregate_excel):"]
     for a in attachments:
         fid = a.get("id", "")
         name = a.get("filename", "")

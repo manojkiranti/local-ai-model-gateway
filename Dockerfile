@@ -22,8 +22,26 @@ RUN apt-get update \
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-COPY requirements.txt .
+COPY requirements.txt requirements-ocr.txt ./
 RUN pip install --upgrade pip && pip install -r requirements.txt
+
+# ---- Optional: image OCR (the read_image tool) --------------------------
+# A build ARG rather than a line in requirements.txt because it is ~270 MB
+# (rapidocr + onnxruntime + opencv) that a deployment which never OCRs an image
+# should not carry. It needs NO torch — see requirements-ocr.txt.
+#
+#   docker compose build --build-arg INSTALL_OCR=true gateway
+#
+# Omitted (the default), `read_image` reports "image OCR is not enabled on this
+# deployment" and every other route behaves identically. Uploading an image
+# still works either way: Pillow is in requirements.txt because the pixel-bomb
+# guard is a security control, not part of the optional feature.
+ARG INSTALL_OCR=false
+RUN if [ "$INSTALL_OCR" = "true" ]; then \
+        pip install -r requirements-ocr.txt; \
+    else \
+        echo "image OCR OMITTED (INSTALL_OCR=false) — read_image will report it is not enabled"; \
+    fi
 
 # ---- Stage 2: runtime ----------------------------------------------------
 FROM python:3.10-slim
@@ -44,6 +62,36 @@ COPY --from=builder /opt/venv /opt/venv
 COPY app ./app
 COPY alembic ./alembic
 COPY alembic.ini ./alembic.ini
+
+# ---- Optional: make the installed OCR stack actually USABLE --------------
+# Each of these three is a §18-class defect: omit it and the stack is present,
+# the job "succeeds", and no text ever comes out.
+#
+#  1. opencv's cv2.abi3.so links X11/XCB/GL. python:*-slim ships none of them,
+#     so the first OCR call dies with "libxcb.so.1: cannot open shared object
+#     file" — at request time, not build time.
+#  2. RapidOCR downloads its ONNX weights on FIRST USE, into its own package
+#     directory. Pre-warming here means no request depends on network access and
+#     the first upload is not seconds slower than the rest.
+#  3. That directory is root-owned after COPY --from, and this container runs as
+#     uid 10001. The write then fails SILENTLY AND EXPENSIVELY: rapidocr
+#     re-downloads on every call, never persists, and returns no text — correct
+#     (fail-closed) but indistinguishable from an image with no text in it.
+#     Measured in the worker image 2026-08-16 (see Dockerfile.worker).
+#
+# The warm step imports app.files.image_ocr rather than repeating the model
+# configuration here, so there is exactly one place that names PP-OCRv5. It is
+# deliberately NOT `|| true`: a build that cannot fetch the weights must fail
+# loudly instead of shipping an image that looks fine and reads nothing.
+ARG INSTALL_OCR=false
+RUN if [ "$INSTALL_OCR" = "true" ]; then \
+        apt-get update \
+        && apt-get install -y --no-install-recommends \
+            libgl1 libglib2.0-0 libxcb1 libx11-6 libxext6 libxrender1 libsm6 \
+        && rm -rf /var/lib/apt/lists/* \
+        && python -c "from app.files.image_ocr import _engine, SUPPORTED_LANGS; [_engine(l) for l in sorted(SUPPORTED_LANGS)]" \
+        && chown -R appuser:appuser /opt/venv/lib/python3.10/site-packages/rapidocr; \
+    fi
 
 # FILES_DIR default; must be writable by the runtime user. Mount a volume here
 # in prod if generated files need to survive container restarts.

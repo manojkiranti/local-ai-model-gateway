@@ -25,7 +25,16 @@ services:
       - "host.docker.internal:host-gateway"
 
   gateway:
-    build: .
+    build:
+      context: .
+      args:
+        # Image OCR for chat uploads (the read_image tool), default OFF: ~270 MB
+        # of rapidocr + onnxruntime + opencv that a deployment which never OCRs
+        # an image should not carry. Enable per-deployment with
+        # INSTALL_OCR=true in the shell or .env. Without it, image UPLOADS still
+        # work and read_image reports that OCR is not enabled — see
+        # docs/image-ocr.md.
+        INSTALL_OCR: ${INSTALL_OCR:-false}
     env_file: .env.docker
     ports:
       - "8000:8000"
@@ -66,15 +75,24 @@ services:
   nrb-runner:
     # NRB pipeline staging: sync -> fetch -> extract -> RAG enqueue, and nothing
     # else. It runs on the GATEWAY image on purpose — httpx, pypdf, openpyxl and
-    # python-docx are all in requirements.txt, and it must NOT acquire Docling or
-    # an OCR stack. Recovery, chunking, embedding and supersession stay the
-    # `worker` service's; these two processes have two jobs.
+    # python-docx are all in requirements.txt, and it must NOT acquire **Docling**.
+    # Recovery, chunking, embedding and supersession stay the `worker` service's;
+    # these two processes have two jobs.
+    #
+    # Note since image OCR landed: with INSTALL_OCR=true this image does carry
+    # rapidocr, because it is the same image as the gateway. That is harmless and
+    # not a hole in the rule above — NRB page recovery goes through
+    # app/nrb/ocr.py, which reaches PP-OCRv5 via **docling** and is still absent
+    # here, so this process cannot recover a page whatever is installed. What it
+    # must never gain is docling/torch.
     #
     # Same image, different command: the API accepts runs, this executes them, so
     # a gateway restart cannot lose an accepted one.
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        INSTALL_OCR: ${INSTALL_OCR:-false}
     command: ["python", "-m", "app.nrb.runner"]
     env_file: .env.docker
     depends_on:

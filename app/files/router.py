@@ -83,9 +83,9 @@ def _reject(path: Optional[Path], code: int, detail: str) -> HTTPException:
     "/files",
     response_model=UploadResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Upload a file the model can read (.xlsx/.csv/.pdf/.docx/.txt/.md/.json)",
+    summary="Upload a file the model can read (spreadsheet, document or image)",
     responses={
-        400: {"description": "Bad extension, corrupt/encrypted file, or zip-bomb."},
+        400: {"description": "Bad extension, corrupt/encrypted file, zip-bomb, or pixel-bomb."},
         401: {"description": "Missing/invalid JWT."},
         413: {"description": "File exceeds the size limit."},
     },
@@ -102,7 +102,8 @@ async def upload_file(
         raise _reject(
             None,
             400,
-            "only .xlsx, .csv, .pdf, .docx, .txt, .md and .json files are accepted",
+            "only .xlsx, .csv, .pdf, .docx, .txt, .md, .json, .png, .jpg, "
+            ".jpeg, .webp, .tif, .tiff and .bmp files are accepted",
         )
 
     # 2) stream to the owner's folder under a UUID name, counting bytes (413 cap)
@@ -141,7 +142,13 @@ async def upload_file(
 
     # 4) parse check + summary. Never evaluates formulas; never OCRs. A scanned
     # PDF passes here deliberately — it is a valid file, and read_document is
-    # where the user is told it has no text layer. Bad file -> unlink + 400.
+    # where the user is told it has no text layer. An IMAGE is summarised by its
+    # dimensions for the same reason plus one more: this runs again on every turn
+    # (history/service._resolve_attachments), so it must stay a header read —
+    # image TEXT comes from the read_image tool. This is also where the
+    # decoded-pixel cap and the image-format allowlist are enforced (see
+    # images.summarize_image); the zip guard above cannot see either.
+    # Bad file -> unlink + 400.
     try:
         summary = await asyncio.to_thread(ingest.summarize, dest)
     except readers.ReadError as exc:

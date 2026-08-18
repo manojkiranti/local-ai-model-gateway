@@ -1,0 +1,27 @@
+# Image OCR for chat uploads (the `read_image` tool).
+#
+# OPTIONAL. `Dockerfile` installs this ONLY under
+# `--build-arg INSTALL_OCR=true`, so a default API image carries no OCR stack
+# and `read_image` answers "image OCR is not enabled on this deployment".
+#
+# ~270 MB installed (rapidocr 98 MB incl. the Devanagari PP-OCRv5 weights,
+# onnxruntime 52 MB, opencv + numpy ~113 MB). Crucially it needs **no torch**:
+# app/nrb/ocr.py reaches the same recogniser through docling because its input
+# is a PDF page, and that path costs torch 1.1 GB + transformers 93 MB.
+# RapidOCR.__call__ takes an image directly, so image OCR skips docling
+# entirely — see the docstring of app/files/image_ocr.py.
+#
+# WHY v5, AND WHY THIS BACKEND (docs/nrb-integration.md §16.6, measured):
+#
+#                          halant/Devanagari char   mean word length
+#   PP-OCRv4 (torch)                 0.0042                24.7
+#   PP-OCRv5 (onnxruntime)           0.0798                 5.4
+#   reference — npttf2utf            0.0982                 5.7
+#
+# v4 is REJECTED for Nepali: it recovers the script but not the orthography (no
+# conjuncts, visual rather than logical order). Versions are named directly
+# rather than left to a resolver so the installed ones are the ones the A/B was
+# run against.
+-r requirements.txt
+rapidocr>=3.9
+onnxruntime>=1.20

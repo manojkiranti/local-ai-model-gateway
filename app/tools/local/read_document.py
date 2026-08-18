@@ -4,14 +4,8 @@ Owner-scoped by file_id (see files/source.py). Handles .pdf/.docx/.txt/.md/
 .json; a PDF's page boundaries appear as '[page N]' marker lines inside the
 line stream, so there is only ever ONE paging unit.
 
-Two deliberate differences from read_excel, both about truncation honesty:
-
-  * METADATA LEADS. agent/loop.py cuts any tool result over
-    MAX_TOOL_RESULT_CHARS from the END, which is exactly where read_excel puts
-    its "call again with start_row=N" note. Leading metadata survives the cut.
-  * WE TRUNCATE FIRST, on whole lines. If the loop cut the body instead, the
-    header would promise "continue at line 401" while the model only ever saw
-    line 90 — a silent hole that looks like a complete read.
+Paging is `_paging.window` — shared with read_image, and the two rules it
+exists for (metadata leads, whole-line truncation first) are documented there.
 """
 
 from __future__ import annotations
@@ -20,61 +14,13 @@ import asyncio
 from pathlib import Path
 from typing import Any, Optional
 
-from ...files import documents, ingest, readers
+from ...files import documents, images, ingest, readers
 from ...files.store import resolve_file
+from ._paging import HEADER_BUDGET, MODEL_RESULT_CAP, window
 from .base import LocalToolSpec
 
 READ_DOC_MAX_LINES = 400
-
-# Must equal agent.loop.MAX_TOOL_RESULT_CHARS. NOT imported from there: the
-# agent imports the tool registry, so a tools -> agent import is circular.
-# tests/test_read_document_tool.py asserts the two agree.
-MODEL_RESULT_CAP = 8000
-HEADER_BUDGET = 400                              # room for the metadata block
 DOC_MAX_CHARS = MODEL_RESULT_CAP - HEADER_BUDGET  # 7600
-
-
-def _window(
-    lines: list[str], start_line: int, max_lines: Optional[int]
-) -> tuple[list[str], int, bool, Optional[tuple[int, int]]]:
-    """Return (window, last_line_number, truncated, hard_cut).
-
-    Truncation is on WHOLE lines: a line that would cross the budget is dropped
-    entirely, so `last_line_number` is exactly what the model received and
-    `last_line_number + 1` is exactly where it should resume.
-
-    `hard_cut` is `(line_number, original_length)` when a single line longer
-    than the ENTIRE character budget had to be cut mid-line, else `None`. That
-    case is invisible to `truncated` when it is also the LAST line in the
-    document: there is no next line to resume at, so `last < len(lines)` is
-    False even though real content was dropped. The caller uses `hard_cut` to
-    say so regardless of `truncated`.
-    """
-    start = max(1, start_line)
-    index = start - 1
-    cap = READ_DOC_MAX_LINES
-    if max_lines is not None:
-        cap = max(1, min(int(max_lines), READ_DOC_MAX_LINES))
-    selected = lines[index : index + cap]
-
-    out: list[str] = []
-    used = 0
-    hard_cut: Optional[tuple[int, int]] = None
-    for offset, line in enumerate(selected):
-        cost = len(line) + 1  # + the newline that joins it
-        if not out and cost > DOC_MAX_CHARS:
-            # A single line longer than the entire budget. Emit it alone and
-            # hard-cut, or the reader could never make progress past it.
-            out.append(line[:DOC_MAX_CHARS] + " …[long line truncated]")
-            hard_cut = (index + offset + 1, len(line))
-            break
-        if used + cost > DOC_MAX_CHARS:
-            break
-        out.append(line)
-        used += cost
-
-    last = index + len(out)
-    return out, last, last < len(lines), hard_cut
 
 
 def _header(
@@ -138,8 +84,11 @@ async def _read_document(args: dict[str, Any]) -> str:
     if record is None:
         return "ERROR: no such file (unknown id, or you don't own it)."
 
-    if Path(record.path).suffix.lower() in ingest.SPREADSHEET_EXTS:
+    ext = Path(record.path).suffix.lower()
+    if ext in ingest.SPREADSHEET_EXTS:
         return "ERROR: this is a spreadsheet — use inspect_excel / read_excel instead."
+    if ext in ingest.IMAGE_EXTS:
+        return "ERROR: this is an image — use read_image instead."
 
     try:
         start_line = int(args.get("start_line", 1) or 1)
@@ -174,9 +123,12 @@ async def _read_document(args: dict[str, Any]) -> str:
             f"has {len(doc.lines)} lines."
         )
 
-    window, last, truncated, hard_cut = _window(doc.lines, start_line, max_lines)
+    body, last, truncated, hard_cut = window(
+        doc.lines, start_line, max_lines,
+        line_cap=READ_DOC_MAX_LINES, char_budget=DOC_MAX_CHARS,
+    )
     header = _header(doc, max(1, start_line), last, truncated, hard_cut)
-    return "\n".join(header + [""] + window)
+    return "\n".join(header + [""] + body)
 
 
 SPEC = LocalToolSpec(
@@ -189,7 +141,8 @@ SPEC = LocalToolSpec(
         "exact start_line to continue from. In a PDF, page boundaries appear as "
         "'[page N]' marker lines, so you can cite the page a passage came from. "
         "For a spreadsheet (.xlsx/.csv) use inspect_excel / read_excel instead, "
-        "and for any total or breakdown use aggregate_excel. For questions about "
+        "and for any total or breakdown use aggregate_excel. For an IMAGE "
+        "(.png/.jpg/.webp/.tif/.bmp) use read_image, which OCRs it. For questions about "
         "company policy, circulars, entitlements or internal rules that the user "
         "did NOT attach to this chat, use search_department_docs — that searches "
         "the department's official corpus, while this reads one attached file."

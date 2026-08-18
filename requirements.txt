@@ -14,6 +14,12 @@ openpyxl>=3.1
 fpdf2>=2.7
 python-docx>=1.1
 pypdf>=6.0
+# Image uploads: dimensions for the attachment summary, the format allowlist,
+# and the decoded-PIXEL cap. That cap is a security control on the upload path
+# (router.py's zip guard cannot see a 200-byte PNG that decodes to 40000x40000),
+# so it must work whether or not the optional OCR stack is installed — hence
+# here and not in requirements-ocr.txt. Previously an undeclared transitive dep.
+Pillow>=10.0
 python-multipart>=0.0.9
 pgvector>=0.3.6
 

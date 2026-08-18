@@ -22,6 +22,7 @@ from . import (
     pdf,
     read_document,
     read_excel,
+    read_image,
     search_department_docs,
     time,
 )
@@ -41,6 +42,7 @@ LOCAL_TOOLS: list[LocalToolSpec] = [
     inspect_excel.SPEC,
     read_excel.SPEC,
     read_document.SPEC,
+    read_image.SPEC,
     aggregate_excel.SPEC,
     search_department_docs.SPEC,
     get_nrb_forex.SPEC,

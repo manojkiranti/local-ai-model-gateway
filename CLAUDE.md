@@ -33,6 +33,10 @@ with zero reference to `d4a91f2c7b3e`), and the stranded dev-DB stamp is the
 citations owner's to resolve when citations is un-deferred, never NRB's.
 `DATABASE_URL=…/local_ai_gateway_p4` for every NRB sync, fetch and DB test.
 
+**Image OCR in chat (`read_image`) lives in `docs/image-ocr.md`** — why not
+docling, why not a VL model, the rapidocr config trap, the pixel-bomb guard, the
+optional `INSTALL_OCR` build flag, and the 9-case eval.
+
 **How to OPERATE the NRB integration lives in `docs/nrb-usage.md`** — the
 runbook (prerequisites, the three processes, triggering/scoping a run, reading
 status, troubleshooting). Point a human there instead of at this file or the
@@ -263,11 +267,16 @@ contextvars + async `save`/`resolve_file` + in-memory fallback, `sink`=
 (owner-scoped id→path resolver) + `turn_files` (installs sink+source together),
 `readers`=xlsx/csv→`Table` normalizer (pure, no formula eval), `documents`=
 pdf/docx/txt/md/json→flat lines normalizer (pure; PDF page markers,
-scanned-vs-empty distinction), `ingest`=extension→family dispatch (spreadsheet
-vs document) shared by the upload route and turn-open, `router`=upload
+scanned-vs-empty distinction), `images`=png/jpg/webp/tif/bmp→format+dimensions
+(pure, **never OCRs** — the summary is recomputed every turn; owns the
+decoded-PIXEL cap and the decoder allowlist), `image_ocr`=the ONLY file that
+knows rapidocr exists (PP-OCRv5/onnxruntime, lazy import,
+`requirements-ocr.txt`; imports no part of docling), `ingest`=extension→family
+dispatch (spreadsheet vs document vs image) shared by the upload route and
+turn-open, `router`=upload
 `POST /v1/files` + `GET /v1/files` list + owner-scoped `/v1/files/{id}`; feeds
 create_excel/html/chart/pdf/csv/docx and inspect_excel/read_excel/
-read_document),
+read_document/read_image),
 `history/` (chat-history: `models` = `chat_sessions`
 + `chat_messages`, `repository` = data access, `service.open_turn` = shared
 turn-open used by chat, `router` = `/v1/sessions`),
@@ -290,8 +299,10 @@ Authed (JWT): `GET /users/me`, `GET /users` (admin), `POST /v1/chat`,
 `POST /v1/nrb/runs` (admin, 202 `{started, run}` / 409 same shape when busy),
 `GET /v1/nrb/runs/{id}` (admin), `GET /v1/nrb/status` (admin, `?department=`),
 `GET /v1/tools`, `GET /v1/mcp/status`, `POST /v1/files` (upload .xlsx/.csv/
-.pdf/.docx/.txt/.md/.json → `generated_files` row `source=uploaded`; 400 bad
-ext/corrupt/zip-bomb, 413 over size cap), `GET /v1/files` (caller's files,
+.pdf/.docx/.txt/.md/.json/.png/.jpg/.jpeg/.webp/.tif/.tiff/.bmp →
+`generated_files` row `source=uploaded`; 400 bad
+ext/corrupt/zip-bomb/pixel-bomb/non-allowlisted image format, 413 over size
+cap), `GET /v1/files` (caller's files,
 newest first; `?source=` filters),
 `GET /v1/files/{id}` (owner-scoped download; 404 if not yours),
 `DELETE /v1/files/{id}` (owner-scoped; 204, removes row + on-disk file),
@@ -346,9 +357,9 @@ events (`token`/`tool_call`/`tool_result`/`done`) + the new id in the
   `OLLAMA_CONTEXT_LENGTH=32768`. Without it Ollama defaults to **4096**, which is
   too small — **15** local tool schemas alone measured **3475 tokens** on
   2026-08-11 (via `usage.prompt_tokens`, qwen2.5; a bare turn's prompt floor was
-  3778, leaving ~300 of a 4096 window). `LOCAL_TOOLS` is now **16** (`read_document`
-  landed after that measurement) — the token figure has not been re-measured
-  since, so treat it as a floor, not the current count, until it is. Either way
+  3778, leaving ~300 of a 4096 window). `LOCAL_TOOLS` is now **17** (`read_document`
+  then `read_image` landed after that measurement) — the token figure has not
+  been re-measured since, so treat it as a floor, not the current count. Either way
   one 8000-char tool result overflows. This matches vLLM's `--max-model-len` (a launch flag),
   so it stays a config value across backends. See
   `docs/llm-transport-and-deployment.md`.
@@ -751,6 +762,52 @@ events (`token`/`tool_call`/`tool_result`/`done`) + the new id in the
   ownership (404 on foreign id), persists `{id,filename,summary}` on the user
   message (`chat_messages.attachments` JSONB), and `build_context_messages`
   re-emits the attachment note on later turns so ids survive without resending.
+- **Image OCR is `read_image`, it is OPTIONAL, and it does NOT go through
+  docling.** Full write-up in `docs/image-ocr.md`. `app/files/image_ocr.py` calls
+  `rapidocr` directly — `RapidOCR.__call__` takes an image, so the docling path
+  (`app/nrb/ocr.py`, which exists because ITS input is a PDF *page*) would add
+  torch 1.1 G + transformers 93 M for nothing. What is reused is §16.6's model
+  decision: PP-OCRv5 on onnxruntime, v4 rejected for Nepali. `rapidocr` +
+  `onnxruntime` live in `requirements-ocr.txt`, installed only under
+  `--build-arg INSTALL_OCR=true`; absent, `read_image` says "image OCR is not
+  enabled on this deployment" and nothing else changes. Six things a rewrite must
+  not lose: (1) **an omitted rapidocr param is not a default, it is Chinese
+  PP-OCRv6** (`config.yaml` ships `lang_type: "ch"`, `ocr_version: "PP-OCRv6"`)
+  and rapidocr *refuses* plain strings, so `ocr_config` declares all eight keys
+  as strings — asserted in an environment WITHOUT rapidocr, where a silent
+  fallback would go unnoticed — and `ocr_params` converts them to enums;
+  (2) detection stays byte-identical to the measured NRB config (`ch`, v5,
+  mobile) because a detector finds text BOXES not characters, so `lang` moves the
+  recogniser only, and `devanagari` is the default because it reads English too
+  (measured exact on `45,320.75`) while a latin-only model returns NOTHING for
+  Nepali; (3) **rapidocr returns one box per WORD** — `Total Amount: 45,320.75`
+  is three boxes on one row — so `group_lines` groups by geometry, never by the
+  order rapidocr emitted, and a blank image returns `txts=None` not `()`;
+  (4) `summarize_image` must **never** OCR (`history/service._resolve_attachments`
+  re-summarizes every attached file on EVERY turn) — locked by an AST test;
+  (5) the caveat lives in the HEADER because `agent/loop.py` cuts from the END,
+  and confidence is reported but **never** compared to a threshold (§16.6 refuses
+  to invent one) — locked by an AST test; (6) the API image can now *acquire* an
+  OCR stack, so `tests/test_image_ocr_import_boundary.py` (a SUBPROCESS check)
+  replaces "it isn't installed" as the guarantee that importing the app never
+  loads rapidocr/onnxruntime/cv2. The Dockerfile's three OCR steps (native
+  OpenCV libs, model pre-warm, `chown` of `site-packages/rapidocr`) are each a
+  §18-class defect if skipped: the stack is present, the call "succeeds", and no
+  text ever comes out.
+- **Uploaded images have a PIXEL cap, and Pillow is not optional.** A ~200-byte
+  PNG can declare 40000×40000 and sail past both the 10 MB wire cap and
+  `router.py`'s zip guard (which only covers the OOXML paths).
+  `images.MAX_IMAGE_PIXELS` is checked BEFORE any decode and does not rely on
+  Pillow's own exception — Pillow only *raises* above 2× its limit and merely
+  warns between 1× and 2×, so a 1.5× bomb would pass. `images._KINDS` doubles as
+  a **decoder allowlist on the sniffed format**, so a GIF renamed `.png` never
+  reaches the GIF decoder. Both are security controls on the upload path, so
+  `Pillow` is in `requirements.txt` (previously an undeclared transitive dep) and
+  uploads keep working with the OCR stack absent. Same file, different trap:
+  **a multi-frame `.tif` loses pages silently** — a scanner's normal output, and
+  the engine reads frame 1 only (measured: page 2's text just vanished) — so
+  `ImageSummary.frames` is a reported fact and `read_image` emits a `PARTIAL:`
+  line, exactly as `read_document` reports `pages_skipped`.
 - **`read_document` reads ONE attached .pdf/.docx/.txt/.md/.json** by `file_id`
   (spreadsheets 400 with a pointer to `inspect_excel`/`read_excel`).
   `app/files/documents.py` normalizes every format to flat lines (`documents.py`
