@@ -102,7 +102,7 @@ slow work. Run it alongside the API:
 ```bash
 .venv/bin/python -m app.rag.worker
 ```
-
+python -m app.nrb.runner
 **In Docker**, the worker runs as its own `worker` compose service (its own
 `Dockerfile.worker`, so Docling + torch never enter the API image), sharing
 the `rag_documents` volume with the `gateway` service so both see the same
