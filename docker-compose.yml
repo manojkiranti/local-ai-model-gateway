@@ -28,13 +28,17 @@ services:
     build:
       context: .
       args:
-        # Image OCR for chat uploads (the read_image tool), default OFF: ~270 MB
-        # of rapidocr + onnxruntime + opencv that a deployment which never OCRs
-        # an image should not carry. Enable per-deployment with
-        # INSTALL_OCR=true in the shell or .env. Without it, image UPLOADS still
-        # work and read_image reports that OCR is not enabled — see
+        # Image OCR for chat uploads (the read_image tool). Default ON via the
+        # COMPOSE default, because this is a build arg and a build arg cannot be
+        # fed by .env.docker (that is env_file = RUNTIME) — so a per-server
+        # runtime file could never turn it on. The tracked compose file is the
+        # only thing that both travels to the server AND feeds the build.
+        # ~270 MB (rapidocr + onnxruntime + opencv), CPU-only, never touches the
+        # GPU. For a slim build that never OCRs: INSTALL_OCR=false docker compose
+        # build. The raw Dockerfile ARG stays false, so a bare `docker build .`
+        # is still slim — only the compose (deployment) path carries OCR. See
         # docs/image-ocr.md.
-        INSTALL_OCR: ${INSTALL_OCR:-false}
+        INSTALL_OCR: ${INSTALL_OCR:-true}
     env_file: .env.docker
     ports:
       - "8000:8000"
@@ -92,7 +96,9 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        INSTALL_OCR: ${INSTALL_OCR:-false}
+        # Same default as gateway (they share the image). Kept in lockstep so the
+        # two never diverge into an OCR-mismatched pair of the same build.
+        INSTALL_OCR: ${INSTALL_OCR:-true}
     command: ["python", "-m", "app.nrb.runner"]
     env_file: .env.docker
     depends_on:
