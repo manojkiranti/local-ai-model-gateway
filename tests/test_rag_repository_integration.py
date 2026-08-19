@@ -49,6 +49,12 @@ def _skip_if_no_db():
         pytest.skip(f"Postgres unreachable: {type(exc).__name__}")
 
 
+# Not a real bcrypt digest, and it does not need to be: `verify_password`
+# returns False for a malformed hash rather than raising, and nothing here
+# logs in. It only has to be NOT NULL to satisfy `ck_users_credential`.
+PLACEHOLDER_HASH = "x" * 60
+
+
 @pytest.fixture()
 def user_id():
     """A throwaway user row; removed afterwards."""
@@ -56,10 +62,14 @@ def user_id():
     email = f"rag-repo-{uuid.uuid4().hex[:8]}@example.com"
 
     async def make(conn):
+        # `password_hash` is required for a 'local' user by
+        # `ck_users_credential`: a local account with no password could never log
+        # in, and the constraint exists so an 'ad' account can never acquire one.
+        # This row never authenticates over HTTP, so the value only has to exist.
         return (await conn.execute(text(
-            "INSERT INTO users (email, auth_provider, role, is_active)"
-            " VALUES (:e, 'local', 'member', true) RETURNING id"),
-            {"e": email})).scalar_one()
+            "INSERT INTO users (email, auth_provider, password_hash, role, is_active)"
+            " VALUES (:e, 'local', :h, 'member', true) RETURNING id"),
+            {"e": email, "h": PLACEHOLDER_HASH})).scalar_one()
 
     uid = _sql(make)
     yield uid

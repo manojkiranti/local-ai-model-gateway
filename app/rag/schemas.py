@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 
 class DepartmentCreate(BaseModel):
@@ -29,7 +29,25 @@ class DepartmentOut(BaseModel):
 
 
 class GrantCreate(BaseModel):
-    user_id: int
+    """Who to grant, by id or by email.
+
+    `email` exists because an admin knows a colleague's address, not their
+    numeric id, and resolving one to the other used to mean paging the whole
+    user list. Exactly one must be supplied: accepting both would raise the
+    question of which wins when they disagree, and silently preferring one is
+    how the wrong person gets access to a department.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    user_id: int | None = None
+    email: EmailStr | None = None
+
+    @model_validator(mode="after")
+    def _exactly_one_identifier(self) -> "GrantCreate":
+        if (self.user_id is None) == (self.email is None):
+            raise ValueError("supply exactly one of user_id or email")
+        return self
 
 
 class MemberOut(BaseModel):

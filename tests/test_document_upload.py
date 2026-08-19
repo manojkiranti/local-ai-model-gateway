@@ -22,10 +22,37 @@ PDF_CT = "application/pdf"
 DOCX_CT = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
 
+# `POST /auth/register` became admin-only when Active Directory sign-in landed: a
+# public register let anyone pre-register a colleague's address as a LOCAL account
+# and permanently shadow their AD identity. Creating a fresh test user therefore
+# needs an admin token, which the seeded test admin supplies. If that admin is
+# absent, the register call fails quietly and the caller still skips on the login
+# — the same behaviour as before.
+SEEDED_ADMIN_EMAIL = "admin@example.com"
+SEEDED_ADMIN_PASSWORD = "supersecret123"
+
+
+def _ensure_user(client, email, password):
+    """Create the user if it does not exist yet, as an admin must now do."""
+    headers = {}
+    if email != SEEDED_ADMIN_EMAIL:
+        resp = client.post(
+            "/auth/login",
+            json={"email": SEEDED_ADMIN_EMAIL, "password": SEEDED_ADMIN_PASSWORD},
+        )
+        if resp.status_code == 200:
+            headers = {"Authorization": f"Bearer {resp.json()['access_token']}"}
+    client.post(
+        "/auth/register",
+        json={"email": email, "password": password},
+        headers=headers,
+    )
+
+
 def _auth(client, email):
     err = resp = None
     try:
-        client.post("/auth/register", json={"email": email, "password": PASSWORD})
+        _ensure_user(client, email, PASSWORD)
         resp = client.post("/auth/login", json={"email": email, "password": PASSWORD})
     except Exception as exc:  # noqa: BLE001
         err = exc

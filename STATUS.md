@@ -27,12 +27,22 @@ app (no separate inner service).
 Stack: FastAPI (async), SQLAlchemy 2.0 async + asyncpg, Alembic, Postgres 17,
 PyJWT (HS256), bcrypt, httpx (no ollama SDK), mcp SDK v2, openpyxl. Python 3.10.
 
-- **Auth**: register/login → JWT. Provider-agnostic User (email, auth_provider,
-  nullable password_hash, role admin|member, is_active, timestamps) — SSO-ready
-  without schema rewrite. First registered user → admin (or ADMIN_EMAILS).
+- **Auth**: login → JWT. User (email, auth_provider `local`|`ad`, nullable
+  password_hash, role admin|member, is_active, timestamps). `POST /auth/login`
+  dispatches on auth_provider and consults exactly ONE credential store — never a
+  fallback chain; `ck_users_credential` makes "both" unrepresentable. Active
+  Directory via `app/auth/directory.py` (`AD_AUTH_ENABLED`, off by default);
+  unknown email + AD success auto-provisions a `member` with no departments. A
+  directory outage is **503, not 401**. Login is throttled
+  (`LOGIN_MAX_ATTEMPTS`, per process) because the endpoint can otherwise trip AD
+  lockout domain-wide. `POST /auth/register` is **admin-only** except on an empty
+  users table, where it mints the first admin (or ADMIN_EMAILS).
 - **Endpoints**:
-  - Public: `GET /health`, `POST /auth/register`, `POST /auth/login`
-  - Authed: `GET /users/me`, `GET /users` (admin, paginated)
+  - Public: `GET /health`, `POST /auth/login`
+  - Admin: `POST /auth/register` (unauthenticated only on an empty users table)
+  - Authed: `GET /users/me`, `GET /users` (admin, paginated, `?q=` email search)
+  - Admin: `PATCH /users/{id}` `{is_active}` — immediate access cut-off
+    (guards: no self-deactivation, never the last active admin; `role` not patchable)
   - Authed: `POST /v1/chat` — the **single unified turn endpoint**: persisted
     (`{session_id?, message, model?, stream?, options?}`, server owns context) AND
     tool-capable (runs the agent loop every turn; model calls tools when useful).
@@ -154,8 +164,12 @@ PyJWT (HS256), bcrypt, httpx (no ollama SDK), mcp SDK v2, openpyxl. Python 3.10.
   non-root, `/health` check); NOT run for real yet. See `DOCKER.md` for the
   localhost→`host.docker.internal` env changes and the deferred `docker-compose`.
   Firewalling internal deps to the gateway IP is deferred; secrets/migrations-in-prod TBD.
-- **SSO/OIDC** — schema is ready, not implemented.
-- **Rate limiting / observability** — not yet. (Integration tests now exist for
+- **Active Directory** — implemented (`app/auth/directory.py`), but the shim at
+  `AD_AUTH_BASE_URL` has NOT been reached from this environment: the host is
+  unroutable here, so UPN-vs-sAMAccountName and the exact response envelope are
+  unverified against the real service. OIDC/SAML remain unimplemented.
+- **Rate limiting / observability** — login is throttled per identifier
+  (in-process only, so N workers means N x the limit); nothing else is. (Integration tests now exist for
   chat history + MCP; they skip when their backing service is unreachable.)
 - **Prompt-injection surface (fetch_url + uploaded spreadsheets + write tools)** —
   `fetch_url` pulls arbitrary external text into the loop, and `inspect_excel`/

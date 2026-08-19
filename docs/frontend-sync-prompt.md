@@ -46,14 +46,54 @@ and a real conflict is worth reporting back rather than coding around.
 
 === Gateway API contract (base URL http://localhost:8000) ===
 
-AUTH (public):
-  POST /auth/register  body {email, password(min 8)}  -> 201 UserOut; 409 if email taken
-  POST /auth/login     body {email, password}
-     -> 200 {access_token, token_type:"bearer", expires_in:<seconds>}; 401 if bad creds
-  Send the token on every authed call as:  Authorization: Bearer <access_token>
+AUTH:
+  POST /auth/login     body {email, password}          PUBLIC
+     -> 200 {access_token, token_type:"bearer", expires_in:<seconds>}
+     -> 401 bad credentials  (detail "Invalid email or password" — identical
+            whether the address is unknown, the password is wrong, or Active
+            Directory rejected it; do not try to tell the user which)
+     -> 403 the account exists but is deactivated
+     -> 429 too many failed attempts. Read the Retry-After header (seconds) and
+            show a countdown. Do NOT auto-retry.
+     -> 503 DIRECTORY SIGN-IN IS DOWN. This one matters: it is NOT a wrong
+            password. Render the server's `detail` verbatim, keep whatever the
+            user typed, and offer "try again" — never "check your password", and
+            never a password-reset prompt. Showing 503 as a credential failure
+            during an AD outage sends a whole office to reset passwords that
+            were never wrong.
+     Send the token on every authed call as:  Authorization: Bearer <access_token>
+
+     One endpoint, two kinds of account. Staff sign in with their Active
+     Directory credentials (the email/UPN goes in the `email` field); local
+     password accounts still exist for service and break-glass admin use. The
+     frontend does not choose and must not ask: the server decides from the
+     user's own record. There is no "sign in with AD" button.
+
+  POST /auth/register  body {email, password(min 8)}   ADMIN ONLY
+     -> 201 UserOut; 409 email taken; 403 caller is not an admin;
+        401 no/invalid token
+     REMOVE any "create an account" / self-signup link from the login screen.
+     Registration now exists only so an admin can create a local service or
+     break-glass account. (Exception you will not see in normal operation: on a
+     completely empty database the first registration is allowed unauthenticated
+     and becomes the admin.)
 
 USER:
-  GET /users/me   -> {id, email, auth_provider, role("admin"|"member"), is_active,
+  GET /users?q=<email fragment>&limit=&offset=   ADMIN ONLY
+     -> 200 {total, limit, offset, items:[UserOut]}   total is the MATCH count
+     `q` is a case-insensitive substring of the email; LIKE wildcards are
+     literal. This is how an admin resolves an email to a user id.
+
+  PATCH /users/{id}  body {is_active: bool}      ADMIN ONLY
+     -> 200 UserOut
+     -> 409 refused, with `detail` naming why: deactivating yourself, or the last
+            active admin. Show `detail` verbatim.
+     -> 404 unknown id; 422 any other field (role is NOT patchable here)
+     Deactivating takes effect on that user's NEXT request, not at token expiry.
+     This is the offboarding control; disabling someone in AD does not revoke a
+     token already issued to them.
+
+  GET /users/me   -> {id, email, auth_provider("local"|"ad"), role("admin"|"member"), is_active,
                       created_at, updated_at}
 
 CHAT (the core endpoint) — POST /v1/chat  (authed):

@@ -206,7 +206,12 @@ in `.env` only, never in code). Create with:
 `psql -h 127.0.0.1 -U postgres -c "CREATE ROLE gateway LOGIN PASSWORD '...'; CREATE DATABASE local_ai_gateway OWNER gateway;"`
 
 ## Layout
-`app/{config,main}`, `db/`, `auth/`, `users/`, `ollama/` (client), `chat/`,
+`app/{config,main}`, `db/`, `auth/` (`security` = JWT+bcrypt, `dependencies` =
+`get_current_user`/`require_admin`/`get_current_user_optional`, `directory` = the
+ONLY file that knows the Active Directory HTTP shim exists, `throttle` =
+per-identifier login limiting, `router` = `/auth/*`), `users/`
+(`models`+`schemas`+`router`, `repository` = the shared lookup plus directory
+provisioning), `ollama/` (client), `chat/`,
 `mcp/` (client), `nrb/` (Nepal Rastra Bank: `client` = Forex API behind
 `get_nrb_forex`; `http` = shared host guard + `FetchError`; `sitemap`+`classify`
 = Phase 2 URL inventory; `wp_api`+`documents`+`attachments`+`page` = Phase 3
@@ -297,8 +302,17 @@ process, `router`/`jobs_router` = `/v1/departments` + `/v1/ingest-jobs`).
   then add `<name>.SPEC` to `LOCAL_TOOLS`. The engine (`registry.py`) never changes.
 
 ## Endpoints
-Public: `/health`, `POST /auth/register`, `POST /auth/login`.
-Authed (JWT): `GET /users/me`, `GET /users` (admin), `POST /v1/chat`,
+Public: `/health`, `POST /auth/login` (local password OR Active Directory,
+decided by the user's own `auth_provider` — 401 rejected / 403 inactive /
+**429 throttled, `Retry-After`** / **503 directory unreachable, which is NOT a
+wrong password**).
+Admin: `POST /auth/register` (creates a **local** account for service or
+break-glass use; unauthenticated ONLY while the `users` table is empty, where it
+mints the first admin).
+Authed (JWT): `GET /users/me`, `GET /users` (admin; `?q=` = case-insensitive
+email substring, LIKE wildcards literal), `PATCH /users/{id}` (admin,
+`{is_active}` only — 409 on self-deactivation or the last active admin),
+`POST /v1/chat`,
 `POST /v1/nrb/runs` (admin, 202 `{started, run}` / 409 same shape when busy),
 `GET /v1/nrb/runs/{id}` (admin), `GET /v1/nrb/status` (admin, `?department=`),
 `GET /v1/tools`, `GET /v1/mcp/status`, `POST /v1/files` (upload .xlsx/.csv/
@@ -312,7 +326,8 @@ newest first; `?source=` filters),
 `GET /v1/sessions`, `GET /v1/sessions/{id}`, `DELETE /v1/sessions/{id}`,
 `POST /v1/departments` (admin), `GET /v1/departments` (admin → all; member →
 granted+active, i.e. the frontend's tabs), `PATCH /v1/departments/{code}`
-(admin), `GET|POST /v1/departments/{code}/members` (admin),
+(admin), `GET|POST /v1/departments/{code}/members` (admin; POST takes `user_id` **XOR**
+`email`),
 `DELETE /v1/departments/{code}/members/{user_id}` (admin),
 `POST /v1/departments/{code}/documents` (admin, multipart → 202
 `{document_id, job_id}`; 400 bad ext/empty, 409 duplicate content, 413 over cap),
@@ -385,8 +400,84 @@ it was folded in.
   (`Settings.rag_docs_base`, mirroring `filestore.base_dir()`). Three processes read
   that tree now — API, worker, download route — and a CWD-relative resolve makes
   them disagree silently.
-- Auth: JWT (PyJWT HS256) + bcrypt. Provider-agnostic User (email, auth_provider,
-  nullable password_hash, role admin|member). **First registered user → admin.**
+- Auth: JWT (PyJWT HS256) + bcrypt. User = email, `auth_provider` (`local`|`ad`),
+  nullable password_hash, role admin|member. **First registered user → admin, and
+  that rule is REGISTRATION-ONLY.**
+- **`/auth/login` dispatches on `auth_provider`; it is never a fallback chain.** A
+  `local` user is checked against bcrypt and Active Directory is not consulted; an
+  `ad` user is checked against the directory and their (always NULL) hash is not.
+  "Try AD then local" would let an offboarded employee keep signing in on a stale
+  hash after AD disabled them; "try local first" would let a local password shadow
+  an AD identity. `ck_users_credential` makes the illegal state unrepresentable —
+  a local user MUST have a hash, an `ad` user MUST NOT — and
+  `ck_users_auth_provider` closes the vocabulary because the dispatch reads it
+  (adding a provider means editing the CHECK, same rule as `ck_documents_status`).
+  With `AD_AUTH_ENABLED=false` an existing `ad` user gets **503, never a local
+  fallback**. Six things a rewrite must not lose:
+  (1) **the "first user → admin" rule must never reach the provisioning path** —
+  `_resolve_role` counts rows and is reachable only from `register`, while
+  `users_repo.resolve_directory_role` consults ADMIN_EMAILS alone; otherwise
+  whoever signs in first on a fresh deploy owns the system (AST-locked in
+  `tests/test_directory_provisioning_rules.py`);
+  (2) **an unreachable directory is 503, a rejected credential is 401** — the shim
+  answers only `Success`/`Failed`, so `DirectoryOutcome` is THREE states and an
+  unrecognised body (empty, IIS error page, SOAP fault, redirect) is a malfunction,
+  not a rejection: rendering an outage as "invalid password" sends the whole office
+  to reset passwords that were never wrong;
+  (3) **`UNAVAILABLE` must not consume a throttle attempt**, or an AD outage locks
+  everyone out for the lockout period on top of the outage;
+  (4) **the shim takes credentials in the QUERY STRING over plain HTTP, so the URL
+  is a secret** — `directory.py` never logs the URL, the params, the response BODY
+  (a shim echoing the query back would put the password in it) or the caught
+  exception *object* (`httpx.HTTPStatusError.__str__` embeds the URL, so
+  `f"failed: {exc}"` is a credential leak), and it pins the `httpx`/`httpcore`
+  loggers at WARNING because they log request URLs at DEBUG;
+  (5) **`is_active` is checked AFTER the credential**, as it always was — checking
+  first would make a disabled account answer 403 to any password and confirm it
+  exists;
+  (6) `register` is admin-only because public registration let anyone pre-register
+  a colleague's address as a `local` account and permanently shadow their AD
+  identity — and on an empty table take admin with it.
+- **`is_active=false` is the offboarding switch; disabling the AD account is
+  NOT.** AD is consulted at the login boundary only, so an account disabled in AD
+  keeps working through an already-issued JWT until it expires — up to
+  `JWT_EXPIRE_MINUTES` (**24h** by default, and there is no refresh flow to
+  shorten). `get_current_user` re-reads the user row every request, so clearing
+  `is_active` takes effect on the holder's very next call. Anyone writing an
+  offboarding runbook needs both steps, in that order of importance.
+  `PATCH /users/{id}` is that lever, and its guards are a PURE function
+  (`app/users/policy.py`) for a reason: refusing self-deactivation and refusing
+  the last active admin are the two ways to lock everyone out of the deployment,
+  and the last-admin branch cannot be safely rehearsed against a real database —
+  proving it needs reducing that database to one admin. `count_active_admins`
+  takes `FOR UPDATE` so two admins deactivating each other concurrently cannot
+  both pass the guard. **`role` is deliberately NOT patchable** (`extra="forbid"`
+  rejects it loudly rather than ignoring it): promotion is an escalation surface
+  wanting its own guards, ADMIN_EMAILS designates admins at creation, and
+  changing an existing user's role is still a SQL-only operation.
+- **Login is throttled, and that is an AD requirement, not hygiene.** Once
+  `/auth/login` forwards a credential to the domain, an unthrottled endpoint is a
+  remote way to trip the **AD lockout counter on every account in the company**.
+  `app/auth/throttle.py` limits per identifier (both providers), so keep
+  `LOGIN_MAX_ATTEMPTS` below the domain's own threshold. Counters are **per
+  process** — N uvicorn workers means N x the limit — and eviction under the size
+  bound deliberately **prefers UNLOCKED entries**, because if a flood of distinct
+  identifiers could evict a locked one, the flood would be a way to clear a
+  lockout.
+- **A test that creates a user must now supply a password_hash or an admin token.**
+  Two consequences of the above that already bit once: a fixture inserting
+  `auth_provider='local'` with a NULL hash violates `ck_users_credential` (it was
+  creating a user who could never log in), and the `_auth` helpers duplicated
+  across ~12 integration test modules had to gain `_ensure_user`, which logs in as
+  the seeded admin before registering. Those helpers **skip on auth failure**, so
+  breaking them turns 86 tests into silent skips that a green run hides — compare
+  the skip count, not just the pass count.
+- **AD has never been reached from a dev environment.** `10.10.0.66` is unroutable
+  here, so UPN-vs-sAMAccountName and the real response envelope (ASMX usually
+  wraps it `<string>Success</string>`) are **unverified against the live service**.
+  The parser is tolerant of both, but if AD turns out to reject UPN the identifier
+  mapping needs a nullable UNIQUE `ad_username` column — a schema change, not a
+  tweak, because the shim returns no email to key on.
 - Agent loop is **hand-rolled, no framework** — keep it readable/commented.
 - **Never** use the `ollama` SDK, and don't add the `openai` SDK either — we call
   the model server's OpenAI-compatible REST surface (`/v1/chat/completions`,

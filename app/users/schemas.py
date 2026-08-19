@@ -17,6 +17,21 @@ class UserOut(BaseModel):
     updated_at: datetime
 
 
+class UserUpdate(BaseModel):
+    """What an admin may change about a user.
+
+    `extra="forbid"` on purpose: `role` is NOT patchable here. Promotion is a
+    privilege-escalation surface that needs its own guards (self-demotion, the
+    last admin) and its own audit story, and ADMIN_EMAILS already designates
+    admins at creation time. A request trying to set `role` is refused loudly
+    rather than having the field silently ignored.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    is_active: bool
+
+
 class UserListResponse(BaseModel):
     total: int
     limit: int

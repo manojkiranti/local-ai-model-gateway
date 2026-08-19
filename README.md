@@ -138,13 +138,44 @@ the worker; they read the same tree.
 
 ## Auth model
 
-Provider-agnostic so SSO/OIDC drops in later without a schema rewrite: users are
-identified by `email`, with `auth_provider` ("local" now), a nullable
-`password_hash` (SSO users have none), and a `role` (`admin` | `member`).
+Users are identified by `email`, with `auth_provider` (`local` | `ad`), a
+nullable `password_hash`, and a `role` (`admin` | `member`).
 
-**Admin bootstrap:** the first user to register becomes `admin` (so there's
-always a way in); everyone after is `member`. You can also force specific
-emails to admin via `ADMIN_EMAILS`.
+**Two credential stores, one login endpoint, and never a fallback between them.**
+`POST /auth/login` reads the user's `auth_provider` and consults exactly one:
+
+| provider | checked against | `password_hash` |
+| -------- | --------------- | --------------- |
+| `local`  | bcrypt hash in Postgres | required |
+| `ad`     | the Active Directory shim (`app/auth/directory.py`) | always NULL |
+
+That asymmetry is the point. "Try AD, then fall back to local" would let an
+offboarded employee keep signing in on a stale hash after their AD account was
+disabled; "try local first" would let a locally-set password shadow an AD
+identity. `ck_users_credential` enforces the same rule in the database, so one
+identity can never hold two ways in.
+
+An email with no user row is the one case that asks AD without knowing the
+provider in advance; a `Success` there creates the row (`auth_provider='ad'`,
+`role='member'`). The new user can chat immediately but sees **no department
+corpus** until an admin grants one.
+
+Set `AD_AUTH_ENABLED=true` + `AD_AUTH_BASE_URL` to switch it on; with it off,
+login behaves exactly as it did before AD existed.
+
+**Admin bootstrap:** on an empty `users` table the first registration is allowed
+unauthenticated and becomes `admin`. After that, `POST /auth/register` is
+**admin-only** — it creates local service and break-glass accounts. `ADMIN_EMAILS`
+forces specific addresses to admin, including directory users, which is how a
+staff admin is designated without any local account at all.
+
+Registration is not public because it was a real hole: anyone could pre-register
+a colleague's address as a `local` account and permanently shadow their AD
+identity, and on an empty database the first-user rule would make them admin.
+
+**Keep at least one local admin.** The AD shim is a single host; if it is
+unreachable, directory sign-in returns 503 and a local account is the only way
+back in.
 
 ## Endpoints
 
@@ -153,8 +184,10 @@ Full, current list is in Swagger at `/docs`. The main groups:
 | Method | Path | Auth | Description |
 | ------ | ---- | ---- | ----------- |
 | GET | `/health` | none | Liveness + Ollama reachability. |
-| POST | `/auth/register` · `/auth/login` | none | Create a local user · get a JWT. |
-| GET | `/users/me` · `/users` | bearer · +admin | Current user · list users. |
+| POST | `/auth/login` | none | Get a JWT. Local password or Active Directory, decided by the user's record. 429 when throttled, **503 when the directory is unreachable — not a bad password**. |
+| POST | `/auth/register` | admin | Create a local account (service / break-glass). Unauthenticated only on an empty database, where it mints the first admin. |
+| GET | `/users/me` · `/users` | bearer · +admin | Current user · list/search users (`?q=` email substring). |
+| PATCH | `/users/{id}` | admin | `{is_active}` — the offboarding switch, effective on the user's next request. 409 for self-deactivation or the last active admin. |
 | POST | `/v1/chat` | bearer | The unified chat turn — streaming or not, tool-capable, persisted. Pass `department` to scope it to a department's documents. Returns `sources`: the documents the answer was grounded in (on the `done` event when streaming). |
 | GET | `/v1/tools` · `/v1/mcp/status` | bearer | Available tools · MCP connection badge. |
 | POST/GET | `/v1/files` · `/v1/files/{id}` | bearer | Upload/list/download per-user files (owner-scoped). |
@@ -169,7 +202,10 @@ Full, current list is in Swagger at `/docs`. The main groups:
 # 0) health (200 if Ollama is up, 503 degraded otherwise)
 curl -s http://localhost:8000/health | jq
 
-# 1) register (first user -> admin)
+# 1) register. Unauthenticated ONLY while the users table is empty, where it
+#    creates the first admin. After that this needs an admin bearer token
+#    (add -H "Authorization: Bearer $TOKEN"), and AD users never register at
+#    all -- their row is created by their first successful sign-in.
 curl -s -X POST http://localhost:8000/auth/register \
   -H 'Content-Type: application/json' \
   -d '{"email":"admin@example.com","password":"supersecret123"}' | jq

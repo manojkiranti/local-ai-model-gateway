@@ -30,6 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..auth.dependencies import get_current_user, require_admin
 from ..config import get_settings
 from ..db.session import get_session
+from ..users import repository as users_repo
 from ..users.models import ROLE_ADMIN, User
 from . import documents as docs_repo
 from . import jobs as jobs_repo
@@ -136,9 +137,22 @@ async def grant_member(
     session: AsyncSession = Depends(get_session),
 ) -> Response:
     dept = await _require_department(session, code)
+
+    user_id = body.user_id
+    if user_id is None:
+        # Granting by email: resolve it here rather than trusting the client to
+        # have looked the id up correctly. Same 404 as an unknown id, so the two
+        # spellings of "that user does not exist" read identically.
+        user = await users_repo.get_by_email(session, body.email.lower())
+        if user is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Unknown user"
+            )
+        user_id = user.id
+
     try:
         await repo.grant_department(
-            session, user_id=body.user_id, department_id=dept.id,
+            session, user_id=user_id, department_id=dept.id,
             granted_by=admin.id,
         )
         await session.commit()

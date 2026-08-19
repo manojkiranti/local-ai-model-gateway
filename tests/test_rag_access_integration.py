@@ -18,6 +18,11 @@ from app.rag import repository as repo
 from app.rag.access import resolve_department
 from app.users.models import ROLE_ADMIN, ROLE_MEMBER, User
 
+# Not a real bcrypt digest, and it does not need to be: nothing here logs in.
+# It only has to be NOT NULL to satisfy `ck_users_credential`, which forbids a
+# 'local' user without a password (and an 'ad' user with one).
+PLACEHOLDER_HASH = "x" * 60
+
 
 def _run(fn):
     """Run `fn(session)` against a fresh engine, disposed in the same loop."""
@@ -65,9 +70,13 @@ def env():
         off = await repo.create_department(s, code=state["off_code"], name="Off")
         off.is_active = False
         await s.flush()
+        # `password_hash` is required for a 'local' user by
+        # `ck_users_credential` — see the note beside PLACEHOLDER_HASH.
         member = User(email=f"m{tag}@example.com", auth_provider="local",
+                      password_hash=PLACEHOLDER_HASH,
                       role=ROLE_MEMBER, is_active=True)
         admin = User(email=f"a{tag}@example.com", auth_provider="local",
+                     password_hash=PLACEHOLDER_HASH,
                      role=ROLE_ADMIN, is_active=True)
         s.add_all([member, admin])
         await s.flush()

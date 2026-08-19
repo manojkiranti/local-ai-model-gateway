@@ -9,6 +9,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Repo root (app/config.py -> app -> repo). Used to anchor relative paths so they
@@ -38,6 +39,31 @@ class Settings(BaseSettings):
     # admin. Additionally, if the users table is empty, the first registrant
     # becomes admin so there's always a way in.
     admin_emails: str = ""
+
+    # --- Active Directory authentication -------------------------------------
+    # An internal HTTP shim in front of AD. It answers ONLY "Success" or
+    # "Failed": no email, no display name, no group membership. So it decides
+    # authentication and nothing else — `role` and department grants stay in
+    # Postgres, granted by an admin. See app/auth/directory.py.
+    #
+    # Off by default: with `ad_auth_enabled=false` login behaves exactly as it
+    # did before AD existed.
+    ad_auth_enabled: bool = False
+    # Base URL of the shim's .asmx service. The /AD_Authentication method name
+    # is HARDCODED in app/auth/directory.py — like NRB's /rates, the host is
+    # config and the path is not, so nothing user-supplied reaches the URL.
+    ad_auth_base_url: str = ""
+    ad_auth_connect_timeout: float = 5.0
+    ad_auth_read_timeout: float = 10.0
+
+    # --- Login rate limiting -------------------------------------------------
+    # Applies to BOTH providers. It exists mainly because of AD: an unthrottled
+    # /auth/login is a remote way to trip the DOMAIN lockout counter on every
+    # account in the company. Keep `login_max_attempts` below the domain's own
+    # lockout threshold. Counters are per PROCESS — see app/auth/throttle.py.
+    login_max_attempts: int = 5
+    login_attempt_window_seconds: int = 300
+    login_lockout_seconds: int = 900
 
     # --- Ollama ---
     ollama_base_url: str = "http://localhost:11434"
@@ -175,6 +201,23 @@ class Settings(BaseSettings):
 
     # --- CORS (frontend talks only to this gateway) ---
     cors_origins: str = "*"  # comma-separated, or "*" for all (dev)
+
+    # --- validation ---
+    @model_validator(mode="after")
+    def _check_ad_auth(self) -> "Settings":
+        """Fail at import, not at the first login attempt.
+
+        A deployment that switches AD on but forgets the URL would otherwise
+        look configured and then answer 503 to every directory user.
+        """
+        if self.ad_auth_enabled and not self.ad_auth_base_url.strip():
+            raise ValueError(
+                "AD_AUTH_ENABLED is true but AD_AUTH_BASE_URL is empty; "
+                "set the .asmx service base URL or disable AD auth"
+            )
+        if self.login_max_attempts < 1:
+            raise ValueError("LOGIN_MAX_ATTEMPTS must be at least 1")
+        return self
 
     # --- parsed helpers ---
     @staticmethod
