@@ -1,28 +1,47 @@
 # Frontend sync prompt
 
-Paste the block below into a Claude CLI session running in the FRONTEND repo to
-audit it against this gateway's current API contract. (As of 2026-08 the existing
-frontend was confirmed working against the OpenAI-transport gateway with **no
-changes** — the port was gateway↔Ollama only. Keep this as a re-check tool for
-future contract changes.)
+Paste the fenced block below into a Claude CLI session running in the FRONTEND
+repo (`local-ai-model-frontend`). It carries this gateway's current API contract
+and asks that session to build to it.
 
-**2026-08-19: the contract DID change.** `/v1/chat` (both paths) and
-`GET /v1/sessions/{id}` now carry `sources`, and there is a new document download
-route. Additive — nothing was removed or renamed — so an existing frontend keeps
-working; it just shows no citations until it reads the new field.
+**Current task in that block: render chat source citations** (added 2026-08-19).
+`/v1/chat` — both the JSON body and the stream's `done` event — plus
+`GET /v1/sessions/{id}` now return `sources`, and there is a new document download
+route. The change is **additive**: nothing was removed or renamed, so the existing
+frontend keeps working; it simply shows no citations until it reads the new field.
+
+History, so the block's framing is not mistaken for the whole story: this file
+began as a no-op re-check after the 2026-08 gateway↔Ollama transport port, which
+changed nothing in the gateway's own HTTP API. That audit passed with no frontend
+changes. Keep this file as the standing sync tool — when the contract changes
+again, update the contract section AND the task section together, or a future
+paste will tell an agent to verify drift that it should be building.
 
 ---
 
 ```
-You are working in the FRONTEND repo for the "Local LLM Gateway" product. The
-gateway backend was refactored so that internally it talks to Ollama over the
-OpenAI-compatible /v1 API instead of Ollama's native API. IMPORTANT: that change
-is entirely gateway↔Ollama. The gateway's OWN HTTP API — the one this frontend
-calls — did NOT change. Your job is to VERIFY this frontend still matches the
-gateway's current contract (below) and fix any drift you find. Do not add any
-"OpenAI" or model-server logic to the frontend; it never talks to Ollama.
+You are working in the FRONTEND repo for the "Local LLM Gateway" product. This
+frontend talks ONLY to the gateway (base URL below) with a JWT bearer token. It
+never talks to Ollama, a model server or the database, and it must never gain
+"OpenAI"/model-server logic — the gateway is the single front door and executes
+all tools itself.
 
-Only modify files in THIS frontend repo. Do not touch the gateway.
+TWO JOBS, in this order:
+
+  (A) BUILD the chat source-citations UI. The gateway now returns `sources` on a
+      chat answer: the department documents that answer was grounded in, with page
+      numbers, a download link, and — for Nepal Rastra Bank documents — how the
+      text was extracted. Nothing renders it yet. Details and the mandatory
+      rendering rules are in the CHAT section and the RENDERING RULES below.
+
+  (B) VERIFY the rest of the API layer still matches the contract below, and fix
+      genuine drift. The contract is additive versus what this frontend was last
+      synced to, so expect (B) to find little or nothing.
+
+Only modify files in THIS frontend repo. Do not touch the gateway. If something in
+the contract looks wrong or impossible to implement as written, say so rather than
+guessing — the contract is generated from the gateway's tests, so a real conflict
+is worth reporting back.
 
 === Gateway API contract (base URL http://localhost:8000) ===
 
@@ -134,11 +153,38 @@ MCP status badge (authed): GET /v1/mcp/status -> always 200, health is in the bo
   {configured, reachable, tools, error}. Never treat a non-reachable MCP as a failure.
 
 === What to actually do ===
-1. Find this frontend's API layer (auth, chat, sessions, files calls).
-2. Diff it against the contract above. Report any mismatch: wrong field names,
-   wrong endpoint paths, wrong streaming event handling, treating tool_call
-   arguments as a string, missing X-Session-Id read, <a href> file downloads, etc.
-3. Fix only genuine mismatches. If it already matches, say so and change nothing.
-4. Do NOT add Ollama/OpenAI/model logic — the frontend only speaks to the gateway.
-Report what you found and what (if anything) you changed.
+
+JOB A — build the citations UI:
+1. Find where an assistant message is rendered, and where a chat response (both
+   the non-streaming JSON and the NDJSON `done` event) is parsed into state.
+2. Carry `sources` through into that state. It is `null` for most turns; treat
+   null and [] differently (see RENDERING RULES) — null means "no corpus was
+   searched", so render nothing at all, not an empty "Sources" heading.
+3. Render a Sources area under the answer: one entry per document, with its title,
+   its pages if any, and a link that DOWNLOADS the document. The download is
+   behind JWT, so fetch it with the Authorization header, take the blob, and make
+   a blob: URL — an <a href> to the endpoint cannot send the token and will 401.
+   This frontend already does exactly that for /v1/files/{id}; reuse that helper.
+4. When `machine_recovered` is true, render `verify_note` prominently on that
+   source — a visible warning, not a tooltip and not muted small print. This is
+   the one rule in this task that is not cosmetic: that document's text was
+   produced by OCR or by a legacy-Nepali-font conversion that no human has checked,
+   so a figure, date or name shown from it may be wrong. Also show `routes` (how
+   each page was extracted) and, when `source_url` is present, a link to the
+   official public page so a user can verify against the original.
+5. When `cited` is false, present the entry as "related" rather than as the source
+   of a specific sentence — the model did not mark which claim came from it.
+6. Do the same on a reloaded thread: GET /v1/sessions/{id} replays `sources` on
+   each assistant message, so history must render identically to a live turn.
+7. Do not persist `download_url` anywhere; always take it from the response. It is
+   derived server-side and may change.
+
+JOB B — verify the rest:
+8. Diff this frontend's API layer against the contract above: field names,
+   endpoint paths, streaming event handling, `tool_call.arguments` being an OBJECT
+   not a string, reading the X-Session-Id header, and no <a href> file downloads.
+9. Fix only genuine mismatches. If a part already matches, say so and change it not.
+
+Report: what you built for JOB A (with the file paths), what JOB B found, and
+anything in the contract you could not implement as specified.
 ```
