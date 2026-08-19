@@ -81,7 +81,7 @@ OpenCV libraries) plus stale env-template edits; its one useful piece
   `RetrievedChunk.file_name` / `.file_type`;
   `GET /v1/departments/{code}/documents/{id}/download`.
 
-- [ ] **Step 1: Confirm the starting point**
+- [x] **Step 1: Confirm the starting point**
 
 ```bash
 git rev-parse --abbrev-ref HEAD      # expect: feat/citations-v2
@@ -89,7 +89,7 @@ git status --porcelain               # expect: empty
 git log --oneline main..HEAD         # expect: only the spec commit
 ```
 
-- [ ] **Step 2: Cherry-pick the implementation commit, leaving it staged**
+- [x] **Step 2: Cherry-pick the implementation commit, leaving it staged**
 
 ```bash
 git cherry-pick -n 2779867
@@ -99,7 +99,7 @@ Expected: one conflict, `CONFLICT (content): Merge conflict in app/rag/retrieval
 Every other file applies cleanly. This is a "both added fields" conflict, not a
 semantic one.
 
-- [ ] **Step 3: Resolve `app/rag/retrieval.py` by keeping both sides**
+- [x] **Step 3: Resolve `app/rag/retrieval.py` by keeping both sides**
 
 `main` added `dense_rank`/`lexical_rank`/`chunk_metadata`/`doc_metadata` (§29);
 v1 added `file_name`/`file_type`. Both are wanted. The dataclass tail becomes:
@@ -143,7 +143,7 @@ grep -c '<<<<<<<\|>>>>>>>' app/rag/retrieval.py   # expect: 0
 git add app/rag/retrieval.py
 ```
 
-- [ ] **Step 4: Run the citation unit tests**
+- [x] **Step 4: Run the citation unit tests**
 
 ```bash
 .venv/bin/pytest tests/test_rag_sources.py tests/test_rag_source_presentation.py -q
@@ -154,7 +154,7 @@ Expected: PASS. These are pure — no Postgres, no model server.
 `test_rag_source_presentation.py` is the anti-fabrication guard the whole feature
 rests on — if it fails, stop and fix it before anything else.
 
-- [ ] **Step 5: Run the suites the cherry-pick touched**
+- [x] **Step 5: Run the suites the cherry-pick touched**
 
 ```bash
 .venv/bin/pytest tests/test_search_department_docs.py tests/test_rag_sources_persistence.py \
@@ -166,7 +166,7 @@ record which ones skipped. If `test_search_department_docs.py` fails, the NRB
 citation-header tests (§29) and v1's `_format` change disagree: fix by keeping
 `_nrb_provenance` in `_header` **and** v1's `(text, presented)` return.
 
-- [ ] **Step 6: Run the whole suite**
+- [x] **Step 6: Run the whole suite**
 
 ```bash
 .venv/bin/pytest -q 2>&1 | tail -20
@@ -175,7 +175,7 @@ citation-header tests (§29) and v1's `_format` change disagree: fix by keeping
 Expected: no new failures versus `main`. Note the baseline first if unsure:
 `git stash && .venv/bin/pytest -q 2>&1 | tail -3 && git stash pop`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A
@@ -206,7 +206,7 @@ revision id is kept, because the dev database is stamped at it.
 - Produces: a single Alembic head at `d4a91f2c7b3e`, whose ancestor chain contains
   all seven NRB revisions.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 """The migration graph must stay a single line.
@@ -251,7 +251,7 @@ def test_every_nrb_revision_is_an_ancestor_of_citations():
     assert "c33c0fd56028" in chain
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 ```bash
 .venv/bin/pytest tests/test_alembic_lineage.py -q
@@ -259,7 +259,7 @@ def test_every_nrb_revision_is_an_ancestor_of_citations():
 
 Expected: FAIL — two heads, and `down_revision` is `c33c0fd56028`.
 
-- [ ] **Step 3: Re-point the revision**
+- [x] **Step 3: Re-point the revision**
 
 In `alembic/versions/d4a91f2c7b3e_add_chat_message_sources.py`:
 
@@ -278,7 +278,7 @@ down_revision: Union[str, None] = "f4c1a90b7d62"
 Also update the `Revises:` line in the module docstring so the file does not
 contradict itself.
 
-- [ ] **Step 4: Run the test and the offline resolution**
+- [x] **Step 4: Run the test and the offline resolution**
 
 ```bash
 .venv/bin/pytest tests/test_alembic_lineage.py -q
@@ -287,7 +287,7 @@ contradict itself.
 
 Expected: PASS, and `alembic heads` prints exactly one revision (`d4a91f2c7b3e`).
 
-- [ ] **Step 5: Prove `base → head` resolves offline, touching no database**
+- [x] **Step 5: Prove `base → head` resolves offline, touching no database**
 
 ```bash
 DATABASE_URL="postgresql+asyncpg://u:p@127.0.0.1:5432/none" \
@@ -297,7 +297,7 @@ DATABASE_URL="postgresql+asyncpg://u:p@127.0.0.1:5432/none" \
 Expected: `13` (main's 5 + NRB's 7 + citations). Exit status 0. This is the same
 check §27.3 ran for the NRB merge; it renders SQL and connects to nothing.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add alembic/versions/d4a91f2c7b3e_add_chat_message_sources.py tests/test_alembic_lineage.py
@@ -328,7 +328,7 @@ this.
 
 **Files:** none. This task changes a development database only.
 
-- [ ] **Step 1: Record the starting state**
+- [x] **Step 1: Record the starting state**
 
 ```bash
 .venv/bin/alembic current
@@ -339,12 +339,12 @@ psql -h 127.0.0.1 -U postgres -d local_ai_gateway -c "\dt nrb_*"
 Expected: `d4a91f2c7b3e`, a `sources` column present, and **no** `nrb_*` tables.
 If any `nrb_*` table exists, STOP — the premise is wrong, re-derive before acting.
 
-- [ ] **Step 2: Ask the user for explicit approval, quoting Step 1's output**
+- [x] **Step 2: Ask the user for explicit approval, quoting Step 1's output**
 
 Say plainly: this drops `chat_messages.sources` (development chat data only) and
 re-stamps the database, then replays 8 migrations. Wait for a yes.
 
-- [ ] **Step 3: Drop the column and reset the stamp**
+- [x] **Step 3: Drop the column and reset the stamp**
 
 ```bash
 psql -h 127.0.0.1 -U postgres -d local_ai_gateway \
@@ -352,7 +352,7 @@ psql -h 127.0.0.1 -U postgres -d local_ai_gateway \
 .venv/bin/alembic stamp c33c0fd56028
 ```
 
-- [ ] **Step 4: Upgrade**
+- [x] **Step 4: Upgrade**
 
 ```bash
 .venv/bin/alembic upgrade head
@@ -360,7 +360,7 @@ psql -h 127.0.0.1 -U postgres -d local_ai_gateway \
 
 Expected: 8 revisions applied (7 NRB + citations), exit 0.
 
-- [ ] **Step 5: Verify**
+- [x] **Step 5: Verify**
 
 ```bash
 .venv/bin/alembic current                                  # d4a91f2c7b3e (head)
@@ -371,7 +371,7 @@ psql -h 127.0.0.1 -U postgres -d local_ai_gateway -c "\dt nrb_*" | wc -l
 
 Expected: head reached, `sources` back as `jsonb`, and the `nrb_*` tables present.
 
-- [ ] **Step 6: Report, do not commit**
+- [x] **Step 6: Report, do not commit**
 
 Nothing to commit — this task produced no file changes. Report exactly what ran
 and what the verification printed.
@@ -395,7 +395,7 @@ call "succeeds", nothing is served, no health check notices.
 - Produces: `app.config.PROJECT_ROOT`, `Settings.rag_docs_base -> str` (absolute).
 - Consumed by: Task 6's `_document_path`.
 
-- [ ] **Step 1: Bring in the failing test**
+- [x] **Step 1: Bring in the failing test**
 
 ```bash
 git checkout a60f08b -- tests/test_config_paths.py
@@ -405,7 +405,7 @@ It asserts four things: a relative value anchors to `PROJECT_ROOT`, an absolute
 value passes through, the answer is independent of `os.chdir`, and the result is
 absolute.
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 ```bash
 .venv/bin/pytest tests/test_config_paths.py -q
@@ -413,7 +413,7 @@ absolute.
 
 Expected: FAIL — `ImportError: cannot import name 'PROJECT_ROOT' from 'app.config'`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 At the top of `app/config.py`, after the `functools` import:
 
@@ -439,7 +439,7 @@ And, beside the other `@property` helpers on `Settings`:
         return str(path if path.is_absolute() else PROJECT_ROOT / path)
 ```
 
-- [ ] **Step 4: Run the test**
+- [x] **Step 4: Run the test**
 
 ```bash
 .venv/bin/pytest tests/test_config_paths.py -q
@@ -447,7 +447,7 @@ And, beside the other `@property` helpers on `Settings`:
 
 Expected: PASS (4 tests).
 
-- [ ] **Step 5: Switch every call site**
+- [x] **Step 5: Switch every call site**
 
 Replace `settings.rag_docs_dir` with `settings.rag_docs_base` in
 `app/rag/router.py` (upload, typed-text, both compensation deletes, `_accept`, and
@@ -460,7 +460,7 @@ grep -rn "rag_docs_dir" app/ | grep -v "rag_docs_dir:" | grep -v rag_docs_base
 
 Expected: only `app/config.py`'s field declaration.
 
-- [ ] **Step 6: Run the RAG suites**
+- [x] **Step 6: Run the RAG suites**
 
 ```bash
 .venv/bin/pytest tests/test_rag_document_download.py tests/test_config_paths.py -q
@@ -469,7 +469,7 @@ Expected: only `app/config.py`'s field declaration.
 
 Expected: PASS or documented skips; no new failures.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add app/config.py app/rag/router.py app/rag/worker.py tests/test_config_paths.py
@@ -505,7 +505,7 @@ the UI must not undo it.
   `origin`, `source_url`, `published_at`, `routes`, `machine_recovered`,
   `verify_note`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `tests/test_rag_sources_nrb.py`:
 
@@ -631,7 +631,7 @@ def test_the_caveat_is_one_constant_with_two_readers():
     assert tool._RECOVERED_ROUTES is rag_sources.RECOVERED_ROUTES
 ```
 
-- [ ] **Step 2: Run them to verify they fail**
+- [x] **Step 2: Run them to verify they fail**
 
 ```bash
 .venv/bin/pytest tests/test_rag_sources_nrb.py -q
@@ -639,7 +639,7 @@ def test_the_caveat_is_one_constant_with_two_readers():
 
 Expected: FAIL — `ImportError: cannot import name 'VERIFY_NOTE'`.
 
-- [ ] **Step 3: Move the caveat vocabulary into `app/rag/sources.py`**
+- [x] **Step 3: Move the caveat vocabulary into `app/rag/sources.py`**
 
 ```python
 # The vocabulary of a machine-recovered citation, defined ONCE and read twice:
@@ -664,7 +664,7 @@ from ...rag.sources import (
 )
 ```
 
-- [ ] **Step 4: Widen `SourceChunk`**
+- [x] **Step 4: Widen `SourceChunk`**
 
 ```python
 @dataclass(frozen=True)
@@ -684,7 +684,7 @@ class SourceChunk:
     published_at: Optional[str] = None
 ```
 
-- [ ] **Step 5: Roll provenance up per document**
+- [x] **Step 5: Roll provenance up per document**
 
 In `_document_sources`, when creating an entry:
 
@@ -733,7 +733,7 @@ and in the finalizing loop:
             entry["routes"].sort()
 ```
 
-- [ ] **Step 6: Carry `documents.source` through retrieval**
+- [x] **Step 6: Carry `documents.source` through retrieval**
 
 In `app/rag/retrieval.py`'s SELECT, beside `doc.file_name` / `doc.file_type`:
 
@@ -751,7 +751,7 @@ On the dataclass, beside `file_name`/`file_type`:
 
 and in the row mapping: `doc_source=r["doc_source"],`.
 
-- [ ] **Step 7: Populate the new fields in the tool**
+- [x] **Step 7: Populate the new fields in the tool**
 
 In `app/tools/local/search_department_docs.py`, replace the inline `SourceChunk`
 comprehension in `_search_department_docs` with a named builder:
@@ -783,7 +783,7 @@ def _source_chunk(chunk: RetrievedChunk) -> SourceChunk:
 
 and call it: `record_search(department.code, [_source_chunk(c) for c in presented])`.
 
-- [ ] **Step 8: Widen `SourceOut`**
+- [x] **Step 8: Widen `SourceOut`**
 
 In `app/chat/schemas.py`, on `SourceOut`:
 
@@ -802,7 +802,7 @@ In `app/chat/schemas.py`, on `SourceOut`:
     verify_note: Optional[str] = None
 ```
 
-- [ ] **Step 9: Run the tests**
+- [x] **Step 9: Run the tests**
 
 ```bash
 .venv/bin/pytest tests/test_rag_sources_nrb.py tests/test_rag_sources.py \
@@ -813,7 +813,7 @@ Expected: PASS. If `test_a_generic_upload_carries_no_nrb_keys` fails, an NRB key
 is being written unconditionally — it must be inside the `origin == NRB_ORIGIN`
 branch.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add app/rag/sources.py app/rag/retrieval.py app/chat/schemas.py \
@@ -846,7 +846,7 @@ Without this branch every NRB citation's download 404s.
 - Consumes: `Settings.rag_docs_base` (Task 4), the download route (Task 1).
 - Produces: `app.rag.router._document_path(doc, settings) -> Path`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 """An NRB citation's download must read the NRB filestore, not RAG_DOCS_DIR.
@@ -939,7 +939,7 @@ def test_an_nrb_document_falls_back_to_the_metadata_blob_hash(tmp_path, monkeypa
     assert _document_path(doc, FakeSettings(tmp_path / "rag_documents")) == blob
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 ```bash
 .venv/bin/pytest tests/test_rag_document_download_nrb.py -q
@@ -947,7 +947,7 @@ def test_an_nrb_document_falls_back_to_the_metadata_blob_hash(tmp_path, monkeypa
 
 Expected: FAIL — `ImportError: cannot import name '_document_path'`.
 
-- [ ] **Step 3: Implement `_document_path` in `app/rag/router.py`**
+- [x] **Step 3: Implement `_document_path` in `app/rag/router.py`**
 
 ```python
 def _document_path(doc, settings) -> Path:
@@ -979,7 +979,7 @@ def _document_path(doc, settings) -> Path:
 
 Add `from pathlib import Path` if it is not already imported.
 
-- [ ] **Step 4: Use it in the route**
+- [x] **Step 4: Use it in the route**
 
 Replace the route's `resolve_storage_path(...)` block with:
 
@@ -1001,7 +1001,7 @@ a row whose bytes were removed out of band is genuinely nothing to serve, not a 
 The `if not doc.storage_key` pre-check that Task 1 brought in must move **below**
 this, or be deleted: an NRB row is valid without a usable `storage_key`.
 
-- [ ] **Step 5: Run the tests**
+- [x] **Step 5: Run the tests**
 
 ```bash
 .venv/bin/pytest tests/test_rag_document_download_nrb.py tests/test_rag_document_download.py -q
@@ -1009,7 +1009,7 @@ this, or be deleted: an NRB row is valid without a usable `storage_key`.
 
 Expected: PASS (integration cases may SKIP without Postgres — say so if they do).
 
-- [ ] **Step 6: Verify the API import graph is still clean**
+- [x] **Step 6: Verify the API import graph is still clean**
 
 ```bash
 .venv/bin/python -c "
@@ -1021,7 +1021,7 @@ print('leaked:', bad); assert not bad
 
 Expected: `leaked: []`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add app/rag/router.py tests/test_rag_document_download_nrb.py
@@ -1050,7 +1050,7 @@ containers it therefore defaults to `/app/nrb_files` — unshared between
 - Test: `tests/test_env_templates.py` (lift from commit `a60f08b`),
   `tests/test_compose_volumes.py` (create)
 
-- [ ] **Step 1: Bring in the env-template test and write the compose test**
+- [x] **Step 1: Bring in the env-template test and write the compose test**
 
 ```bash
 git checkout a60f08b -- tests/test_env_templates.py
@@ -1102,7 +1102,7 @@ def test_they_all_mount_it_at_the_same_path():
     assert targets == {"/app/nrb_files"}
 ```
 
-- [ ] **Step 2: Run both to verify they fail**
+- [x] **Step 2: Run both to verify they fail**
 
 ```bash
 .venv/bin/pytest tests/test_compose_volumes.py tests/test_env_templates.py -q
@@ -1115,7 +1115,7 @@ and `.env.example sets keys that are not app/config.py settings: ['INSTALL_OCR']
 If `yaml` is missing, install PyYAML into this venv and add it to
 `requirements.txt` under a comment saying it is test-only tooling.
 
-- [ ] **Step 3: Add the volume to `docker-compose.yml`**
+- [x] **Step 3: Add the volume to `docker-compose.yml`**
 
 Add `- nrb_files:/app/nrb_files` to the `volumes:` list of `gateway`, `worker` and
 `nrb-runner`, each with a comment saying why that service needs it, and add
@@ -1132,7 +1132,7 @@ volumes:
   worker_cache:
 ```
 
-- [ ] **Step 4: Document the setting in both templates**
+- [x] **Step 4: Document the setting in both templates**
 
 Add to `.env.docker.example` and `.env.docker`:
 
@@ -1147,7 +1147,7 @@ current defaults from `app/config.py`, and add `INSTALL_OCR` to
 `test_env_templates.py`'s `FOREIGN_KEYS` with a one-line justification (it is a
 Docker **build** arg, not a `Settings` field).
 
-- [ ] **Step 5: Run the tests**
+- [x] **Step 5: Run the tests**
 
 ```bash
 .venv/bin/pytest tests/test_compose_volumes.py tests/test_env_templates.py -q
@@ -1155,7 +1155,7 @@ Docker **build** arg, not a `Settings` field).
 
 Expected: PASS.
 
-- [ ] **Step 6: Validate the compose file parses**
+- [x] **Step 6: Validate the compose file parses**
 
 ```bash
 docker compose config >/dev/null && echo OK
@@ -1164,7 +1164,7 @@ docker compose config >/dev/null && echo OK
 Expected: `OK`. If Docker is unavailable here, say so explicitly rather than
 implying the stack was exercised.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add docker-compose.yml .env.docker .env.docker.example .env.example \
@@ -1190,7 +1190,7 @@ document that was not in the model's context?
 **Files:**
 - Test: `tests/test_citation_eval.py` (create)
 
-- [ ] **Step 1: Write the eval**
+- [x] **Step 1: Write the eval**
 
 ```python
 """Citation resolution eval — 10 labelled turns.
@@ -1277,7 +1277,7 @@ def test_machine_recovered_matches_the_route():
         assert source["machine_recovered"] is flag
 ```
 
-- [ ] **Step 2: Run it**
+- [x] **Step 2: Run it**
 
 ```bash
 .venv/bin/pytest tests/test_citation_eval.py -q
@@ -1286,7 +1286,7 @@ def test_machine_recovered_matches_the_route():
 Expected: PASS, 14 tests. Record the pass rate in the docs update (Task 9). If a
 case fails, the resolver is wrong, not the case — fix `sources.py`.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add tests/test_citation_eval.py
@@ -1310,7 +1310,7 @@ about citations, and the frontend contract does not mention them at all.
 - Modify: `CLAUDE.md`, `AGENTS.md`, `README.md`,
   `docs/frontend-sync-prompt.md`, `docs/nrb-integration.md`
 
-- [ ] **Step 1: `docs/frontend-sync-prompt.md` — the contract the UI reads**
+- [x] **Step 1: `docs/frontend-sync-prompt.md` — the contract the UI reads**
 
 In the contract block, extend the `stream=false` response and the `done` event with
 `"sources": null | [ … ]`, document `SourceOut`'s fields (including the NRB-only
@@ -1328,7 +1328,7 @@ DEPARTMENT DOCUMENT DOWNLOAD (authed):
       legacy-font conversion that no human has checked.
 ```
 
-- [ ] **Step 2: `CLAUDE.md` — endpoints and a gotcha**
+- [x] **Step 2: `CLAUDE.md` — endpoints and a gotcha**
 
 Add the download route to the authed endpoint list; add `sources` to the
 `POST /v1/chat` response description; and add a gotcha paragraph covering: the
@@ -1337,17 +1337,17 @@ budget-surviving passages may be cited; multi-search turns cannot attribute `[N]
 `sources` is not gated by `EXPOSE_TRACE`; `download_url` is derived, never stored;
 and the NRB download resolves from the filestore, not `RAG_DOCS_DIR`.
 
-- [ ] **Step 3: `AGENTS.md` — correct the stale NRB paragraph**
+- [x] **Step 3: `AGENTS.md` — correct the stale NRB paragraph**
 
 It still says the recovery cache and supersession "do not exist" and that Phase 8
 "is not started"; all three are done (§21, §22, §29). Fix those sentences and add
 citations to the core contracts list.
 
-- [ ] **Step 4: `README.md`**
+- [x] **Step 4: `README.md`**
 
 Add the download endpoint and the `sources` field to the endpoint tables.
 
-- [ ] **Step 5: `docs/nrb-integration.md` — a new §30**
+- [x] **Step 5: `docs/nrb-integration.md` — a new §30**
 
 Write "§30. Citations un-deferred — chat-level source citations (v2)" covering:
 the §27.4 lineage step as executed (rebased revision, one head, the dev-DB
@@ -1359,7 +1359,7 @@ eval (Task 8's 10 cases + observed pass rate), feedback capture
 (`chat_messages.sources` as the audit log; out-of-range marker logging), and
 review loop (first corpus ingest, first UI render, after §15's Nepali review).
 
-- [ ] **Step 6: Run the full suite one last time**
+- [x] **Step 6: Run the full suite one last time**
 
 ```bash
 .venv/bin/pytest -q 2>&1 | tail -10
@@ -1367,7 +1367,7 @@ review loop (first corpus ingest, first UI render, after §15's Nepali review).
 
 Expected: no failures; report which suites skipped and why.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add CLAUDE.md AGENTS.md README.md docs/frontend-sync-prompt.md docs/nrb-integration.md
@@ -1384,3 +1384,44 @@ Passage-level payloads and inline `[N]` anchor mapping; reranking or abstention;
 a global cross-department NRB corpus (§29.1); the UI itself, which lives in the
 separate `local-ai-model-frontend` repo. Running the NRB corpus ingest is
 independent work that this feature does not block and is not blocked by.
+
+---
+
+## Execution record (2026-08-19)
+
+All nine tasks executed on `feat/citations-v2`. Final state: **2,056 passed, 6
+skipped, 1 failed** — the failure is `test_rag_reingest_integration.py::
+test_department_filter_restricts_the_set` (`assert 644 == 2`), which depends on the
+dev database being nearly empty and **failed identically on a stashed baseline
+before any of this work**. Baselines were taken by stashing rather than assumed:
+batch 1 was 63F/68E before and after Task 1, batch 2 was 112F before and after.
+
+Five deviations from the plan as written, each because reality disagreed:
+
+1. **Task 3 took a non-destructive route.** Inspection found 104 of 2,003
+   `chat_messages` rows already holding `sources` from v1 dev testing, which made
+   the planned `DROP COLUMN` lossier than the plan assumed. The user chose
+   `stamp c33c0fd56028 → upgrade f4c1a90b7d62 → stamp d4a91f2c7b3e`: same end
+   schema, no column dropped, no row lost. Evidence it worked — 45 NRB tests that
+   were failing purely for want of those tables now pass.
+2. **`get_heads()` returns a list, not a tuple.** Task 2's test asserted a tuple.
+   The test was wrong, not the code.
+3. **The plan's page-aggregation eval case was wrong.** It cited `[1]` over three
+   passages and expected two pages; resolution maps markers to PASSAGES, so `[5]`
+   alone was correct. Fixed the case to cite all three.
+4. **Two test stubs predated production changes and needed updating**:
+   `test_rag_source_presentation.py`'s `RetrievedChunk` helper (missing
+   `dense_rank`/`lexical_rank`, added to `main` by §29 after v1 was written) and
+   `test_nrb_document_resolution.py`'s settings stub (supplied `rag_docs_dir` to a
+   function that now reads `rag_docs_base`).
+5. **One task was added: an end-to-end `/v1/chat` test** (`tests/
+   test_chat_sources_integration.py`, 7 cases). The plan's coverage stopped at the
+   tool (string) and at persistence (rows written directly), leaving the actual
+   product path — the collector contextvar inside the streaming generator —
+   unexercised. That is precisely where `file_sink` and `rag_context` have each
+   been got wrong before, so it was worth closing rather than noting.
+
+Not verified, and not verifiable here: the Compose stack was never brought up with
+the new `nrb_files` volume (`docker compose config` validates the file, which per
+§18 is not the same thing as a working image), and no live model was called — every
+chat test fakes Ollama and retrieval.
