@@ -256,7 +256,7 @@ async def upload_document(
         )
 
     storage_key = mint_storage_key(dept.code, file.filename or "document")
-    write_document(data, storage_key, settings.rag_docs_dir)
+    write_document(data, storage_key, settings.rag_docs_base)
 
     try:
         doc = await docs_repo.create_document(
@@ -268,14 +268,14 @@ async def upload_document(
     except docs_repo.DocumentConflict as exc:
         # Compensate: the bytes are already on disk and nothing will reference
         # them now. A duplicate upload must not leak a file.
-        delete_document(storage_key, settings.rag_docs_dir)
+        delete_document(storage_key, settings.rag_docs_base)
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
     except Exception:
-        delete_document(storage_key, settings.rag_docs_dir)
+        delete_document(storage_key, settings.rag_docs_base)
         raise
 
     return await _accept(
-        session, doc, storage_key=storage_key, docs_dir=settings.rag_docs_dir
+        session, doc, storage_key=storage_key, docs_dir=settings.rag_docs_base
     )
 
 
@@ -303,7 +303,7 @@ async def create_text_document(
     # Stored as a .txt under the same tree so the worker has one read path.
     storage_key = mint_storage_key(dept.code, "typed.txt")
     data = content.encode("utf-8")
-    write_document(data, storage_key, settings.rag_docs_dir)
+    write_document(data, storage_key, settings.rag_docs_base)
 
     try:
         doc = await docs_repo.create_document(
@@ -312,14 +312,14 @@ async def create_text_document(
             storage_key=storage_key, file_name=None, uploaded_by=admin.id,
         )
     except docs_repo.DocumentConflict as exc:
-        delete_document(storage_key, settings.rag_docs_dir)
+        delete_document(storage_key, settings.rag_docs_base)
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
     except Exception:
-        delete_document(storage_key, settings.rag_docs_dir)
+        delete_document(storage_key, settings.rag_docs_base)
         raise
 
     return await _accept(
-        session, doc, storage_key=storage_key, docs_dir=settings.rag_docs_dir
+        session, doc, storage_key=storage_key, docs_dir=settings.rag_docs_base
     )
 
 
@@ -437,7 +437,7 @@ async def download_department_document(
 
     settings = get_settings()
     try:
-        path = resolve_storage_path(doc.storage_key, settings.rag_docs_dir)
+        path = resolve_storage_path(doc.storage_key, settings.rag_docs_base)
     except StorageError as exc:
         # The key is ours, but it round-tripped through the database, so it is
         # treated as untrusted coming back. A traversal attempt is a 404 to the

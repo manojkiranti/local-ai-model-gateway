@@ -153,7 +153,7 @@ def _document_path(snap: DocSnapshot, settings: Settings) -> Path:
 
     if not snap.storage_key:
         raise ParseError(f"document {snap.id} has no storage_key")
-    path: Path = resolve_storage_path(snap.storage_key, settings.rag_docs_dir)
+    path: Path = resolve_storage_path(snap.storage_key, settings.rag_docs_base)
     if not path.exists():
         raise ParseError(f"stored file is missing: {snap.storage_key}")
     return path

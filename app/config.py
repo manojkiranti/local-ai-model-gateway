@@ -6,9 +6,17 @@ environment, never be baked into source.
 """
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Repo root (app/config.py -> app -> repo). Used to anchor relative paths so they
+# do not depend on a process's working directory — the API, the ingest worker and
+# the citation download route are separate readers that must resolve the corpus
+# to the SAME place. `app/nrb/filestore.base_dir()` already does this for the NRB
+# blob tree, for exactly the same reason.
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
 class Settings(BaseSettings):
@@ -198,6 +206,20 @@ class Settings(BaseSettings):
     @property
     def fetch_url_allowed_hosts(self) -> list[str]:
         return [h.lower() for h in self._csv(self.fetch_url_allowlist)]
+
+    @property
+    def rag_docs_base(self) -> str:
+        """Absolute corpus directory. A relative RAG_DOCS_DIR is anchored to the
+        PROJECT ROOT, never the process CWD, so the API (which writes uploads),
+        the worker (which reads them) and the download route (which serves them)
+        resolve the same tree no matter how each was launched. An absolute value
+        is used verbatim.
+
+        A CWD-relative read is the §18 failure class: the call "succeeds", the
+        row says `ready`, and nothing is ever served.
+        """
+        path = Path(self.rag_docs_dir)
+        return str(path if path.is_absolute() else PROJECT_ROOT / path)
 
     @property
     def rag_skipped_sections(self) -> set[str]:
