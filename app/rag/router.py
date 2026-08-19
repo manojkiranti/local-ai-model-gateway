@@ -10,6 +10,7 @@ use.
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
 from fastapi import (
     APIRouter,
@@ -391,6 +392,34 @@ def _download_filename(doc) -> str:
     return f"{base}.txt"
 
 
+def _document_path(doc, settings) -> Path:
+    """Where this document's bytes actually live.
+
+    Two trees, because §28 removed the per-corpus copy. An NRB document's bytes
+    exist once, content-addressed under `NRB_FILES_DIR`; everything else lives
+    under `RAG_DOCS_DIR`. The NRB key is RECONSTRUCTED from the content hash
+    rather than read from `storage_key`, exactly as `worker._document_path` does:
+    a row minted under the old copy scheme carries a `RAG_DOCS_DIR`-style key that
+    no longer points at anything, and following it would 404 a document that is
+    present on disk. `metadata.blob_sha256` is the same digest again, kept as the
+    fallback for a row whose `content_hash` was never backfilled.
+
+    The `app.nrb` import is local so the module graph stays honest about what the
+    API loads; `filestore` is stdlib + config only and pulls in no worker
+    dependency (no docling, no torch, no OCR stack).
+    """
+    if (doc.meta or {}).get("origin") == "nrb":
+        from ..nrb import filestore
+
+        digest = doc.content_hash or str((doc.meta or {}).get("blob_sha256") or "")
+        return filestore.resolve_path(
+            filestore.storage_key_for(digest, doc.file_type)
+        )
+    if not doc.storage_key:
+        raise StorageError(f"document {getattr(doc, 'id', '?')} has no storage_key")
+    return resolve_storage_path(doc.storage_key, settings.rag_docs_base)
+
+
 @router.get(
     "/{code}/documents/{document_id}/download",
     response_class=FileResponse,
@@ -429,19 +458,15 @@ async def download_department_document(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Unknown document"
         )
-    if not doc.storage_key:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="This document has no downloadable file",
-        )
-
     settings = get_settings()
     try:
-        path = resolve_storage_path(doc.storage_key, settings.rag_docs_base)
-    except StorageError as exc:
-        # The key is ours, but it round-tripped through the database, so it is
-        # treated as untrusted coming back. A traversal attempt is a 404 to the
-        # caller and a 500-worthy event for us — never a served file.
+        path = _document_path(doc, settings)
+    except Exception as exc:  # StorageError, FileStoreError, or an unusable digest
+        # Every key here is ours, but each round-trips through the database, so on
+        # the way back it is untrusted: a traversal attempt, a malformed hash or a
+        # row with no bytes at all is a 404 to the caller and never a served file.
+        # (A missing storage_key used to be checked separately; an NRB row is
+        # legitimately without a usable one, so the check moved in here.)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Unknown document"
         ) from exc

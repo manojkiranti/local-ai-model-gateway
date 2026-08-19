@@ -290,3 +290,47 @@ def test_traversal_storage_key_is_refused(env):
     resp = client.get(_url(code, doc_id), headers=admin)
     assert resp.status_code == 404
     assert b"root:" not in resp.content
+
+
+# --------------------------------------------------------------------------- #
+# NRB documents: the bytes are in the filestore, not RAG_DOCS_DIR (§28)
+# --------------------------------------------------------------------------- #
+def test_an_nrb_document_downloads_from_the_filestore(env, tmp_path, monkeypatch):
+    """End-to-end over HTTP, because the unit test for `_document_path` cannot see
+    the route's own 404 paths.
+
+    An NRB document is an ordinary `documents` row with `metadata.origin='nrb'`
+    whose bytes were never copied under RAG_DOCS_DIR — they live content-addressed
+    in the NRB filestore. Before the origin branch existed, this request 404'd
+    while the document was listed as ready.
+    """
+    import hashlib
+
+    from app.nrb import filestore
+
+    client, admin, _member, _outsider, code = env
+    payload = b"%PDF-1.4 nrb circular bytes"
+    digest = hashlib.sha256(payload).hexdigest()
+
+    monkeypatch.setattr(filestore, "base_dir", lambda: tmp_path / "nrb_files")
+    blob = tmp_path / "nrb_files" / digest[:2] / f"{digest}.pdf"
+    blob.parent.mkdir(parents=True)
+    blob.write_bytes(payload)
+
+    doc_id = _upload(client, admin, code).json()["document_id"]
+    # Turn the uploaded row into what the NRB ingest driver mints: origin=nrb, the
+    # blob's hash as content_hash, and a FILESTORE storage_key.
+    _sql(lambda c: c.execute(
+        text(
+            "UPDATE documents SET metadata = jsonb_build_object("
+            "  'origin', 'nrb', 'page_url', 'https://www.nrb.org.np/x/'),"
+            " content_hash = :h, file_type = 'pdf', storage_key = :k"
+            " WHERE id = :i"
+        ),
+        {"h": digest, "k": f"{digest[:2]}/{digest}.pdf", "i": doc_id},
+    ))
+
+    resp = client.get(_url(code, doc_id), headers=admin)
+    assert resp.status_code == 200
+    assert resp.content == payload
+    assert resp.headers["content-type"] == "application/pdf"
