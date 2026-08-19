@@ -13,8 +13,15 @@ and GIN indexes from comparison, and an autogenerate run here would still churn
 unrelated diffs. One column does not need the machinery.
 
 Revision ID: d4a91f2c7b3e
-Revises: c33c0fd56028
+Revises: f4c1a90b7d62
 Create Date: 2026-08-09
+
+Rebased 2026-08-19 per docs/nrb-integration.md §27.4. This revision was authored
+as a SIBLING of the NRB chain (both off c33c0fd56028) while citations was
+deferred. Un-deferring it makes it a descendant instead, so the graph stays one
+linear head and no merge revision is ever needed. The revision ID is deliberately
+unchanged — a database is stamped at it, and §27.4 assigns that database's
+reconciliation to this work rather than to NRB's.
 
 """
 from typing import Sequence, Union
@@ -24,7 +31,7 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision: str = "d4a91f2c7b3e"
-down_revision: Union[str, None] = "c33c0fd56028"
+down_revision: Union[str, None] = "f4c1a90b7d62"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
