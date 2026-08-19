@@ -151,7 +151,14 @@ requirements-nrb.txt    npttf2utf (GPL-3, opt-in build ARG only)
 9. **File context lives inside streaming generators.** Install file sink/source
    and RAG contextvars inside the async generator Starlette actually iterates,
    or streaming turns lose ownership/context.
-10. **HTTP 202 is not ingestion success.** Clients must poll
+10. **A citation may only name what the model saw.** `/v1/chat` returns
+    document-level `sources` collected on a contextvar during the turn, and only
+    passages that survived the retrieval tool's character budget may appear.
+    `sources` is never gated by `EXPOSE_TRACE`, `download_url` is derived rather
+    than stored, and an NRB source must carry its extraction route plus the
+    machine-recovered verify note — one constant shared with the tool, so the UI
+    and the answer cannot disagree.
+11. **HTTP 202 is not ingestion success.** Clients must poll
     `/v1/ingest-jobs/{id}` until `succeeded` or `failed` and surface progress or
     errors.
 
@@ -200,9 +207,12 @@ record, and re-deriving state from code or chat history has gone wrong before.
   (`app/nrb/recovery.py`). Eight named blobs have been chunked, embedded and
   retrieved end-to-end (250 chunks, scratch DB, §17/§18.7), and Phase 7 step 1 —
   the scoped, resumable, enqueue-only ingest driver — is built and validated on
-  31 documents (§20). **The CORPUS is still not ingested**, the versioned
-  recovery cache and the supersession link do not exist, and the
-  `search_nrb_documents` tool (Phase 8) is not started.
+  31 documents (§20). Since then: the versioned recovery cache (§21), supersession
+  (§22), the shared pipeline service + runner process and the thin admin API
+  (§23–§26) all landed, and Phase 8 (§29) made NRB documents searchable through the
+  EXISTING `search_department_docs` — there is **no** `search_nrb_documents`, because
+  a cross-department tool would fight the department-scope FK invariant. **The CORPUS
+  is still not ingested.**
 - The corpus ingest driver is `app/nrb/corpus.py` +
   `scripts/nrb_rag_ingest_corpus.py`, and it selects from the CATALOG ONLY. It
   must never consult `nrb_extractions` — that table is Phase 6 evidence, not an
@@ -214,12 +224,14 @@ record, and re-deriving state from code or chat history has gone wrong before.
 - **Each pipeline stage has its own answer to "is it idempotent", and stage 4 is
   the odd one.** Sync is all-zero on a second run; fetch selects only `pending`
   (excluded by the status column, not a `WHERE`); extract selects blobs with no
-  row at this `extractor_version`. But **recovery re-runs on every ingest** —
-  `rag.parse_nrb_to_chunks` calls `extraction.extract_file` fresh and never reads
-  `nrb_extractions`, so conversion and OCR are recomputed each time and that
-  table is *evidence, not an input to ingestion*. Nothing is scheduled anywhere:
-  stages 1–3 are manual CLI passes and the only daemon is `app.rag.worker`.
-  Details and the three Phase 7 gaps are `docs/nrb-integration.md` §19.
+  row at this `extractor_version`. Recovery **used to** re-run on every ingest; since
+  §21 it is cached per unit in `nrb_recoveries`/`nrb_recovery_units`, keyed on two
+  separate version domains (routing identity vs per-unit engine), so an OCR bump
+  re-runs OCR pages only. `nrb_extractions` remains *evidence, never an input to
+  ingestion* — an AST test enforces that the ingest driver cannot read it. Nothing
+  is SCHEDULED anywhere (no cron, no timer): a run is admitted by the API or the
+  CLI and executed by `python -m app.nrb.runner`, with `app.rag.worker` draining
+  the ingest queue. Details are `docs/nrb-integration.md` §19–§26.
 - Extraction identity is `(content_sha256, extractor_version)`. `native-1` and
   `native-2` rows coexist deliberately, so an old measurement stays reproducible.
   A classifier change means a NEW version, never an edit in place.

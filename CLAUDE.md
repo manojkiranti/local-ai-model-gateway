@@ -21,17 +21,20 @@ Postgres + pgvector layout, ports, RAG settings, what is not yet live. Read it
 instead of guessing the environment; update it when any of it changes.
 
 **NRB work runs against the SCRATCH database `local_ai_gateway_p4`, not
-`local_ai_gateway`.** The dev DB is stamped at `d4a91f2c7b3e`, a revision that
-exists only on `feat/rag-source-citations` — which is **deferred, not abandoned**
-(user's decision, `docs/nrb-integration.md` §9.10). So on this branch `alembic
-current` against the dev DB fails by design. Do **not** "fix" it with `alembic
-stamp`, by dropping `chat_messages.sources`, or by recreating the DB. The §9.10
-point-4 decision is now **made (§27, 2026-08-17): citations stays deferred and NRB
-merges FIRST** as a single clean linear head — there is no reconciliation to do on
-this branch (the graph is already one head off `main`, proven `base→head` on p4
-with zero reference to `d4a91f2c7b3e`), and the stranded dev-DB stamp is the
-citations owner's to resolve when citations is un-deferred, never NRB's.
-`DATABASE_URL=…/local_ai_gateway_p4` for every NRB sync, fetch and DB test.
+`local_ai_gateway`.** `DATABASE_URL=…/local_ai_gateway_p4` for every NRB sync,
+fetch and DB test.
+
+**The Alembic lineage is RESOLVED (2026-08-19, §30) — one linear head, nothing
+stranded.** The old warning here (dev DB stamped at a revision that existed only on
+a deferred branch, `alembic current` failing "by design") is **obsolete**: citations
+was un-deferred, `d4a91f2c7b3e` was rebased onto the NRB head `f4c1a90b7d62` per
+§27.4's runbook — same revision id, so the stamp stayed valid — and the dev DB was
+reconciled by stamping back to the pre-fork baseline `c33c0fd56028`, upgrading
+through the 7 NRB revisions, then stamping past citations (the `sources` column was
+already there with identical DDL, so **no column was dropped and no chat row lost**).
+`local_ai_gateway` and `local_ai_gateway_p4` are both at head. `alembic heads` must
+stay **one** — `tests/test_alembic_lineage.py` fails if a second appears, and a new
+migration must sit on the current head, never beside it.
 
 **Image OCR in chat (`read_image`) lives in `docs/image-ocr.md`** — why not
 docling, why not a VL model, the rapidocr config trap, the pixel-bomb guard, the
@@ -317,7 +320,11 @@ granted+active, i.e. the frontend's tabs), `PATCH /v1/departments/{code}`
 `GET /v1/departments/{code}/documents` (dept members see `ready` only; admins see
 non-archived, `?include_archived=` admin-only),
 `DELETE /v1/departments/{code}/documents/{id}` (admin; archives — chunks removed,
-row retained), `GET /v1/ingest-jobs/{id}` (admin, progress).
+row retained),
+`GET /v1/departments/{code}/documents/{id}/download` (what a chat citation links
+to — original bytes; 403 ungranted department, 404 at document granularity:
+unknown id, another department's, non-`ready` for a member, or bytes missing),
+`GET /v1/ingest-jobs/{id}` (admin, progress).
 `GET /v1/mcp/status` is the UI's MCP-connection badge — **always 200**, health
 is in the body (`configured/reachable/tools/error`), never a 502.
 `POST /v1/chat` is the **single, unified** turn endpoint — **stateful**
@@ -325,11 +332,59 @@ is in the body (`configured/reachable/tools/error`), never a 502.
 context + persists both rows) and **tool-capable** (runs the agent loop every
 turn; the
 model calls local/MCP tools when useful). `stream:false` → JSON
-`{session_id, message, model, stop_reason, trace?}`; `stream:true` → NDJSON typed
-events (`token`/`tool_call`/`tool_result`/`done`) + the new id in the
-`X-Session-Id` header. **There is no `/v1/agent`** — it was folded in.
+`{session_id, message, model, stop_reason, trace?, sources?}`; `stream:true` →
+NDJSON typed events (`token`/`tool_call`/`tool_result`/`done`, with `sources` on
+`done`) + the new id in the `X-Session-Id` header. **There is no `/v1/agent`** —
+it was folded in.
 
 ## Conventions / gotchas
+- **A chat answer's `sources` are collected out of band, and only the passages the
+  model actually SAW may appear.** A tool returns a string, so `app/rag/sources.py`
+  is the return channel: a per-turn collector on a contextvar, installed by the chat
+  router beside `turn_files` and `_department_scope` — same streaming rule (set it
+  INSIDE the generator Starlette iterates), and the collector object is constructed
+  *outside* the `with` so the `finally` that writes the assistant row can still read
+  it. Five things a rewrite must not lose: (1) `search_department_docs` records only
+  the passages that survived its character budget (`_format` returns
+  `(text, presented)`, both drop paths discard from the END so `[1..k]` still
+  indexes the survivors) — a trimmed passage was never in context, and citing its
+  document would invent provenance; (2) with **several** searches every presented
+  document is `cited:false`, because each call restarts numbering at `[1]` and
+  guessing would link the wrong file; (3) an out-of-range `[9]` is dropped, not an
+  error, and `[2024]` in prose is not a citation (the marker regex is bounded to
+  three digits); (4) `download_url` is **derived** at serialization from
+  `department_code + document_id` and never stored, so rows survive a route change
+  — safe only because `departments.code` is immutable (`PATCH` touches name and
+  is_active alone); (5) `sources` is **never** gated by `EXPOSE_TRACE` — the trace
+  is diagnostics, a citation is the product — and `null` (no corpus searched) is a
+  different fact from `[]`.
+- **The "machine-recovered — VERIFY …" sentence is ONE constant with TWO readers.**
+  `sources.VERIFY_NOTE`/`RECOVERED_ROUTES` are rendered into the model's context by
+  `search_department_docs._nrb_provenance` **and** published as a source's
+  `verify_note`; a second copy would drift, and a UI badge contradicting the answer
+  text leaves the reader unable to tell which to believe
+  (`test_the_caveat_is_one_constant_with_two_readers`). A source's `routes` is the
+  **union** over the pages the model saw, because an NRB PDF is routed per PAGE
+  (§16) — reporting only the first route would hide the recovered page, which is
+  exactly the page a reader must check. `authoritative: false` alone is enough to
+  caveat a route we have not enumerated. Native NRB text carries the route WITHOUT
+  the caveat (§29.2: over-warning trains a reader to ignore the warning).
+- **The citation download reads TWO trees, and NRB's is not `RAG_DOCS_DIR`.**
+  `rag/router._document_path` branches on `documents.metadata.origin`: an NRB
+  document's bytes exist only in the content-addressed NRB filestore (§28 removed
+  the copy), and the key is **reconstructed from the content hash** rather than read
+  from `storage_key` — exactly as `worker._document_path` does — so a row minted
+  under the old copy scheme still resolves with no migration
+  (`metadata.blob_sha256` is the fallback digest). Consequences: an NRB row is
+  legitimately without a usable `storage_key`, so that check lives inside the
+  resolver, and **all three containers must mount the one `nrb_files` volume** —
+  nrb-runner writes it, worker reads it during recovery, gateway serves it. A
+  private per-container copy fails the §18 way: fetch reports success, the job
+  succeeds with no text, the download 404s a document listed as `ready`.
+- **A relative `RAG_DOCS_DIR` is anchored to the REPO ROOT, not the CWD**
+  (`Settings.rag_docs_base`, mirroring `filestore.base_dir()`). Three processes read
+  that tree now — API, worker, download route — and a CWD-relative resolve makes
+  them disagree silently.
 - Auth: JWT (PyJWT HS256) + bcrypt. Provider-agnostic User (email, auth_provider,
   nullable password_hash, role admin|member). **First registered user → admin.**
 - Agent loop is **hand-rolled, no framework** — keep it readable/commented.
@@ -1067,8 +1122,11 @@ events (`token`/`tool_call`/`tool_result`/`done`) + the new id in the
 - Test login: `admin@example.com` / `supersecret123` (persisted in Postgres).
 
 ## Not done yet
-Frontend (unblocked now). History follow-ups (title rename, context-window
-truncation). File follow-ups (pagination, orphan cleanup of root-level
+Frontend (unblocked now) — including **rendering chat citations**: `/v1/chat`,
+the stream's `done` event and session replay all carry `sources` now (§30), and
+nothing draws them yet. A source with `machine_recovered` MUST render its
+`verify_note`; the contract is in `docs/frontend-sync-prompt.md`. History
+follow-ups (title rename, context-window truncation). File follow-ups (pagination, orphan cleanup of root-level
 pre-scoping files). Client-side stream cancellation/abort.
 Deployment hardening (firewall internal deps to the gateway IP) is deferred by
 the user for now.
@@ -1082,9 +1140,10 @@ replace the runner); and GPU-server deployment, still blocked on §19.1 (no host
 no key, no SSH user in this environment). **Phase 8 is DONE (§29):** NRB documents
 are searched via `search_department_docs` with route-aware, caveated citations —
 no separate `search_nrb_documents`. The `RAG_DOCS_DIR` duplication decision is
-**DONE (§28, resolve-from-filestore)** and the Alembic lineage is **DONE (§27,
-citations stays deferred / NRB merges first)**; neither gates a full-corpus
-ingest. Two known-and-recorded, not fixed: `075bf12eb087`'s broken-ToUnicode text
+**DONE (§28, resolve-from-filestore)** and the Alembic lineage is **DONE and
+EXECUTED (§27 decided it, §30 carried it out: citations un-deferred, rebased onto
+the NRB head, one linear head, both databases at head)**; neither gates a
+full-corpus ingest. Two known-and-recorded, not fixed: `075bf12eb087`'s broken-ToUnicode text
 layer (a `native-3` + new cohort, §17.6) and the Nepali semantic review of the
 §15 pack — **conversion correctness is still unmeasured** (which is why §29's
 citations carry the machine-recovered "VERIFY" caveat).

@@ -6,6 +6,11 @@ frontend was confirmed working against the OpenAI-transport gateway with **no
 changes** — the port was gateway↔Ollama only. Keep this as a re-check tool for
 future contract changes.)
 
+**2026-08-19: the contract DID change.** `/v1/chat` (both paths) and
+`GET /v1/sessions/{id}` now carry `sources`, and there is a new document download
+route. Additive — nothing was removed or renamed — so an existing frontend keeps
+working; it just shows no citations until it reads the new field.
+
 ---
 
 ```
@@ -45,7 +50,37 @@ CHAT (the core endpoint) — POST /v1/chat  (authed):
       "message": { "role": "assistant", "content": string },
       "model": string,
       "stop_reason": "completed" | "max_iterations" | "error",
-      "trace": null | [ ...tool trace entries... ] }   // null when no tools ran
+      "trace": null | [ ...tool trace entries... ],    // null when no tools ran
+      "sources": null | [ Source, ... ] }              // null when no corpus was searched
+
+  Source (one entry per DOCUMENT the answer was grounded in, best first):
+    { "document_id": string,
+      "title": string,
+      "department_code": string,
+      "file_name": string|null,
+      "file_type": string|null,      // pdf | docx | xlsx | csv | text
+      "pages": number[],             // ascending; [] for csv/xlsx/typed text
+      "cited": boolean,              // true = the model's [N] named this document
+      "download_url": string|null,   // relative; see the download route below
+      "origin": string|null,         // "nrb" for an NRB catalog doc, else upload|manual
+      // The five below are NRB-only and null for anything else:
+      "source_url": string|null,     // the document's public page on nrb.org.np
+      "published_at": string|null,
+      "routes": string[]|null,       // native | legacy_conversion | ocr, per page
+      "machine_recovered": bool|null,
+      "verify_note": string|null }
+
+  RENDERING RULES for sources:
+    * null means the turn searched no corpus. Render nothing — not an empty panel.
+    * `cited: false` means the answer was grounded in these documents but the model
+      did not mark them (or two searches ran, so [N] is ambiguous). Still show them,
+      just without implying a specific claim came from a specific file.
+    * `machine_recovered: true` MUST render its `verify_note`. That text is not
+      decoration: the page's text came from OCR or from a legacy-font conversion
+      that no human has verified, so a figure, date or name on it may be wrong.
+      The same sentence was shown to the model, so your badge and the answer agree.
+    * `sources` is NOT suppressed by EXPOSE_TRACE. The trace is diagnostics; the
+      citations are part of the answer.
 
   When stream=true -> 200, Content-Type application/x-ndjson.
     The new/continuing session id is ALSO returned in the response header:
@@ -56,7 +91,10 @@ CHAT (the core endpoint) — POST /v1/chat  (authed):
       {"type":"tool_result","name": string,"status": string,"result": string,"iteration": int}
       {"type":"done","session_id": string,"stop_reason": string,
        "iteration_count": int,"final_answer": string|null,
-       "error_message": string|null,"trace": array}
+       "error_message": string|null,"trace": array,
+       "sources": null | [ Source, ... ]}   // same shape as the JSON body's
+    Sources arrive ONLY on "done", never earlier: they are resolved against the
+    FINAL answer's [N] markers, so they cannot be correct before the turn ends.
     Render tokens live as they arrive; tool_call/tool_result are the "glass-box"
     activity you can show inline. The turn ends on the single "done" event.
     Note: arguments in tool_call is a JSON OBJECT, not a string.
@@ -68,7 +106,10 @@ SESSIONS (chat history, authed):
   GET    /v1/sessions            -> [ {id, title|null, created_at, updated_at, message_count} ]
   GET    /v1/sessions/{id}       -> {id, title|null, created_at, updated_at,
                                      messages:[{id, seq, role, content, trace|null,
-                                                model|null, created_at}]}   ; 404 if not yours
+                                                sources|null, model|null,
+                                                created_at}]}   ; 404 if not yours
+         `sources` replays the same shape the live turn returned (download_url is
+         recomputed on read), so a reloaded thread shows the same links.
   DELETE /v1/sessions/{id}       -> 204 ; 404 if not yours
 
 FILES (per-user, authed):
@@ -80,6 +121,14 @@ FILES (per-user, authed):
   DELETE /v1/files/{id}       -> 204
   GOTCHA: downloads are behind JWT, so an <a href> can't send the Bearer header.
           Fetch with the Authorization header, get a blob, make a blob: URL.
+
+DEPARTMENT DOCUMENT DOWNLOAD (authed) — what a citation links to:
+  GET /v1/departments/{code}/documents/{document_id}/download -> raw bytes
+      403 you have no grant for that department
+      404 unknown document, another department's document, one that is not `ready`
+          (members), or a row whose bytes are missing
+      GOTCHA: same as /v1/files/{id} — behind JWT, so an <a href> cannot fetch it.
+      Fetch with the Authorization header, take the blob, make a blob: URL.
 
 MCP status badge (authed): GET /v1/mcp/status -> always 200, health is in the body
   {configured, reachable, tools, error}. Never treat a non-reachable MCP as a failure.

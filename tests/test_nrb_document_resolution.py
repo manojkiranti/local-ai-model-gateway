@@ -42,8 +42,11 @@ def _write_blob(base, body: bytes, extension: str = "pdf") -> str:
 
 
 def _settings(rag_dir) -> SimpleNamespace:
-    # `_document_path` reads only `.rag_docs_dir`, and only on the generic branch.
-    return SimpleNamespace(rag_docs_dir=str(rag_dir))
+    # `_document_path` reads only `.rag_docs_base`, and only on the generic branch.
+    # (It read `.rag_docs_dir` until that value started being anchored to the repo
+    # root rather than the process CWD; the tmp path here is already absolute, so
+    # the two are the same thing for this stub.)
+    return SimpleNamespace(rag_docs_base=str(rag_dir))
 
 
 def test_an_nrb_document_resolves_from_the_filestore_not_rag_docs_dir(

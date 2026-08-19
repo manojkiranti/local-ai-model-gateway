@@ -155,11 +155,12 @@ Full, current list is in Swagger at `/docs`. The main groups:
 | GET | `/health` | none | Liveness + Ollama reachability. |
 | POST | `/auth/register` · `/auth/login` | none | Create a local user · get a JWT. |
 | GET | `/users/me` · `/users` | bearer · +admin | Current user · list users. |
-| POST | `/v1/chat` | bearer | The unified chat turn — streaming or not, tool-capable, persisted. Pass `department` to scope it to a department's documents. |
+| POST | `/v1/chat` | bearer | The unified chat turn — streaming or not, tool-capable, persisted. Pass `department` to scope it to a department's documents. Returns `sources`: the documents the answer was grounded in (on the `done` event when streaming). |
 | GET | `/v1/tools` · `/v1/mcp/status` | bearer | Available tools · MCP connection badge. |
 | POST/GET | `/v1/files` · `/v1/files/{id}` | bearer | Upload/list/download per-user files (owner-scoped). |
-| GET | `/v1/sessions` · `/v1/sessions/{id}` | bearer | Chat history. |
+| GET | `/v1/sessions` · `/v1/sessions/{id}` | bearer | Chat history; assistant messages replay their `sources`. |
 | — | `/v1/departments` (+`/members`, `/documents`) | admin / member | Manage departments, grants, and the document corpus. |
+| GET | `/v1/departments/{code}/documents/{id}/download` | member (dept) | The original bytes behind a chat citation. Behind JWT, so fetch with the bearer header and make a blob URL. |
 | GET | `/v1/ingest-jobs/{id}` | admin | Ingest progress for an uploaded document. |
 
 ## Prove it works (register → login → authenticated /users/me)

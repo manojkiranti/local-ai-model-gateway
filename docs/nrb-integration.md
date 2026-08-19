@@ -5279,3 +5279,156 @@ whether it honours the caveat — that needs the UI and real traffic.
 NRB chunks with the expected route split), after the §15 Nepali review (the caveat
 wording may soften for verified conversions), and if a global NRB corpus is ever
 taken up (§29.1).
+
+## 30. Citations un-deferred — chat-level source citations (v2)
+
+**Date:** 2026-08-19. **What §29 left:** the provenance a reader needs was rendered
+into the string the MODEL reads and nowhere else. `ChatTurnResponse` carried
+`session_id / message / model / stop_reason / trace`; there was no `sources` field,
+no `chat_messages.sources` column and no way to open a cited document. A frontend
+could not draw a source chip, and a user could not check an answer — which matters
+most for the documents whose text a machine reconstructed and no Nepali reader has
+verified (§15, §16.6, §17.6). This section closes that, and executes the §27.4
+lineage step that had been waiting on it.
+
+Design and plan: `docs/superpowers/specs/2026-08-19-chat-source-citations-design.md`,
+`docs/superpowers/plans/2026-08-19-chat-source-citations.md`.
+
+### 30.1 The lineage step, carried out
+
+§27.4 named this work's first obligation and it is done. `d4a91f2c7b3e` was rebased
+so its `down_revision` is the NRB head `f4c1a90b7d62` — the sibling became a
+descendant, the graph stays **one linear head**, and no merge revision exists. The
+revision id was deliberately unchanged, because a database was stamped at it.
+Verified offline (`alembic upgrade head --sql`: 13 revisions, exit 0, citations
+last) and locked by `tests/test_alembic_lineage.py`, which fails if a second head
+ever appears.
+
+**The dev-database reconciliation, which §27.4 assigned to the citations owner and
+which the plan initially got slightly wrong.** Rebasing fixes the graph, not the
+stamp: `local_ai_gateway` sat at `d4a91f2c7b3e` with the `sources` column but **no
+NRB schema**, so after the rebase Alembic considered it already at head and would
+have applied nothing — leaving the seven NRB revisions permanently unapplied and
+`/v1/nrb/*` broken against it. Inspection also found **104 of 2,003 `chat_messages`
+rows already carrying `sources`** from v1 dev testing, which made the planned
+`DROP COLUMN` lossier than assumed. The route taken instead (the user's choice) was
+non-destructive:
+
+```
+alembic stamp c33c0fd56028      # the pre-fork baseline both branches forked from
+alembic upgrade f4c1a90b7d62    # the 7 NRB revisions, applied for real
+alembic stamp d4a91f2c7b3e      # the column already exists with identical DDL
+```
+
+End state: both `local_ai_gateway` and `local_ai_gateway_p4` at head, one head,
+`sources` intact, **no column dropped and no chat row lost**. Evidence that it
+worked: 45 NRB tests that had been failing purely because the dev DB lacked those
+tables now pass. This is the one place the CLAUDE.md prohibition on stamping is
+lifted, and only because §27.4 wrote this procedure for this moment.
+
+### 30.2 What ships
+
+* **`app/rag/sources.py`** — a per-turn collector on a contextvar (a tool returns a
+  string, so there is no in-band channel), installed by the chat router beside
+  `turn_files` and `_department_scope`, with both of their rules: set it INSIDE the
+  generator Starlette iterates, and construct the collector OUTSIDE the `with` so
+  the `finally` that writes the assistant row can still read it.
+* **Only passages the model actually saw may be cited.** `search_department_docs`
+  reports the passages that survived its character budget; both of its drop paths
+  discard from the END, so `[1..k]` still indexes the survivors. A trimmed passage
+  was never in context, and citing its document would invent provenance.
+* **Resolution rules** — one search maps `[N]` onto that call's list (`cited:true`);
+  no parseable marker falls back to every presented document (`cited:false`, because
+  the answer was still grounded in them); **several** searches yield every presented
+  document at `cited:false`, because each call restarts numbering at `[1]`; an
+  out-of-range `[9]` is dropped rather than erroring, and `[2024]` in prose is not a
+  citation.
+* **NRB provenance on the payload** — `origin`, `source_url`, `published_at`,
+  `routes`, `machine_recovered`, `verify_note`. `routes` is the **union** over the
+  pages the model saw, because an NRB PDF is routed per PAGE (§16): naming only the
+  first route would hide the recovered page, which is exactly the page a reader must
+  check. `authoritative: false` alone is enough to caveat a route we have not
+  enumerated. Native NRB text carries its route WITHOUT the caveat (§29.2). The
+  caveat sentence is **one constant with two readers** — the tool renders it for the
+  model, the API publishes it as `verify_note` — because a UI badge contradicting
+  the answer text leaves a reader unable to tell which to believe.
+* **`GET /v1/departments/{code}/documents/{id}/download`** — 403 at department
+  granularity, 404 at document granularity (unknown, foreign, non-`ready` for a
+  member, traversal, or bytes missing). Behind JWT, so the frontend fetches with the
+  bearer header and makes a blob URL.
+* **Persistence** — `chat_messages.sources` JSONB, written on every assistant row,
+  replayed by `GET /v1/sessions/{id}`. `download_url` is **derived** on read and
+  never stored, so rows survive a route change; safe because `departments.code` is
+  immutable. `sources` is **never** gated by `EXPOSE_TRACE`: the trace is
+  diagnostics, a citation is the product.
+
+### 30.3 The NRB download branch — the part v1 could not have known
+
+The deferred branch predates §28. It resolved every document as
+`resolve_storage_path(storage_key, RAG_DOCS_DIR)`, which for an NRB document points
+at a path that does not exist — §28 removed the per-corpus copy, and those bytes
+live only content-addressed in the NRB filestore. Unfixed, **every NRB citation's
+download would 404 while the document was listed `ready`**: the §18 shape, where
+nothing errors and nothing is served.
+
+`rag/router._document_path` now branches on `documents.metadata.origin` and
+**reconstructs** the filestore key from the content hash rather than reading
+`storage_key`, exactly as `worker._document_path` does, so a row minted under the
+old copy scheme still resolves with no migration and no re-ingest
+(`metadata.blob_sha256` is the fallback digest). Consequence: an NRB row is
+legitimately without a usable `storage_key`, so that check moved inside the
+resolver. `app.nrb.filestore` is stdlib + config only, and a subprocess check
+confirms importing the app still loads no docling, torch or OCR stack.
+
+Also `Settings.rag_docs_base`: a relative `RAG_DOCS_DIR` is anchored to the repo
+root, never the process CWD — `filestore.base_dir()` already did this for the NRB
+tree, and the API is now a third reader of the corpus tree.
+
+### 30.4 A deployment gap this found (pre-existing, §28 follow-through)
+
+`NRB_FILES_DIR` was in neither `.env.docker` nor `.env.docker.example`, and no
+`nrb_files` volume was mounted anywhere in `docker-compose.yml`. In containers it
+defaulted to `/app/nrb_files`: **unshared between `nrb-runner` (which downloads),
+`worker` (which reads during recovery) and `gateway` (which must now serve it)** —
+three private, empty copies. Removing the `RAG_DOCS_DIR` duplication in §28 is what
+stopped masking it. All three services now mount one `nrb_files` volume at the same
+path, both templates set the variable, and `tests/test_compose_volumes.py` locks it;
+`docker compose config` validates the file. Adopting v1's env-template test also
+surfaced real drift: **12 RAG settings existed in `Settings` but not in
+`.env.example`** (silently defaulting for anyone reading that file), now documented,
+and `INSTALL_OCR` is a BUILD arg so it is allowlisted rather than removed.
+
+Not verified: the stack has not been brought up with these volumes, and per §18 a
+worker image is verified by its ROUTE SPLIT on a known blob, never by a config
+parse. That remains true here.
+
+### 30.5 Evaluation & Improvement (chat citations)
+
+**Success metric.** Every RAG-grounded answer returns at least one source, and **no
+source names a document that was not in the model's context**. The second half is
+the one that matters: fabricated provenance is worse than absent provenance, because
+a link makes an answer look checked. The budget-survivor rule is the mechanism, and
+`test_sources_never_name_a_document_that_was_trimmed_away` plus
+`test_no_source_is_ever_invented` are the guards. First user-facing citation surface
+in the product, so the nearest proxy for SQLs.
+
+**Eval.** `tests/test_citation_eval.py` — 10 labelled turns (single search with
+markers; single search without; multi-search; no search; out-of-range `[9]`; a bare
+year; one document on two pages; NRB ocr / legacy_conversion / native) scored on
+exact `document_id`, `pages`, `cited` and `machine_recovered`. **16/16 passing.**
+Alongside it: 8 NRB payload cases, 7 end-to-end `/v1/chat` cases (both turn paths,
+streaming `done`, replay), 6 download-resolution cases and 3 lineage cases.
+**NOT evaluated:** whether recovered TEXT is correct — that is §15's Nepali review,
+still open, which is precisely why the payload carries a caveat rather than a
+correctness claim.
+
+**Feedback capture.** `chat_messages.sources` is itself the audit log: every turn's
+resolved provenance is persisted regardless of `EXPOSE_TRACE`, so "which documents
+did we cite, how often, and were they machine-recovered" is a query, not a new
+store. Worth adding when there is traffic: a count of out-of-range `[N]` markers
+(a model citing `[9]` over five passages is a prompt problem, not a resolver one).
+
+**Review loop.** On the first real corpus ingest (do citations render with the
+expected route split on live NRB chunks), when the frontend first draws them (is the
+verify badge legible and honoured), and after §15's Nepali review — which may soften
+the caveat wording for conversions that are by then verified.
