@@ -22,6 +22,7 @@ from ...ollama.client import OllamaClient, OllamaError
 from ...rag.context import current_department
 from ...rag.embedding import EmbeddingError, embed_texts
 from ...rag.retrieval import RetrievedChunk, search_chunks
+from ...rag.sources import SourceChunk, record_search
 from .base import LocalToolSpec
 
 NO_DEPARTMENT = (
@@ -99,7 +100,9 @@ TRIM_NOTE = (
 )
 
 
-def _format(chunks: list[RetrievedChunk], *, department_code: str, budget: int) -> str:
+def _format(
+    chunks: list[RetrievedChunk], *, department_code: str, budget: int
+) -> tuple[str, list[RetrievedChunk]]:
     """Serialize results, keeping every citation header and trimming bodies.
 
     Headers are reserved before bodies because they are the citable part: a
@@ -107,6 +110,12 @@ def _format(chunks: list[RetrievedChunk], *, department_code: str, budget: int) 
     accounting is exact — intro, the trim note, every join separator and every
     trim suffix are all reserved up front — because the agent loop's own cut at
     MAX_TOOL_RESULT_CHARS makes no such distinction and would sever a header.
+
+    Returns the text AND the passages that survived into it. Both drop paths
+    below discard from the END, so the surviving prefix keeps its ``[1..k]``
+    numbering. Citations are resolved against exactly this list: a passage the
+    budget removed was never in the model's context, so listing its document as
+    a source would invent provenance.
     """
     intro = (
         f"{len(chunks)} passage(s) from the {department_code} department's "
@@ -156,7 +165,10 @@ def _format(chunks: list[RetrievedChunk], *, department_code: str, budget: int) 
     while len(out) > budget and len(parts) > 2:
         parts = parts[:-2] + [TRIM_NOTE] if parts[-1] == TRIM_NOTE else parts[:-1]
         out = JOIN.join(parts)
-    return out
+
+    # parts = [intro, entry, entry, …] with an optional TRIM_NOTE last.
+    entry_count = len(parts) - 1 - (1 if parts and parts[-1] == TRIM_NOTE else 0)
+    return out, chunks[: max(0, entry_count)]
 
 
 async def _search_department_docs(args: dict[str, Any]) -> str:
@@ -207,11 +219,28 @@ async def _search_department_docs(args: dict[str, Any]) -> str:
             f"knowledge."
         )
 
-    return _format(
+    text, presented = _format(
         chunks,
         department_code=department.code,
         budget=settings.rag_tool_result_max_chars,
     )
+    # Structured provenance for the turn's `sources`. The tool's own return value
+    # is a string with nowhere to put it, so it goes out of band on a contextvar
+    # — a no-op when nobody installed a collector.
+    record_search(
+        department.code,
+        [
+            SourceChunk(
+                document_id=c.document_id,
+                title=c.title,
+                file_name=c.file_name,
+                file_type=c.file_type,
+                page_number=c.page_number,
+            )
+            for c in presented
+        ],
+    )
+    return text
 
 
 SPEC = LocalToolSpec(

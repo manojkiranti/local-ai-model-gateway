@@ -184,6 +184,7 @@ async def add_message(
     trace: Optional[list[Any]] = None,
     model: Optional[str] = None,
     attachments: Optional[list[Any]] = None,
+    sources: Optional[list[Any]] = None,
 ) -> ChatMessage:
     """Append a message with the next per-session seq, and bump the session's
     updated_at. Locks the session row so concurrent turns serialize."""
@@ -207,6 +208,7 @@ async def add_message(
         trace=trace,
         model=model,
         attachments=attachments,
+        sources=sources,
     )
     session.add(message)
     # Touch the session so threads re-sort by recency (server clock).
@@ -240,6 +242,7 @@ async def add_assistant_message(
     content: str,
     trace: Optional[list[Any]] = None,
     model: Optional[str] = None,
+    sources: Optional[list[Any]] = None,
 ) -> ChatMessage:
     return await add_message(
         session,
@@ -248,4 +251,5 @@ async def add_assistant_message(
         content=content,
         trace=trace,
         model=model,
+        sources=sources,
     )

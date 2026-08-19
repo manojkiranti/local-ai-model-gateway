@@ -19,6 +19,9 @@ class MessageOut(BaseModel):
     content: str
     # Agent turns carry the per-iteration execution trace; chat turns are null.
     trace: Optional[list[Any]] = None
+    # Department documents an assistant answer cited, with `download_url` filled
+    # in by the router. Unlike `trace` this is never suppressed by EXPOSE_TRACE.
+    sources: Optional[list[Any]] = None
     model: Optional[str] = None
     created_at: datetime
 

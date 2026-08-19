@@ -77,6 +77,8 @@ fused AS (
 SELECT c.id            AS chunk_id,
        c.document_id   AS document_id,
        doc.title       AS title,
+       doc.file_name   AS file_name,
+       doc.file_type   AS file_type,
        c.content       AS content,
        c.page_number   AS page_number,
        c.section       AS section,
@@ -134,6 +136,11 @@ class RetrievedChunk:
     # trust caveat. Empty for a generic upload.
     chunk_metadata: dict = field(default_factory=dict)
     doc_metadata: dict = field(default_factory=dict)
+    # Carried for citations, not for retrieval. Defaulted so existing callers
+    # that construct this by position keep working; the `documents` join is
+    # already there for `title`, so these two columns are free.
+    file_name: str | None = None
+    file_type: str | None = None
 
 
 def _as_dict(value: object) -> dict:
@@ -223,6 +230,8 @@ async def search_chunks(
             ),
             chunk_metadata=_as_dict(r["chunk_metadata"]),
             doc_metadata=_as_dict(r["doc_metadata"]),
+            file_name=r["file_name"],
+            file_type=r["file_type"],
         )
         for r in rows
     ]

@@ -31,6 +31,12 @@ from ..history import repository as repo
 from ..history.service import open_turn
 from ..mcp.client import MCPClient, MCPUnavailableError
 from ..rag.context import rag_context
+from ..rag.sources import (
+    SourceCollector,
+    resolve_sources,
+    source_scope,
+    with_download_urls,
+)
 from ..ollama.client import OllamaClient
 from ..users.models import User
 from .schemas import ChatTurnRequest, ChatTurnResponse, TurnMessage
@@ -121,6 +127,12 @@ async def chat(
         async def event_stream():
             final_answer = error_message = stop_reason = None
             trace = None
+            sources = None
+            # Constructed OUTSIDE the `with` on purpose. `source_scope` resets the
+            # contextvar on exit, but the `finally` below — which writes the
+            # assistant row — runs after that. Holding the object here keeps the
+            # turn's provenance reachable either way.
+            collector = SourceCollector()
             try:
                 # Files any tool creates this turn are owned by this user +
                 # session, and the read tools resolve ids owner-scoped. Must be
@@ -130,7 +142,8 @@ async def chat(
                 # the router before returning StreamingResponse is NOT visible
                 # inside the generator Starlette later iterates.
                 with turn_files(user_id=user.id, session_id=sid), \
-                        _department_scope(department):
+                        _department_scope(department), \
+                        source_scope(collector):
                     async for event in stream_turn(
                         messages=context, ollama=ollama, mcp=mcp,
                         settings=run_settings, user_email=user.email,
@@ -140,6 +153,11 @@ async def chat(
                             final_answer = event.get("final_answer")
                             error_message = event.get("error_message")
                             trace = event.get("trace")
+                            # Citations are resolved against the FINAL answer, so
+                            # this can only happen once the loop is done.
+                            sources = resolve_sources(
+                                collector.records, final_answer or ""
+                            )
                             # Send the client the SAME trace the non-streaming
                             # path returns: null unless tools actually ran, and
                             # null outright when EXPOSE_TRACE is off. The loop's
@@ -150,13 +168,18 @@ async def chat(
                                 **event,
                                 "session_id": sid,
                                 "trace": _client_trace(_trace_if_tools(trace), run_settings),
+                                # Deliberately NOT run through _client_trace:
+                                # sources are the answer's citations, and a
+                                # deployment that hides diagnostics still wants
+                                # them.
+                                "sources": with_download_urls(sources),
                             }
                         yield (json.dumps(event) + "\n").encode()
             except MCPUnavailableError as exc:  # rare: handshake failed post pre-flight
                 stop_reason, error_message = "error", exc.message
                 done = {"type": "done", "session_id": sid, "stop_reason": "error",
                         "iteration_count": 0, "final_answer": None,
-                        "error_message": exc.message, "trace": []}
+                        "error_message": exc.message, "trace": [], "sources": None}
                 yield (json.dumps(done) + "\n").encode()
             finally:
                 content = final_answer or error_message or f"(no answer: {stop_reason})"
@@ -165,6 +188,8 @@ async def chat(
                     await repo.add_assistant_message(
                         s2, session_id=sid, content=content,
                         trace=_trace_if_tools(trace), model=model,
+                        # Stored WITHOUT download_url — derived on read.
+                        sources=sources,
                     )
                     await s2.commit()
 
@@ -175,11 +200,13 @@ async def chat(
         )
 
     # --- non-streaming: collect the same loop into a result dict ---
+    collector = SourceCollector()
     try:
         # Files created this turn are owned by this user + session; read tools
         # resolve attached file ids owner-scoped.
         with turn_files(user_id=user.id, session_id=sid), \
-                _department_scope(department):
+                _department_scope(department), \
+                source_scope(collector):
             result = await run_turn(
                 messages=context, ollama=ollama, mcp=mcp,
                 settings=run_settings, user_email=user.email,
@@ -189,8 +216,12 @@ async def chat(
 
     content = _final_content(result)
     trace = _trace_if_tools(result["trace"])
+    # Citations are resolved against the final answer text, so this follows the
+    # loop rather than living inside it.
+    sources = resolve_sources(collector.records, result.get("final_answer") or "")
     await repo.add_assistant_message(
-        session, session_id=sid, content=content, trace=trace, model=model
+        session, session_id=sid, content=content, trace=trace, model=model,
+        sources=sources,  # stored without download_url — derived on read
     )
     await session.commit()
     return ChatTurnResponse(
@@ -199,4 +230,5 @@ async def chat(
         model=model,
         stop_reason=result["stop_reason"],
         trace=_client_trace(trace, run_settings),
+        sources=with_download_urls(sources),
     )
