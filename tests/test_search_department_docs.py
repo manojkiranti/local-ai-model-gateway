@@ -236,3 +236,17 @@ def test_output_tells_the_model_to_answer_only_from_these_passages(faked):
         out = _run({"query": "annual leave"})
     assert "ONLY from these passages" in out
     assert "cite" in out.lower()
+
+
+def test_the_caveat_is_one_constant_with_two_readers():
+    """The model's context and the API's `verify_note` must never drift apart.
+
+    Two copies of this sentence is the failure mode: a UI badge that disagreed
+    with the answer text would be worse than neither, because the reader cannot
+    tell which one to believe.
+    """
+    from app.rag import sources as rag_sources
+    from app.tools.local import search_department_docs as tool
+
+    assert tool._VERIFY is rag_sources.VERIFY_NOTE
+    assert tool._RECOVERED_ROUTES is rag_sources.RECOVERED_ROUTES

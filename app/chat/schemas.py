@@ -41,6 +41,21 @@ class SourceOut(BaseModel):
     # Fetch it WITH the bearer header and make a blob URL — an <a href> cannot
     # send the token.
     download_url: Optional[str] = None
+    # Where the document came from: "nrb" for a catalog document, else the
+    # document's own source ("upload"/"manual").
+    origin: Optional[str] = None
+    # NRB-only, and null for anything else. `routes` is the union of the extraction
+    # routes behind the pages the model was shown (an NRB PDF is routed per page,
+    # §16); `machine_recovered` is true when any of them was OCR'd or converted
+    # from a legacy font — text that is retrieval-grade but NOT authoritative for a
+    # figure, date or name. `verify_note` carries the exact wording the model was
+    # shown, so a UI badge cannot contradict the answer. A client that renders a
+    # source with `machine_recovered` MUST show it.
+    source_url: Optional[str] = None
+    published_at: Optional[str] = None
+    routes: Optional[list[str]] = None
+    machine_recovered: Optional[bool] = None
+    verify_note: Optional[str] = None
 
 
 class ChatTurnRequest(BaseModel):

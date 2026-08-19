@@ -22,7 +22,12 @@ from ...ollama.client import OllamaClient, OllamaError
 from ...rag.context import current_department
 from ...rag.embedding import EmbeddingError, embed_texts
 from ...rag.retrieval import RetrievedChunk, search_chunks
-from ...rag.sources import SourceChunk, record_search
+from ...rag.sources import (
+    RECOVERED_ROUTES as _RECOVERED_ROUTES,
+    VERIFY_NOTE as _VERIFY,
+    SourceChunk,
+    record_search,
+)
 from .base import LocalToolSpec
 
 NO_DEPARTMENT = (
@@ -50,8 +55,10 @@ def _clamp_top_k(raw: Any, default: int, ceiling: int) -> int:
 # is explicitly `authoritative: false` (§16.6) and a legacy-font conversion is
 # still unverified by a Nepali reader (§15). The caveat rides on the citation so
 # the model sees it exactly where it would quote the passage.
-_RECOVERED_ROUTES = {"ocr", "legacy_conversion"}
-_VERIFY = "machine-recovered — VERIFY figures, dates and names against the source"
+#
+# Both come from `app/rag/sources.py`, imported above: the chat API publishes the
+# SAME sentence as a source's `verify_note`, and a UI badge that disagreed with
+# this text would leave the reader unable to tell which to believe.
 
 
 def _nrb_provenance(chunk: RetrievedChunk) -> str:
@@ -77,6 +84,31 @@ def _nrb_provenance(chunk: RetrievedChunk) -> str:
     elif published:
         lines.append(f"published {published}")
     return ("\n    " + "\n    ".join(lines)) if lines else ""
+
+
+def _source_chunk(chunk: RetrievedChunk) -> SourceChunk:
+    """The citation's structured view of a retrieved passage.
+
+    Reads exactly the metadata `_nrb_provenance` renders for the model, so the two
+    can never describe one passage differently: the route and the trust flag are
+    the CHUNK's (NRB routes per page, §16), the URL and the date are the
+    DOCUMENT's. `origin` falls back to `documents.source` so an ordinary upload
+    still says where it came from.
+    """
+    cm = chunk.chunk_metadata or {}
+    dm = chunk.doc_metadata or {}
+    return SourceChunk(
+        document_id=chunk.document_id,
+        title=chunk.title,
+        file_name=chunk.file_name,
+        file_type=chunk.file_type,
+        page_number=chunk.page_number,
+        origin=cm.get("origin") or dm.get("origin") or chunk.doc_source,
+        route=cm.get("route"),
+        authoritative=cm.get("authoritative"),
+        source_url=dm.get("page_url") or dm.get("source_url"),
+        published_at=dm.get("published_at"),
+    )
 
 
 def _header(index: int, chunk: RetrievedChunk) -> str:
@@ -227,19 +259,7 @@ async def _search_department_docs(args: dict[str, Any]) -> str:
     # Structured provenance for the turn's `sources`. The tool's own return value
     # is a string with nowhere to put it, so it goes out of band on a contextvar
     # — a no-op when nobody installed a collector.
-    record_search(
-        department.code,
-        [
-            SourceChunk(
-                document_id=c.document_id,
-                title=c.title,
-                file_name=c.file_name,
-                file_type=c.file_type,
-                page_number=c.page_number,
-            )
-            for c in presented
-        ],
-    )
+    record_search(department.code, [_source_chunk(c) for c in presented])
     return text
 
 

@@ -33,6 +33,20 @@ from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import Any, Iterator, Optional
 
+# The vocabulary of a machine-recovered citation, defined ONCE and read twice:
+# `search_department_docs` renders it into the model's context, and the chat API
+# publishes it as `verify_note`. Two copies of this sentence would drift, and a UI
+# badge disagreeing with the answer text is worse than neither — the reader cannot
+# tell which to believe. `test_the_caveat_is_one_constant_with_two_readers` locks it.
+#
+# Why the caveat exists at all: OCR output is explicitly `authoritative: false`
+# (§16.6), a legacy-font conversion is still `awaiting_nepali_review` (§15), and
+# even a native text layer can be codepoint-corrupt (§17.6). The route is how a
+# reader knows which of those they are looking at.
+NRB_ORIGIN = "nrb"
+RECOVERED_ROUTES = frozenset({"ocr", "legacy_conversion"})
+VERIFY_NOTE = "machine-recovered — VERIFY figures, dates and names against the source"
+
 # ``[12]`` — the marker the retrieval tool tells the model to cite with. Bounded
 # to three digits so a stray "[2024]" in document text is not read as a citation
 # into a passage list that never has thousands of entries.
@@ -52,6 +66,16 @@ class SourceChunk:
     file_name: Optional[str] = None
     file_type: Optional[str] = None
     page_number: Optional[int] = None
+    # Provenance, carried opaquely from the chunk's and the document's metadata.
+    # `origin` is "nrb" for a catalog document, else the document's own source
+    # ("upload"/"manual"). The rest are NRB-only and stay None elsewhere:
+    # `route`/`authoritative` are the CHUNK's (NRB routes per page, §16) while
+    # `source_url`/`published_at` are the DOCUMENT's.
+    origin: Optional[str] = None
+    route: Optional[str] = None
+    authoritative: Optional[bool] = None
+    source_url: Optional[str] = None
+    published_at: Optional[str] = None
 
 
 @dataclass
@@ -129,10 +153,14 @@ def _cited_indices(answer: str, count: int) -> list[int]:
 def _document_sources(
     chunks: list[SourceChunk], *, department_code: str, cited: bool
 ) -> list[dict[str, Any]]:
-    """Collapse passages to one entry per document, aggregating page numbers.
+    """Collapse passages to one entry per document, aggregating page numbers and
+    (for NRB) the extraction routes behind them.
 
     First-seen order is preserved, so the most relevant document (retrieval is
     returned best-first) leads the list.
+
+    The NRB keys are ABSENT rather than null on an ordinary upload, so a client can
+    tell "not an NRB document" from "NRB, route unknown".
     """
     by_document: dict[str, dict[str, Any]] = {}
     for chunk in chunks:
@@ -146,13 +174,33 @@ def _document_sources(
                 "file_type": chunk.file_type,
                 "pages": [],
                 "cited": cited,
+                "origin": chunk.origin,
             }
+            if chunk.origin == NRB_ORIGIN:
+                entry["source_url"] = chunk.source_url
+                entry["published_at"] = chunk.published_at
+                entry["routes"] = []
+                entry["machine_recovered"] = False
+                entry["verify_note"] = None
             by_document[chunk.document_id] = entry
         if chunk.page_number is not None and chunk.page_number not in entry["pages"]:
             entry["pages"].append(chunk.page_number)
+        if chunk.origin == NRB_ORIGIN:
+            # An NRB PDF is routed per PAGE (§16), so one document can mix native
+            # text with a converted or an OCR'd page. Report the union: naming only
+            # the first route would hide the recovered page, which is precisely the
+            # page a reader has to verify.
+            if chunk.route and chunk.route not in entry["routes"]:
+                entry["routes"].append(chunk.route)
+            if chunk.route in RECOVERED_ROUTES or chunk.authoritative is False:
+                entry["machine_recovered"] = True
 
     for entry in by_document.values():
         entry["pages"].sort()
+        if "routes" in entry:
+            entry["routes"].sort()
+        if entry.get("machine_recovered"):
+            entry["verify_note"] = VERIFY_NOTE
     return list(by_document.values())
 
 

@@ -79,6 +79,7 @@ SELECT c.id            AS chunk_id,
        doc.title       AS title,
        doc.file_name   AS file_name,
        doc.file_type   AS file_type,
+       doc.source      AS doc_source,
        c.content       AS content,
        c.page_number   AS page_number,
        c.section       AS section,
@@ -141,6 +142,9 @@ class RetrievedChunk:
     # already there for `title`, so these two columns are free.
     file_name: str | None = None
     file_type: str | None = None
+    # `documents.source` ("upload"/"manual"). Only a citation reads it — it is what
+    # a source's `origin` falls back to when a document is not from the NRB catalog.
+    doc_source: str | None = None
 
 
 def _as_dict(value: object) -> dict:
@@ -232,6 +236,7 @@ async def search_chunks(
             doc_metadata=_as_dict(r["doc_metadata"]),
             file_name=r["file_name"],
             file_type=r["file_type"],
+            doc_source=r["doc_source"],
         )
         for r in rows
     ]
