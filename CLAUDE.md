@@ -961,8 +961,12 @@ it was folded in.
   `department` parameter, so a prompt injection has nothing to target. Contract:
   404 unknown/inactive, 404 foreign session (ownership is re-checked, not assumed
   of the caller), 403 ungranted, 409 department mismatch, 409 **existing general
-  session given a department**, 400 bound session with no code. Admins bypass the
-  grant check ONLY.
+  session given a department**. Admins bypass the grant check ONLY. **Omitting
+  `department` on a BOUND session is not an error** — it continues in its own
+  department, read from `chat_sessions.department_id` (`access.py`'s `code is None`
+  branch). An earlier version of this line claimed a 400 there; no such 400 exists
+  in the code, and a frontend that believed it would send the code defensively on
+  every turn and treat a legitimate omission as a bug.
 - **`chat_session is None` (new) ≠ `chat_session.department_id is None`
   (existing general chat).** Both look like "no department". Collapsing them lets
   an existing general conversation be relabelled HR on turn five, misrepresenting

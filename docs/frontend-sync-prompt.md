@@ -40,8 +40,9 @@ TWO JOBS, in this order:
 
 Only modify files in THIS frontend repo. Do not touch the gateway. If something in
 the contract looks wrong or impossible to implement as written, say so rather than
-guessing — the contract is generated from the gateway's tests, so a real conflict
-is worth reporting back.
+guessing — the contract below was written by hand from the gateway's code and
+verified field-by-field against it, but hand-written means it can still be wrong,
+and a real conflict is worth reporting back rather than coding around.
 
 === Gateway API contract (base URL http://localhost:8000) ===
 
@@ -62,7 +63,33 @@ CHAT (the core endpoint) — POST /v1/chat  (authed):
       "model": string | null,        // optional per-request override
       "stream": boolean,             // false = JSON, true = NDJSON stream
       "options": object | null,      // passthrough (e.g. {"temperature":0.2})
-      "file_ids": string[] | null }  // ids from POST /v1/files to attach
+      "file_ids": string[] | null,   // ids from POST /v1/files to attach
+      "department": string | null }  // a department tab's code, e.g. "hr"
+
+  ABOUT "department" — READ THIS BEFORE BUILDING THE CITATIONS UI. A chat is
+  either a GENERAL chat or bound to ONE department, and only a department chat
+  searches documents. A general chat therefore returns "sources": null on every
+  turn, always. If this frontend never sends `department`, you will build the whole
+  citations UI and correctly never see a single citation — so wire the department
+  selection first, or you cannot tell your UI from a broken backend.
+    * Send `department` on the FIRST turn (session_id omitted) to open a department
+      chat. That binds the session permanently.
+    * On later turns of a bound session you MAY omit it — the server reads the
+      binding from its own row. Sending it is an optional consistency check.
+      Omitting it is NOT an error.
+    * The department is never a tool argument and is never trusted from the body on
+      an existing session; the server owns it. Do not try to "switch" a chat's
+      department — start a new chat instead.
+    * Errors: 404 unknown or deactivated department · 403 you have no grant for it ·
+      409 this session belongs to a different department · 409 this is an existing
+      GENERAL conversation and cannot be adopted into a department (start a new
+      chat in the tab) · 404 the session is not yours.
+
+DEPARTMENTS (the tabs the user may open a chat in) — authed:
+  GET /v1/departments -> [ {code, name, is_active, ...} ]
+      A member sees only the departments granted to them and still active; an
+      admin sees all. This is the list to render as tabs / a picker, and it is how
+      the user gets into a chat that can produce citations at all.
 
   When stream=false -> 200 JSON:
     { "session_id": string,
@@ -155,6 +182,12 @@ MCP status badge (authed): GET /v1/mcp/status -> always 200, health is in the bo
 === What to actually do ===
 
 JOB A — build the citations UI:
+0. FIRST, make a department chat reachable, or nothing below is testable: check
+   whether this frontend calls GET /v1/departments and sends `department` on the
+   first turn. If it does not, wire that up (tabs or a picker) before touching the
+   citations UI — a general chat returns "sources": null forever, so without this
+   you cannot distinguish working code from broken code. Say in your report which
+   of the two you found.
 1. Find where an assistant message is rendered, and where a chat response (both
    the non-streaming JSON and the NDJSON `done` event) is parsed into state.
 2. Carry `sources` through into that state. It is `null` for most turns; treat
