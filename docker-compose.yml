@@ -54,6 +54,9 @@ services:
     volumes:
       - gateway_files:/app/generated_files
       - rag_documents:/app/rag_documents          # shared with worker
+      # Serving a chat citation's source document. Since §28 an NRB document has
+      # NO copy under rag_documents — its bytes are only here.
+      - nrb_files:/app/nrb_files
 
   worker:
     build:
@@ -74,6 +77,9 @@ services:
     restart: unless-stopped
     volumes:
       - rag_documents:/app/rag_documents          # SAME volume the gateway writes
+      # Reads NRB blobs during recovery/ingest (worker._document_path). Without
+      # this the job SUCCEEDS with an empty document — the §18 failure shape.
+      - nrb_files:/app/nrb_files
       - worker_cache:/home/appuser/.cache         # persist Docling models
 
   nrb-runner:
@@ -109,8 +115,17 @@ services:
     restart: unless-stopped
     volumes:
       - rag_documents:/app/rag_documents          # the RAG stage copies into it
+      # WRITES the blobs (the Phase 5 fetch). The other two only read them, so
+      # all three must mount the same volume at the same path or the corpus
+      # exists three times and is empty twice.
+      - nrb_files:/app/nrb_files
 
 volumes:
   gateway_files:
   rag_documents:
+  # The NRB blob store. Written by nrb-runner (Phase 5 fetch), read by worker
+  # (recovery + ingest) and by gateway (serving a citation's download). Since §28
+  # there is no rag_documents copy of an NRB file, so this volume IS the corpus's
+  # bytes — losing it loses 8.6 GB that would have to be re-downloaded.
+  nrb_files:
   worker_cache:
