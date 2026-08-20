@@ -238,3 +238,78 @@ def test_bad_document_source_is_rejected(dept_pair):
     with pytest.raises(Exception) as exc:
         _tx(bad)
     assert "ck_documents_source" in str(exc.value)
+
+
+@pytest.fixture()
+def dept_and_user(dept_pair):
+    """A user to hold grants, on top of `dept_pair`'s two departments.
+
+    `ck_users_credential` means a 'local' user MUST carry a password_hash, so the
+    insert supplies one rather than leaving it NULL.
+    """
+    email = f"role-{uuid.uuid4().hex[:8]}@example.com"
+
+    async def setup(conn):
+        return (await conn.execute(text(
+            "INSERT INTO users (email, auth_provider, password_hash, role, is_active)"
+            " VALUES (:e, 'local', 'x', 'member', true) RETURNING id"),
+            {"e": email})).scalar_one()
+
+    user_id = _tx(setup)
+    yield {**dept_pair, "user": user_id}
+
+    async def teardown(conn):
+        # user_departments cascades on users.id, but delete it explicitly: a leaked
+        # grant is exactly the state that would alter a later run's result.
+        await conn.execute(text("DELETE FROM user_departments WHERE user_id = :u"),
+                           {"u": user_id})
+        await conn.execute(text("DELETE FROM users WHERE id = :u"), {"u": user_id})
+    _tx(teardown)
+
+
+def test_user_departments_role_defaults_to_the_weakest_level(dept_and_user):
+    """Least privilege on omission: an insert that forgets the level must not
+    quietly create an editor. This default is also what let the migration backfill
+    every pre-existing grant without a data step."""
+    async def insert_and_read(conn):
+        await conn.execute(text(
+            "INSERT INTO user_departments (user_id, department_id) VALUES (:u, :d)"),
+            {"u": dept_and_user["user"], "d": dept_and_user["a"]})
+        return (await conn.execute(text(
+            "SELECT role FROM user_departments"
+            " WHERE user_id = :u AND department_id = :d"),
+            {"u": dept_and_user["user"], "d": dept_and_user["a"]})).scalar_one()
+
+    assert _tx(insert_and_read) == "viewer"
+
+
+def test_bad_department_role_is_rejected(dept_and_user):
+    """The vocabulary is closed because every gate compares this exact string. A
+    typo'd level would be a level that allows nothing, silently -- the same reason
+    ck_documents_status exists."""
+    async def bad(conn):
+        await conn.execute(text(
+            "INSERT INTO user_departments (user_id, department_id, role)"
+            " VALUES (:u, :d, 'editer')"),
+            {"u": dept_and_user["user"], "d": dept_and_user["a"]})
+
+    with pytest.raises(Exception) as exc:
+        _tx(bad)
+    assert "ck_user_departments_role" in str(exc.value)
+
+
+def test_bad_user_role_is_rejected():
+    """users.role had NO check constraint while auth_provider and documents.status
+    both did. `require_admin` compares this exact string, so an unrecognised value
+    is silently a non-admin -- a privilege bug that reads as a typo."""
+    _skip_if_no_db()
+
+    async def bad(conn):
+        await conn.execute(text(
+            "INSERT INTO users (email, auth_provider, password_hash, role, is_active)"
+            " VALUES (:e, 'local', 'x', 'administrator', true)"),
+            {"e": f"ckrole-{uuid.uuid4().hex[:8]}@example.com"})
+
+    with pytest.raises(Exception) as exc:
+        _tx(bad)
+    assert "ck_users_role" in str(exc.value)

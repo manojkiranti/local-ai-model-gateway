@@ -99,12 +99,28 @@ class UserDepartment(Base):
     """
 
     __tablename__ = "user_departments"
+    __table_args__ = (
+        # Closed vocabulary, same rule as ck_documents_status: every gate compares
+        # this exact string, so an unrecognised value is not cosmetic — it is a
+        # level that allows nothing (`permissions.allows` fails closed). Adding a
+        # level means editing this CHECK.
+        CheckConstraint(
+            "role IN ('viewer', 'editor', 'owner')",
+            name="ck_user_departments_role",
+        ),
+    )
 
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
     )
     department_id: Mapped[int] = mapped_column(
         ForeignKey("departments.id", ondelete="CASCADE"), primary_key=True
+    )
+    # What the holder may DO here: viewer < editor < owner (app/rag/permissions.py).
+    # Defaulting to the weakest level is least privilege on omission, and it is what
+    # let the migration backfill every pre-existing grant without a data step.
+    role: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default=text("'viewer'")
     )
     granted_by: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True

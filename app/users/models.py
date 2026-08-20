@@ -50,6 +50,13 @@ class User(Base):
             " OR (auth_provider <> 'local' AND password_hash IS NULL)",
             name="ck_users_credential",
         ),
+        # users.role had no CHECK while auth_provider and documents.status both
+        # did. `require_admin` compares this exact string, so an unrecognised value
+        # is silently a non-admin — a privilege bug that reads as a typo.
+        CheckConstraint(
+            "role IN ('admin', 'member')",
+            name="ck_users_role",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
