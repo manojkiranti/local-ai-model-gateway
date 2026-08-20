@@ -242,3 +242,172 @@ def test_corpus_operations_reject_an_inactive_department(env):
                        headers=admin).status_code == 404
     assert client.get(f"/v1/departments/{code}/documents",
                       headers=admin).status_code == 404
+
+
+# Repeated rather than imported from tests/test_rag_departments_api.py: a shared
+# fixture across test modules couples two suites that assert different things.
+@pytest.fixture()
+def levels():
+    """A department plus one user at each level, granted by the admin."""
+    with TestClient(app) as client:
+        admin = _auth(client, "admin@example.com")
+        if _me(client, admin).get("role") != "admin":
+            pytest.skip("admin@example.com is not an admin in this database")
+        code = f"dlv{uuid.uuid4().hex[:6]}"
+        assert client.post(
+            "/v1/departments", json={"code": code, "name": "Levels"},
+            headers=admin,
+        ).status_code == 201
+        people = {}
+        for level in ("viewer", "editor", "owner"):
+            headers = _auth(client, f"docs-{level}-{uuid.uuid4().hex[:8]}@example.com")
+            uid = _me(client, headers)["id"]
+            assert client.post(
+                f"/v1/departments/{code}/members",
+                json={"user_id": uid, "role": level},
+                headers=admin,
+            ).status_code == 204
+            people[level] = (headers, uid)
+        yield client, admin, code, people
+
+
+def _typed(client, headers, code, title):
+    return client.post(
+        f"/v1/departments/{code}/documents/text",
+        json={"title": title, "content": "some corpus text"},
+        headers=headers,
+    )
+
+
+def test_an_editor_can_upload(levels):
+    """The whole point of the feature: curating a department no longer requires
+    global admin over every other department, the user table and NRB."""
+    client, _admin, code, people = levels
+    editor, _ = people["editor"]
+    resp = _upload(client, editor, code, "editor.csv", CSV)
+    assert resp.status_code == 202, resp.text
+    assert resp.json()["document_id"]
+
+
+def test_an_owner_can_upload(levels):
+    client, _admin, code, people = levels
+    owner, _ = people["owner"]
+    resp = _upload(client, owner, code, "owner.csv", CSV)
+    assert resp.status_code == 202, resp.text
+
+
+def test_a_viewer_cannot_upload(levels):
+    client, _admin, code, people = levels
+    viewer, _ = people["viewer"]
+    resp = _upload(client, viewer, code, "viewer.csv", CSV)
+    assert resp.status_code == 403
+    assert resp.json()["detail"] == (
+        "Editor access to this department is required"
+    )
+
+
+def test_the_uploader_is_recorded_as_the_editor_not_an_admin(levels):
+    """`uploaded_by` used to be the admin's id by construction; it must now be
+    whoever actually uploaded."""
+    client, _admin, code, people = levels
+    editor, editor_id = people["editor"]
+    doc_id = _upload(client, editor, code, "who.csv", CSV).json()["document_id"]
+    rows = client.get(f"/v1/departments/{code}/documents", headers=editor).json()
+    assert any(r["id"] == doc_id for r in rows)
+
+
+def test_a_viewer_cannot_add_typed_text(levels):
+    client, _admin, code, people = levels
+    viewer, _ = people["viewer"]
+    assert _typed(client, viewer, code, "Nope").status_code == 403
+
+
+def test_an_editor_can_add_typed_text(levels):
+    client, _admin, code, people = levels
+    editor, _ = people["editor"]
+    assert _typed(client, editor, code, "Editor typed").status_code == 202
+
+
+def test_a_viewer_cannot_archive(levels):
+    client, admin, code, people = levels
+    viewer, _ = people["viewer"]
+    doc_id = _typed(client, admin, code, "Doc").json()["document_id"]
+    assert client.delete(
+        f"/v1/departments/{code}/documents/{doc_id}", headers=viewer
+    ).status_code == 403
+
+
+def test_an_editor_can_archive(levels):
+    client, admin, code, people = levels
+    editor, _ = people["editor"]
+    doc_id = _typed(client, admin, code, "Doc2").json()["document_id"]
+    assert client.delete(
+        f"/v1/departments/{code}/documents/{doc_id}", headers=editor
+    ).status_code == 204
+
+
+def test_a_viewer_sees_only_ready_documents_and_no_admin_fields(levels):
+    """A pending or failed document is not part of the corpus a viewer's answers
+    can cite, and surfacing it invites "why can't the assistant see this?"."""
+    client, admin, code, people = levels
+    viewer, _ = people["viewer"]
+    _typed(client, admin, code, "Fresh")
+    rows = client.get(f"/v1/departments/{code}/documents", headers=viewer).json()
+    assert all(r["status"] == "ready" for r in rows)
+    assert all("embed_model" not in r for r in rows)
+
+
+def test_an_editor_sees_non_ready_documents_and_admin_fields(levels):
+    client, admin, code, people = levels
+    editor, _ = people["editor"]
+    doc_id = _typed(client, admin, code, "Fresh2").json()["document_id"]
+    rows = client.get(f"/v1/departments/{code}/documents", headers=editor).json()
+    assert any(r["id"] == doc_id for r in rows)
+    assert all("embed_model" in r for r in rows)
+
+
+def test_a_viewer_cannot_list_archived(levels):
+    client, _admin, code, people = levels
+    viewer, _ = people["viewer"]
+    resp = client.get(
+        f"/v1/departments/{code}/documents?include_archived=true", headers=viewer
+    )
+    assert resp.status_code == 403
+    assert resp.json()["detail"] == (
+        "Editor access to this department is required"
+    )
+
+
+def test_an_editor_can_list_archived(levels):
+    client, admin, code, people = levels
+    editor, _ = people["editor"]
+    doc_id = _typed(client, admin, code, "ToArchive").json()["document_id"]
+    assert client.delete(
+        f"/v1/departments/{code}/documents/{doc_id}", headers=admin
+    ).status_code == 204
+    seen = client.get(
+        f"/v1/departments/{code}/documents?include_archived=true", headers=editor
+    ).json()
+    assert any(r["id"] == doc_id for r in seen)
+
+
+def test_a_viewer_cannot_download_a_non_ready_document(levels):
+    """404, not 403: at document granularity the answer must not reveal that an
+    id exists inside a department you can otherwise see."""
+    client, admin, code, people = levels
+    viewer, _ = people["viewer"]
+    doc_id = _typed(client, admin, code, "Fresh3").json()["document_id"]
+    resp = client.get(
+        f"/v1/departments/{code}/documents/{doc_id}/download", headers=viewer
+    )
+    assert resp.status_code == 404
+
+
+def test_an_outsider_is_still_403_at_department_granularity(levels):
+    """No grant at all remains a different refusal from a grant that is too
+    weak, and it is 403 because the department is not the secret."""
+    client, _admin, code, _people = levels
+    outsider = _auth(client, f"docs-out-{uuid.uuid4().hex[:8]}@example.com")
+    resp = client.get(f"/v1/departments/{code}/documents", headers=outsider)
+    assert resp.status_code == 403
+    assert resp.json()["detail"] == "You do not have access to this department"

@@ -318,11 +318,11 @@ async def upload_document(
     code: str,
     title: str = Form(...),
     file: UploadFile = File(...),
-    admin: User = Depends(require_admin),
+    user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> IngestAccepted:
     settings = get_settings()
-    dept = await _require_active_department(session, code)
+    dept, _level = await _require_level(session, user, code, LEVEL_EDITOR)
 
     try:
         file_type = detect_file_type(file.filename or "")
@@ -348,7 +348,7 @@ async def upload_document(
             session, department_id=dept.id, title=title, source="upload",
             file_type=file_type, content_hash=docs_repo.content_hash_of(data),
             storage_key=storage_key, file_name=file.filename,
-            uploaded_by=admin.id,
+            uploaded_by=user.id,
         )
     except docs_repo.DocumentConflict as exc:
         # Compensate: the bytes are already on disk and nothing will reference
@@ -372,12 +372,12 @@ async def upload_document(
 async def create_text_document(
     code: str,
     body: TextDocumentCreate,
-    admin: User = Depends(require_admin),
+    user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> IngestAccepted:
     """Typed-in knowledge: source='manual', no file_name, no storage_key file."""
     settings = get_settings()
-    dept = await _require_active_department(session, code)
+    dept, _level = await _require_level(session, user, code, LEVEL_EDITOR)
 
     content = body.content.strip()
     if not content:
@@ -394,7 +394,7 @@ async def create_text_document(
         doc = await docs_repo.create_document(
             session, department_id=dept.id, title=body.title, source="manual",
             file_type="text", content_hash=docs_repo.content_hash_of(data),
-            storage_key=storage_key, file_name=None, uploaded_by=admin.id,
+            storage_key=storage_key, file_name=None, uploaded_by=user.id,
         )
     except docs_repo.DocumentConflict as exc:
         delete_document(storage_key, settings.rag_docs_base)
@@ -415,23 +415,23 @@ async def list_department_documents(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    """Admins manage; members browse.
+    """Editors manage; viewers browse.
 
-    A member sees only `ready` documents — a `pending` or `failed` one is not
+    A viewer sees only `ready` documents — a `pending` or `failed` one is not
     part of the corpus their answers can cite, and surfacing it just invites
-    "why can't the assistant see this?". Admins see every non-archived document
+    "why can't the assistant see this?". Editors see every non-archived document
     because managing failures is exactly their job, plus `?include_archived=`.
 
-    `response_model=None` because the two roles genuinely return different
+    `response_model=None` because the two levels genuinely return different
     shapes; FastAPI serializes whichever model is returned.
     """
-    dept = await _require_department_access(session, user, code)
+    dept, level = await _require_level(session, user, code, LEVEL_VIEWER)
 
-    if user.role != ROLE_ADMIN:
+    if not permissions.allows(level, LEVEL_EDITOR):
         if include_archived:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only admins can list archived documents",
+                detail=permissions.insufficient_level(LEVEL_EDITOR),
             )
         rows = await docs_repo.list_documents(session, dept.id, ready_only=True)
         return [DocumentOut.model_validate(d) for d in rows]
@@ -521,10 +521,10 @@ async def download_department_document(
     """Serve a corpus document's original bytes — what a chat citation links to.
 
     Status codes follow the routes beside this one rather than one blanket rule:
-    an ungranted **department** is 403 (as in `_require_department_access`, and
-    as `GET /{code}/documents` already answers), while anything at **document**
+    an ungranted **department** is 403 (as in `_require_level`, and as
+    `GET /{code}/documents` already answers), while anything at **document**
     granularity is 404 — unknown id, a document belonging to another department,
-    or one a member is not allowed to read. Members are held to `ready`
+    or one a viewer is not allowed to read. Viewers are held to `ready`
     documents, matching the list route: a pending or archived document is not
     part of the corpus their answers can cite, and distinguishing "exists but
     you may not have it" from "does not exist" would leak the corpus's shape.
@@ -532,13 +532,13 @@ async def download_department_document(
     Behind JWT like every other download here, so the frontend must fetch with
     the Authorization header and build a blob URL.
     """
-    dept = await _require_department_access(session, user, code)
+    dept, level = await _require_level(session, user, code, LEVEL_VIEWER)
     doc = await docs_repo.get_document(session, document_id)
     if doc is None or doc.department_id != dept.id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Unknown document"
         )
-    if user.role != ROLE_ADMIN and doc.status != STATUS_READY:
+    if not permissions.allows(level, LEVEL_EDITOR) and doc.status != STATUS_READY:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Unknown document"
         )
@@ -574,12 +574,12 @@ async def download_department_document(
 async def archive_department_document(
     code: str,
     document_id: str,
-    _admin: User = Depends(require_admin),
+    user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> Response:
     """Archive: chunks removed so it stops being retrievable, row retained for
     audit. Not a delete — `documents.chunk_count` stays as the record."""
-    dept = await _require_active_department(session, code)
+    dept, _level = await _require_level(session, user, code, LEVEL_EDITOR)
     doc = await docs_repo.get_document(session, document_id)
     if doc is None or doc.department_id != dept.id:
         raise HTTPException(
