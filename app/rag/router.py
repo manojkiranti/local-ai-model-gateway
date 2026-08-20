@@ -32,10 +32,12 @@ from ..config import get_settings
 from ..db.session import get_session
 from ..users import repository as users_repo
 from ..users.models import ROLE_ADMIN, User
+from . import access, permissions
 from . import documents as docs_repo
 from . import jobs as jobs_repo
 from . import repository as repo
 from .models import STATUS_READY
+from .permissions import LEVEL_EDITOR, LEVEL_OWNER, LEVEL_VIEWER
 from .parsing import ParseError, detect_file_type
 from .schemas import (
     DepartmentCreate,
@@ -68,6 +70,18 @@ async def _require_department(session: AsyncSession, code: str):
     return dept
 
 
+def _department_out(dept, role: str | None) -> DepartmentOut:
+    """`role` is the CALLER's effective level, which is not on the ORM row."""
+    return DepartmentOut(
+        id=dept.id,
+        code=dept.code,
+        name=dept.name,
+        is_active=dept.is_active,
+        created_at=dept.created_at,
+        role=role,
+    )
+
+
 @router.post("", response_model=DepartmentOut, status_code=status.HTTP_201_CREATED)
 async def create_department(
     body: DepartmentCreate,
@@ -83,7 +97,8 @@ async def create_department(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Department '{body.code}' already exists",
         )
-    return DepartmentOut.model_validate(dept)
+    # The caller is a global admin, so owner is their effective level here.
+    return _department_out(dept, LEVEL_OWNER)
 
 
 @router.get("", response_model=list[DepartmentOut])
@@ -91,12 +106,16 @@ async def list_departments(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> list[DepartmentOut]:
-    """Admins see every department; everyone else sees only their own tabs."""
+    """Admins see every department; everyone else sees only their own tabs.
+
+    Each row carries the caller's OWN level, so the frontend decides what to draw
+    from one field instead of reimplementing the policy against /users/me.
+    """
     if user.role == ROLE_ADMIN:
         rows = await repo.list_departments(session)
-    else:
-        rows = await repo.list_departments_for_user(session, user.id)
-    return [DepartmentOut.model_validate(d) for d in rows]
+        return [_department_out(d, LEVEL_OWNER) for d in rows]
+    granted = await repo.list_departments_for_user(session, user.id)
+    return [_department_out(d, level) for d, level in granted]
 
 
 @router.patch("/{code}", response_model=DepartmentOut)
@@ -115,16 +134,20 @@ async def update_department(
         dept.is_active = body.is_active
     await session.commit()
     await session.refresh(dept)
-    return DepartmentOut.model_validate(dept)
+    # The caller is a global admin, so owner is their effective level here.
+    return _department_out(dept, LEVEL_OWNER)
 
 
 @router.get("/{code}/members", response_model=list[MemberOut])
 async def list_members(
     code: str,
-    _admin: User = Depends(require_admin),
+    user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> list[MemberOut]:
-    dept = await _require_department(session, code)
+    """Owner-visible, INCLUDING other owners: `grant_refusal` restricts writes,
+    not reads, and hiding owners would leave an owner unable to see why a revoke
+    was refused."""
+    dept, _level = await _require_level(session, user, code, LEVEL_OWNER)
     rows = await repo.list_department_members(session, dept.id)
     return [MemberOut.model_validate(m) for m in rows]
 
@@ -133,16 +156,24 @@ async def list_members(
 async def grant_member(
     code: str,
     body: GrantCreate,
-    admin: User = Depends(require_admin),
+    caller: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> Response:
-    dept = await _require_department(session, code)
+    """Grant access at a level, or change an existing member's level.
+
+    An owner delegates viewer and editor; only a global admin mints owners. The
+    guard is `permissions.grant_refusal`, which takes `caller_is_global_admin`
+    SEPARATELY from the level for the reason documented there.
+    """
+    dept, caller_level = await _require_level(session, caller, code, LEVEL_OWNER)
 
     user_id = body.user_id
     if user_id is None:
         # Granting by email: resolve it here rather than trusting the client to
         # have looked the id up correctly. Same 404 as an unknown id, so the two
-        # spellings of "that user does not exist" read identically.
+        # spellings of "that user does not exist" read identically. This path is
+        # also what lets an OWNER grant at all — `GET /users` is global-admin-only,
+        # so they cannot resolve an address to an id themselves.
         user = await users_repo.get_by_email(session, body.email.lower())
         if user is None:
             raise HTTPException(
@@ -150,10 +181,22 @@ async def grant_member(
             )
         user_id = user.id
 
+    existing = await repo.get_department_level(
+        session, user_id=user_id, department_id=dept.id
+    )
+    refusal = permissions.grant_refusal(
+        caller_level=caller_level,
+        caller_is_global_admin=caller.role == ROLE_ADMIN,
+        requested_level=body.role,
+        existing_target_level=existing,
+    )
+    if refusal is not None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=refusal)
+
     try:
         await repo.grant_department(
             session, user_id=user_id, department_id=dept.id,
-            granted_by=admin.id,
+            granted_by=caller.id, role=body.role,
         )
         await session.commit()
     except IntegrityError:
@@ -169,10 +212,25 @@ async def grant_member(
 async def revoke_member(
     code: str,
     user_id: int,
-    _admin: User = Depends(require_admin),
+    caller: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> Response:
-    dept = await _require_department(session, code)
+    dept, caller_level = await _require_level(session, caller, code, LEVEL_OWNER)
+    existing = await repo.get_department_level(
+        session, user_id=user_id, department_id=dept.id
+    )
+    # `requested_level=None` is revocation. An owner may not evict another owner:
+    # that is the lateral case, and it needs no last-owner guard because global
+    # admin is always the backstop.
+    refusal = permissions.grant_refusal(
+        caller_level=caller_level,
+        caller_is_global_admin=caller.role == ROLE_ADMIN,
+        requested_level=None,
+        existing_target_level=existing,
+    )
+    if refusal is not None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=refusal)
+
     removed = await repo.revoke_department(
         session, user_id=user_id, department_id=dept.id
     )
@@ -203,19 +261,31 @@ async def _require_active_department(session: AsyncSession, code: str):
     return dept
 
 
-async def _require_department_access(session: AsyncSession, user: User, code: str):
-    """Read access to a department's document list: admin, or a grant."""
+async def _require_level(
+    session: AsyncSession, user: User, code: str, minimum: str
+):
+    """The active department plus the caller's level, or the right refusal.
+
+    The order matters and is the order slice 1 established: 404 for unknown or
+    inactive FIRST (admins included — a soft-disabled department is gone from the
+    product, and 403 would confirm it still exists), then 403 for no grant, then
+    403 naming the level required. Naming it is safe here because the caller holds
+    a grant, so the department's existence is not the secret; where existence IS
+    the secret — a document, an ingest job — the answer is 404 instead.
+    """
     dept = await _require_active_department(session, code)
-    if user.role != ROLE_ADMIN:
-        allowed = await repo.has_department_access(
-            session, user_id=user.id, department_id=dept.id
+    level = await access.effective_department_level(session, user, dept)
+    if level is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this department",
         )
-        if not allowed:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You do not have access to this department",
-            )
-    return dept
+    if not permissions.allows(level, minimum):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=permissions.insufficient_level(minimum),
+        )
+    return dept, level
 
 
 async def _accept(

@@ -124,7 +124,19 @@ def test_soft_disable_hides_a_department_without_revoking_the_grant(clients):
     assert code not in [d["code"] for d in
                         client.get("/v1/departments", headers=member).json()]
 
-    # The grant survives — the admin listing still shows the member.
+    # The members route now requires an ACTIVE department, for admins too --
+    # `_require_active_department`'s own rule, that a soft-disabled department is
+    # gone from the product and 403 would confirm it still exists.
+    assert client.get(
+        f"/v1/departments/{code}/members", headers=admin
+    ).status_code == 404
+
+    # The grant itself survives, which is the actual invariant: reactivating
+    # brings the department straight back for the same member, with no re-grant.
+    assert client.patch(f"/v1/departments/{code}", json={"is_active": True},
+                        headers=admin).status_code == 200
+    assert code in [d["code"] for d in
+                    client.get("/v1/departments", headers=member).json()]
     members = client.get(f"/v1/departments/{code}/members", headers=admin).json()
     assert uid in [m["user_id"] for m in members]
 
@@ -173,3 +185,215 @@ def test_departments_require_authentication(clients):
     # (401, 403) matches tests/test_protected_endpoints.py — HTTPBearer's
     # no-credentials status has moved between FastAPI versions.
     assert client.get("/v1/departments").status_code in (401, 403)
+
+
+@pytest.fixture()
+def dept_with_levels(clients):
+    """A fresh department plus one user at each level, granted by the admin."""
+    client, admin, _member, _uid = clients
+    code = f"lv{uuid.uuid4().hex[:6]}"
+    resp = client.post(
+        "/v1/departments", json={"code": code, "name": "Levels"}, headers=admin
+    )
+    assert resp.status_code == 201, resp.text
+    people = {}
+    for level in ("viewer", "editor", "owner"):
+        email = f"rag-{level}-{uuid.uuid4().hex[:8]}@example.com"
+        headers = _auth(client, email)
+        uid = _me(client, headers)["id"]
+        granted = client.post(
+            f"/v1/departments/{code}/members",
+            json={"user_id": uid, "role": level},
+            headers=admin,
+        )
+        assert granted.status_code == 204, granted.text
+        people[level] = (headers, uid)
+    return client, admin, code, people
+
+
+def test_a_global_admin_can_grant_owner(dept_with_levels):
+    """The escalation guard must not apply to global admins, or nobody can ever
+    create an owner and the feature is unusable."""
+    client, admin, code, _people = dept_with_levels
+    headers = _auth(client, f"rag-newowner-{uuid.uuid4().hex[:8]}@example.com")
+    uid = _me(client, headers)["id"]
+    resp = client.post(
+        f"/v1/departments/{code}/members",
+        json={"user_id": uid, "role": "owner"},
+        headers=admin,
+    )
+    assert resp.status_code == 204, resp.text
+
+
+def test_an_owner_can_grant_an_editor(dept_with_levels):
+    client, _admin, code, people = dept_with_levels
+    owner, _ = people["owner"]
+    headers = _auth(client, f"rag-delegated-{uuid.uuid4().hex[:8]}@example.com")
+    uid = _me(client, headers)["id"]
+    resp = client.post(
+        f"/v1/departments/{code}/members",
+        json={"user_id": uid, "role": "editor"},
+        headers=owner,
+    )
+    assert resp.status_code == 204, resp.text
+
+
+def test_an_owner_can_grant_by_email_without_reading_the_user_table(dept_with_levels):
+    """GET /users is global-admin-only, so email-or-id is what makes delegation
+    workable at all."""
+    client, _admin, code, people = dept_with_levels
+    owner, _ = people["owner"]
+    email = f"rag-byemail-{uuid.uuid4().hex[:8]}@example.com"
+    _auth(client, email)
+    assert client.get("/users", headers=owner).status_code == 403
+    resp = client.post(
+        f"/v1/departments/{code}/members",
+        json={"email": email, "role": "viewer"},
+        headers=owner,
+    )
+    assert resp.status_code == 204, resp.text
+
+
+def test_an_owner_cannot_grant_owner(dept_with_levels):
+    client, _admin, code, people = dept_with_levels
+    owner, _ = people["owner"]
+    headers = _auth(client, f"rag-wannabe-{uuid.uuid4().hex[:8]}@example.com")
+    uid = _me(client, headers)["id"]
+    resp = client.post(
+        f"/v1/departments/{code}/members",
+        json={"user_id": uid, "role": "owner"},
+        headers=owner,
+    )
+    assert resp.status_code == 403
+    assert "global admin" in resp.json()["detail"]
+
+
+def test_an_owner_cannot_revoke_another_owner(dept_with_levels):
+    client, admin, code, people = dept_with_levels
+    owner, _ = people["owner"]
+    other = _auth(client, f"rag-coowner-{uuid.uuid4().hex[:8]}@example.com")
+    other_id = _me(client, other)["id"]
+    assert client.post(
+        f"/v1/departments/{code}/members",
+        json={"user_id": other_id, "role": "owner"},
+        headers=admin,
+    ).status_code == 204
+    resp = client.delete(
+        f"/v1/departments/{code}/members/{other_id}", headers=owner
+    )
+    assert resp.status_code == 403
+
+
+def test_an_owner_cannot_demote_another_owner(dept_with_levels):
+    """Demotion is the same escalation surface as promotion."""
+    client, admin, code, people = dept_with_levels
+    owner, _ = people["owner"]
+    other = _auth(client, f"rag-demote-{uuid.uuid4().hex[:8]}@example.com")
+    other_id = _me(client, other)["id"]
+    assert client.post(
+        f"/v1/departments/{code}/members",
+        json={"user_id": other_id, "role": "owner"},
+        headers=admin,
+    ).status_code == 204
+    resp = client.post(
+        f"/v1/departments/{code}/members",
+        json={"user_id": other_id, "role": "viewer"},
+        headers=owner,
+    )
+    assert resp.status_code == 403
+
+
+def test_an_owner_can_revoke_an_editor(dept_with_levels):
+    client, _admin, code, people = dept_with_levels
+    owner, _ = people["owner"]
+    _editor, editor_id = people["editor"]
+    resp = client.delete(
+        f"/v1/departments/{code}/members/{editor_id}", headers=owner
+    )
+    assert resp.status_code == 204
+
+
+@pytest.mark.parametrize("level", ["viewer", "editor"])
+def test_below_owner_cannot_manage_members(dept_with_levels, level):
+    client, _admin, code, people = dept_with_levels
+    headers, _ = people[level]
+    assert client.get(
+        f"/v1/departments/{code}/members", headers=headers
+    ).status_code == 403
+    resp = client.post(
+        f"/v1/departments/{code}/members",
+        json={"email": "nobody@example.com", "role": "viewer"},
+        headers=headers,
+    )
+    assert resp.status_code == 403
+    assert resp.json()["detail"] == (
+        "Owner access to this department is required"
+    )
+
+
+def test_an_outsider_cannot_manage_members(dept_with_levels):
+    """No grant at all is a different refusal from a grant that is too weak."""
+    client, _admin, code, _people = dept_with_levels
+    outsider = _auth(client, f"rag-outsider-{uuid.uuid4().hex[:8]}@example.com")
+    resp = client.get(f"/v1/departments/{code}/members", headers=outsider)
+    assert resp.status_code == 403
+    assert resp.json()["detail"] == "You do not have access to this department"
+
+
+def test_the_members_list_carries_emails_and_levels(dept_with_levels):
+    client, _admin, code, people = dept_with_levels
+    owner, _ = people["owner"]
+    rows = client.get(f"/v1/departments/{code}/members", headers=owner).json()
+    by_level = {r["role"]: r for r in rows}
+    assert set(by_level) == {"viewer", "editor", "owner"}
+    assert all("@" in r["email"] for r in rows)
+
+
+def test_list_departments_reports_the_callers_level(dept_with_levels):
+    client, admin, code, people = dept_with_levels
+    for level in ("viewer", "editor", "owner"):
+        headers, _ = people[level]
+        mine = client.get("/v1/departments", headers=headers).json()
+        row = next(d for d in mine if d["code"] == code)
+        assert row["role"] == level
+    # A global admin sees every department at the effective level owner.
+    all_rows = client.get("/v1/departments", headers=admin).json()
+    assert next(d for d in all_rows if d["code"] == code)["role"] == "owner"
+
+
+def test_regranting_changes_the_level(dept_with_levels):
+    client, admin, code, people = dept_with_levels
+    viewer, viewer_id = people["viewer"]
+    assert client.post(
+        f"/v1/departments/{code}/members",
+        json={"user_id": viewer_id, "role": "editor"},
+        headers=admin,
+    ).status_code == 204
+    mine = client.get("/v1/departments", headers=viewer).json()
+    assert next(d for d in mine if d["code"] == code)["role"] == "editor"
+
+
+def test_an_unknown_level_is_rejected_before_the_database(dept_with_levels):
+    client, admin, code, people = dept_with_levels
+    _viewer, viewer_id = people["viewer"]
+    resp = client.post(
+        f"/v1/departments/{code}/members",
+        json={"user_id": viewer_id, "role": "editer"},
+        headers=admin,
+    )
+    assert resp.status_code == 422
+
+
+def test_granting_without_a_role_still_defaults_to_viewer(dept_with_levels):
+    """An existing client that never sent `role` keeps granting what it granted
+    before -- that is what makes this migration behaviour-neutral."""
+    client, admin, code, _people = dept_with_levels
+    headers = _auth(client, f"rag-default-{uuid.uuid4().hex[:8]}@example.com")
+    uid = _me(client, headers)["id"]
+    assert client.post(
+        f"/v1/departments/{code}/members",
+        json={"user_id": uid},
+        headers=admin,
+    ).status_code == 204
+    mine = client.get("/v1/departments", headers=headers).json()
+    assert next(d for d in mine if d["code"] == code)["role"] == "viewer"

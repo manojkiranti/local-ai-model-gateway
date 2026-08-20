@@ -3,8 +3,14 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
+
+# The level vocabulary as the API accepts it. `Literal` rejects a typo with 422
+# before the request reaches ck_user_departments_role, so a client gets a field
+# error rather than a 500 out of an IntegrityError.
+DepartmentRole = Literal["viewer", "editor", "owner"]
 
 
 class DepartmentCreate(BaseModel):
@@ -26,6 +32,11 @@ class DepartmentOut(BaseModel):
     name: str
     is_active: bool
     created_at: datetime
+    # The CALLER's effective level here ('owner' for a global admin with no grant
+    # row). Server-side so the frontend has ONE rule — role is editor or owner
+    # means show the upload button — instead of reimplementing the policy against
+    # /users/me. Not on the ORM row, so `_department_out` builds it.
+    role: str | None = None
 
 
 class GrantCreate(BaseModel):
@@ -42,6 +53,9 @@ class GrantCreate(BaseModel):
 
     user_id: int | None = None
     email: EmailStr | None = None
+    # Absent means the weakest level, so an existing client that never sent this
+    # field keeps granting exactly what it granted before.
+    role: DepartmentRole = "viewer"
 
     @model_validator(mode="after")
     def _exactly_one_identifier(self) -> "GrantCreate":
@@ -55,6 +69,10 @@ class MemberOut(BaseModel):
 
     user_id: int
     department_id: int
+    role: str
+    # `GET /users` is global-admin-only, so without the email a department owner
+    # managing members sees bare integers they have no way to resolve.
+    email: str
     granted_by: int | None
     granted_at: datetime
 
