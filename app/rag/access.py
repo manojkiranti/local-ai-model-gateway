@@ -17,24 +17,49 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..history.models import ChatSession
 from ..users.models import ROLE_ADMIN, User
+from . import permissions
 from . import repository as repo
 from .context import DepartmentContext
 
 
-async def _require_grant(session: AsyncSession, user: User, dept) -> None:
-    """Admins bypass the grant check ONLY. Re-checked on every turn, which is
-    what makes revocation take effect on the next turn — Postgres stays the live
-    authorization source."""
-    if user.role == ROLE_ADMIN:
-        return
-    allowed = await repo.has_department_access(
-        session, user_id=user.id, department_id=dept.id
-    )
-    if not allowed:
+async def effective_department_level(
+    session: AsyncSession, user: User, dept
+) -> str | None:
+    """The caller's level in `dept`, or None if they have no access. Never raises.
+
+    The ONE place a level is computed, so the chat boundary and every
+    `/v1/departments/*` route agree by construction rather than by two functions
+    happening to match.
+
+    A global admin skips the lookup entirely, preserving the existing behaviour
+    that admins never touch `user_departments`. `permissions.effective_level` then
+    takes the MAXIMUM, so an admin who also holds a weak grant is still an owner.
+    """
+    is_global_admin = user.role == ROLE_ADMIN
+    grant = None
+    if not is_global_admin:
+        grant = await repo.get_department_level(
+            session, user_id=user.id, department_id=dept.id
+        )
+    return permissions.effective_level(grant, is_global_admin=is_global_admin)
+
+
+async def _require_grant(session: AsyncSession, user: User, dept) -> str:
+    """The caller's level here, or 403. Admins bypass the grant check ONLY.
+
+    Re-checked on every turn, which is what makes revocation take effect on the
+    next turn — Postgres stays the live authorization source.
+
+    ANY level may chat: curation is what levels gate, while holding the grant at
+    all is what "may ask a question here" means.
+    """
+    level = await effective_department_level(session, user, dept)
+    if level is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have access to this department",
         )
+    return level
 
 
 async def resolve_department(

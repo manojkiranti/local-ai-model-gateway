@@ -15,7 +15,7 @@ from sqlalchemy.pool import NullPool
 from app.config import get_settings
 from app.history.models import ChatSession
 from app.rag import repository as repo
-from app.rag.access import resolve_department
+from app.rag.access import effective_department_level, resolve_department
 from app.users.models import ROLE_ADMIN, ROLE_MEMBER, User
 
 # Not a real bcrypt digest, and it does not need to be: nothing here logs in.
@@ -224,3 +224,45 @@ def test_ownership_is_checked_before_the_department_is_even_looked_up(env):
         _resolve(env["member"], "no-such-department", foreign)
     assert exc.value.status_code == 404
     assert "Session" in exc.value.detail
+
+
+@pytest.mark.parametrize("level", ["viewer", "editor", "owner"])
+def test_every_level_can_chat_in_its_department(env, level):
+    """The chat boundary admits ANY level. Curation is what levels gate; holding
+    the grant at all is what "may ask a question here" means."""
+    async def relevel(s):
+        await repo.grant_department(
+            s, user_id=env["member"].id, department_id=env["hr"],
+            granted_by=None, role=level)
+        await s.commit()
+
+    _run(relevel)
+    ctx = _resolve(env["member"], env["hr_code"], None)
+    assert ctx is not None
+    assert ctx.id == env["hr"] and ctx.code == env["hr_code"]
+
+
+def test_effective_level_reports_the_members_grant(env):
+    async def go(s):
+        dept = await repo.get_department_by_id(s, env["hr"])
+        return await effective_department_level(s, env["member"], dept)
+
+    assert _run(go) == "viewer"
+
+
+def test_effective_level_is_owner_for_a_global_admin_without_a_grant(env):
+    """A global admin is owner-equivalent for capabilities, and reaches that
+    answer WITHOUT a user_departments lookup — the admin bypass is unchanged."""
+    async def go(s):
+        dept = await repo.get_department_by_id(s, env["hr"])
+        return await effective_department_level(s, env["admin"], dept)
+
+    assert _run(go) == "owner"
+
+
+def test_effective_level_is_none_without_a_grant(env):
+    async def go(s):
+        dept = await repo.get_department_by_id(s, env["fin"])
+        return await effective_department_level(s, env["member"], dept)
+
+    assert _run(go) is None
