@@ -163,6 +163,33 @@ corpus** until an admin grants one.
 Set `AD_AUTH_ENABLED=true` + `AD_AUTH_BASE_URL` to switch it on; with it off,
 login behaves exactly as it did before AD existed.
 
+### Two kinds of role
+
+`users.role` (`admin` | `member`) gates **global** routes: the user table, the NRB
+pipeline, creating and retiring departments. A department **grant** carries its own
+level, so curating one department never requires power over the others.
+
+| Capability | viewer | editor | owner | global admin |
+| --- | :-: | :-: | :-: | :-: |
+| Chat + retrieval in the department | Yes | Yes | Yes | Yes (bypasses the grant) |
+| Download `ready` documents | Yes | Yes | Yes | Yes |
+| List non-`ready` and archived documents | — | Yes | Yes | Yes |
+| Upload / add text / archive documents | — | Yes | Yes | Yes |
+| Poll ingest jobs for this department | — | Yes | Yes | any department |
+| List members, grant/revoke viewer & editor | — | — | Yes | Yes |
+| Grant or revoke **owner** | — | — | — | Yes |
+| Create, rename or retire a department | — | — | — | Yes |
+
+An owner runs their department day to day but cannot mint another owner, which
+bounds the escalation chain at one level. **A global admin is the backstop for
+every department; only a global admin can create a department owner.** That is why
+the guard takes "is this caller a global admin" as a separate question from "what
+is their level here" — collapse the two and nobody can ever create an owner.
+
+Levels are set through `POST /v1/departments/{code}/members`, which is also the
+promote/demote route. Omitting `role` grants `viewer`, so every grant that existed
+before levels did means exactly what it always meant.
+
 **Admin bootstrap:** on an empty `users` table the first registration is allowed
 unauthenticated and becomes `admin`. After that, `POST /auth/register` is
 **admin-only** — it creates local service and break-glass accounts. `ADMIN_EMAILS`
@@ -192,9 +219,11 @@ Full, current list is in Swagger at `/docs`. The main groups:
 | GET | `/v1/tools` · `/v1/mcp/status` | bearer | Available tools · MCP connection badge. |
 | POST/GET | `/v1/files` · `/v1/files/{id}` | bearer | Upload/list/download per-user files (owner-scoped). |
 | GET | `/v1/sessions` · `/v1/sessions/{id}` | bearer | Chat history; assistant messages replay their `sources`. |
-| — | `/v1/departments` (+`/members`, `/documents`) | admin / member | Manage departments, grants, and the document corpus. |
-| GET | `/v1/departments/{code}/documents/{id}/download` | member (dept) | The original bytes behind a chat citation. Behind JWT, so fetch with the bearer header and make a blob URL. |
-| GET | `/v1/ingest-jobs/{id}` | admin | Ingest progress for an uploaded document. |
+| GET | `/v1/departments` | bearer | Your departments (all of them for an admin). Each row's `role` is your effective level here — the one field a UI needs to decide what to draw. |
+| — | `/v1/departments/{code}/members` | owner (dept) / admin | List, grant, revoke. `POST` takes `user_id` XOR `email`, plus optional `role`, and doubles as promote/demote. Only an admin may set `owner`. |
+| — | `/v1/departments/{code}/documents` | editor (dept) / admin | Upload, add typed text, archive. A viewer gets 403 naming the level required. |
+| GET | `/v1/departments/{code}/documents/{id}/download` | viewer (dept) | The original bytes behind a chat citation. Behind JWT, so fetch with the bearer header and make a blob URL. |
+| GET | `/v1/ingest-jobs/{id}` | editor (dept) / admin | Ingest progress for an uploaded document. 404 rather than 403 when you may not see it. |
 
 ## Prove it works (register → login → authenticated /users/me)
 

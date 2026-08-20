@@ -325,21 +325,27 @@ newest first; `?source=` filters),
 `DELETE /v1/files/{id}` (owner-scoped; 204, removes row + on-disk file),
 `GET /v1/sessions`, `GET /v1/sessions/{id}`, `DELETE /v1/sessions/{id}`,
 `POST /v1/departments` (admin), `GET /v1/departments` (admin → all; member →
-granted+active, i.e. the frontend's tabs), `PATCH /v1/departments/{code}`
-(admin), `GET|POST /v1/departments/{code}/members` (admin; POST takes `user_id` **XOR**
-`email`),
-`DELETE /v1/departments/{code}/members/{user_id}` (admin),
-`POST /v1/departments/{code}/documents` (admin, multipart → 202
+granted+active, i.e. the frontend's tabs — **each row carries `role`, the
+caller's own effective level**), `PATCH /v1/departments/{code}`
+(admin), `GET|POST /v1/departments/{code}/members` (**dept owner** or admin; POST
+takes `user_id` **XOR** `email` plus optional `role`, and is also the
+promote/demote route — 403 if an owner asks for `owner`),
+`DELETE /v1/departments/{code}/members/{user_id}` (**dept owner** or admin; 403 if
+an owner targets another owner),
+`POST /v1/departments/{code}/documents` (**dept editor**, multipart → 202
 `{document_id, job_id}`; 400 bad ext/empty, 409 duplicate content, 413 over cap),
-`POST /v1/departments/{code}/documents/text` (admin, typed text → `source=manual`),
-`GET /v1/departments/{code}/documents` (dept members see `ready` only; admins see
-non-archived, `?include_archived=` admin-only),
-`DELETE /v1/departments/{code}/documents/{id}` (admin; archives — chunks removed,
-row retained),
+`POST /v1/departments/{code}/documents/text` (**dept editor**, typed text →
+`source=manual`),
+`GET /v1/departments/{code}/documents` (dept **viewers** see `ready` only;
+**editors** see non-archived, `?include_archived=` editor-only),
+`DELETE /v1/departments/{code}/documents/{id}` (**dept editor**; archives — chunks
+removed, row retained),
 `GET /v1/departments/{code}/documents/{id}/download` (what a chat citation links
 to — original bytes; 403 ungranted department, 404 at document granularity:
-unknown id, another department's, non-`ready` for a member, or bytes missing),
-`GET /v1/ingest-jobs/{id}` (admin, progress).
+unknown id, another department's, non-`ready` for a viewer, or bytes missing),
+`GET /v1/ingest-jobs/{id}` (**dept editor** of the job's document, or admin;
+**404** — never 403 — when you may not see it, because a job id maps to a
+document).
 `GET /v1/mcp/status` is the UI's MCP-connection badge — **always 200**, health
 is in the body (`configured/reachable/tools/error`), never a 502.
 `POST /v1/chat` is the **single, unified** turn endpoint — **stateful**
@@ -1039,6 +1045,33 @@ it was folded in.
 - **Starlette 1.x gotcha:** `include_router` mounts as a lazy `_IncludedRouter`,
   so `app.routes` won't list child routes as `APIRoute`. Verify routes via
   TestClient or `/openapi.json`, not `isinstance` checks.
+- **A department grant carries a LEVEL, and a global admin is not an owner.**
+  `user_departments.role` is `viewer` < `editor` < `owner`
+  (`ck_user_departments_role` closes the vocabulary, same rule as
+  `ck_documents_status`), and every decision lives in the pure
+  `app/rag/permissions.py`. Four things a rewrite must not lose: (1) **`allows()`
+  takes a level while `grant_refusal()` takes `caller_is_global_admin`
+  SEPARATELY** — a global admin is owner-equivalent for capabilities, but run them
+  through the owner escalation rule and "an owner cannot grant owner" stops global
+  admins creating owners too, at which point the feature is unusable and whoever
+  debugs it deletes the guard (`test_a_global_admin_is_never_refused_a_membership_change`
+  locks it); (2) **every gate fails closed** — `allows(None, …)` and
+  `allows("<unknown>", …)` are both False, so a level that escaped the CHECK cannot
+  compare as rank 0 and pass the viewer test; (3) `effective_level` takes the
+  **MAXIMUM** of grant and admin-ness, so being granted a department never costs an
+  admin a capability; (4) an owner delegates viewer/editor but **never `owner`**,
+  and may neither demote nor evict an existing owner — that bounds the escalation
+  chain at depth 1 and needs no last-owner guard, because global admin is always
+  the backstop (unlike `LAST_ADMIN` in `app/users/policy.py`, which has none).
+  `access.effective_department_level` is the ONE place a level is computed and
+  `router._require_level` the ONE gate, ordering refusals **404** unknown/inactive
+  → **403** no grant → **403** naming the level. Naming the level is safe only
+  there: at document and ingest-job granularity the answer is **404**, because
+  existence is the secret. The chat boundary admits **any** level — curation is
+  what levels gate, while holding the grant at all is what "may ask a question
+  here" means. `POST .../members` is also promote/demote, so
+  `grant_department` upserts: `on_conflict_do_nothing` would report success while
+  leaving the old level in place.
 - **Department access is a database invariant, not a convention.** A chunk's
   `department_id` is held to its document's by the composite FK
   `(document_id, department_id) → documents(id, department_id)`, so

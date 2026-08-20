@@ -126,10 +126,73 @@ CHAT (the core endpoint) — POST /v1/chat  (authed):
       chat in the tab) · 404 the session is not yours.
 
 DEPARTMENTS (the tabs the user may open a chat in) — authed:
-  GET /v1/departments -> [ {code, name, is_active, ...} ]
+  GET /v1/departments -> [ {code, name, is_active, role, ...} ]
       A member sees only the departments granted to them and still active; an
       admin sees all. This is the list to render as tabs / a picker, and it is how
       the user gets into a chat that can produce citations at all.
+
+      `role` is YOUR level in that department: "viewer" | "editor" | "owner".
+      It is the ONE field that decides what to draw, and it already accounts for
+      global admins (an admin reads "owner" everywhere):
+
+          role === "viewer"                     -> chat + read only
+          role === "editor" || role === "owner"  -> also show upload / archive
+          role === "owner"                       -> also show the members screen
+
+      DO NOT recombine this with /users/me's global `role` to work out what is
+      allowed. The server has already done it; a second copy of the policy on the
+      client will drift, and a UI that shows an upload button the API then refuses
+      is worse than no button.
+
+DEPARTMENT MEMBERS (admin, or an OWNER of that department) — authed:
+  GET    /v1/departments/{code}/members
+      -> [ {user_id, email, role, granted_by, granted_at} ]
+      `email` is here because GET /users is admin-only — an owner needs it to tell
+      members apart. Owners appear in this list even though an owner may not
+      modify them; that is deliberate, so a refused revoke is explicable.
+
+  POST   /v1/departments/{code}/members
+      body { user_id | email, role? }   // exactly ONE of user_id / email
+      `role` defaults to "viewer". This endpoint is ALSO promote/demote: posting an
+      existing member with a new `role` changes their level, so one screen does
+      grant and change.
+      -> 204 done
+      -> 403 with a `detail` to render VERBATIM. Two distinct cases:
+           "Owner access to this department is required"
+                 you are a viewer/editor here — do not offer this screen at all
+           "Only a global admin can grant owner access to a department"
+                 an owner tried to create another owner. Keep the dialog open and
+                 show the message; tell them to ask an admin. Do NOT retry.
+      -> 404 unknown user (same answer for an unknown id and an unknown email)
+      -> 422 `role` was not one of viewer/editor/owner
+      NOTE: an owner cannot look users up (GET /users is admin-only), so grant by
+      `email` on the owner screen.
+
+  DELETE /v1/departments/{code}/members/{user_id}
+      -> 204 removed
+      -> 403 "Only a global admin can change or revoke another owner's access"
+             — an owner may not evict a fellow owner. Render verbatim.
+      -> 404 that user held no grant here
+
+DEPARTMENT DOCUMENTS (editor of that department, or admin) — authed:
+  POST   /v1/departments/{code}/documents        multipart {title, file}
+  POST   /v1/departments/{code}/documents/text   {title, content}
+  DELETE /v1/departments/{code}/documents/{id}   archive
+      -> 403 "Editor access to this department is required"
+             THIS IS NOT A LOGIN PROBLEM. Never trigger a re-login or a token
+             refresh on it — the user is signed in and simply lacks the level.
+             Render `detail` and hide the control next time (see `role` above).
+
+  GET    /v1/departments/{code}/documents[?include_archived=true]
+      A viewer sees `ready` documents only, and `include_archived=true` is 403 for
+      them. An editor sees every non-archived document plus extra operational
+      fields (embed_model, embed_dim, updated_at) — so do not assume one shape.
+
+  GET    /v1/ingest-jobs/{id}
+      Editor of that document's department, or admin. Poll it after an upload.
+      -> 404 when you may not see it. NOT 403: a job id maps to a document, so the
+             API refuses to confirm the job exists at all. Treat 404 as "no longer
+             available" rather than retrying.
 
   When stream=false -> 200 JSON:
     { "session_id": string,

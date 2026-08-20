@@ -37,12 +37,28 @@ PyJWT (HS256), bcrypt, httpx (no ollama SDK), mcp SDK v2, openpyxl. Python 3.10.
   (`LOGIN_MAX_ATTEMPTS`, per process) because the endpoint can otherwise trip AD
   lockout domain-wide. `POST /auth/register` is **admin-only** except on an empty
   users table, where it mints the first admin (or ADMIN_EMAILS).
+- **Department roles**: `users.role` gates GLOBAL routes (users, NRB, creating and
+  retiring departments); a department **grant** carries its own level,
+  `user_departments.role` = `viewer` < `editor` < `owner`
+  (`ck_user_departments_role`). Editors curate their department's corpus — upload,
+  typed text, archive, ingest-job progress — with no power over any other
+  department; owners additionally manage membership but **cannot mint owners**,
+  which stays with a global admin so the escalation chain stops at one level.
+  Decisions live in the pure `app/rag/permissions.py`;
+  `access.effective_department_level` computes a level and `router._require_level`
+  is the single gate. `POST /v1/departments/{code}/members` takes an optional
+  `role` and doubles as promote/demote; omitting it grants `viewer`, so every
+  pre-existing grant means exactly what it always meant.
 - **Endpoints**:
   - Public: `GET /health`, `POST /auth/login`
   - Admin: `POST /auth/register` (unauthenticated only on an empty users table)
   - Authed: `GET /users/me`, `GET /users` (admin, paginated, `?q=` email search)
   - Admin: `PATCH /users/{id}` `{is_active}` — immediate access cut-off
     (guards: no self-deactivation, never the last active admin; `role` not patchable)
+  - Dept-scoped: `GET /v1/departments` (each row's `role` = your effective level),
+    `GET|POST|DELETE /v1/departments/{code}/members` (owner), the
+    `/v1/departments/{code}/documents*` routes (editor) and `GET /v1/ingest-jobs/{id}`
+    (editor of the job's department; **404**, not 403, when you may not see it)
   - Authed: `POST /v1/chat` — the **single unified turn endpoint**: persisted
     (`{session_id?, message, model?, stream?, options?}`, server owns context) AND
     tool-capable (runs the agent loop every turn; model calls tools when useful).
