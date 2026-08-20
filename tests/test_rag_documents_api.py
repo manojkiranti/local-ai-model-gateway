@@ -411,3 +411,43 @@ def test_an_outsider_is_still_403_at_department_granularity(levels):
     resp = client.get(f"/v1/departments/{code}/documents", headers=outsider)
     assert resp.status_code == 403
     assert resp.json()["detail"] == "You do not have access to this department"
+
+
+def test_an_editor_can_poll_the_job_for_their_own_upload(levels):
+    """Without this the feature ships broken: POST .../documents hands the
+    uploader a job_id, and a global-admin gate would refuse them their own."""
+    client, _admin, code, people = levels
+    editor, _ = people["editor"]
+    job_id = _typed(client, editor, code, "Editor job").json()["job_id"]
+    resp = client.get(f"/v1/ingest-jobs/{job_id}", headers=editor)
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["id"] == job_id
+
+
+def test_a_viewer_cannot_poll_a_job_in_their_own_department(levels):
+    """404 rather than 403: a job id maps to a document, and confirming this one
+    exists would leak the corpus's shape to someone who cannot see it."""
+    client, admin, code, people = levels
+    viewer, _ = people["viewer"]
+    job_id = _typed(client, admin, code, "Admin job").json()["job_id"]
+    assert client.get(
+        f"/v1/ingest-jobs/{job_id}", headers=viewer
+    ).status_code == 404
+
+
+def test_an_outsider_cannot_poll_a_job(levels):
+    client, admin, code, _people = levels
+    outsider = _auth(client, f"docs-jobout-{uuid.uuid4().hex[:8]}@example.com")
+    job_id = _typed(client, admin, code, "Admin job 2").json()["job_id"]
+    assert client.get(
+        f"/v1/ingest-jobs/{job_id}", headers=outsider
+    ).status_code == 404
+
+
+def test_an_unknown_job_is_404_for_everyone(levels):
+    client, admin, _code, people = levels
+    editor, _ = people["editor"]
+    for headers in (admin, editor):
+        assert client.get(
+            f"/v1/ingest-jobs/{uuid.uuid4().hex}", headers=headers
+        ).status_code == 404
