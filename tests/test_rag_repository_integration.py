@@ -104,18 +104,19 @@ def test_access_is_denied_until_granted(codes, user_id):
     async def go(s):
         d = await repo.create_department(s, code=codes[0], name="HR")
         await s.commit()
-        before = await repo.has_department_access(
+        before = await repo.get_department_level(
             s, user_id=user_id, department_id=d.id)
         await repo.grant_department(
             s, user_id=user_id, department_id=d.id, granted_by=None)
         await s.commit()
-        after = await repo.has_department_access(
+        after = await repo.get_department_level(
             s, user_id=user_id, department_id=d.id)
         return before, after
 
     before, after = _run(go)
-    assert before is False
-    assert after is True
+    # A non-None level IS the access check: no grant means no level.
+    assert before is None
+    assert after == "viewer"
 
 
 def test_grant_is_idempotent(codes, user_id):
@@ -145,14 +146,14 @@ def test_revoke_removes_access_and_reports_whether_it_did(codes, user_id):
         await s.commit()
         second = await repo.revoke_department(s, user_id=user_id, department_id=d.id)
         await s.commit()
-        access = await repo.has_department_access(
+        level = await repo.get_department_level(
             s, user_id=user_id, department_id=d.id)
-        return first, second, access
+        return first, second, level
 
-    first, second, access = _run(go)
+    first, second, level = _run(go)
     assert first is True
     assert second is False   # nothing left to revoke
-    assert access is False
+    assert level is None
 
 
 def test_list_for_user_returns_only_granted_and_active(codes, user_id):
@@ -163,11 +164,15 @@ def test_list_for_user_returns_only_granted_and_active(codes, user_id):
         await repo.grant_department(
             s, user_id=user_id, department_id=granted.id, granted_by=None)
         await s.commit()
-        names = [d.code for d in await repo.list_departments_for_user(s, user_id)]
+        names = [
+            d.code for d, _level in await repo.list_departments_for_user(s, user_id)
+        ]
         # Now soft-disable the granted one: it must disappear.
         await repo.set_department_active(s, code=codes[0], is_active=False)
         await s.commit()
-        after = [d.code for d in await repo.list_departments_for_user(s, user_id)]
+        after = [
+            d.code for d, _level in await repo.list_departments_for_user(s, user_id)
+        ]
         return names, after
 
     names, after = _run(go)
@@ -178,3 +183,97 @@ def test_list_for_user_returns_only_granted_and_active(codes, user_id):
 def test_set_active_on_unknown_code_returns_none(codes):
     assert _run(lambda s: repo.set_department_active(
         s, code="no-such-code-xyz", is_active=False)) is None
+
+
+def test_get_department_level_returns_the_grant_level(codes, user_id):
+    async def go(s):
+        d = await repo.create_department(s, code=codes[0], name="Ops")
+        await s.commit()
+        await repo.grant_department(
+            s, user_id=user_id, department_id=d.id, granted_by=None,
+            role="editor")
+        await s.commit()
+        return await repo.get_department_level(
+            s, user_id=user_id, department_id=d.id)
+
+    assert _run(go) == "editor"
+
+
+def test_grant_department_defaults_to_viewer(codes, user_id):
+    """Least privilege when the caller does not name a level."""
+    async def go(s):
+        d = await repo.create_department(s, code=codes[0], name="Ops")
+        await s.commit()
+        await repo.grant_department(
+            s, user_id=user_id, department_id=d.id, granted_by=None)
+        await s.commit()
+        return await repo.get_department_level(
+            s, user_id=user_id, department_id=d.id)
+
+    assert _run(go) == "viewer"
+
+
+def test_regranting_changes_the_level_rather_than_doing_nothing(codes, user_id):
+    """This is also the promote/demote path. `on_conflict_do_nothing` would report
+    success while silently leaving the old level in place -- the worst possible
+    outcome for a permission change."""
+    async def go(s):
+        d = await repo.create_department(s, code=codes[0], name="Ops")
+        await s.commit()
+        await repo.grant_department(
+            s, user_id=user_id, department_id=d.id, granted_by=None,
+            role="viewer")
+        await s.commit()
+        await repo.grant_department(
+            s, user_id=user_id, department_id=d.id, granted_by=None,
+            role="owner")
+        await s.commit()
+        promoted = await repo.get_department_level(
+            s, user_id=user_id, department_id=d.id)
+        # And back down again: demotion goes through the same statement.
+        await repo.grant_department(
+            s, user_id=user_id, department_id=d.id, granted_by=None,
+            role="viewer")
+        await s.commit()
+        demoted = await repo.get_department_level(
+            s, user_id=user_id, department_id=d.id)
+        rows = len(await repo.list_department_members(s, d.id))
+        return promoted, demoted, rows
+
+    promoted, demoted, rows = _run(go)
+    assert promoted == "owner"
+    assert demoted == "viewer"
+    assert rows == 1          # still ONE grant, not three
+
+
+def test_list_department_members_carries_the_email_and_level(codes, user_id):
+    """An owner managing members sees emails, not bare integers: GET /users is
+    global-admin-only, so without this the members screen is unusable for them."""
+    async def go(s):
+        d = await repo.create_department(s, code=codes[0], name="Ops")
+        await s.commit()
+        await repo.grant_department(
+            s, user_id=user_id, department_id=d.id, granted_by=None,
+            role="editor")
+        await s.commit()
+        return await repo.list_department_members(s, d.id)
+
+    rows = _run(go)
+    assert len(rows) == 1
+    assert rows[0].user_id == user_id
+    assert rows[0].role == "editor"
+    assert "@" in rows[0].email
+
+
+def test_list_departments_for_user_carries_the_level(codes, user_id):
+    async def go(s):
+        d = await repo.create_department(s, code=codes[0], name="Ops")
+        await s.commit()
+        await repo.grant_department(
+            s, user_id=user_id, department_id=d.id, granted_by=None,
+            role="owner")
+        await s.commit()
+        return await repo.list_departments_for_user(s, user_id)
+
+    rows = _run(go)
+    assert [(d.code, level) for d, level in rows] == [(codes[0], "owner")]
