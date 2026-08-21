@@ -329,9 +329,12 @@ granted+active, i.e. the frontend's tabs — **each row carries `role`, the
 caller's own effective level**), `PATCH /v1/departments/{code}`
 (admin), `GET|POST /v1/departments/{code}/members` (**dept owner** or admin; POST
 takes `user_id` **XOR** `email` plus optional `role`, and is also the
-promote/demote route — 403 if an owner asks for `owner`),
+promote/demote route — 403 if an owner asks for `owner`, 409 if the account is
+deactivated, and an **omitted `role` keeps the level**),
 `DELETE /v1/departments/{code}/members/{user_id}` (**dept owner** or admin; 403 if
-an owner targets another owner),
+an owner targets another owner — but their OWN row is theirs),
+**all three member routes work on a soft-disabled department**, unlike every
+document route,
 `POST /v1/departments/{code}/documents` (**dept editor**, multipart → 202
 `{document_id, job_id}`; 400 bad ext/empty, 409 duplicate content, 413 over cap),
 `POST /v1/departments/{code}/documents/text` (**dept editor**, typed text →
@@ -1072,6 +1075,39 @@ it was folded in.
   here" means. `POST .../members` is also promote/demote, so
   `grant_department` upserts: `on_conflict_do_nothing` would report success while
   leaving the old level in place.
+- **On `POST .../members`, an ABSENT `role` preserves the level; it does not mean
+  viewer.** `GrantCreate.role` is `DepartmentRole | None = None`, and the upsert
+  writes `role` only when it was supplied. Defaulting absence to `viewer` looks
+  harmless and is not: the route upserts, so "field omitted" became
+  indistinguishable from "set to viewer" and re-adding an existing owner **stripped
+  them to viewer, answered 204, and overwrote `granted_at`** — measured, and missed
+  by `test_granting_twice_is_idempotent` because that only exercises viewer→viewer
+  (`test_omitting_role_on_a_RE_grant_does_not_demote` is the guard). A new grant
+  with no `role` still lands on viewer, which is least privilege with no level to
+  keep. Three related rules in the same neighbourhood: (1) **the read-then-write in
+  `grant_member`/`revoke_member` is serialised by
+  `repo.lock_department_for_members`** — without it a global admin promoting U to
+  owner races a department owner demoting U, the owner's read sees the old level,
+  the refusal is skipped and the fresh owner is overwritten; the lock is on the
+  DEPARTMENT row, not the grant row, because the dangerous interleaving is two
+  INSERTs and `FOR UPDATE` cannot hold a row that does not exist yet; (2) **an
+  owner may act on their OWN row** (`grant_refusal(target_is_caller=True)`), or
+  stepping down would need an admin — the parameter defaults to False so a caller
+  that forgets it gets the strict answer; (3) **a deactivated account cannot be
+  granted** (409) — the old admin-only user dropdown filtered them out and the
+  email path cannot, so an offboarded account would return as a phantom member.
+- **Membership survives soft-disable; the CORPUS does not.** The three member
+  routes pass `require_active=False` to `_require_level`; every document route does
+  not. Grants deliberately outlive `is_active=false`, so revoking a departing
+  employee on a retired department must not require reactivating it — which would
+  re-expose it as a live tab to every remaining member — revoking, then disabling
+  it again. Raised independently by a code review and by the frontend author, after
+  the first cut active-gated all of them. Accepted trade-off recorded at the same
+  time: `_require_level` answers **404** for an unknown code and **403** for a real
+  one, so an authenticated user can probe which department codes exist. That is the
+  existing documented contract on every department-scoped route ("403 ungranted
+  department") and the frontend branches on it; codes are org unit names, while the
+  secret is the corpus, which stays 404 at document granularity.
 - **Department access is a database invariant, not a convention.** A chunk's
   `department_id` is held to its document's by the composite FK
   `(document_id, department_id) → documents(id, department_id)`, so

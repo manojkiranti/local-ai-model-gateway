@@ -4,11 +4,23 @@ Paste the fenced block below into a Claude CLI session running in the FRONTEND
 repo (`local-ai-model-frontend`). It carries this gateway's current API contract
 and asks that session to build to it.
 
-**Current task in that block: render chat source citations** (added 2026-08-19).
-`/v1/chat` — both the JSON body and the stream's `done` event — plus
-`GET /v1/sessions/{id}` now return `sources`, and there is a new document download
-route. The change is **additive**: nothing was removed or renamed, so the existing
-frontend keeps working; it simply shows no citations until it reads the new field.
+**Current task in that block: verify the department-role UI** (updated 2026-08-21).
+Per-department levels (`viewer` < `editor` < `owner`) landed on the gateway's
+`feat/role`, and the frontend built them on its own `feat/roles`. So the block's
+job is now VERIFICATION, not construction — the contract below is the corrected
+one, after the frontend author's review (`frontend-role-review-2026-08-20.md`) and
+a gateway code review were both applied.
+
+**Not additive, and the two branches ship together.** `GET /v1/departments` rows
+gain a required `role`, and the frontend's level helper fails CLOSED — so a
+frontend on `feat/roles` talking to a gateway WITHOUT `feat/role` receives no
+`role`, hides every RAG admin control, and shows no error explaining why. Deploy
+them as a pair.
+
+Previous task, shipped: render chat source citations (2026-08-19) — `/v1/chat`,
+the stream's `done` event and `GET /v1/sessions/{id}` return `sources`, plus the
+document download route. Done on both sides; the contract for it is still below
+because it is still the contract.
 
 History, so the block's framing is not mistaken for the whole story: this file
 began as a no-op re-check after the 2026-08 gateway↔Ollama transport port, which
@@ -28,15 +40,23 @@ all tools itself.
 
 TWO JOBS, in this order:
 
-  (A) BUILD the chat source-citations UI. The gateway now returns `sources` on a
-      chat answer: the department documents that answer was grounded in, with page
-      numbers, a download link, and — for Nepal Rastra Bank documents — how the
-      text was extracted. Nothing renders it yet. Details and the mandatory
-      rendering rules are in the CHAT section and the RENDERING RULES below.
+  (A) VERIFY the department-role UI against the contract below. Both sides are
+      built, and six review items have since been applied to the gateway — four
+      of which change what you should expect:
+        * `role` on a department row is now REQUIRED and a closed set
+          ("viewer" | "editor" | "owner"), never null.
+        * `POST .../members` with NO `role` key now PRESERVES an existing
+          member's level (it used to demote them to viewer). If your client sends
+          a client-side default of "viewer", REMOVE it — omit the field unless the
+          user actually chose a level, or "re-add" still silently demotes.
+        * The members routes now work on a SOFT-DISABLED department. If you added
+          a workaround that refuses to call them when `is_active` is false, remove
+          it.
+        * Department CRUD (create / rename / enable-disable) is GLOBAL-ADMIN-only.
+          An `owner` must not be shown those forms.
 
   (B) VERIFY the rest of the API layer still matches the contract below, and fix
-      genuine drift. The contract is additive versus what this frontend was last
-      synced to, so expect (B) to find little or nothing.
+      genuine drift — including the citations UI shipped in the previous sync.
 
 Only modify files in THIS frontend repo. Do not touch the gateway. If something in
 the contract looks wrong or impossible to implement as written, say so rather than
@@ -139,12 +159,35 @@ DEPARTMENTS (the tabs the user may open a chat in) — authed:
           role === "editor" || role === "owner"  -> also show upload / archive
           role === "owner"                       -> also show the members screen
 
+      `role` is REQUIRED and always one of those three -- never null. If you ever
+      receive null or a missing field, you are talking to a gateway without
+      `feat/role`; fail closed and say so, do not guess.
+
       DO NOT recombine this with /users/me's global `role` to work out what is
       allowed. The server has already done it; a second copy of the policy on the
       client will drift, and a UI that shows an upload button the API then refuses
       is worse than no button.
 
+      BUT `role` does NOT cover department CRUD. Creating a department, renaming
+      it, and enabling/disabling it are GLOBAL-ADMIN-only:
+          POST  /v1/departments            admin
+          PATCH /v1/departments/{code}     admin
+      An `owner` reaches the members screen and the corpus, NOT these. Gate them
+      on /users/me's `role === "admin"`. Showing an owner a Create-department form
+      is exactly the failure the previous paragraph warns about.
+
+      THE THREE 403 DETAILS you can get from a department-scoped route, all to be
+      rendered verbatim and none of them a login problem:
+        "You do not have access to this department"          -> no grant at all
+        "Editor access to this department is required"       -> grant too weak
+        "Owner access to this department is required"         -> grant too weak
+
 DEPARTMENT MEMBERS (admin, or an OWNER of that department) — authed:
+  These three routes work on a SOFT-DISABLED department too, unlike the corpus
+  routes. Grants deliberately survive `is_active = false`, so cleaning up a
+  departing employee's access must not require reactivating the department. Do not
+  special-case an inactive department here. (Note a non-admin owner has no UI path
+  to it, since GET /v1/departments lists active departments only.)
   GET    /v1/departments/{code}/members
       -> [ {user_id, email, role, granted_by, granted_at} ]
       `email` is here because GET /users is admin-only — an owner needs it to tell
@@ -153,9 +196,21 @@ DEPARTMENT MEMBERS (admin, or an OWNER of that department) — authed:
 
   POST   /v1/departments/{code}/members
       body { user_id | email, role? }   // exactly ONE of user_id / email
-      `role` defaults to "viewer". This endpoint is ALSO promote/demote: posting an
-      existing member with a new `role` changes their level, so one screen does
-      grant and change.
+      OMITTING `role` means "do not change the level": a NEW member lands on
+      "viewer", an EXISTING member keeps the level they have. Do NOT send a
+      client-side default of "viewer" — that turns a re-add into a silent
+      demotion, which is the bug this rule exists to prevent. Send `role` only
+      when the user actually chose one.
+
+      This endpoint is ALSO promote/demote: posting an existing member with a new
+      `role` changes their level, so one screen does grant and change.
+
+      An owner may act on their OWN row without an admin — stepping down from
+      owner to editor/viewer, or revoking themselves, is allowed. Only *another*
+      owner is untouchable.
+
+      A DEACTIVATED account cannot be granted: 409 "That account is deactivated;
+      reactivate it before granting access". Render it verbatim.
       -> 204 done
       -> 403 with a `detail` to render VERBATIM. Two distinct cases:
            "Owner access to this department is required"
@@ -175,6 +230,9 @@ DEPARTMENT MEMBERS (admin, or an OWNER of that department) — authed:
       -> 404 that user held no grant here
 
 DEPARTMENT DOCUMENTS (editor of that department, or admin) — authed:
+  These DO 404 on a soft-disabled department, for admins too: a retired department
+  is gone from the product as far as its corpus is concerned. Membership is the
+  documented exception, above.
   POST   /v1/departments/{code}/documents        multipart {title, file}
   POST   /v1/departments/{code}/documents/text   {title, content}
   DELETE /v1/departments/{code}/documents/{id}   archive

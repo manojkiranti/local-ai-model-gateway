@@ -47,8 +47,13 @@ PyJWT (HS256), bcrypt, httpx (no ollama SDK), mcp SDK v2, openpyxl. Python 3.10.
   Decisions live in the pure `app/rag/permissions.py`;
   `access.effective_department_level` computes a level and `router._require_level`
   is the single gate. `POST /v1/departments/{code}/members` takes an optional
-  `role` and doubles as promote/demote; omitting it grants `viewer`, so every
-  pre-existing grant means exactly what it always meant.
+  `role` and doubles as promote/demote; **omitting it preserves an existing
+  member's level** (viewer only for a brand-new grant), so a re-add cannot demote
+  by accident. Member routes work on a soft-disabled department — grants outlive
+  `is_active=false`, so offboarding must not require reactivating it — while corpus
+  routes still 404 there. An owner may step down or revoke themselves; a
+  deactivated account cannot be granted (409). Membership writes serialise on the
+  department row so the owner guard cannot be raced.
 - **Endpoints**:
   - Public: `GET /health`, `POST /auth/login`
   - Admin: `POST /auth/register` (unauthenticated only on an empty users table)
