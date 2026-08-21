@@ -244,8 +244,7 @@ def test_every_level_can_chat_in_its_department(env, level):
 
 def test_effective_level_reports_the_members_grant(env):
     async def go(s):
-        dept = await repo.get_department_by_id(s, env["hr"])
-        return await effective_department_level(s, env["member"], dept)
+        return await effective_department_level(s, env["member"], env["hr"])
 
     assert _run(go) == "viewer"
 
@@ -254,15 +253,13 @@ def test_effective_level_is_owner_for_a_global_admin_without_a_grant(env):
     """A global admin is owner-equivalent for capabilities, and reaches that
     answer WITHOUT a user_departments lookup — the admin bypass is unchanged."""
     async def go(s):
-        dept = await repo.get_department_by_id(s, env["hr"])
-        return await effective_department_level(s, env["admin"], dept)
+        return await effective_department_level(s, env["admin"], env["hr"])
 
     assert _run(go) == "owner"
 
 
 def test_effective_level_is_none_without_a_grant(env):
     async def go(s):
-        dept = await repo.get_department_by_id(s, env["fin"])
-        return await effective_department_level(s, env["member"], dept)
+        return await effective_department_level(s, env["member"], env["fin"])
 
     assert _run(go) is None

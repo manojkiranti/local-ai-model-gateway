@@ -36,7 +36,11 @@ class DepartmentOut(BaseModel):
     # row). Server-side so the frontend has ONE rule — role is editor or owner
     # means show the upload button — instead of reimplementing the policy against
     # /users/me. Not on the ORM row, so `_department_out` builds it.
-    role: str | None = None
+    #
+    # REQUIRED, not `str | None`. A fail-closed client hides every control when
+    # this is null, with no error anywhere to explain why, so a construction site
+    # that forgets it must fail loudly here instead.
+    role: DepartmentRole
 
 
 class GrantCreate(BaseModel):
@@ -53,9 +57,12 @@ class GrantCreate(BaseModel):
 
     user_id: int | None = None
     email: EmailStr | None = None
-    # Absent means the weakest level, so an existing client that never sent this
-    # field keeps granting exactly what it granted before.
-    role: DepartmentRole = "viewer"
+    # ABSENT means "do not change the level": viewer for a new grant, unchanged
+    # for an existing one. It cannot default to "viewer", because this endpoint
+    # upserts — "field omitted" would then be indistinguishable from "set to
+    # viewer" and re-adding an existing owner would silently strip them, with a
+    # 204 and no audit trail. Demotion must be something you asked for.
+    role: DepartmentRole | None = None
 
     @model_validator(mode="after")
     def _exactly_one_identifier(self) -> "GrantCreate":
@@ -69,7 +76,7 @@ class MemberOut(BaseModel):
 
     user_id: int
     department_id: int
-    role: str
+    role: DepartmentRole
     # `GET /users` is global-admin-only, so without the email a department owner
     # managing members sees bare integers they have no way to resolve.
     email: str

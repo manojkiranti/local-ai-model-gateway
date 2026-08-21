@@ -90,9 +90,14 @@ async def grant_department(
     user_id: int,
     department_id: int,
     granted_by: int | None,
-    role: str = LEVEL_VIEWER,
+    role: str | None = None,
 ) -> None:
     """Grant access at `role`, or change an existing grant's level.
+
+    `role=None` means "do not change the level": a NEW grant lands on the weakest
+    level, an existing one keeps what it has. That asymmetry is deliberate — see
+    `GrantCreate.role`, where defaulting absence to "viewer" made re-adding an
+    owner a silent demotion.
 
     `on_conflict_do_UPDATE`, not `do_nothing`: this is also the promote/demote
     path, and a no-op would report success while leaving the old level in place —
@@ -107,12 +112,17 @@ async def grant_department(
         user_id=user_id,
         department_id=department_id,
         granted_by=granted_by,
-        role=role,
+        # A new row still needs a concrete level; the column default would do it,
+        # but naming it keeps the INSERT and the CHECK in one place.
+        role=LEVEL_VIEWER if role is None else role,
     )
     stmt = stmt.on_conflict_do_update(
         index_elements=["user_id", "department_id"],
         set_={
-            "role": stmt.excluded.role,
+            # On conflict, `role=None` keeps the level already stored.
+            "role": (
+                UserDepartment.role if role is None else stmt.excluded.role
+            ),
             "granted_by": stmt.excluded.granted_by,
             "granted_at": func.now(),
         },
@@ -131,6 +141,28 @@ async def revoke_department(
         )
     )
     return result.rowcount > 0
+
+
+async def lock_department_for_members(
+    session: AsyncSession, department_id: int
+) -> None:
+    """Serialise membership changes in one department.
+
+    `grant_refusal` reads the target's existing level and then writes, so without
+    a lock the two steps race: a global admin promoting U to owner while a
+    department owner concurrently demotes U means the owner's read sees `editor`,
+    skips the refusal, and overwrites a freshly minted owner — the exact
+    escalation the guard exists to close.
+
+    The lock is on the DEPARTMENT row, not the grant row, because the dangerous
+    interleaving includes two INSERTs: with no grant row yet there is nothing for
+    `FOR UPDATE` to hold. Same precedent as `count_active_admins` taking
+    `FOR UPDATE` so two admins cannot deactivate each other concurrently. Member
+    changes are rare admin actions, so serialising them costs nothing.
+    """
+    await session.execute(
+        select(Department.id).where(Department.id == department_id).with_for_update()
+    )
 
 
 async def get_department_level(

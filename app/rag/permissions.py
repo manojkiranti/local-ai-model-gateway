@@ -71,10 +71,13 @@ def grant_refusal(
     caller_is_global_admin: bool,
     requested_level: str | None,
     existing_target_level: str | None,
+    target_is_caller: bool = False,
 ) -> str | None:
     """Why this membership change is refused, or None if it may proceed.
 
-    `requested_level=None` means revocation.
+    `requested_level=None` means revocation. `target_is_caller` says the row being
+    changed is the caller's own; it defaults to False so a caller that forgets the
+    argument gets the STRICT answer, never the permissive one.
 
     THE TRAP THIS FUNCTION EXISTS FOR: a global admin is owner-equivalent for
     capabilities (`effective_level`) but must NOT be run through the owner
@@ -91,6 +94,15 @@ def grant_refusal(
     # a pure policy that depends on its caller having been careful is not a policy.
     if not allows(caller_level, LEVEL_OWNER):
         return insufficient_level(LEVEL_OWNER)
+
+    # An owner's OWN row is theirs: they may step down or leave without finding a
+    # global admin. This branch sits behind the owner gate above, so a viewer or
+    # editor naming themselves gains nothing by it. Reaching here means the caller
+    # is already an owner, so "promote myself to owner" is a no-op, not an
+    # escalation. The rule below is about evicting a FELLOW owner and never
+    # applied to yourself.
+    if target_is_caller:
+        return None
 
     # An owner delegates viewer and editor only. Bounding the chain at depth 1
     # keeps "who can mint peers" with global admin, mirroring the existing rule

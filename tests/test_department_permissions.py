@@ -171,3 +171,64 @@ def test_the_refusal_message_names_the_level_required():
     assert perms.insufficient_level(perms.LEVEL_OWNER) == (
         "Owner access to this department is required"
     )
+
+
+# --------------------------------------------------------------------------- #
+# Self-targeting: an owner's own row is theirs. Raised independently by the
+# /code-review pass and by the frontend author, who both noticed the docstring
+# reasoning ("owner A evicting owner B") does not cover acting on yourself.
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize("requested", [None, "viewer", "editor", "owner"])
+def test_an_owner_may_always_act_on_their_own_row(requested):
+    """Stepping down or leaving must not need a global admin. The escalation
+    rationale is about evicting a FELLOW owner; it never applied to yourself."""
+    assert (
+        perms.grant_refusal(
+            caller_level=perms.LEVEL_OWNER,
+            caller_is_global_admin=False,
+            requested_level=requested,
+            existing_target_level=perms.LEVEL_OWNER,
+            target_is_caller=True,
+        )
+        is None
+    )
+
+
+@pytest.mark.parametrize("caller", [None, "viewer", "editor"])
+def test_self_targeting_is_not_an_escalation_route(caller):
+    """The self branch sits BEHIND the owner gate, so a viewer or editor naming
+    themselves gains nothing."""
+    assert perms.grant_refusal(
+        caller_level=caller,
+        caller_is_global_admin=False,
+        requested_level=perms.LEVEL_OWNER,
+        existing_target_level=caller,
+        target_is_caller=True,
+    ) == perms.insufficient_level(perms.LEVEL_OWNER)
+
+
+def test_targeting_someone_else_is_unchanged_by_the_self_rule():
+    assert (
+        perms.grant_refusal(
+            caller_level=perms.LEVEL_OWNER,
+            caller_is_global_admin=False,
+            requested_level="viewer",
+            existing_target_level=perms.LEVEL_OWNER,
+            target_is_caller=False,
+        )
+        == perms.OWNER_CANNOT_CHANGE_OWNER
+    )
+
+
+def test_target_is_caller_defaults_to_false():
+    """The dangerous reading must be the one you have to ask for: a caller that
+    forgets the argument gets the strict answer, not the permissive one."""
+    assert (
+        perms.grant_refusal(
+            caller_level=perms.LEVEL_OWNER,
+            caller_is_global_admin=False,
+            requested_level=None,
+            existing_target_level=perms.LEVEL_OWNER,
+        )
+        == perms.OWNER_CANNOT_CHANGE_OWNER
+    )

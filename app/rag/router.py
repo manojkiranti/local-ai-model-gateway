@@ -97,8 +97,12 @@ async def create_department(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Department '{body.code}' already exists",
         )
-    # The caller is a global admin, so owner is their effective level here.
-    return _department_out(dept, LEVEL_OWNER)
+    # Derived, not hardcoded: both routes are require_admin today, so this is
+    # always `owner` — but a hardcode would silently start lying about the
+    # caller's level if either route ever loosened.
+    return _department_out(
+        dept, await access.effective_department_level(session, _admin, dept.id)
+    )
 
 
 @router.get("", response_model=list[DepartmentOut])
@@ -134,8 +138,12 @@ async def update_department(
         dept.is_active = body.is_active
     await session.commit()
     await session.refresh(dept)
-    # The caller is a global admin, so owner is their effective level here.
-    return _department_out(dept, LEVEL_OWNER)
+    # Derived, not hardcoded: both routes are require_admin today, so this is
+    # always `owner` — but a hardcode would silently start lying about the
+    # caller's level if either route ever loosened.
+    return _department_out(
+        dept, await access.effective_department_level(session, _admin, dept.id)
+    )
 
 
 @router.get("/{code}/members", response_model=list[MemberOut])
@@ -147,7 +155,9 @@ async def list_members(
     """Owner-visible, INCLUDING other owners: `grant_refusal` restricts writes,
     not reads, and hiding owners would leave an owner unable to see why a revoke
     was refused."""
-    dept, _level = await _require_level(session, user, code, LEVEL_OWNER)
+    dept, _level = await _require_level(
+        session, user, code, LEVEL_OWNER, require_active=False
+    )
     rows = await repo.list_department_members(session, dept.id)
     return [MemberOut.model_validate(m) for m in rows]
 
@@ -165,22 +175,39 @@ async def grant_member(
     guard is `permissions.grant_refusal`, which takes `caller_is_global_admin`
     SEPARATELY from the level for the reason documented there.
     """
-    dept, caller_level = await _require_level(session, caller, code, LEVEL_OWNER)
+    dept, caller_level = await _require_level(
+        session, caller, code, LEVEL_OWNER, require_active=False
+    )
 
-    user_id = body.user_id
-    if user_id is None:
-        # Granting by email: resolve it here rather than trusting the client to
-        # have looked the id up correctly. Same 404 as an unknown id, so the two
-        # spellings of "that user does not exist" read identically. This path is
-        # also what lets an OWNER grant at all — `GET /users` is global-admin-only,
-        # so they cannot resolve an address to an id themselves.
-        user = await users_repo.get_by_email(session, body.email.lower())
-        if user is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Unknown user"
-            )
-        user_id = user.id
+    # Resolve the target the same way whichever identifier was supplied, so the
+    # two spellings of "that user does not exist" read identically and both paths
+    # get the is_active check. The email path is also what lets an OWNER grant at
+    # all — `GET /users` is global-admin-only, so they cannot resolve an address
+    # to an id themselves.
+    target = (
+        await users_repo.get_by_id(session, body.user_id)
+        if body.user_id is not None
+        else await users_repo.get_by_email(session, body.email.lower())
+    )
+    if target is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Unknown user"
+        )
+    if not target.is_active:
+        # The old admin-only user dropdown filtered deactivated accounts out; the
+        # email path cannot, so the refusal has to live here or an offboarded
+        # account reappears as a phantom member nobody can explain. 409 with a
+        # readable detail, matching `PATCH /users/{id}`'s convention.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="That account is deactivated; reactivate it before granting access",
+        )
+    user_id = target.id
 
+    # Serialise membership changes in this department before READING the target's
+    # level: the read-then-write below is otherwise a race that can overwrite a
+    # concurrently minted owner (see `lock_department_for_members`).
+    await repo.lock_department_for_members(session, dept.id)
     existing = await repo.get_department_level(
         session, user_id=user_id, department_id=dept.id
     )
@@ -189,6 +216,7 @@ async def grant_member(
         caller_is_global_admin=caller.role == ROLE_ADMIN,
         requested_level=body.role,
         existing_target_level=existing,
+        target_is_caller=user_id == caller.id,
     )
     if refusal is not None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=refusal)
@@ -215,18 +243,23 @@ async def revoke_member(
     caller: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> Response:
-    dept, caller_level = await _require_level(session, caller, code, LEVEL_OWNER)
+    dept, caller_level = await _require_level(
+        session, caller, code, LEVEL_OWNER, require_active=False
+    )
+    await repo.lock_department_for_members(session, dept.id)
     existing = await repo.get_department_level(
         session, user_id=user_id, department_id=dept.id
     )
     # `requested_level=None` is revocation. An owner may not evict another owner:
     # that is the lateral case, and it needs no last-owner guard because global
-    # admin is always the backstop.
+    # admin is always the backstop. Their OWN row is theirs, though — stepping
+    # down must not require finding an admin.
     refusal = permissions.grant_refusal(
         caller_level=caller_level,
         caller_is_global_admin=caller.role == ROLE_ADMIN,
         requested_level=None,
         existing_target_level=existing,
+        target_is_caller=user_id == caller.id,
     )
     if refusal is not None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=refusal)
@@ -262,9 +295,14 @@ async def _require_active_department(session: AsyncSession, code: str):
 
 
 async def _require_level(
-    session: AsyncSession, user: User, code: str, minimum: str
+    session: AsyncSession,
+    user: User,
+    code: str,
+    minimum: str,
+    *,
+    require_active: bool = True,
 ):
-    """The active department plus the caller's level, or the right refusal.
+    """The department plus the caller's level, or the right refusal.
 
     The order matters and is the order slice 1 established: 404 for unknown or
     inactive FIRST (admins included — a soft-disabled department is gone from the
@@ -272,9 +310,25 @@ async def _require_level(
     403 naming the level required. Naming it is safe here because the caller holds
     a grant, so the department's existence is not the secret; where existence IS
     the secret — a document, an ingest job — the answer is 404 instead.
+
+    `require_active=False` is for MEMBERSHIP only. Grants deliberately survive
+    soft-disable, so managing them has to survive it too: otherwise revoking a
+    departing employee's grant on a retired department means reactivating it —
+    re-exposing it as a live tab to every remaining member — revoking, then
+    disabling it again. Corpus operations keep the strict rule; a soft-disabled
+    department is still gone from the product for documents.
+
+    Consequence worth stating: this route is reachable for a department that
+    `GET /v1/departments` does not list (that query filters on active), so a
+    non-admin owner has no UI path to it. That is fine — the department is hidden
+    from everyone, so there is nothing to protect and nothing to show.
     """
-    dept = await _require_active_department(session, code)
-    level = await access.effective_department_level(session, user, dept)
+    dept = (
+        await _require_active_department(session, code)
+        if require_active
+        else await _require_department(session, code)
+    )
+    level = await access.effective_department_level(session, user, dept.id)
     if level is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

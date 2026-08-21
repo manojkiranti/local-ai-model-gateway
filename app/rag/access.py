@@ -23,13 +23,18 @@ from .context import DepartmentContext
 
 
 async def effective_department_level(
-    session: AsyncSession, user: User, dept
+    session: AsyncSession, user: User, department_id: int
 ) -> str | None:
-    """The caller's level in `dept`, or None if they have no access. Never raises.
+    """The caller's level in this department, or None for no access. Never raises.
 
-    The ONE place a level is computed, so the chat boundary and every
-    `/v1/departments/*` route agree by construction rather than by two functions
-    happening to match.
+    The ONE place a level is computed, so the chat boundary, every
+    `/v1/departments/*` route and `/v1/ingest-jobs/{id}` agree by construction
+    rather than by several functions happening to match. Any future rule added
+    here applies everywhere at once, which is the whole point.
+
+    Takes a department **id**, not a Department: `/v1/ingest-jobs/{id}` reaches a
+    department through `documents.department_id` and never loads the row, and a
+    signature it could not call is what made that handler open-code the rule.
 
     A global admin skips the lookup entirely, preserving the existing behaviour
     that admins never touch `user_departments`. `permissions.effective_level` then
@@ -39,7 +44,7 @@ async def effective_department_level(
     grant = None
     if not is_global_admin:
         grant = await repo.get_department_level(
-            session, user_id=user.id, department_id=dept.id
+            session, user_id=user.id, department_id=department_id
         )
     return permissions.effective_level(grant, is_global_admin=is_global_admin)
 
@@ -53,7 +58,7 @@ async def _require_grant(session: AsyncSession, user: User, dept) -> str:
     ANY level may chat: curation is what levels gate, while holding the grant at
     all is what "may ask a question here" means.
     """
-    level = await effective_department_level(session, user, dept)
+    level = await effective_department_level(session, user, dept.id)
     if level is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

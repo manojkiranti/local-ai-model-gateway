@@ -8,10 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..auth.dependencies import get_current_user
 from ..db.session import get_session
-from ..users.models import ROLE_ADMIN, User
+from ..users.models import User
+from . import access
 from . import documents as docs_repo
 from . import jobs as jobs_repo
-from . import repository as repo
 from .permissions import LEVEL_EDITOR, allows
 from .schemas import IngestJobOut
 
@@ -41,20 +41,24 @@ async def get_ingest_job(
             status_code=status.HTTP_404_NOT_FOUND, detail="Unknown ingest job"
         )
 
-    if user.role != ROLE_ADMIN:
-        doc = await docs_repo.get_document(session, job.document_id)
-        level = None
-        if doc is not None:
-            # Deliberately NOT gated on the department being active: this job is
-            # the record of work on a document this editor owns, and a department
-            # soft-disabled mid-ingest should not turn their progress view into a
-            # 404 they cannot interpret.
-            level = await repo.get_department_level(
-                session, user_id=user.id, department_id=doc.department_id
-            )
-        if not allows(level, LEVEL_EDITOR):
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Unknown ingest job"
-            )
+    doc = await docs_repo.get_document(session, job.document_id)
+    level = None
+    if doc is not None:
+        # Through `access.effective_department_level`, not open-coded here: that
+        # function is the ONE place a level is computed, so a rule added to it
+        # applies to this route too. Open-coding the admin bypass agreed with it
+        # today and would have silently stopped agreeing later.
+        #
+        # Deliberately NOT gated on the department being active: this job is the
+        # record of work on a document this editor owns, and a department
+        # soft-disabled mid-ingest should not turn their progress view into a 404
+        # they cannot interpret.
+        level = await access.effective_department_level(
+            session, user, doc.department_id
+        )
+    if not allows(level, LEVEL_EDITOR):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Unknown ingest job"
+        )
 
     return IngestJobOut.model_validate(job)

@@ -124,21 +124,17 @@ def test_soft_disable_hides_a_department_without_revoking_the_grant(clients):
     assert code not in [d["code"] for d in
                         client.get("/v1/departments", headers=member).json()]
 
-    # The members route now requires an ACTIVE department, for admins too --
-    # `_require_active_department`'s own rule, that a soft-disabled department is
-    # gone from the product and 403 would confirm it still exists.
-    assert client.get(
-        f"/v1/departments/{code}/members", headers=admin
-    ).status_code == 404
+    # The grant survives -- and MEMBERSHIP stays manageable while the department
+    # is disabled, because offboarding must not require reactivating a retired
+    # department (which would re-expose it as a live tab to everyone left).
+    members = client.get(f"/v1/departments/{code}/members", headers=admin).json()
+    assert uid in [m["user_id"] for m in members]
 
-    # The grant itself survives, which is the actual invariant: reactivating
-    # brings the department straight back for the same member, with no re-grant.
+    # Reactivating brings it straight back for the same member, no re-grant.
     assert client.patch(f"/v1/departments/{code}", json={"is_active": True},
                         headers=admin).status_code == 200
     assert code in [d["code"] for d in
                     client.get("/v1/departments", headers=member).json()]
-    members = client.get(f"/v1/departments/{code}/members", headers=admin).json()
-    assert uid in [m["user_id"] for m in members]
 
 
 def test_granting_twice_is_idempotent(clients):
@@ -397,3 +393,120 @@ def test_granting_without_a_role_still_defaults_to_viewer(dept_with_levels):
     ).status_code == 204
     mine = client.get("/v1/departments", headers=headers).json()
     assert next(d for d in mine if d["code"] == code)["role"] == "viewer"
+
+
+def test_omitting_role_on_a_RE_grant_does_not_demote(dept_with_levels):
+    """The regression this closes: `role` defaulting to 'viewer' plus an upsert
+    made "field absent" indistinguishable from "set to viewer", so re-adding an
+    existing owner silently stripped them to viewer and answered 204. Demotion
+    must always be something you asked for."""
+    client, admin, code, people = dept_with_levels
+    _owner, owner_id = people["owner"]
+    resp = client.post(
+        f"/v1/departments/{code}/members",
+        json={"user_id": owner_id},
+        headers=admin,
+    )
+    assert resp.status_code == 204, resp.text
+    members = client.get(f"/v1/departments/{code}/members", headers=admin).json()
+    assert next(m for m in members if m["user_id"] == owner_id)["role"] == "owner"
+
+
+def test_omitting_role_on_a_NEW_grant_still_means_viewer(dept_with_levels):
+    """Absence means 'do not change the level'; with no level to keep, that is
+    least privilege."""
+    client, admin, code, _people = dept_with_levels
+    headers = _auth(client, f"rag-newabsent-{uuid.uuid4().hex[:8]}@example.com")
+    uid = _me(client, headers)["id"]
+    assert client.post(
+        f"/v1/departments/{code}/members", json={"user_id": uid}, headers=admin
+    ).status_code == 204
+    mine = client.get("/v1/departments", headers=headers).json()
+    assert next(d for d in mine if d["code"] == code)["role"] == "viewer"
+
+
+def test_an_explicit_demotion_still_works(dept_with_levels):
+    """Preserving on absence must not make deliberate demotion impossible."""
+    client, admin, code, people = dept_with_levels
+    _owner, owner_id = people["owner"]
+    assert client.post(
+        f"/v1/departments/{code}/members",
+        json={"user_id": owner_id, "role": "viewer"},
+        headers=admin,
+    ).status_code == 204
+    members = client.get(f"/v1/departments/{code}/members", headers=admin).json()
+    assert next(m for m in members if m["user_id"] == owner_id)["role"] == "viewer"
+
+
+def test_an_owner_can_step_down_without_an_admin(dept_with_levels):
+    """An owner's own row is theirs: leaving must not require a global admin."""
+    client, admin, code, people = dept_with_levels
+    owner, owner_id = people["owner"]
+    assert client.post(
+        f"/v1/departments/{code}/members",
+        json={"user_id": owner_id, "role": "editor"},
+        headers=owner,
+    ).status_code == 204
+    members = client.get(f"/v1/departments/{code}/members", headers=admin).json()
+    assert next(m for m in members if m["user_id"] == owner_id)["role"] == "editor"
+
+
+def test_an_owner_can_revoke_their_own_grant(dept_with_levels):
+    client, admin, code, people = dept_with_levels
+    owner, owner_id = people["owner"]
+    assert client.delete(
+        f"/v1/departments/{code}/members/{owner_id}", headers=owner
+    ).status_code == 204
+    members = client.get(f"/v1/departments/{code}/members", headers=admin).json()
+    assert all(m["user_id"] != owner_id for m in members)
+
+
+def test_granting_a_deactivated_account_is_refused(dept_with_levels):
+    """The old admin-only dropdown filtered deactivated users out; the email path
+    cannot, so the refusal has to live on the server or an offboarded account
+    reappears as a phantom member."""
+    client, admin, code, _people = dept_with_levels
+    email = f"rag-gone-{uuid.uuid4().hex[:8]}@example.com"
+    headers = _auth(client, email)
+    uid = _me(client, headers)["id"]
+    assert client.patch(
+        f"/users/{uid}", json={"is_active": False}, headers=admin
+    ).status_code == 200
+    for body in ({"user_id": uid}, {"email": email}):
+        resp = client.post(
+            f"/v1/departments/{code}/members", json=body, headers=admin
+        )
+        assert resp.status_code == 409, resp.text
+        assert "deactivated" in resp.json()["detail"].lower()
+
+
+def test_members_are_manageable_on_a_soft_disabled_department(dept_with_levels):
+    """Offboarding must not require reactivating a retired department, which would
+    re-expose it as a live tab to every remaining member. Grants deliberately
+    survive soft-disable, so managing them has to survive it too."""
+    client, admin, code, people = dept_with_levels
+    _editor, editor_id = people["editor"]
+    assert client.patch(
+        f"/v1/departments/{code}", json={"is_active": False}, headers=admin
+    ).status_code == 200
+    listed = client.get(f"/v1/departments/{code}/members", headers=admin)
+    assert listed.status_code == 200, listed.text
+    assert client.delete(
+        f"/v1/departments/{code}/members/{editor_id}", headers=admin
+    ).status_code == 204
+
+
+def test_the_corpus_routes_still_404_on_a_soft_disabled_department(dept_with_levels):
+    """The membership exception must NOT leak into corpus operations: a
+    soft-disabled department is still gone from the product for documents."""
+    client, admin, code, _people = dept_with_levels
+    assert client.patch(
+        f"/v1/departments/{code}", json={"is_active": False}, headers=admin
+    ).status_code == 200
+    assert client.get(
+        f"/v1/departments/{code}/documents", headers=admin
+    ).status_code == 404
+    assert client.post(
+        f"/v1/departments/{code}/documents/text",
+        json={"title": "T", "content": "c"}, headers=admin,
+    ).status_code == 404
