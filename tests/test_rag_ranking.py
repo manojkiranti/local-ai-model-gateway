@@ -90,3 +90,11 @@ def test_mismatched_score_count_is_a_programming_error():
 
 def test_the_no_signal_score_is_named_so_a_threshold_cannot_land_on_it():
     assert NO_SIGNAL_SCORE == 0.5
+
+
+def test_a_zero_top_k_still_returns_one_passage_rather_than_abstaining():
+    # A config typo (RAG_TOP_K=0) must not turn into "the bank has no policy on
+    # anything". Degrading to one passage is the safe failure; abstaining is not.
+    result = decide([chunk(1), chunk(2)], [0.9, 0.8], threshold=0.7, top_k=0)
+    assert len(result.kept) == 1
+    assert result.abstained is False

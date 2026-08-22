@@ -32,6 +32,13 @@ from .retrieval import RetrievedChunk
 # least informative case sits exactly on the boundary.
 NO_SIGNAL_SCORE = 0.5
 
+# A floor of 1, and it is a fail-safe rather than a nicety. With top_k=0 and no
+# floor, `kept` is empty, so `abstained` becomes True and a single misconfigured
+# RAG_TOP_K=0 would refuse EVERY question in EVERY department while reporting it
+# as "not in these documents" -- a false statement about the corpus, delivered
+# universally, from a config typo. Degrading to one passage is the safe failure.
+MIN_KEPT = 1
+
 
 @dataclass(frozen=True)
 class Ranking:
@@ -76,7 +83,7 @@ def decide(
     # Stable sort: equal scores keep the order fusion gave them, so a tie is
     # broken by RRF rather than arbitrarily.
     ordered = sorted(chunks, key=lambda c: by_id[c.chunk_id], reverse=True)
-    kept = [c for c in ordered if by_id[c.chunk_id] >= threshold][: max(1, top_k)]
+    kept = [c for c in ordered if by_id[c.chunk_id] >= threshold][: max(MIN_KEPT, top_k)]
 
     return Ranking(
         kept=kept,
