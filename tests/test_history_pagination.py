@@ -188,3 +188,70 @@ def test_another_users_sessions_are_never_returned():
         assert all(row[0].user_id == mine for row in rows)
 
     _run(go)
+
+
+def test_a_thread_page_is_the_NEWEST_messages_in_ascending_order():
+    """A chat opens at the bottom, so the first page is the newest messages —
+    but returned ascending, because the frontend renders top-to-bottom."""
+
+    async def go(session):
+        user_id = await _seed_user(session)
+        s = await repo.create_session(session, user_id=user_id, title="t")
+        for i in range(30):
+            await repo.add_user_message(session, session_id=s.id, content=f"m{i}")
+        await session.commit()
+
+        row, msgs, cursor = await repo.get_thread_page(
+            session, session_id=s.id, user_id=user_id, limit=10
+        )
+        assert row is not None
+        assert [m.seq for m in msgs] == sorted(m.seq for m in msgs)
+        assert msgs[-1].content == "m29"
+        assert cursor is not None
+
+    _run(go)
+
+
+def test_walking_a_thread_backwards_covers_every_message_once():
+    async def go(session):
+        user_id = await _seed_user(session)
+        s = await repo.create_session(session, user_id=user_id, title="t")
+        for i in range(25):
+            await repo.add_user_message(session, session_id=s.id, content=f"m{i}")
+        await session.commit()
+
+        seen, cursor = [], None
+        for _ in range(10):
+            _, msgs, cursor = await repo.get_thread_page(
+                session, session_id=s.id, user_id=user_id, limit=10,
+                before_seq=cursor,
+            )
+            seen.extend(m.seq for m in msgs)
+            if cursor is None:
+                break
+        assert sorted(seen) == list(range(1, 26))
+
+    _run(go)
+
+
+def test_a_foreign_thread_is_not_readable():
+    async def go(session):
+        mine = await _seed_user(session)
+        theirs = await _seed_user(session)
+        s = await repo.create_session(session, user_id=theirs, title="t")
+        await repo.add_user_message(session, session_id=s.id, content="secret")
+        await session.commit()
+
+        row, msgs, _ = await repo.get_thread_page(
+            session, session_id=s.id, user_id=mine, limit=10
+        )
+        assert row is None
+        assert msgs == []
+
+    _run(go)
+
+
+def test_the_unbounded_thread_read_is_gone():
+    # Left in place, the next person reintroduces the bug this plan removed.
+    assert not hasattr(repo, "get_session_with_messages")
+    assert not hasattr(repo, "list_sessions")

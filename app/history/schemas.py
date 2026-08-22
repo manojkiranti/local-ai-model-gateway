@@ -58,3 +58,5 @@ class SessionDetail(BaseModel):
     created_at: datetime
     updated_at: datetime
     messages: list[MessageOut]
+    # Walks OLDER messages. Null when the thread's first message is included.
+    next_cursor: Optional[str] = None

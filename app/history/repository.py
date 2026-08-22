@@ -16,9 +16,13 @@ from typing import Any, Optional
 
 from sqlalchemy import delete, func, literal, select, tuple_, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
-from .cursors import decode_session_cursor, encode_session_cursor
+from .cursors import (
+    decode_seq_cursor,
+    decode_session_cursor,
+    encode_seq_cursor,
+    encode_session_cursor,
+)
 from .models import ROLE_ASSISTANT, ROLE_USER, ChatMessage, ChatSession
 
 TITLE_MAX = 80
@@ -111,15 +115,48 @@ async def get_context_tail(
     return out
 
 
-async def get_session_with_messages(
-    session: AsyncSession, *, session_id: str, user_id: int
-) -> Optional[ChatSession]:
-    result = await session.execute(
-        select(ChatSession)
-        .where(ChatSession.id == session_id, ChatSession.user_id == user_id)
-        .options(selectinload(ChatSession.messages))
+async def get_thread_page(
+    session: AsyncSession,
+    *,
+    session_id: str,
+    user_id: int,
+    limit: int = DEFAULT_PAGE_LIMIT,
+    before_seq: str | None = None,
+) -> tuple[Optional[ChatSession], list[ChatMessage], Optional[str]]:
+    """One page of a thread: (session_row, messages_ascending, next_cursor).
+
+    Returns (None, [], None) when the session is unknown or not this user's —
+    the router turns that into 404, and we never confirm it exists.
+
+    The page SELECTED is the newest `limit` messages (a chat opens at the
+    bottom); the page RETURNED is ascending by `seq` so the frontend renders
+    top-to-bottom unchanged. The cursor walks older.
+
+    Anchored on `seq`, not `created_at`: seq is already UNIQUE(session_id, seq)
+    and already the relationship's order_by, so it is a total order with no
+    tiebreaker needed.
+    """
+    limit = max(1, min(limit, MAX_PAGE_LIMIT))
+    row = await get_owned_session(session, session_id=session_id, user_id=user_id)
+    if row is None:
+        return None, [], None
+
+    stmt = (
+        select(ChatMessage)
+        .where(ChatMessage.session_id == session_id)
+        .order_by(ChatMessage.seq.desc())
+        .limit(limit + 1)
     )
-    return result.scalar_one_or_none()
+    if before_seq is not None:
+        stmt = stmt.where(ChatMessage.seq < decode_seq_cursor(before_seq))
+
+    newest_first = list((await session.execute(stmt)).scalars().all())
+    has_more = len(newest_first) > limit
+    newest_first = newest_first[:limit]
+    next_cursor = (
+        encode_seq_cursor(newest_first[-1].seq) if has_more and newest_first else None
+    )
+    return row, list(reversed(newest_first)), next_cursor
 
 
 async def list_sessions_page(

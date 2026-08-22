@@ -62,12 +62,18 @@ async def list_my_sessions(
 async def get_my_session(
     session_id: str,
     request: Request,
+    limit: int = Query(repo.DEFAULT_PAGE_LIMIT, ge=1, le=repo.MAX_PAGE_LIMIT),
+    cursor: str | None = Query(None, description="Opaque; walks older messages."),
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> SessionDetail:
-    chat_session = await repo.get_session_with_messages(
-        session, session_id=session_id, user_id=user.id
-    )
+    try:
+        chat_session, rows, next_cursor = await repo.get_thread_page(
+            session, session_id=session_id, user_id=user.id,
+            limit=limit, before_seq=cursor,
+        )
+    except BadCursor as exc:
+        raise HTTPException(status_code=400, detail=f"invalid cursor: {exc}") from exc
     if chat_session is None:
         raise HTTPException(status_code=404, detail="session not found")
     # The trace stays in the database for audit either way; EXPOSE_TRACE=false
@@ -75,7 +81,7 @@ async def get_my_session(
     # can't resurrect a "how it worked" panel the live turn didn't show.
     expose_trace = request.app.state.settings.expose_trace
     messages = []
-    for m in chat_session.messages:
+    for m in rows:
         out = MessageOut.model_validate(m)
         if not expose_trace:
             out.trace = None
@@ -90,6 +96,7 @@ async def get_my_session(
         created_at=chat_session.created_at,
         updated_at=chat_session.updated_at,
         messages=messages,
+        next_cursor=next_cursor,
     )
 
 
