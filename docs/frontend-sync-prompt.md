@@ -4,18 +4,26 @@ Paste the fenced block below into a Claude CLI session running in the FRONTEND
 repo (`local-ai-model-frontend`). It carries this gateway's current API contract
 and asks that session to build to it.
 
-**Current task in that block: verify the department-role UI** (updated 2026-08-21).
-Per-department levels (`viewer` < `editor` < `owner`) landed on the gateway's
-`feat/role`, and the frontend built them on its own `feat/roles`. So the block's
-job is now VERIFICATION, not construction — the contract below is the corrected
-one, after the frontend author's review (`frontend-role-review-2026-08-20.md`) and
-a gateway code review were both applied.
+**Current task in that block: consume PAGINATED chat history** (updated 2026-08-22).
+Chat history is now keyset-paginated on the gateway's `feat/lazy-load`:
+`GET /v1/sessions` returns an ENVELOPE instead of a bare array, and
+`GET /v1/sessions/{id}` returns ONE PAGE instead of the whole thread. Full
+rationale and known limits:
+`docs/superpowers/plans/2026-08-22-chat-history-lazy-loading-PROGRESS.md`.
 
-**Not additive, and the two branches ship together.** `GET /v1/departments` rows
-gain a required `role`, and the frontend's level helper fails CLOSED — so a
-frontend on `feat/roles` talking to a gateway WITHOUT `feat/role` receives no
-`role`, hides every RAG admin control, and shows no error explaining why. Deploy
-them as a pair.
+**Breaking in BOTH directions, so the two branches ship together.** An old
+frontend against the new gateway calls `.map` on an object; a new frontend
+against an old gateway reads `items` off a bare array. Both render zero
+conversations, and neither shows an error explaining why. Same coupling as
+`feat/role`/`feat/roles`.
+
+Also on that branch: `POST /v1/chat`'s `message` gained `max_length=8000`, so a
+long paste that used to succeed now returns 422.
+
+Previous task, shipped: verify the department-role UI (2026-08-21). Per-department
+levels (`viewer` < `editor` < `owner`) landed on the gateway's `feat/role` and the
+frontend's `feat/roles`; the corrected contract is still below because it is still
+the contract, and those two branches are still an unshipped pair.
 
 Previous task, shipped: render chat source citations (2026-08-19) — `/v1/chat`,
 the stream's `done` event and `GET /v1/sessions/{id}` return `sources`, plus the
@@ -40,9 +48,14 @@ all tools itself.
 
 TWO JOBS, in this order:
 
-  (A) VERIFY the department-role UI against the contract below. Both sides are
-      built, and six review items have since been applied to the gateway — four
-      of which change what you should expect:
+  (A) BUILD paginated chat history — see JOB A at the bottom. The gateway no
+      longer returns the whole session list or the whole thread, so this is API
+      consumption plus paging UI, NOT client-side virtualization of an
+      already-fetched array.
+
+  (A2) VERIFY the department-role UI against the contract below (it shipped
+      earlier; re-check only if you touch it). Six review items were applied to
+      the gateway — four of which change what you should expect:
         * `role` on a department row is now REQUIRED and a closed set
           ("viewer" | "editor" | "owner"), never null.
         * `POST .../members` with NO `role` key now PRESERVES an existing
@@ -118,7 +131,7 @@ USER:
 
 CHAT (the core endpoint) — POST /v1/chat  (authed):
   Request body:
-    { "message": string (required, non-empty),
+    { "message": string (required, non-empty, MAX 8000 chars -> 422 over that),
       "session_id": string | null,   // omit/null to start a new conversation
       "model": string | null,        // optional per-request override
       "stream": boolean,             // false = JSON, true = NDJSON stream
@@ -309,12 +322,26 @@ DEPARTMENT DOCUMENTS (editor of that department, or admin) — authed:
   Errors: 401 missing/invalid JWT; 404 unknown session_id or model not pulled;
           502 Ollama/MCP unreachable.
 
-SESSIONS (chat history, authed):
-  GET    /v1/sessions            -> [ {id, title|null, created_at, updated_at, message_count} ]
-  GET    /v1/sessions/{id}       -> {id, title|null, created_at, updated_at,
-                                     messages:[{id, seq, role, content, trace|null,
-                                                sources|null, model|null,
-                                                created_at}]}   ; 404 if not yours
+SESSIONS (chat history, authed) — PAGINATED as of 2026-08-22:
+  GET    /v1/sessions?limit=&cursor=
+         -> { items: [ {id, title|null, created_at, updated_at, message_count} ],
+              next_cursor: string | null }
+         An ENVELOPE, not a bare array. `limit` default 30, max 100 (outside
+         1..100 is a 422). `cursor` is OPAQUE base64 — never parse or construct
+         one; only ever echo back a `next_cursor` the server gave you.
+         `next_cursor: null` = no further page. 400 = malformed cursor.
+         Row shape is UNCHANGED, `message_count` included.
+         Ordering is keyset on (updated_at DESC, id DESC). It guarantees no
+         DUPLICATES, but a session bumped to the top mid-scroll can be MISSED
+         until a refetch of page one — that is expected, not a bug.
+  GET    /v1/sessions/{id}?limit=&cursor=
+         -> {id, title|null, created_at, updated_at,
+             messages:[{id, seq, role, content, trace|null, sources|null,
+                        model|null, created_at}],
+             next_cursor: string | null}     ; 404 if not yours, 400 bad cursor
+         ONE PAGE, not the full thread: the NEWEST `limit` messages, but returned
+         ASCENDING by seq — so top-to-bottom rendering is unchanged.
+         `next_cursor` walks OLDER messages, null once the first message is in.
          `sources` replays the same shape the live turn returned (download_url is
          recomputed on read), so a reloaded thread shows the same links.
   DELETE /v1/sessions/{id}       -> 204 ; 404 if not yours
@@ -342,7 +369,53 @@ MCP status badge (authed): GET /v1/mcp/status -> always 200, health is in the bo
 
 === What to actually do ===
 
-JOB A — build the citations UI:
+JOB A — consume paginated chat history:
+0. Read src/lib/api.ts, src/hooks/useSessions.ts and
+   src/components/layout/Sidebar.tsx FIRST and follow the patterns already there
+   (the request<T>() helper, AbortSignal threading, existing error handling). Do
+   not restructure state management for this.
+1. Update the two API functions and their types: listSessions (typed
+   Promise<SessionSummary[]> today) and getSession. Add the envelope types. Keep
+   SessionSummary and MessageOut exactly as they are — only the wrappers changed.
+   Do not send `limit`; let the server's default of 30 govern both.
+2. Sidebar: auto-load the next page with an IntersectionObserver sentinel at the
+   bottom.
+3. Thread: an explicit "Load older messages" button at the TOP. Chosen
+   deliberately over an upward sentinel — auto-loading upward plus scroll
+   anchoring is the jumpy case, and a button is predictable and testable.
+4. THE SCROLL TRAP, and the one thing most likely to be got wrong: a button does
+   NOT remove the anchoring work. Prepending older messages grows the DOM above
+   the viewport, so the view jumps unless you restore it — capture scrollHeight
+   before the prepend, then set scrollTop += (newScrollHeight - oldScrollHeight)
+   in a LAYOUT effect, before paint. Assert this in a test.
+5. Guard overlapping and chained requests in BOTH places: ignore a trigger while
+   a request is in flight, and keep the sentinel disabled until the page has been
+   appended. A sentinel that stays intersected after append fires repeatedly and
+   walks several pages on one fast scroll.
+6. Sidebar RESET on invalidation: drop accumulated pages and refetch page one
+   when a session is created, deleted, or a turn completes (a turn bumps
+   updated_at and reorders the list server-side). Dedupe by id when appending,
+   defensively.
+7. Handle 400 distinctly from 404. A 400 means OUR cursor state is bad, not that
+   the user's data is wrong — reset to page one and refetch, never surface a raw
+   error. 404 on the thread route still means "unknown session or not yours" and
+   must behave exactly as it does today.
+8. Distinguish "no more pages" (next_cursor === null) from "zero sessions" — do
+   not render a dead sentinel or a disabled button when the first page came back
+   short.
+9. Composer: enforce the 8000-char message cap client-side. Show a counter as the
+   user approaches it, and if they exceed it point them at file upload
+   (POST /v1/files + file_ids), which is the intended path for long content. Do
+   not let a long paste die on a raw 422.
+10. Tests (vitest, matching the existing suite's conventions): the envelope is
+   parsed and items rendered; paging appends without duplicates and stops on a
+   null cursor; a cursor is never sent unless the server supplied it; prepending
+   older messages preserves scroll position; a 400 resets to page one; the
+   composer blocks >8000 chars before submitting.
+11. Record the both-directions breaking-pair coupling somewhere durable in this
+   repo (README or a docs note), not only in the session transcript.
+
+JOB A2 — the citations UI (SHIPPED 2026-08-19; re-verify only if you touch it):
 0. FIRST, make a department chat reachable, or nothing below is testable: check
    whether this frontend calls GET /v1/departments and sends `department` on the
    first turn. If it does not, wire that up (tabs or a picker) before touching the
@@ -379,6 +452,10 @@ JOB B — verify the rest:
    not a string, reading the X-Session-Id header, and no <a href> file downloads.
 9. Fix only genuine mismatches. If a part already matches, say so and change it not.
 
+Run npm run test, npm run lint and npm run build. SHOW the output rather than
+summarising it.
+
 Report: what you built for JOB A (with the file paths), what JOB B found, and
-anything in the contract you could not implement as specified.
+anything in the contract you could not implement as specified — say so plainly
+instead of working around it.
 ```
