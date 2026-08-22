@@ -309,6 +309,12 @@ def test_a_long_thread_does_not_grow_the_prompt_without_bound(monkeypatch):
         app.state.mcp = FakeMCP()
 
         # A small window makes the budget bite within a handful of turns.
+        # NOTE: 8000 is below context_reserve_tokens (12000) +
+        # context_tool_schema_tokens (4000), so `budget_for` clamps to
+        # MIN_HISTORY_BUDGET (512) here — this exercises the FLOOR path, not a
+        # normal mid-range budget. Still a valid growth guard (the plateau
+        # assertion below holds regardless of which path produced the budget),
+        # but worth knowing if this test's failure mode ever needs debugging.
         settings = get_settings()
         monkeypatch.setattr(settings, "context_window_tokens", 8000, raising=False)
 
@@ -387,3 +393,48 @@ def test_the_model_is_told_when_earlier_turns_were_dropped(monkeypatch):
             ), "a truncated context must announce itself to the model"
         finally:
             _cleanup(client, headers)
+
+
+def test_a_malformed_cursor_is_400_on_both_paginated_routes():
+    # A silent fall-back to page one on a bad cursor is invisible server-side
+    # and reads to a client as "history is broken" (see cursors.py). Both
+    # GET /v1/sessions and GET /v1/sessions/{id} decode a caller-supplied
+    # cursor and must answer 400, not 404 or a quiet first page.
+    with TestClient(app) as client:
+        headers = _auth_headers(client)
+        app.state.ollama = FakeOllama()
+        app.state.mcp = FakeMCP()
+        _cleanup(client, headers)
+        try:
+            r = client.post("/v1/chat", json={"message": "hi"}, headers=headers)
+            assert r.status_code == 200
+            sid = r.json()["session_id"]
+
+            resp = client.get("/v1/sessions?cursor=@@@", headers=headers)
+            assert resp.status_code == 400
+
+            resp = client.get(f"/v1/sessions/{sid}?cursor=@@@", headers=headers)
+            assert resp.status_code == 400
+        finally:
+            _cleanup(client, headers)
+
+
+def test_an_oversized_message_is_a_clean_422_not_a_turn():
+    # ChatTurnRequest.message has a max_length so an unbounded paste can't
+    # blow the context budget from the current-message side (see CLAUDE.md's
+    # "the budget bounds HISTORY, not the PROMPT" finding). This must be a
+    # plain FastAPI validation error, not something the turn path handles.
+    with TestClient(app) as client:
+        headers = _auth_headers(client)
+        app.state.ollama = FakeOllama()
+        app.state.mcp = FakeMCP()
+        resp = client.post(
+            "/v1/chat", json={"message": "x" * 8001, "stream": False}, headers=headers
+        )
+        assert resp.status_code == 422
+
+        resp_ok = client.post(
+            "/v1/chat", json={"message": "x" * 8000, "stream": False}, headers=headers
+        )
+        assert resp_ok.status_code == 200
+        _cleanup(client, headers)

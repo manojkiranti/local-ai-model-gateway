@@ -26,6 +26,8 @@ import math
 from dataclasses import dataclass
 from typing import Any
 
+from .models import ROLE_USER
+
 # Devanagari block: U+0900..U+097F, plus the extended block U+A8E0..U+A8FF.
 _DEVANAGARI_RANGES = ((0x0900, 0x097F), (0xA8E0, 0xA8FF))
 
@@ -44,8 +46,6 @@ DEVANAGARI_CHARS_PER_TOKEN = 0.85
 # Per-message cost of the role framing the model server adds around content.
 MESSAGE_OVERHEAD_TOKENS = 4
 SAFETY_MARGIN = 1.10
-
-from .models import ROLE_ASSISTANT, ROLE_USER
 
 
 def format_attachment_note(attachments: list[dict[str, Any]], *, active: bool = True) -> str:
@@ -177,19 +177,54 @@ def select_turns(messages: list, budget: int) -> Selection:
     no question to answer. That case reports `truncated=False` — nothing was
     dropped, it simply does not fit, and claiming otherwise would emit a note
     about history that does not exist.
+
+    Two things `build_context_messages` EMITS were previously uncosted here:
+    TRUNCATION_NOTE (only when turns are dropped) and the pinned attachment
+    note (only when the newest attachment set's own message doesn't survive).
+    Both are charged against `budget` up front, conservatively — reserved
+    whether or not they end up needed — rather than computed after the fact,
+    because whether they're needed depends on the very selection being made.
     """
     if not messages:
         return Selection(messages=[], truncated=False, pinned_attachments=None)
 
     groups = _group_turns(messages)
+
+    # Reserve room for TRUNCATION_NOTE (emitted only if something is dropped)
+    # and for the pinned-attachment note (emitted only if the newest
+    # attachment-bearing message falls outside the selection). Reserving both
+    # unconditionally is the "keep it simple" version of exact accounting: it
+    # costs a little unused budget on a turn that needed neither, in exchange
+    # for the emitted messages always actually fitting.
+    reserved = estimate_tokens(TRUNCATION_NOTE) + MESSAGE_OVERHEAD_TOKENS
+    with_files = [m for m in messages if m.role == ROLE_USER and m.attachments]
+    if with_files:
+        reserved += estimate_tokens(
+            format_attachment_note(with_files[-1].attachments, active=True)
+        ) + MESSAGE_OVERHEAD_TOKENS
+    effective_budget = budget - reserved
+
     kept: list[list] = []
     spent = 0
     for group in reversed(groups):
         cost = sum(estimate_message_tokens(m) for m in group)
-        if kept and spent + cost > budget:
+        if kept and spent + cost > effective_budget:
             break
         kept.insert(0, group)
         spent += cost
+
+    # A leading assistant-headed group is possible only from malformed history
+    # (a user row with no assistant reply, left by a failed model call —
+    # `open_turn` persists the user message immediately, before the model is
+    # ever called). `_group_turns` gives it its own group rather than merging
+    # it into whatever came before, so it can end up FIRST in `kept` if the
+    # tail we read from the DB happened to start there. A selection may never
+    # begin with an assistant message (CLAUDE.md), so drop it — but only when a
+    # later user-headed group exists to take its place; never return an empty
+    # selection.
+    while len(kept) > 1 and kept[0] and kept[0][0].role != ROLE_USER:
+        dropped_group = kept.pop(0)
+        spent -= sum(estimate_message_tokens(m) for m in dropped_group)
 
     selected = [m for group in kept for m in group]
     dropped = len(selected) < len(messages)
@@ -198,7 +233,6 @@ def select_turns(messages: list, budget: int) -> Selection:
     # active. If its message did not survive, carry the record forward.
     pinned = None
     if dropped:
-        with_files = [m for m in messages if m.role == ROLE_USER and m.attachments]
         if with_files and with_files[-1] not in selected:
             pinned = with_files[-1].attachments
 

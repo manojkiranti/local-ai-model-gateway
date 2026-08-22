@@ -56,8 +56,11 @@ async def list_my_sessions(
 @router.get(
     "/{session_id}",
     response_model=SessionDetail,
-    summary="Get one session with its full ordered message thread",
-    responses={404: {"description": "Unknown session id (or not yours)."}},
+    summary="Get one page of a session's ordered message thread",
+    responses={
+        400: {"description": "Malformed cursor."},
+        404: {"description": "Unknown session id (or not yours)."},
+    },
 )
 async def get_my_session(
     session_id: str,

@@ -93,6 +93,29 @@ def merge_tool_call_deltas(
             slot["arguments"] += function["arguments"]
 
 
+def normalize_usage(raw: Any) -> dict[str, int] | None:
+    """Normalize an OpenAI-shaped ``usage`` object to the three fields callers
+    care about, or None if it's absent/malformed. This is the ONE place a
+    caller reads token accounting from — never hand a raw provider dict
+    upstream (module rule: this file owns the wire format).
+
+    Fails closed: a partial/garbled `usage` (missing a key, non-int value)
+    returns None rather than a half-populated dict, because a caller comparing
+    "actual" against our estimate must never compare against a fabricated
+    number.
+    """
+    if not isinstance(raw, dict):
+        return None
+    try:
+        return {
+            "prompt_tokens": int(raw["prompt_tokens"]),
+            "completion_tokens": int(raw["completion_tokens"]),
+            "total_tokens": int(raw["total_tokens"]),
+        }
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
 def finalize_tool_calls(acc: dict[int, dict[str, Any]]) -> list[dict[str, Any]]:
     """Flatten the accumulator into index-ordered complete calls.
 
@@ -133,6 +156,14 @@ class OllamaClient:
 
     # ---- generation (non-streaming) ----
     async def chat(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """A single non-streaming completion. Returns the provider's raw JSON —
+        callers that need `usage` should run it through `normalize_usage`
+        rather than reading `data["usage"]` directly. This is the method the
+        design doc's calibration measurement used directly against Ollama
+        (`usage.prompt_tokens` vs `context.estimate_tokens`); the live turn
+        path (`agent/loop.py`) does not call it — see `stream_chat`'s docstring
+        for why streaming usage is a separate, unverified story.
+        """
         return await self._post_json("/v1/chat/completions", payload)
 
     async def embeddings(self, payload: dict[str, Any]) -> dict[str, Any]:

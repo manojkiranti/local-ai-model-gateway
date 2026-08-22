@@ -5,6 +5,16 @@ Keyset, not offset, and that is not a style choice: sessions sort by
 PAGES while the user scrolls. Offset paging would show some sessions twice and
 skip others entirely.
 
+What keyset actually buys here: it prevents DUPLICATES (a row already returned
+is never returned again on a later page of the same scroll, because the cursor
+is a position, not a count). It does NOT make the scroll immune to a session
+being bumped to the top mid-scroll — a session sitting below the cursor that
+receives a new turn moves to page one, which is now above where the cursor
+points, so THAT scroll skips it. It reappears correctly on a fresh fetch of
+page one; it is not lost, only absent from the scroll already in progress. A
+frontend author should read this as "no dupes, not a live feed," not as "never
+misses anything."
+
 The payload is base64 so it is opaque — the session keyset needs `id` as a
 tiebreaker today because `updated_at` is not unique, and a client that never
 parsed the cursor cannot break when that changes.

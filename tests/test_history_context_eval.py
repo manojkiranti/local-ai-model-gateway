@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.history.context import budget_for, estimate_tokens, select_turns
+from app.history.context import select_turns
 from app.history.models import ROLE_ASSISTANT, ROLE_USER
 
 # name, builder -> messages

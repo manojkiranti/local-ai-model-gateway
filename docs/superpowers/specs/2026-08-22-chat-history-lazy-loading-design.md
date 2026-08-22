@@ -172,9 +172,18 @@ read.** `OLLAMA_CONTEXT_LENGTH=32768` is set on the Ollama service; there is no
 window back (measured, CLAUDE.md). Nothing checks the two copies against each
 other, so if Ollama is later raised, or a fresh deploy omits the variable and
 Ollama falls back to its 4096 default, the gateway keeps budgeting against
-32768 and is wrong in silence. Mitigation: log the estimate, and log the
-server's reported `usage.prompt_tokens` when present, so the two are
-comparable. That comparison is also how the estimator constants get calibrated.
+32768 and is wrong in silence. Mitigation: log the estimate on every turn.
+The server's `usage.prompt_tokens` is NOT logged automatically alongside it —
+the live turn path (`agent/loop.py`) always talks to Ollama over the SSE
+stream (both `stream:true` and `stream:false` clients drain the same
+generator), and that stream carries no `usage` field without
+`stream_options.include_usage`, which is unverified against the production
+Ollama (no GPU-box access, CLAUDE.md §19.1) and was deliberately NOT turned on
+speculatively — faking the comparison would be worse than not having it.
+`OllamaClient.chat()` (non-streaming) + `normalize_usage` DO surface the real
+value, and that is the method this design doc's own calibration measurement
+used directly against Ollama, as a one-off script rather than a live-turn
+log line.
 
 ## Testing
 
@@ -221,11 +230,39 @@ plus infinite-scroll wiring in `hooks/useSessions.ts`.
 
 ## Evaluation & Improvement
 
-**Success metric.** No turn's estimated prompt size exceeds
-`CONTEXT_WINDOW_TOKENS`, and the estimate never *under*-states the server's
-reported `usage.prompt_tokens`. Under-estimating is the only failure that
-reaches a user, because it is what lets the system prompt get dropped.
-Proxy for the UI half: sidebar first-paint stops growing with session count.
+**What this guarantees, precisely (2026-08-22, whole-branch review
+correction).** CHAT HISTORY is bounded — it is the one component of the prompt
+that would otherwise grow without limit over a conversation's life, and
+`select_turns`/`budget_for` cap it. That is NOT the same claim as "the whole
+prompt fits the window": the current user message, RAG passages and tool
+results all come out of `context_reserve_tokens` (a fixed-size reserve, not a
+per-turn measurement of what those three actually cost), so a turn that
+combines several maximum-size tool results (up to `agent_max_iterations=8` of
+`MAX_TOOL_RESULT_CHARS=8000` chars each) CAN still exceed the window even
+though history behaved exactly as designed. Tool results are capped per call
+and per turn (`MAX_TOOL_RESULT_CHARS`, `rag_tool_result_max_chars`), never
+against the running budget, and `ChatTurnRequest.message` now has a
+`max_length` (app/chat/schemas.py) for the same reason the reserve was raised —
+see CLAUDE.md's "the budget bounds HISTORY, not the PROMPT" gotcha for the
+full accounting. Success metric, stated accurately: no turn's estimated
+HISTORY size exceeds its budget, and the estimate never *under*-states the
+server's reported `usage.prompt_tokens` for the messages it actually covers.
+Under-estimating history is the failure that reaches a user, because it is
+what lets the system prompt get dropped. Proxy for the UI half: sidebar
+first-paint stops growing with session count.
+
+The current user message and RAG passages are bounded too, separately from
+history: `ChatTurnRequest.message` (app/chat/schemas.py) carries
+`max_length=8000` and `rag_tool_result_max_chars=7000` caps a passage — both
+matching the codebase's existing `MAX_TOOL_RESULT_CHARS` convention. 8000 was
+chosen over a tighter cap deliberately: users legitimately paste stack traces
+and long questions, and a cap that rejects ordinary use with a 422 is a worse
+regression than the overflow it prevents; the frontend composer has no
+client-side length limit today. Worst case, an all-Devanagari 8000-char
+message alone prices at ~10,353 tokens — more than `context_reserve_tokens`
+(12000) has left over (~2941) once a realistic RAG result is also accounted
+for, so this cap, like the reserve itself, bounds the REALISTIC case, not
+every combination of maximums stacked together in one turn.
 
 **Eval.** A labelled set of 8 synthetic threads with known content, scored on
 two things: (a) estimated vs actual `usage.prompt_tokens` per thread, pass when
@@ -295,10 +332,14 @@ component for each — the margin is once again a genuine safety buffer rather
 than the only thing holding the line. No further constant change was needed
 after this round.
 
-**Feedback capture.** Every turn logs the estimate, the selected message count,
-whether truncation occurred, and the server's `usage.prompt_tokens` when
-returned. That log line is the calibration dataset; an estimate below actual is
-the signal to raise the constants.
+**Feedback capture.** Every turn logs the estimate, the selected message count
+and whether truncation occurred (`history/service.py:_log_budget`). The
+server's `usage.prompt_tokens` is deliberately NOT part of that per-turn log —
+see the Mitigation note above for why (the live path streams; streaming usage
+is unverified and was not faked). The calibration dataset instead comes from
+running `OllamaClient.chat()` + `normalize_usage` out of band, as in the two
+measurement rounds below; an estimate below actual there is the signal to raise
+the constants.
 
 **Review loop.** Re-read the estimate-vs-actual log after the first week of
 real use and again whenever `LOCAL_TOOLS` grows or a model changes — both move

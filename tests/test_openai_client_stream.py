@@ -223,3 +223,24 @@ async def test_is_healthy_probes_v1_models():
     assert await client.is_healthy() is True
     assert seen["url"] == "http://fake:11434/v1/models"
     await client.aclose()
+
+
+def test_normalize_usage_extracts_the_three_fields():
+    from app.ollama.client import normalize_usage
+
+    raw = {"prompt_tokens": 100, "completion_tokens": 20, "total_tokens": 120, "extra": "x"}
+    assert normalize_usage(raw) == {
+        "prompt_tokens": 100,
+        "completion_tokens": 20,
+        "total_tokens": 120,
+    }
+
+
+def test_normalize_usage_fails_closed_on_a_partial_or_malformed_object():
+    from app.ollama.client import normalize_usage
+
+    assert normalize_usage(None) is None
+    assert normalize_usage({}) is None
+    assert normalize_usage({"prompt_tokens": 1}) is None
+    assert normalize_usage({"prompt_tokens": "not-a-number",
+                             "completion_tokens": 1, "total_tokens": 1}) is None

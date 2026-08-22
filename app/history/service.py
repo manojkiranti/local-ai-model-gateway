@@ -34,6 +34,20 @@ def _log_budget(session_id, tail, selection, budget) -> None:
     line is the only place the disagreement becomes visible, and it is the
     dataset the estimator's constants get calibrated against — compare it with
     the server's reported usage.prompt_tokens.
+
+    That comparison is NOT automatic on every live turn: the turn path
+    (`agent/loop.py`) always talks to Ollama over the SSE `/v1/chat/completions`
+    stream (for both `stream:true` and `stream:false` clients — `run_turn` just
+    drains the same generator), and Ollama's stream carries no `usage` field
+    without `stream_options.include_usage`, which is unverified against the
+    production server (no GPU-box access — see CLAUDE.md §19.1) and is
+    therefore NOT turned on speculatively; faking a number here would be worse
+    than not logging one. `app.ollama.client.OllamaClient.chat()` +
+    `normalize_usage` DO surface the real `usage.prompt_tokens` for the
+    non-streaming completion path, and that is exactly the method the design
+    doc's own calibration measurement used directly against Ollama. Use that
+    path (a one-off script, not a live turn) to recalibrate the estimator
+    constants; see the design doc's Evaluation section for the worked example.
     """
     spent = sum(ctx.estimate_message_tokens(m) for m in selection.messages)
     logger.info(

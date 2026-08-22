@@ -60,7 +60,27 @@ class SourceOut(BaseModel):
 
 class ChatTurnRequest(BaseModel):
     session_id: Optional[str] = None  # omit to start a new conversation
-    message: str = Field(..., min_length=1)
+    # 8000 chars — same convention as `MAX_TOOL_RESULT_CHARS`/
+    # `rag_tool_result_max_chars` elsewhere in this codebase, and picked over
+    # a tighter cap on purpose: users legitimately paste stack traces, tables
+    # and long questions, and 4000 chars (~700-800 English words) rejects
+    # ordinary pastes with a 422 — a worse regression than the overflow this
+    # exists to prevent. The frontend's composer (../react/local-ai-model-
+    # frontend, Composer.tsx) has no client-side length cap today, so this is
+    # the only bound in the whole path.
+    #
+    # Worst-case cost at this cap: 8000 Devanagari chars price at ~10,353
+    # tokens through `context.estimate_tokens` (8000/0.85 * 1.10). That is
+    # MORE than the ~2941 tokens `context_reserve_tokens` (12000) set aside
+    # for "this message + the answer" alongside one realistic RAG result
+    # (~9059 tokens) — so an all-Devanagari 8000-char paste landing in the
+    # SAME turn as a big RAG result can still exceed the reserve. This is the
+    # same non-guarantee CLAUDE.md's "the budget bounds HISTORY, not the
+    # PROMPT" finding already documents for stacked tool results: the reserve
+    # covers a realistic turn, not every worst case stacked together. A
+    # rejected message is a clean FastAPI 422, not something the turn path
+    # has to special-case.
+    message: str = Field(..., min_length=1, max_length=8000)
     model: Optional[str] = None  # per-request override; else DEFAULT_CHAT_MODEL
     stream: bool = False
     options: Optional[dict] = None  # passthrough Ollama options (temperature, …)

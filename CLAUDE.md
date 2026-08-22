@@ -1014,7 +1014,7 @@ it was folded in.
   time) but won't ACT on it once tools are in play — it asks the user for a
   file id it was already handed, which reads as "the assistant ignored my PDF".
   Stronger imperative wording barely helped (2/6); only the role did. Both
-  emitters (`service.open_turn`, `repository.build_context_messages`) use
+  emitters (`service.open_turn`, `context.build_context_messages`) use
   `user`; `test_attachment_note_is_a_user_message_not_a_system_one` locks it.
   Related, and the reason this was easy to get wrong: the agent's
   `SYSTEM_PROMPT` is now **always** message 0 — the old

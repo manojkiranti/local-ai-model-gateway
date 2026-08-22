@@ -103,8 +103,24 @@ class Settings(BaseSettings):
     # date system prompt lives), and the turn still returns a normal answer.
     # app/history/context.py logs the estimate so drift is at least visible.
     context_window_tokens: int = 32768
-    # Room kept for RAG passages, tool results and the answer itself.
-    context_reserve_tokens: int = 6000
+    # Room kept for the CURRENT turn: the user's own message, one RAG passage,
+    # and the model's answer. NOT a true worst case — see the derivation below
+    # and CLAUDE.md's "the budget bounds HISTORY, not the PROMPT" gotcha for
+    # what this deliberately does not cover (several maximum-size tool results
+    # in one turn can still overflow; that is a per-turn cap, not a history one).
+    #
+    # Derivation (2026-08-22, whole-branch review): a realistic single
+    # department-RAG result is `rag_tool_result_max_chars=7000` chars of
+    # Devanagari, which `context.estimate_tokens` prices at ~9059 tokens
+    # (7000/0.85 * 1.10, i.e. this module's own constants — see
+    # app/history/context.py). Reserving the true worst case instead (several
+    # 8000-char tool results across `agent_max_iterations` iterations) would
+    # push the history budget down to `MIN_HISTORY_BUDGET` and effectively
+    # delete conversation memory every turn, trading a rare overflow for a
+    # permanent regression — so this covers ONE realistic RAG-heavy turn, not
+    # all of them. 9059 (one RAG result) + ~2941 (the current user message plus
+    # the model's own answer) = 12000, rounded for headroom.
+    context_reserve_tokens: int = 12000
     # Measured floor for the local tool schemas. CLAUDE.md's 3475 figure was
     # taken at 15 tools and LOCAL_TOOLS is now 17 — re-measure when it grows.
     context_tool_schema_tokens: int = 4000
@@ -271,6 +287,25 @@ class Settings(BaseSettings):
                 f"RAG_RERANK_POOL ({self.rag_rerank_pool}) must be >= RAG_TOP_K "
                 f"({self.rag_top_k}); a smaller pool silently caps how many "
                 "passages can be presented"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _check_context_budget(self) -> "Settings":
+        """`budget_for` (app/history/context.py) subtracts the reserve and the
+        tool-schema floor from the window and floors the result at
+        `MIN_HISTORY_BUDGET` — so a misconfiguration here has NO visible
+        symptom, it just silently serves the floor (near-zero history) on
+        every turn. Same style, same failure mode as `_check_rerank_pool`:
+        refuse to start rather than serve a silently-wrong budget.
+        """
+        if self.context_window_tokens <= self.context_reserve_tokens + self.context_tool_schema_tokens:
+            raise ValueError(
+                f"CONTEXT_WINDOW_TOKENS ({self.context_window_tokens}) must be "
+                f"greater than CONTEXT_RESERVE_TOKENS + CONTEXT_TOOL_SCHEMA_TOKENS "
+                f"({self.context_reserve_tokens + self.context_tool_schema_tokens}); "
+                "otherwise every turn silently gets MIN_HISTORY_BUDGET worth of "
+                "history regardless of the configured window"
             )
         return self
 

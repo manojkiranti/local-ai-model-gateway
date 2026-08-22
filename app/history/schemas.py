@@ -49,7 +49,9 @@ class SessionPage(BaseModel):
 
 
 class SessionDetail(BaseModel):
-    """GET /v1/sessions/{id} — the full thread."""
+    """GET /v1/sessions/{id} — ONE PAGE of the thread (newest `limit` messages,
+    returned ascending), not the full thread. `next_cursor` walks older
+    messages."""
 
     model_config = ConfigDict(from_attributes=True)
 

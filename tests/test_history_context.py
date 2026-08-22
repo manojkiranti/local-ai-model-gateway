@@ -34,7 +34,7 @@ def test_mixed_script_is_between_the_two_pure_cases():
     assert estimate_tokens(latin) < estimate_tokens(mixed) < estimate_tokens(devanagari)
 
 
-from app.history.context import Selection, select_turns
+from app.history.context import select_turns
 from app.history.models import ROLE_ASSISTANT, ROLE_USER
 from app.history.models import ChatMessage
 
@@ -78,6 +78,24 @@ def test_selection_never_starts_with_a_dangling_assistant():
         sel = select_turns(_thread(20), budget=budget)
         if sel.messages:
             assert sel.messages[0].role == ROLE_USER
+
+
+def test_a_tail_beginning_with_an_assistant_message_is_never_selected():
+    # A dangling assistant row is reachable, not just theoretical: `open_turn`
+    # persists the user message immediately, so a failed model call leaves
+    # exactly a user row with no assistant reply. If `get_context_tail` cuts
+    # right after that gap, the DB-side tail it hands to select_turns can
+    # start on an assistant message even though the FULL history never had one
+    # at the head. `_group_turns` gives that row its own one-message group, and
+    # with a generous budget every group is kept — so without this guard the
+    # selection would start with it too.
+    tail = [
+        _msg(1, ROLE_ASSISTANT, "orphaned reply, no question before it"),
+    ] + _thread(3)  # a real, later user/assistant-headed run
+    sel = select_turns(tail, budget=1_000_000)
+    assert sel.messages, "must never return an empty selection"
+    assert sel.messages[0].role == ROLE_USER
+    assert tail[0] not in sel.messages
 
 
 def test_a_single_over_budget_message_still_yields_a_usable_context():

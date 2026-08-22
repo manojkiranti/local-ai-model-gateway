@@ -6,8 +6,10 @@ the model call, then the assistant row. `add_message` allocates `seq` under a
 row lock (SELECT … FOR UPDATE on the session) so concurrent turns can't collide;
 the UNIQUE(session_id, seq) constraint is the final safety net.
 
-The two pure helpers (`build_context_messages`, `make_title`) have no DB
-dependency and are unit-tested without Postgres.
+`make_title` is a pure helper with no DB dependency, unit-tested without
+Postgres. `build_context_messages` moved to `context.py` (it belongs beside the
+selection rule it feeds, not in a data-access file) — see that module for the
+prompt-shaping helpers.
 """
 
 from __future__ import annotations
