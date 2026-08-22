@@ -222,15 +222,28 @@ def resolve_sources(
       list. Those documents are `cited: true`. If nothing parseable was cited,
       fall back to every presented document with `cited: false`, because the
       answer was still grounded in them even though the model failed to mark it.
-    - **Several searches** -> every presented document, `cited: false`. Each call
-      restarts numbering at ``[1]``, so a marker is genuinely ambiguous across
-      calls; guessing would attach confident-looking links to the wrong file.
+    - **Several searches that PRESENTED passages** -> every presented document,
+      `cited: false`. Each call restarts numbering at ``[1]``, so a marker is
+      genuinely ambiguous across calls; guessing would attach confident-looking
+      links to the wrong file.
+
+    Records that presented NOTHING (an abstention, or a search with no hits) count
+    only as the "a corpus was searched" signal. They are excluded from the
+    one-vs-several decision: an abstaining search alongside one real hit still has
+    exactly one passage list, so ``[N]`` is unambiguous and must still resolve.
+    Counting the empty record would silently downgrade every document to
+    `cited: false` — a citation-precision regression with no visible symptom.
     """
     if not records:
         return None
 
-    if len(records) == 1:
-        record = records[0]
+    presented = [r for r in records if r.chunks]
+    if not presented:
+        # Searched, and nothing survived: `[]`, which is not `None`.
+        return []
+
+    if len(presented) == 1:
+        record = presented[0]
         indices = _cited_indices(answer, len(record.chunks))
         if indices:
             cited_chunks = [record.chunks[i - 1] for i in indices]
@@ -243,7 +256,7 @@ def resolve_sources(
 
     out: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for record in records:
+    for record in presented:
         for entry in _document_sources(
             record.chunks, department_code=record.department_code, cited=False
         ):

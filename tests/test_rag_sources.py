@@ -221,3 +221,25 @@ def test_resolved_sources_never_carry_a_download_url():
 def test_source_shape_contains_every_published_field(field):
     sources = resolve_sources([record(chunk("docA", title="T", page=3))], "[1]")
     assert field in sources[0]
+
+
+def test_an_empty_record_does_not_poison_citation_resolution():
+    """An abstaining search alongside a real one must still resolve ``[N]``.
+
+    Empty records are kept as the "a corpus was searched" signal, but they present
+    no passage list, so they cannot make a marker ambiguous. Counting them towards
+    the multi-search rule downgraded every document to `cited: false` — silent
+    citation-precision loss with no visible symptom.
+    """
+    records = [record(), record(chunk("docA"), chunk("docB"))]
+    sources = resolve_sources(records, "Yes, see [1].") or []
+    assert [s["document_id"] for s in sources] == ["docA"]
+    assert sources[0]["cited"] is True
+
+
+def test_two_records_that_both_presented_still_abandon_the_mapping():
+    """The multi-search rule is unchanged when TWO calls really showed passages."""
+    records = [record(chunk("docA")), record(chunk("docB"), code="finance")]
+    sources = resolve_sources(records, "See [1].") or []
+    assert {s["document_id"] for s in sources} == {"docA", "docB"}
+    assert all(s["cited"] is False for s in sources)
