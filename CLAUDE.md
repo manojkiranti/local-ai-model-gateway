@@ -296,8 +296,20 @@ data access, `storage` = `storage_key` minting + traversal-safe resolution,
 `chunking`/`parsing` = content → `Chunk[]` (Docling lazily, worker only),
 `embedding` = query/document-aware embed + 2560→1536 + normalize, `jobs` =
 Postgres queue, `ingest` = atomic replacement, `worker` = the separate ingest
-process, `router`/`jobs_router` = `/v1/departments` + `/v1/ingest-jobs`).
-`alembic/` for migrations.
+process, `ranking` = the ONE place a refusal is decided (pure `decide()` +
+IO-only `apply()`, split like `permissions`/`access` so the code producing a
+user-visible refusal is provable with no DB and no GPU; **fails OPEN**, inverting
+`app/nrb/`'s rule — there withholding text stops garbage being published, here
+withholding an answer asserts something false about the bank's own policies),
+`eval_metrics` = the four retrieval metrics, pure so a broken metric cannot
+report a false pass (`false_refusal_rate` is the one that governs the operating
+point), `router`/`jobs_router` = `/v1/departments` + `/v1/ingest-jobs`).
+`alembic/` for migrations. Retrieval eval lives in
+`scripts/rag_eval_{build_cohort,sweep}.py` — the first generates cohort
+CANDIDATES and REFUSES to freeze while any question still carries its `[REVIEW`
+marker (a cohort is evidence only because a human wrote its questions), the
+second sweeps threshold x pool over the frozen cohort and prints the table the
+operating point is chosen from.
 - **Adding a local tool:** new `app/tools/local/<name>.py` with `_fn` + `SPEC`,
   then add `<name>.SPEC` to `LOCAL_TOOLS`. The engine (`registry.py`) never changes.
 
@@ -1295,6 +1307,20 @@ before claiming a contract is unconsumed. Its per-department roles UI is on bran
 `feat/roles` and **ships together with this repo's `feat/role`** — a roles frontend
 against a gateway without the level field receives no `role`, fails closed, and
 silently hides every RAG admin control.
+
+**Abstention is WIRED BUT INERT.** `search_department_docs` fetches
+`RAG_RERANK_POOL` and routes candidates through `app/rag/ranking.py`, which can
+abstain — but `RAG_RERANK_ENABLED=false` and `RAG_RELEVANCE_THRESHOLD` is an
+unfitted placeholder, so the serving path is byte-identical to before: RRF order,
+no abstention. **0.5 is disqualified as a threshold** — it is exactly what
+`rerank.score_from_logprobs` returns for "no signal", so it would refuse on a
+missing signal. Fitting it needs three things in order: a human authors the 50
+`[REVIEW` questions in `docs/rag/retrieval-eval-cohort.json` and freezes it,
+`ollama pull qwen3-reranker:4b`, then `scripts/rag_eval_sweep.py`. Pick the
+operating point from the false-refusal column FIRST — refusing a question the
+corpus answers is worse than the over-confidence this replaces, because
+over-confidence yields a wrong answer the user may catch while a false refusal
+denies a correct one. Design + method: `docs/superpowers/specs/2026-08-22-rag-abstention-and-retrieval-eval-design.md`.
 
 Still open here: history follow-ups (title rename, context-window truncation);
 file follow-ups (pagination, orphan cleanup of root-level pre-scoping files);

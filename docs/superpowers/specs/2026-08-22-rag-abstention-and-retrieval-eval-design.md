@@ -134,10 +134,26 @@ rescuing the passage RRF ranked 15th and demoting the one it ranked 2nd. So
 `search_chunks(limit=rag_rerank_pool)` and `top_k` becomes the post-rerank cut.
 `RAG_CANDIDATE_POOL` (50 per channel, pre-fusion) is unchanged.
 
-**(b) `RAG_RERANK_POOL` drops 20 → 10, and the calls are parallelised.**
+**(b) `RAG_RERANK_POOL` STAYS 20, and the calls are parallelised.**
 `asyncio.gather` over the pool lets the backend batch them, turning ~3 s serial
-into roughly one batched pass. The pool size is an eval-measured parameter, not a
-guess: the sweep in §3 reports recall at pool 10 vs 20 so the trade is visible.
+into roughly one batched pass, which removes the latency reason for shrinking the
+pool. *(Amended during implementation — this clause originally said 20 → 10, and
+that was a bug.)* Two reasons 10 is wrong:
+
+1. **`rag_rerank_pool >= rag_top_k` is a coherence requirement.** At pool 10 with
+   `top_k` 12, `top_k` is unreachable even with reranking fully enabled: retrieval
+   only ever fetches 10 candidates, so the configured presentation limit silently
+   becomes 10 with no visible symptom. `app/config.py` now refuses that
+   combination at import rather than serving it.
+2. **A pool ≥ `top_k` is what makes the rerank-DISABLED path byte-identical to the
+   pre-branch behaviour.** Fusion orders by `rrf_score DESC`, so the first
+   `top_k` rows of a larger pool are exactly the same rows in the same order as a
+   `limit=top_k` query returned before. At pool 10 the disabled deployment would
+   quietly present fewer passages than it used to.
+
+The pool size is still an eval-measured parameter: the sweep in §3 reports recall
+at pool 10 vs 20 so the trade is visible — 20-vs-10 is precisely what the sweep
+measures, and it is not a decision to pre-empt in config.
 
 **(c) Abstention is a distinct result, not an empty one.** The existing
 zero-results branch already tells the model to say it could not find the answer
@@ -191,11 +207,16 @@ follow-up, not something this design delivers.**
 
 | Setting | Now | After | Note |
 |---|---|---|---|
-| `RAG_RERANK_ENABLED` | `false` | `true` | now has a call site to gate |
-| `RAG_RERANK_POOL` | 20 | 10 | eval-measured; also `search_chunks(limit=)` |
+| `RAG_RERANK_ENABLED` | `false` | `false` | has a call site now, but stays OFF until the §3 sweep fits a threshold — an unfitted 0.5 is `NO_SIGNAL_SCORE` and would refuse on a missing signal |
+| `RAG_RERANK_POOL` | 20 | 20 | unchanged; must stay >= `RAG_TOP_K` (§2.4(b)), enforced by a `Settings` validator. Also `search_chunks(limit=)` |
 | `RAG_RELEVANCE_THRESHOLD` | 0.5 | fitted | from the §3 sweep; never 0.5 |
 | `RAG_TOP_K` | 12 | 12 | now the post-rerank cut |
 | `RAG_CANDIDATE_POOL` | 50 | 50 | unchanged, pre-fusion |
+
+*(Amended during implementation: the "After" column previously said `true` / 10.
+Shipped config is `false` / 20 — the flag cannot be flipped before the sweep has
+run, and the pool must not drop below `top_k`. As originally written this table
+invited the next operator to "fix" the config back into a bug.)*
 
 `RAG_RERANK_ENABLED=false` must remain a working configuration: it takes the
 `degraded` path, which is the same code the fail-open branch uses. That keeps the
