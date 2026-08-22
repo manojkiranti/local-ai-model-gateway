@@ -11,11 +11,20 @@ import asyncio
 import uuid
 
 import pytest
+from sqlalchemy import text
 from sqlalchemy.exc import InterfaceError, OperationalError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
-import app.main  # noqa: F401  (registers every ORM model's mapping)
+# Model modules only, not `app.main` — importing the whole FastAPI app (its
+# routers, ollama/mcp clients, etc.) into a DB-only test module is unnecessary.
+# These three alone populate Base.metadata with `departments`, which is what
+# `chat_sessions.department_id`'s FK needs resolvable before this file's
+# throwaway engine touches metadata (see tests/test_rag_reingest_integration.py
+# for the same models-import pattern).
+import app.rag.models  # noqa: F401  (departments, for chat_sessions.department_id's FK)
+import app.history.models  # noqa: F401
+import app.users.models  # noqa: F401
 from app.config import get_settings
 from app.history import repository as repo
 from app.users.models import User
@@ -39,6 +48,15 @@ def _run(coro_fn):
         pytest.skip(f"Postgres unreachable: {type(exc).__name__}: {exc}")
 
 
+# Every user `_seed_user` creates, so `_cleanup` can remove it (and its
+# sessions/messages, which cascade off `users.id`) afterwards. Without this the
+# file leaks a user + sessions + messages per test, per run — CLAUDE.md records
+# exactly this class of leak starving a DIFFERENT test file's drain loop once
+# it accumulated (tests/test_rag_reingest_integration.py's own history). A test
+# that leaves rows behind eventually breaks a different test.
+_SEEDED_USER_IDS: list[int] = []
+
+
 async def _seed_user(session) -> int:
     user = User(
         email=f"page-{uuid.uuid4().hex[:8]}@example.com",
@@ -50,7 +68,40 @@ async def _seed_user(session) -> int:
     )
     session.add(user)
     await session.flush()
+    _SEEDED_USER_IDS.append(user.id)
     return user.id
+
+
+@pytest.fixture(autouse=True)
+def _cleanup():
+    """Delete this test's seeded users afterwards (chat_sessions.user_id and
+    chat_messages.session_id both cascade, so this alone removes everything).
+    Runs in `finally`-equivalent position via the fixture's teardown half, so
+    it happens whether the test passed or the assertion raised — and any
+    teardown failure here must not swallow the original test failure, so we
+    let it raise on its own rather than wrapping the yield in try/except."""
+    _SEEDED_USER_IDS.clear()
+    yield
+    ids = list(_SEEDED_USER_IDS)
+    _SEEDED_USER_IDS.clear()
+    if not ids:
+        return
+
+    async def _go():
+        engine = create_async_engine(get_settings().database_url, poolclass=NullPool)
+        try:
+            async with engine.begin() as conn:
+                await conn.execute(
+                    text("DELETE FROM users WHERE id = ANY(:ids)"), {"ids": ids}
+                )
+        finally:
+            await engine.dispose()
+
+    try:
+        asyncio.run(_go())
+    except (OperationalError, InterfaceError, OSError):
+        # The test already skipped for the same reason; nothing to clean.
+        pass
 
 
 def test_paging_returns_every_session_exactly_once():
