@@ -291,6 +291,13 @@ def test_a_long_thread_does_not_grow_the_prompt_without_bound(monkeypatch):
     """The turn path must budget history. Before this, a long conversation
     overflowed the window and Ollama silently dropped the FRONT of the prompt —
     the identity and date system prompt — while still returning a normal answer.
+
+    The discriminating signal is the ADJACENT-TURN DELTA, not a ratio against
+    an early turn: once the budget bites, each new turn drops roughly as much
+    old history as it adds, so consecutive prompt sizes go flat. Unbounded
+    growth adds a whole ~3000-char message every turn with nothing dropped, so
+    the delta stays large. A ratio against turn 5/6 does not catch this —
+    linear growth over double the turns still lands within a x2 margin.
     """
     from app.config import get_settings
 
@@ -324,9 +331,21 @@ def test_a_long_thread_does_not_grow_the_prompt_without_bound(monkeypatch):
                 assert resp.status_code == 200
                 session_id = resp.json()["session_id"]
 
-            # The prompt stops growing rather than climbing with every turn.
-            assert seen_prompt_sizes[-1] < seen_prompt_sizes[5] * 2
-            assert max(seen_prompt_sizes[6:]) <= max(seen_prompt_sizes[:6]) * 2
+            # The prompt PLATEAUS rather than climbing every turn: once the
+            # budget bites, the last turn-to-turn delta is near zero, not a
+            # whole extra message (~3000 chars). Unbounded growth would add a
+            # full message every turn, so this delta alone discriminates.
+            last_delta = seen_prompt_sizes[-1] - seen_prompt_sizes[-2]
+            assert last_delta < 1000, (
+                f"prompt still grew by {last_delta} chars on the last turn "
+                f"(sizes={seen_prompt_sizes})"
+            )
+            # The whole tail (once the budget has had several turns to bite)
+            # sits in a flat band, not a rising staircase.
+            tail = seen_prompt_sizes[6:]
+            assert max(tail) - min(tail) < 1000, (
+                f"prompt size is not flat over the tail (sizes={seen_prompt_sizes})"
+            )
         finally:
             _cleanup(client, headers)
 
