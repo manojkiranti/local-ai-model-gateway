@@ -188,3 +188,22 @@ def test_no_candidates_makes_no_rerank_calls():
     assert client.calls == 0
     assert result.abstained is False
     assert result.degraded is False
+
+
+def test_an_abstention_is_logged_with_the_scores_that_caused_it(caplog):
+    client = ScriptedClient([-9.0, -9.0])  # exp(-9) ~ 0.0001 -> far below 0.7
+    with caplog.at_level("INFO", logger="app.rag.ranking"):
+        result = asyncio.run(apply_ranking(
+            client, "pension scheme", [chunk(1), chunk(2)],
+            settings=FakeSettings()))
+    assert result.abstained is True
+    assert any("abstained" in r.getMessage() for r in caplog.records), caplog.text
+
+
+def test_a_degraded_ranking_is_logged_as_a_warning(caplog):
+    # A silently un-reranked deployment looks exactly like a working one. This
+    # log line is the only thing that distinguishes them at runtime.
+    with caplog.at_level("WARNING", logger="app.rag.ranking"):
+        asyncio.run(apply_ranking(BrokenClient(), "q", [chunk(1)],
+                                  settings=FakeSettings()))
+    assert any(r.levelname == "WARNING" for r in caplog.records)

@@ -178,9 +178,14 @@ not the no-signal sentinel.
 
 **(f) Scores are persisted, not just used.** `RetrievedChunk` already carries
 `dense_rank` / `lexical_rank` explicitly so "a bad retrieval is attributable from
-stored data instead of a hand-built reproduction". `rerank_score` joins them, and
-reaches `chat_messages.trace` by the same route. No migration: the trace is
-JSONB.
+stored data instead of a hand-built reproduction". `rerank_score` is emitted as a structured log line rather than persisted into
+`chat_messages.trace`. The trace is a per-iteration `list[dict]` whose shape
+`chat/router._trace_if_tools` inspects, so threading tool-internal data into it
+needs a new contextvar pass through `agent/loop.py` for marginal gain over a log
+line — and a log line is what an operator alerts on for a silently degraded
+deployment. **Cost, recorded honestly: logs are less durable than a JSONB
+column, so accumulating per-turn scores for a later threshold refit is a
+follow-up, not something this design delivers.**
 
 ### 2.5 Configuration
 
@@ -305,11 +310,13 @@ unanswerable), scored by `tests/test_rag_retrieval_eval.py`. Pass/agreement rate
 at the chosen threshold is recorded in §3.3's table when produced; it is unmeasured
 today, which is the point of this work.
 
-**Feedback capture.** `chat_messages.trace` already persists per-turn diagnostics
-and is written regardless of `EXPOSE_TRACE`. Adding `rerank_score` and `degraded`
-to it turns ordinary usage into labelled data: an answer the user rejects whose
-top score was 0.42 is a threshold datapoint, and a `degraded=true` streak is an
-operational alarm. No new table, no migration.
+**Feedback capture.** Ranking emits a structured log line per search carrying
+the candidate count, the top score, the threshold in force, and whether it
+abstained or ran degraded. That makes a degraded deployment detectable — the §18
+lesson that every way this breaks looks like it is working — and makes refusals
+auditable after the fact. It is weaker than per-turn persistence: correlating a
+specific user's rejected answer with its score needs the durable capture noted in
+§2.4(f), which remains a follow-up.
 
 **Review loop.** Re-run the sweep whenever any input to the score changes — the
 embedding model, `RAG_CHUNK_MAX_CHARS` / `_OVERLAP_CHARS`, the reranker model, or

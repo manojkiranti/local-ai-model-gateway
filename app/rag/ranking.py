@@ -146,9 +146,25 @@ async def apply(
         )
         return _degraded(chunks, settings.rag_top_k)
 
-    return decide(
+    result = decide(
         chunks,
         scores,
         threshold=settings.rag_relevance_threshold,
         top_k=settings.rag_top_k,
     )
+    # Diagnostics, deliberately at INFO for the ordinary case and carrying the
+    # DROPPED scores too — those are the interesting half when someone asks why
+    # the assistant refused. No query text: it is user input and may carry
+    # confidential detail, so only its length is recorded.
+    ranked = sorted(result.scores.values(), reverse=True)
+    logger.info(
+        "ranked %d candidates (query_chars=%d threshold=%.2f top=%s) -> "
+        "kept %d%s",
+        len(chunks),
+        len(query),
+        settings.rag_relevance_threshold,
+        f"{ranked[0]:.3f}" if ranked else "n/a",
+        len(result.kept),
+        ", abstained" if result.abstained else "",
+    )
+    return result
