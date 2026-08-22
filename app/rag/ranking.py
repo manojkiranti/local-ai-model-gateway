@@ -21,9 +21,11 @@ unranked but honest answer. So an unavailable reranker means RRF order,
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Sequence
 
+from .rerank import rerank
 from .retrieval import RetrievedChunk
 
 # What `rerank.score_from_logprobs` returns when neither "yes" nor "no" appeared
@@ -59,6 +61,9 @@ class Ranking:
     degraded: bool
 
 
+logger = logging.getLogger(__name__)
+
+
 def decide(
     chunks: Sequence[RetrievedChunk],
     scores: Sequence[float],
@@ -90,4 +95,60 @@ def decide(
         scores=by_id,
         abstained=not kept,
         degraded=False,
+    )
+
+
+def _degraded(chunks: Sequence[RetrievedChunk], top_k: int) -> Ranking:
+    """RRF order, no abstention, flagged. The fail-open outcome."""
+    return Ranking(
+        kept=list(chunks[: max(MIN_KEPT, top_k)]),
+        scores={},
+        abstained=False,
+        degraded=True,
+    )
+
+
+async def apply(
+    client,
+    query: str,
+    chunks: Sequence[RetrievedChunk],
+    *,
+    settings,
+) -> Ranking:
+    """Score `chunks` against `query` and decide what to keep.
+
+    `client` is anything satisfying `rerank.ChatClient` — passed in rather than
+    constructed so this module needs no httpx import and no knowledge of the
+    backend.
+    """
+    if not chunks:
+        return Ranking(kept=[], scores={}, abstained=False, degraded=False)
+
+    if not settings.rag_rerank_enabled:
+        # Not an error path: an untuned deployment runs exactly as it does today.
+        return _degraded(chunks, settings.rag_top_k)
+
+    try:
+        scores = await rerank(
+            client,
+            query,
+            [c.content for c in chunks],
+            model=settings.rag_rerank_model,
+        )
+    except Exception as exc:  # noqa: BLE001
+        # Deliberately broad. Fail-open is the whole point: a new exception type
+        # out of httpx, a timeout, a model that was evicted — none of them may
+        # become a refusal, which the user would read as "the bank has no policy
+        # on this". Narrowing this is a regression, not a tidy-up.
+        logger.warning(
+            "rerank unavailable (%s); falling back to RRF order without abstention",
+            type(exc).__name__,
+        )
+        return _degraded(chunks, settings.rag_top_k)
+
+    return decide(
+        chunks,
+        scores,
+        threshold=settings.rag_relevance_threshold,
+        top_k=settings.rag_top_k,
     )

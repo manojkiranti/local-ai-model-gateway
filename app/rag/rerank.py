@@ -22,6 +22,7 @@ score is `softmax(logprob_yes, logprob_no)`. That keeps the wire format inside
 
 from __future__ import annotations
 
+import asyncio
 import math
 from typing import Any, Protocol, Sequence
 
@@ -74,13 +75,16 @@ async def rerank(
     *,
     model: str,
 ) -> list[float]:
-    """Score each passage against the query. One forward pass per passage.
+    """Score each passage against the query. One forward pass per passage, all
+    issued CONCURRENTLY.
 
-    Not called anywhere while `RAG_RERANK_ENABLED` is false. Kept so enabling it
-    is a config change plus a model pull, not a rewrite.
+    Sequential scoring cost one round trip per candidate — at a pool of 20 and
+    150 ms per call that was ~3 s of serial latency added to every search.
+    `gather` lets the backend batch them, and preserves input order, which
+    `ranking.decide` relies on to pair a score with its chunk.
     """
-    scores: list[float] = []
-    for passage in passages:
+
+    async def one(passage: str) -> float:
         response = await client.chat(
             {
                 "model": model,
@@ -98,5 +102,8 @@ async def rerank(
         )
         choice = (response.get("choices") or [{}])[0]
         content = ((choice.get("logprobs") or {}).get("content") or [{}])[0]
-        scores.append(score_from_logprobs(content.get("top_logprobs") or []))
-    return scores
+        return score_from_logprobs(content.get("top_logprobs") or [])
+
+    # Order is preserved by gather, and it is load-bearing: decide() zips these
+    # against the chunk list.
+    return list(await asyncio.gather(*(one(p) for p in passages)))

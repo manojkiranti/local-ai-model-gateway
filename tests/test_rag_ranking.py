@@ -98,3 +98,93 @@ def test_a_zero_top_k_still_returns_one_passage_rather_than_abstaining():
     result = decide([chunk(1), chunk(2)], [0.9, 0.8], threshold=0.7, top_k=0)
     assert len(result.kept) == 1
     assert result.abstained is False
+
+
+import asyncio
+from dataclasses import dataclass as _dc
+
+from app.rag.ranking import apply as apply_ranking
+
+
+@_dc
+class FakeSettings:
+    rag_rerank_enabled: bool = True
+    rag_rerank_model: str = "qwen3-reranker:4b"
+    rag_relevance_threshold: float = 0.7
+    rag_top_k: int = 10
+
+
+class ScriptedClient:
+    """Answers each rerank call with a queued yes-logprob. Records concurrency."""
+
+    def __init__(self, yes_logprobs):
+        self._queue = list(yes_logprobs)
+        self.calls = 0
+        self.in_flight = 0
+        self.max_in_flight = 0
+
+    async def chat(self, payload):
+        self.calls += 1
+        self.in_flight += 1
+        self.max_in_flight = max(self.max_in_flight, self.in_flight)
+        await asyncio.sleep(0)  # yield, so overlap is observable
+        self.in_flight -= 1
+        logprob = self._queue.pop(0)
+        return {
+            "choices": [
+                {"logprobs": {"content": [
+                    {"top_logprobs": [{"token": "yes", "logprob": logprob}]}
+                ]}}
+            ]
+        }
+
+
+class BrokenClient:
+    async def chat(self, payload):
+        raise RuntimeError("GPU is on fire")
+
+
+def test_scoring_runs_concurrently_not_one_at_a_time():
+    # 20 sequential round trips was ~3s of added latency per search.
+    client = ScriptedClient([0.0] * 4)
+    asyncio.run(apply_ranking(client, "q", [chunk(i) for i in range(1, 5)],
+                              settings=FakeSettings()))
+    assert client.calls == 4
+    assert client.max_in_flight > 1, "calls must overlap"
+
+
+def test_a_failing_reranker_falls_back_to_rrf_order_and_does_not_abstain():
+    # The rule this test exists to protect: an infrastructure failure must never
+    # become a false statement about the corpus.
+    chunks = [chunk(1), chunk(2)]
+    result = asyncio.run(apply_ranking(BrokenClient(), "q", chunks,
+                                       settings=FakeSettings()))
+    assert result.degraded is True
+    assert result.abstained is False
+    assert [c.chunk_id for c in result.kept] == [1, 2]
+
+
+def test_reranking_disabled_behaves_exactly_like_today():
+    chunks = [chunk(1), chunk(2), chunk(3)]
+    result = asyncio.run(apply_ranking(
+        BrokenClient(), "q", chunks,
+        settings=FakeSettings(rag_rerank_enabled=False)))
+    assert result.degraded is True
+    assert result.abstained is False
+    assert [c.chunk_id for c in result.kept] == [1, 2, 3]
+
+
+def test_degraded_still_respects_top_k():
+    chunks = [chunk(i) for i in range(1, 6)]
+    result = asyncio.run(apply_ranking(
+        BrokenClient(), "q", chunks,
+        settings=FakeSettings(rag_rerank_enabled=False, rag_top_k=2)))
+    assert [c.chunk_id for c in result.kept] == [1, 2]
+
+
+def test_no_candidates_makes_no_rerank_calls():
+    client = ScriptedClient([])
+    result = asyncio.run(apply_ranking(client, "q", [], settings=FakeSettings()))
+    assert client.calls == 0
+    assert result.abstained is False
+    assert result.degraded is False
