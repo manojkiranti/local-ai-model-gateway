@@ -99,8 +99,11 @@ Model facts that bite:
   there is still no calibrated relevance score in production, and
   `RAG_RELEVANCE_THRESHOLD` is still an **unfitted placeholder**. Note that its
   current value `0.5` is disqualified on principle: it is exactly what
-  `rerank.score_from_logprobs` returns for "no signal", so it would refuse on a
-  missing signal. Fitting it means freezing the eval cohort, pulling the reranker
+  `rerank.score_from_logprobs` returns for "no signal", and the decision boundary
+  would sit exactly on that sentinel. Since the comparison is `>=`, a passage the
+  reranker had NO opinion about would be **kept and treated as relevant** (verified:
+  at 0.5 a no-signal passage is kept, at 0.6 it is dropped). Either way the least
+  informative case is settled by the comparison operator rather than by evidence. Fitting it means freezing the eval cohort, pulling the reranker
   and running `scripts/rag_eval_sweep.py` — see
   `docs/superpowers/specs/2026-08-22-rag-abstention-and-retrieval-eval-design.md`.
 - **Tool-calling behaviour is model- and shim-dependent.** The 35B MoE has not

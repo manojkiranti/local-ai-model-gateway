@@ -207,7 +207,7 @@ follow-up, not something this design delivers.**
 
 | Setting | Now | After | Note |
 |---|---|---|---|
-| `RAG_RERANK_ENABLED` | `false` | `false` | has a call site now, but stays OFF until the §3 sweep fits a threshold — an unfitted 0.5 is `NO_SIGNAL_SCORE` and would refuse on a missing signal |
+| `RAG_RERANK_ENABLED` | `false` | `false` | has a call site now, but stays OFF until the §3 sweep fits a threshold — an unfitted 0.5 is `NO_SIGNAL_SCORE`, and because the comparison is `>=` a no-opinion passage would be KEPT as relevant (not refused, as an earlier draft of this table said) |
 | `RAG_RERANK_POOL` | 20 | 20 | unchanged; must stay >= `RAG_TOP_K` (§2.4(b)), enforced by a `Settings` validator. Also `search_chunks(limit=)` |
 | `RAG_RELEVANCE_THRESHOLD` | 0.5 | fitted | from the §3 sweep; never 0.5 |
 | `RAG_TOP_K` | 12 | 12 | now the post-rerank cut |

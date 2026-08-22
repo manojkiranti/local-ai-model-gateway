@@ -92,6 +92,27 @@ def test_the_no_signal_score_is_named_so_a_threshold_cannot_land_on_it():
     assert NO_SIGNAL_SCORE == 0.5
 
 
+def test_a_threshold_equal_to_the_no_signal_score_ADMITS_the_no_opinion_passage():
+    """The trap, pinned: at threshold == NO_SIGNAL_SCORE the boundary sits exactly
+    on the sentinel `score_from_logprobs` returns when the reranker answered
+    neither "yes" nor "no". Because `decide` compares with `>=`, that passage is
+    KEPT and presented to the model as relevant — it is NOT refused.
+
+    Documentation got this backwards once, in four files. The direction matters to
+    whoever picks the operating point: at 0.5 you silently trust passages the
+    reranker had no opinion about, and one notch higher you discard them. Either
+    way the least informative case is decided by the comparison operator rather
+    than by evidence, which is why 0.5 is disqualified as a threshold.
+    """
+    at = decide([chunk(1)], [NO_SIGNAL_SCORE], threshold=NO_SIGNAL_SCORE, top_k=10)
+    assert [c.chunk_id for c in at.kept] == [1], "at the sentinel: admitted"
+    assert at.abstained is False
+
+    above = decide([chunk(1)], [NO_SIGNAL_SCORE], threshold=NO_SIGNAL_SCORE + 0.1, top_k=10)
+    assert above.kept == [], "one notch above the sentinel: dropped"
+    assert above.abstained is True
+
+
 def test_a_zero_top_k_still_returns_one_passage_rather_than_abstaining():
     # A config typo (RAG_TOP_K=0) must not turn into "the bank has no policy on
     # anything". Degrading to one passage is the safe failure; abstaining is not.

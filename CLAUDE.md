@@ -1313,8 +1313,11 @@ silently hides every RAG admin control.
 abstain — but `RAG_RERANK_ENABLED=false` and `RAG_RELEVANCE_THRESHOLD` is an
 unfitted placeholder, so the serving path is byte-identical to before: RRF order,
 no abstention. **0.5 is disqualified as a threshold** — it is exactly what
-`rerank.score_from_logprobs` returns for "no signal", so it would refuse on a
-missing signal. Fitting it needs three things in order: a human authors the 50
+`rerank.score_from_logprobs` returns for "no signal", and the decision boundary would sit exactly on the sentinel, and since the
+comparison is `>=`, a passage the reranker had NO opinion about would be kept
+and treated as relevant (verified: at 0.5 a no-signal passage is kept; at 0.6 it
+is dropped). Either way the least informative case is decided by the comparison
+operator rather than by evidence, which is why the value is disqualified. Fitting it needs three things in order: a human authors the 50
 `[REVIEW` questions in `docs/rag/retrieval-eval-cohort.json` and freezes it,
 `ollama pull qwen3-reranker:4b`, then `scripts/rag_eval_sweep.py`. Pick the
 operating point from the false-refusal column FIRST — refusing a question the
