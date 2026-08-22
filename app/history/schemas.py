@@ -36,6 +36,18 @@ class SessionSummary(BaseModel):
     message_count: int
 
 
+class SessionPage(BaseModel):
+    """GET /v1/sessions — one page of the sidebar.
+
+    An envelope rather than a bare array so pagination is visible in the
+    OpenAPI schema. A cursor hidden in a header would let a client that ignores
+    it read page one and believe it had everything.
+    """
+
+    items: list[SessionSummary]
+    next_cursor: Optional[str] = None
+
+
 class SessionDetail(BaseModel):
     """GET /v1/sessions/{id} — the full thread."""
 

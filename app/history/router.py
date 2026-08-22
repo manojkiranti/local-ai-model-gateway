@@ -4,7 +4,7 @@ Ownership is enforced everywhere: a session that isn't yours reads as 404 (we
 never confirm it exists). This is where per-user scoping lands.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..auth.dependencies import get_current_user
@@ -12,31 +12,45 @@ from ..db.session import get_session
 from ..rag.sources import with_download_urls
 from ..users.models import User
 from . import repository as repo
-from .schemas import MessageOut, SessionDetail, SessionSummary
+from .cursors import BadCursor
+from .schemas import MessageOut, SessionDetail, SessionPage, SessionSummary
 
 router = APIRouter(prefix="/v1/sessions", tags=["sessions"])
 
 
 @router.get(
     "",
-    response_model=list[SessionSummary],
-    summary="List my chat sessions (newest-updated first)",
+    response_model=SessionPage,
+    summary="List my chat sessions, newest-updated first (paginated)",
+    responses={400: {"description": "Malformed cursor."}},
 )
 async def list_my_sessions(
+    limit: int = Query(repo.DEFAULT_PAGE_LIMIT, ge=1, le=repo.MAX_PAGE_LIMIT),
+    cursor: str | None = Query(None, description="Opaque; from a prior next_cursor."),
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
-) -> list[SessionSummary]:
-    rows = await repo.list_sessions(session, user_id=user.id)
-    return [
-        SessionSummary(
-            id=s.id,
-            title=s.title,
-            created_at=s.created_at,
-            updated_at=s.updated_at,
-            message_count=count,
+) -> SessionPage:
+    try:
+        rows, next_cursor = await repo.list_sessions_page(
+            session, user_id=user.id, limit=limit, cursor=cursor
         )
-        for s, count in rows
-    ]
+    except BadCursor as exc:
+        # 400, never a silent page one: a client stuck re-reading the first
+        # page looks like "history is broken" and is invisible server-side.
+        raise HTTPException(status_code=400, detail=f"invalid cursor: {exc}") from exc
+    return SessionPage(
+        items=[
+            SessionSummary(
+                id=s.id,
+                title=s.title,
+                created_at=s.created_at,
+                updated_at=s.updated_at,
+                message_count=count,
+            )
+            for s, count in rows
+        ],
+        next_cursor=next_cursor,
+    )
 
 
 @router.get(

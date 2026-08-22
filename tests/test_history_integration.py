@@ -117,7 +117,10 @@ def _auth_headers(client: TestClient) -> dict:
 
 
 def _cleanup(client: TestClient, headers: dict) -> None:
-    for s in client.get("/v1/sessions", headers=headers).json():
+    # ?limit=100: GET /v1/sessions is paginated now, and _cleanup must clean up
+    # more than one page's worth if a prior run left extra sessions behind.
+    resp = client.get("/v1/sessions?limit=100", headers=headers).json()
+    for s in resp["items"]:
         client.delete(f"/v1/sessions/{s['id']}", headers=headers)
 
 
@@ -153,7 +156,7 @@ def test_chat_history_end_to_end():
             assert detail["messages"][1]["trace"] is None
 
             # --- session appears in the list with a count ---
-            listed = client.get("/v1/sessions", headers=headers).json()
+            listed = client.get("/v1/sessions", headers=headers).json()["items"]
             assert any(s["id"] == sid and s["message_count"] == 4 for s in listed)
 
             # --- ownership / unknown id -> 404 ---

@@ -14,13 +14,16 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, func, literal, select, tuple_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from .cursors import decode_session_cursor, encode_session_cursor
 from .models import ROLE_ASSISTANT, ROLE_USER, ChatMessage, ChatSession
 
 TITLE_MAX = 80
+DEFAULT_PAGE_LIMIT = 30
+MAX_PAGE_LIMIT = 100
 
 
 # --------------------------------------------------------------------------- #
@@ -119,19 +122,52 @@ async def get_session_with_messages(
     return result.scalar_one_or_none()
 
 
-async def list_sessions(
-    session: AsyncSession, *, user_id: int
-) -> list[tuple[ChatSession, int]]:
-    """(session, message_count) for a user, newest-updated first."""
-    count_col = func.count(ChatMessage.id)
-    result = await session.execute(
-        select(ChatSession, count_col)
-        .outerjoin(ChatMessage, ChatMessage.session_id == ChatSession.id)
-        .where(ChatSession.user_id == user_id)
-        .group_by(ChatSession.id)
-        .order_by(ChatSession.updated_at.desc())
+async def list_sessions_page(
+    session: AsyncSession,
+    *,
+    user_id: int,
+    limit: int = DEFAULT_PAGE_LIMIT,
+    cursor: str | None = None,
+) -> tuple[list[tuple[ChatSession, int]], str | None]:
+    """One page of (session, message_count), newest-updated first.
+
+    KEYSET, not offset: every turn bumps `updated_at`, so rows move between
+    pages while the user scrolls and offset paging would duplicate and skip.
+    `id` is the tiebreaker because `updated_at` is not unique.
+
+    The count is a CORRELATED SUBQUERY, so it is computed for the ~30 rows
+    actually returned. The old outer join + GROUP BY aggregated every message
+    the user had ever sent, to populate a field for rows below the fold.
+    """
+    limit = max(1, min(limit, MAX_PAGE_LIMIT))
+    count_sq = (
+        select(func.count(ChatMessage.id))
+        .where(ChatMessage.session_id == ChatSession.id)
+        .correlate(ChatSession)
+        .scalar_subquery()
     )
-    return [(row[0], row[1]) for row in result.all()]
+    stmt = (
+        select(ChatSession, count_sq)
+        .where(ChatSession.user_id == user_id)
+        .order_by(ChatSession.updated_at.desc(), ChatSession.id.desc())
+        .limit(limit + 1)  # one extra row tells us whether more exist
+    )
+    if cursor is not None:
+        after_updated, after_id = decode_session_cursor(cursor)
+        stmt = stmt.where(
+            tuple_(ChatSession.updated_at, ChatSession.id)
+            < tuple_(literal(after_updated), literal(after_id))
+        )
+
+    rows = [(row[0], row[1]) for row in (await session.execute(stmt)).all()]
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+    next_cursor = (
+        encode_session_cursor(rows[-1][0].updated_at, rows[-1][0].id)
+        if has_more and rows
+        else None
+    )
+    return rows, next_cursor
 
 
 async def delete_session(
