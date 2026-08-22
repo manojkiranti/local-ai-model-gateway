@@ -665,7 +665,9 @@ def test_a_long_thread_does_not_grow_the_prompt_without_bound(monkeypatch):
     from app.config import get_settings
     from app.history import repository as repo
 
-    client, headers, _ = _client_and_auth()  # existing helper in this module
+    # This module's own pattern: a TestClient context + _auth_headers.
+    with TestClient(app) as client:
+        headers = _auth_headers(client)
 
     # A small window makes the budget bite within a handful of turns.
     settings = get_settings()
@@ -701,8 +703,9 @@ def test_the_model_is_told_when_earlier_turns_were_dropped(monkeypatch):
     from app.config import get_settings
     from app.history.context import TRUNCATION_NOTE
 
-    client, headers, _ = _client_and_auth()
-    monkeypatch.setattr(get_settings(), "context_window_tokens", 8000, raising=False)
+    with TestClient(app) as client:
+        headers = _auth_headers(client)
+        monkeypatch.setattr(get_settings(), "context_window_tokens", 8000, raising=False)
 
     prompts = []
 
@@ -726,7 +729,7 @@ def test_the_model_is_told_when_earlier_turns_were_dropped(monkeypatch):
     ), "a truncated context must announce itself to the model"
 ```
 
-If `_client_and_auth` does not exist in that module under that name, reuse whatever `_auth`/client helper the file already defines — do not add a second one.
+Both tests body-indent under the `with TestClient(app) as client:` block, matching every other test in this module (see `test_history_integration.py:125`). `_auth_headers` and `FakeOllama` already exist there — do not add second copies. Assign `app.state.ollama = Recording()` inside the `with` block, and call `_cleanup(client, headers)` at the end so the seeded sessions do not leak into other tests (that leak is what CLAUDE.md records as eventually breaking a different test).
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -1283,15 +1286,37 @@ async def list_my_sessions(
 
 Add to the router's imports: `Query` from fastapi, `BadCursor` from `.cursors`, `SessionPage` from `.schemas`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [ ] **Step 4: Update the two existing consumers of the bare array**
 
-Run: `.venv/bin/pytest tests/test_history_pagination.py tests/test_history_integration.py -v`
+The envelope is a breaking change INSIDE the test suite too. Two places read
+`GET /v1/sessions` as a list and will raise `TypeError` / silently iterate the
+envelope's keys:
+
+- `tests/test_history_integration.py:120` (`_cleanup`):
+```python
+    for s in client.get("/v1/sessions", headers=headers).json()["items"]:
+        client.delete(f"/v1/sessions/{s['id']}", headers=headers)
+```
+  Note `_cleanup` now only deletes the FIRST page. Pass `?limit=100` so a test
+  that created more than 30 sessions still cleans up after itself:
+```python
+    resp = client.get("/v1/sessions?limit=100", headers=headers).json()
+```
+- `tests/test_history_integration.py:156` (`listed = …`): read `["items"]` and
+  keep the surrounding assertions unchanged.
+
+`tests/test_protected_endpoints.py:13` only asserts the status code and needs no
+change.
+
+- [ ] **Step 5: Run tests to verify they pass**
+
+Run: `.venv/bin/pytest tests/test_history_pagination.py tests/test_history_integration.py tests/test_protected_endpoints.py -v`
 Expected: all pass
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add app/history/ tests/test_history_pagination.py
+git add app/history/ tests/test_history_pagination.py tests/test_history_integration.py
 git commit -m "feat(history): keyset-paginate GET /v1/sessions behind an envelope"
 ```
 
@@ -1556,16 +1581,59 @@ Add to the Conventions / gotchas section:
   visible, and it is the dataset the estimator is calibrated against.
 ```
 
-- [ ] **Step 3: Record the calibration measurement**
+- [ ] **Step 3: Add the eval case set**
+
+The spec's Evaluation section names an 8-thread labelled set. Create
+`tests/test_history_context_eval.py` — the pure half runs offline and gates the
+five invariants; the estimate-vs-actual half is skipped without a live model,
+and SAYS so rather than passing vacuously:
+
+```python
+"""The 8-case eval for the context budget (see the design doc's Evaluation
+section). The pure cases run everywhere. The estimate-vs-actual case needs the
+live model and SKIPS without it — a skip here is an unmeasured metric, not a
+pass, so read the skip count."""
+
+from __future__ import annotations
+
+import pytest
+
+from app.history.context import budget_for, estimate_tokens, select_turns
+
+# name, builder -> messages
+CASES = [
+    "short_latin", "short_devanagari", "long_latin", "long_devanagari",
+    "mixed", "active_upload_beyond_budget", "single_over_budget_message",
+    "exactly_at_the_boundary",
+]
+
+
+@pytest.mark.parametrize("case", CASES)
+def test_every_case_yields_a_non_empty_selection_and_pairs_turns(case):
+    msgs = _build(case)          # local builder, one branch per case name
+    sel = select_turns(msgs, budget=2000)
+    assert sel.messages, f"{case}: an empty context is never acceptable"
+    assert sel.messages[0].role == "user", f"{case}: dangling assistant"
+
+
+@pytest.mark.parametrize("case", CASES)
+def test_the_estimate_never_falls_below_the_servers_own_count(case):
+    pytest.skip("needs the live model: compare est_tokens with usage.prompt_tokens")
+```
+
+Write `_build` with one explicit branch per case name — no shared fixture that
+makes the Devanagari and latin cases secretly identical.
+
+- [ ] **Step 4: Record the calibration measurement**
 
 Run a real turn against the live model with a long thread, read `usage.prompt_tokens` from the response, and compare it with the `est_tokens=` figure in the log line. Record both numbers, and the resulting decision on `LATIN_CHARS_PER_TOKEN`/`DEVANAGARI_CHARS_PER_TOKEN`, in the design doc's Evaluation section. **If the estimate came out BELOW the actual, raise the constants and re-measure** — that direction is the one that reaches a user.
 
 If the live model is unavailable, write that down explicitly as unmeasured rather than leaving the section implying it was checked.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add CLAUDE.md docs/superpowers/specs/2026-08-22-chat-history-lazy-loading-design.md
+git add CLAUDE.md tests/test_history_context_eval.py docs/superpowers/specs/2026-08-22-chat-history-lazy-loading-design.md
 git commit -m "docs: record the history pagination and context-budget invariants"
 ```
 
