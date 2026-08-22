@@ -31,7 +31,16 @@ _DEVANAGARI_RANGES = ((0x0900, 0x097F), (0xA8E0, 0xA8FF))
 
 # Pessimistic on purpose — see the module docstring.
 LATIN_CHARS_PER_TOKEN = 3.5
-DEVANAGARI_CHARS_PER_TOKEN = 1.0
+# MEASURED, not assumed: against qwen2.5:latest (local dev Ollama; the
+# production qwen3.5:35b-a3b is unreachable from this environment) a
+# Devanagari-heavy thread's RAW estimate (before SAFETY_MARGIN) came out at
+# ~0.92x the server's actual usage.prompt_tokens at 1.0 chars/token — i.e.
+# already BELOW actual, with only the margin holding the line. 0.85 was
+# picked from that same measurement: it puts the raw estimate at ~1.07x
+# actual (comfortably above 1.0 on its own) and the margined estimate at
+# ~1.18x. See the design doc's Evaluation section for the full table and the
+# re-measurement across multiple samples that confirmed it.
+DEVANAGARI_CHARS_PER_TOKEN = 0.85
 # Per-message cost of the role framing the model server adds around content.
 MESSAGE_OVERHEAD_TOKENS = 4
 SAFETY_MARGIN = 1.10

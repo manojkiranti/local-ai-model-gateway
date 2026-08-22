@@ -258,19 +258,42 @@ same string.
 | Latin-heavy (English compliance prose, 7,500 chars) | 7,500 | 2,358 | 1,530 | **1.541** |
 | Devanagari-heavy (Nepali monetary-policy prose, 11,520 chars) | 11,520 | 11,447 | 11,369 | **1.007** |
 
-Both ratios are **≥ 1.0** — the estimate never fell below the actual token
-count for either script, so per the standing rule ("if the estimate came out
-below the actual, raise the constants") **no constant was changed**.
-`LATIN_CHARS_PER_TOKEN=3.5` and `DEVANAGARI_CHARS_PER_TOKEN=1.0` both stayed
-as they were; no test needed re-running as a result.
+Both ratios are **≥ 1.0**, but **the Devanagari one is a false pass, not a
+real margin.** `SAFETY_MARGIN=1.10` is a multiplier applied on top of the raw
+character-ratio estimate — it exists to protect against exactly this case,
+not to be the only thing standing between the estimate and actual. Stripping
+it out: raw (pre-margin) estimate for the Devanagari sample was
+`11447 / 1.10 ≈ 10406`, against an actual of `11369` — a raw ratio of
+**~0.915**, i.e. the un-margined estimate was already **below** actual.
+`DEVANAGARI_CHARS_PER_TOKEN=1.0` was undercharging Devanagari text; the
+margin alone was masking it. Per the standing rule ("if the estimate came
+out below the actual, raise the constants") this is exactly the below-actual
+case, even though the margined number nominally cleared 1.0, so the constant
+was raised.
 
-One caveat worth recording rather than hiding: the Devanagari ratio (1.007)
-is close enough to 1.0 that it leaves very little headroom on this one
-sample — a slightly different Nepali passage, or the real production
-tokenizer, could plausibly land it under 1.0. `SAFETY_MARGIN=1.10` is the
-only thing keeping it above water here; the review loop below should treat a
-second Devanagari sample, and ideally one taken against the production
-model, as the next thing to check before trusting this margin long-term.
+**Constant change.** `DEVANAGARI_CHARS_PER_TOKEN`: `1.0 → 0.85`. Picked from
+the same measurement rather than by guessing: scaling the raw estimate by
+`1.0 / 0.85 ≈ 1.176` moves the raw ratio from 0.915 to `0.915 × 1.176 ≈
+1.076` — comfortably above 1.0 **before** the margin is even applied — and
+the margined ratio to `1.076 × 1.10 ≈ 1.18`, matching the re-measurement
+below. `LATIN_CHARS_PER_TOKEN=3.5` was untouched — its measured ratio (1.541)
+had real headroom even before applying this same raw-vs-margin scrutiny.
+
+**Re-measurement (2026-08-22, after the fix), `DEVANAGARI_CHARS_PER_TOKEN=0.85`.**
+One sample was not enough to trust — this round used two independent
+Devanagari passages (different vocabulary/topic) plus one genuinely mixed
+Nepali/English passage, same model (`qwen2.5:latest`), same method:
+
+| Payload | Chars | `estimate_tokens` | actual `usage.prompt_tokens` | ratio (estimate/actual) |
+|---|---|---|---|---|
+| Devanagari A (monetary-policy prose, re-run) | 11,520 | 13,380 | 11,369 | **1.177** |
+| Devanagari B (KYC/branch-compliance prose, new) | 11,385 | 13,225 | 10,699 | **1.236** |
+| Mixed Nepali/English (KYC + audit sentence, new) | 10,620 | 6,028 | 4,485 | **1.344** |
+
+Every ratio is now comfortably above 1.0, including the raw (pre-margin)
+component for each — the margin is once again a genuine safety buffer rather
+than the only thing holding the line. No further constant change was needed
+after this round.
 
 **Feedback capture.** Every turn logs the estimate, the selected message count,
 whether truncation occurred, and the server's `usage.prompt_tokens` when
