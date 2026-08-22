@@ -335,7 +335,11 @@ cap), `GET /v1/files` (caller's files,
 newest first; `?source=` filters),
 `GET /v1/files/{id}` (owner-scoped download; 404 if not yours),
 `DELETE /v1/files/{id}` (owner-scoped; 204, removes row + on-disk file),
-`GET /v1/sessions`, `GET /v1/sessions/{id}`, `DELETE /v1/sessions/{id}`,
+`GET /v1/sessions` (keyset-paginated, `{items, next_cursor}`; `?limit=`
+defaults 30/max 100, `?cursor=` continues the page, 400 on a malformed
+cursor), `GET /v1/sessions/{id}` (newest page of that thread, ascending by
+`seq`, same `{items, next_cursor}` envelope and `?limit=`/`?cursor=`/400
+contract), `DELETE /v1/sessions/{id}`,
 `POST /v1/departments` (admin), `GET /v1/departments` (admin → all; member →
 granted+active, i.e. the frontend's tabs — **each row carries `role`, the
 caller's own effective level**), `PATCH /v1/departments/{code}`
@@ -1016,6 +1020,41 @@ it was folded in.
   `SYSTEM_PROMPT` is now **always** message 0 — the old
   `base_messages[0].role != "system"` guard silently dropped it for any session
   that began with a file upload, back when the note was a system message.
+- **Chat history is paginated by KEYSET, and the model's context is budgeted
+  separately from either read.** Three loads used to be unbounded; two of them
+  shared one repository function, so a `LIMIT` added for the UI would have
+  silently truncated the model's prompt. They are now three bounded reads:
+  `list_sessions_page` (keyset on `(updated_at DESC, id DESC)` — offset paging
+  duplicates and skips, because every turn bumps `updated_at` and rows move
+  between pages mid-scroll), `get_thread_page` (keyset on `seq`, newest page
+  selected, ascending order returned), and `get_context_tail` (newest N,
+  selecting only `seq/role/content/attachments` — `trace` and `sources` are
+  never in a prompt and were most of the cost). `get_session_with_messages` and
+  `list_sessions` are DELETED, and a test asserts they stay gone.
+  `app/history/context.py` owns the budget and is pure — no DB, no model — for
+  the `app/rag/ranking.py` reason: the rule deciding what the model sees should
+  be provable without a database or a GPU. Five things a rewrite must not lose:
+  (1) **the estimator is SCRIPT-AWARE** — `len/4` is an English ratio, and on
+  this mixed Nepali/English corpus it under-counts Devanagari into the very
+  overflow the budget prevents; the constants are pessimistic on purpose,
+  because over-estimating wastes window while under-estimating lets Ollama drop
+  the FRONT of the prompt, where the identity and date system prompt lives;
+  (2) **selection keeps whole turns**, so no dangling assistant reply can head
+  the context as if it had spoken unprompted; (3) **the active attachment set is
+  PINNED** when its own turn falls outside the budget — losing the file ids
+  makes the model ask for an id it was handed, the failure
+  `test_attachment_note_is_a_user_message_not_a_system_one` exists for — and a
+  pinned set demotes every surviving one, because two active sets leave the
+  model guessing; (4) **dropped turns announce themselves** via
+  `TRUNCATION_NOTE`, for the same reason `_for_model` appends `[TRUNCATED …]`:
+  a bare cut of history reads as a COMPLETE conversation, so the model denies
+  being told what it was told — and the note is absent when nothing was
+  dropped, because an always-present warning trains the model to ignore it;
+  (5) **`CONTEXT_WINDOW_TOKENS` is a second copy of `OLLAMA_CONTEXT_LENGTH`**
+  that this process cannot read back (no `num_ctx` field, no reported window),
+  so a mismatch is silent and every symptom looks like a healthy turn —
+  `service._log_budget` logging the estimate is the only place it becomes
+  visible, and it is the dataset the estimator is calibrated against.
 - **`aggregate_excel` is the correct tool for ANY total** — sum/avg/min/max/count
   with an optional one-level `group_by` and AND-only filters, computed over
   EVERY row via `readers.open_sheet_rows` (uncapped streaming context manager,

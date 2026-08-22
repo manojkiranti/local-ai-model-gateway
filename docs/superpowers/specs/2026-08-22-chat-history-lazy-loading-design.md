@@ -232,8 +232,45 @@ two things: (a) estimated vs actual `usage.prompt_tokens` per thread, pass when
 the estimate is within +30% and never below actual; (b) the five pure
 invariants above, pass/fail. Cases: short latin; short Devanagari; long latin;
 long Devanagari; mixed; a thread whose active upload is beyond the budget; a
-thread with one over-budget message; a thread exactly at the boundary. Current
-rate: **not yet run** — (a) needs the live model.
+thread with one over-budget message; a thread exactly at the boundary.
+Implemented in `tests/test_history_context_eval.py`. Current rate for (b):
+**8/8 pass** — every case yields a non-empty selection with no dangling
+assistant turn. (a) is a fixed `pytest.skip` in that file pending a
+per-thread live-model harness (see the calibration measurement below, which
+covers the same question on two representative payloads rather than all 8
+named cases).
+
+**Calibration measurement (2026-08-22).** Taken against **`qwen2.5:latest`**
+on the local dev Ollama (`http://localhost:11434`) — **not** the production
+model (`qwen3.5:35b-a3b` on the GPU server), which is unreachable from this
+environment (§19.1 in CLAUDE.md: no host, no SSH key, no remote Docker
+context here). Treat these numbers as **indicative**, not a substitute for a
+production-model measurement once the GPU box is reachable.
+
+Method: a single-message request was sent to `POST /v1/chat/completions`
+(non-streaming) for a latin-heavy payload and, separately, a
+Devanagari-heavy payload, and `usage.prompt_tokens` from the response was
+compared against `app.history.context.estimate_tokens` run over the exact
+same string.
+
+| Payload | Chars | `estimate_tokens` | `usage.prompt_tokens` (actual) | ratio (estimate/actual) |
+|---|---|---|---|---|
+| Latin-heavy (English compliance prose, 7,500 chars) | 7,500 | 2,358 | 1,530 | **1.541** |
+| Devanagari-heavy (Nepali monetary-policy prose, 11,520 chars) | 11,520 | 11,447 | 11,369 | **1.007** |
+
+Both ratios are **≥ 1.0** — the estimate never fell below the actual token
+count for either script, so per the standing rule ("if the estimate came out
+below the actual, raise the constants") **no constant was changed**.
+`LATIN_CHARS_PER_TOKEN=3.5` and `DEVANAGARI_CHARS_PER_TOKEN=1.0` both stayed
+as they were; no test needed re-running as a result.
+
+One caveat worth recording rather than hiding: the Devanagari ratio (1.007)
+is close enough to 1.0 that it leaves very little headroom on this one
+sample — a slightly different Nepali passage, or the real production
+tokenizer, could plausibly land it under 1.0. `SAFETY_MARGIN=1.10` is the
+only thing keeping it above water here; the review loop below should treat a
+second Devanagari sample, and ideally one taken against the production
+model, as the next thing to check before trusting this margin long-term.
 
 **Feedback capture.** Every turn logs the estimate, the selected message count,
 whether truncation occurred, and the server's `usage.prompt_tokens` when
