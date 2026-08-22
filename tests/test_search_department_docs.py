@@ -86,11 +86,20 @@ def test_queries_are_embedded_in_query_mode(faked):
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize("hostile", [100000, -5, 0, "5", "abc", None, 3.7])
 def test_top_k_is_clamped_regardless_of_what_the_model_sends(faked, hostile):
-    """JSON Schema bounds are advisory; the clamp is in Python."""
+    """JSON Schema bounds are advisory; the clamp is in Python.
+
+    Two separate facts, and conflating them is what made this test wrong once:
+    the CLAMP bounds what may be presented (<= rag_top_k), while RETRIEVAL now
+    fetches the wider rerank POOL so ranking has candidates to reject. Asserting
+    the clamp through retrieval's `limit` broke the moment the pool landed.
+    """
+    top_k = get_settings().rag_top_k
+    assert 1 <= tool._clamp_top_k(hostile, top_k, top_k) <= top_k
     faked["results"] = [_chunk(1)]
     with rag_context(HR):
         _run({"query": "leave", "top_k": hostile})
-    assert 1 <= faked["limit"] <= get_settings().rag_top_k
+    # retrieval fetches the POOL; the clamp applies after ranking
+    assert faked["limit"] == get_settings().rag_rerank_pool
 
 
 def test_query_length_is_clamped_before_embedding(faked):
