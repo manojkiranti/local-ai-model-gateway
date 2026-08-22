@@ -99,10 +99,17 @@ class SourceCollector:
     records: list[SearchRecord] = field(default_factory=list)
 
     def record(self, department_code: str, chunks: list[SourceChunk]) -> None:
-        if chunks:
-            self.records.append(
-                SearchRecord(department_code=department_code, chunks=list(chunks))
-            )
+        """Record one search, INCLUDING one that presented nothing.
+
+        An empty record is not noise — it is the difference between "a corpus was
+        searched and held nothing relevant" (`sources: []`) and "no corpus was
+        searched at all" (`sources: null`). `resolve_sources` renders those
+        differently, and an abstention is exactly the first case. Dropping empty
+        records collapsed the two and made abstention look like a general chat.
+        """
+        self.records.append(
+            SearchRecord(department_code=department_code, chunks=list(chunks))
+        )
 
 
 _current: ContextVar[Optional[SourceCollector]] = ContextVar(

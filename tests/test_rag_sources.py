@@ -153,11 +153,28 @@ def test_collector_captures_within_scope_and_survives_it():
     assert [c.document_id for c in collector.records[0].chunks] == ["docA"]
 
 
-def test_collector_ignores_empty_chunk_lists():
+def test_collector_records_a_search_that_found_nothing():
+    # "searched, nothing relevant" and "never searched" are different facts and
+    # resolve_sources renders them differently ([] vs null). Dropping the empty
+    # record collapsed them, which made abstention indistinguishable from a
+    # general chat that never touched the corpus.
     collector = SourceCollector()
     with source_scope(collector):
         record_search("hr", [])
-    assert collector.records == []
+    assert len(collector.records) == 1
+    assert collector.records[0].department_code == "hr"
+    assert collector.records[0].chunks == []
+
+
+def test_a_search_that_found_nothing_resolves_to_empty_not_null():
+    collector = SourceCollector()
+    with source_scope(collector):
+        record_search("hr", [])
+    assert resolve_sources(collector.records, "I could not find that.") == []
+
+
+def test_no_search_at_all_still_resolves_to_null():
+    assert resolve_sources([], "A general answer.") is None
 
 
 def test_nested_scopes_restore_the_outer_collector():
