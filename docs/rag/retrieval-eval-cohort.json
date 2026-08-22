@@ -1,0 +1,358 @@
+{
+  "parameters": {
+    "generated_at": "2026-08-22",
+    "department": "risk_compliance",
+    "negatives_from": null,
+    "document_count": 6,
+    "chunk_count": 536,
+    "sha256": null
+  },
+  "limitations": [
+    "Chunk-derived questions reuse their source document's vocabulary, so they flatter the lexical channel. The answerable set measures an upper bound on recall; the negatives carry the trustworthy signal.",
+    "One department's corpus supports no population claim. Re-sweep for a corpus that differs in size or character.",
+    "expect_document_id is DOCUMENT granularity: the right document via the wrong passage scores as a hit. expect_section is diagnostic only.",
+    "Negatives are human-authored placeholders, not drawn from a second department's corpus, because only one department (risk_compliance) is populated at generation time. This is a different bias from corpus-derived negatives, not a lesser one: a human must invent questions this department's corpus genuinely cannot answer, rather than borrowing real questions from elsewhere."
+  ],
+  "questions": [
+    {
+      "id": "q001",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: Chapter 16: Business Verification, Collateral Verification & Drawing Power Monitoring > 81 Formats] Chapter 16: Business Verification, Collateral Verification & Drawing Power Monitoring > 81 Formats The formats to be used for Stock and Book Debt Inspection sha",
+      "expect_document_id": "04932b8279c24c1d9ee6aba0e495ca03",
+      "expect_section": "Chapter 16: Business Verification, Collateral Verification & Drawing Power Monitoring > 81 Formats"
+    },
+    {
+      "id": "q002",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: Chapter 1: Introduction > 2 Definitions] Chapter 1: Introduction > 2 Definitions Unless otherwise specifically indicated, the following terms used in “Guideline on Environmental and Social Risk Managem",
+      "expect_document_id": "32c4217f8f874f65b3a0ecf96cfb728b",
+      "expect_section": "Chapter 1: Introduction > 2 Definitions"
+    },
+    {
+      "id": "q003",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: Chapter 1: Introduction > 2 Definitions] Chapter 1: Introduction > 2 Definitions Unless otherwise specifically indicated, the following terms used in “Corporate Social Responsibility (CSR) Policy” shal",
+      "expect_document_id": "50d76fb45cf545a2b5e95ec5fc634fc4",
+      "expect_section": "Chapter 1: Introduction > 2 Definitions"
+    },
+    {
+      "id": "q004",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: Chapter 3: Disclosures > 10 Disclosure as per Right to Information Act 2064] Chapter 3: Disclosures > 10 Disclosure as per Right to Information Act 2064 In order to comply with Section 5(3) of Right to Information Act 2064 and Section 3 ",
+      "expect_document_id": "56d49c7fd8e3445784978c9593198185",
+      "expect_section": "Chapter 3: Disclosures > 10 Disclosure as per Right to Information Act 2064"
+    },
+    {
+      "id": "q005",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: 127 Risk Management > 127.4 AML/CFT Compliance and Assessment of ML/FT Risks and their Mitigation] 127 Risk Management > 127.4 AML/CFT Compliance and Assessment of ML/FT Risks and their Mitigation The Bank shall comply with currently applicable internal and N",
+      "expect_document_id": "793d517a52354f72a7002e65270a058f",
+      "expect_section": "127 Risk Management > 127.4 AML/CFT Compliance and Assessment of ML/FT Risks and their Mitigation"
+    },
+    {
+      "id": "q006",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: Chapter 2: Business Continuity Planning > 7 Strategy Development Phase] Chapter 2: Business Continuity Planning > 7 Strategy Development Phase Adoption of preventive measures Arrangement of workplace at different locations for Manag",
+      "expect_document_id": "aa005f49bb7e452bab31bbd9a97ba3fe",
+      "expect_section": "Chapter 2: Business Continuity Planning > 7 Strategy Development Phase"
+    },
+    {
+      "id": "q007",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: Chapter 4: Credit Limit and Facilities > 16 Types of Credit Facilities > 16.1 Business Loans] Chapter 4: Credit Limit and Facilities > 16 Types of Credit Facilities > 16.1 Business Loans Permanent working capital means the part of working capital which i",
+      "expect_document_id": "04932b8279c24c1d9ee6aba0e495ca03",
+      "expect_section": "Chapter 4: Credit Limit and Facilities > 16 Types of Credit Facilities > 16.1 Business Loans"
+    },
+    {
+      "id": "q008",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: ESRM Guidelines] Guideline on Environmental and Social Risk Management (ESRM) 2026 Guideline on Environmental and Social Risk Management 2026 In exercise to the power conferred ",
+      "expect_document_id": "32c4217f8f874f65b3a0ecf96cfb728b",
+      "expect_section": null
+    },
+    {
+      "id": "q009",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: Chapter 2: CSR Policy of the Bank > 9 Modus Operandi for CSR Fund Utilization > 9.3 Basis for Selecting CSR Programs] Chapter 2: CSR Policy of the Bank > 9 Modus Operandi for CSR Fund Utilization > 9.3 Basis for Selecting CSR Programs CSR Program and proposals should be selecte",
+      "expect_document_id": "50d76fb45cf545a2b5e95ec5fc634fc4",
+      "expect_section": "Chapter 2: CSR Policy of the Bank > 9 Modus Operandi for CSR Fund Utilization > 9.3 Basis for Selecting CSR Programs"
+    },
+    {
+      "id": "q010",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: Chapter 1: Short Title, Commencement & Definitions > 4 Related Regulatory Provision] Chapter 1: Short Title, Commencement & Definitions > 4 Related Regulatory Provision | kl/R5]b – # u&#124;fxssf] klxrfg tyf sf/f]af/ ;DaGwL Joj:yf | &amp;7= jfo/",
+      "expect_document_id": "56d49c7fd8e3445784978c9593198185",
+      "expect_section": "Chapter 1: Short Title, Commencement & Definitions > 4 Related Regulatory Provision"
+    },
+    {
+      "id": "q011",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: 115 > Roles and Responsibilities] 115 > Roles and Responsibilities the internal control and risk management system is adequate or not to ensure well-ordered and prudent conduct of business. | | ",
+      "expect_document_id": "793d517a52354f72a7002e65270a058f",
+      "expect_section": "115 > Roles and Responsibilities"
+    },
+    {
+      "id": "q012",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: Chapter 2: Business Continuity Planning > 8 Implementation Phase] Chapter 2: Business Continuity Planning > 8 Implementation Phase lmmediate Escalation Mechanism during Crisis and Major Operational Incident With a view to ensu",
+      "expect_document_id": "aa005f49bb7e452bab31bbd9a97ba3fe",
+      "expect_section": "Chapter 2: Business Continuity Planning > 8 Implementation Phase"
+    },
+    {
+      "id": "q013",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: Chapter 3: Credit Architecture > 9 Credit Business Function > 9.4 Relationship Manager] Chapter 3: Credit Architecture > 9 Credit Business Function > 9.4 Relationship Manager Each credit customer in the Bank will have designated Relationship Manage",
+      "expect_document_id": "04932b8279c24c1d9ee6aba0e495ca03",
+      "expect_section": "Chapter 3: Credit Architecture > 9 Credit Business Function > 9.4 Relationship Manager"
+    },
+    {
+      "id": "q014",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: Chapter 4: Implementing Environmental and Social Management System > 13 NRB Monitoring and Control] Chapter 4: Implementing Environmental and Social Management System > 13 NRB Monitoring and Control These Guidelines aim to ensure effective integration of E&S r",
+      "expect_document_id": "32c4217f8f874f65b3a0ecf96cfb728b",
+      "expect_section": "Chapter 4: Implementing Environmental and Social Management System > 13 NRB Monitoring and Control"
+    },
+    {
+      "id": "q015",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: Chapter 4:  Review, Reinforcement Framework > 15 Roles and Responsibilities] Chapter 4: Review, Reinforcement Framework > 15 Roles and Responsibilities Board The Board of Directors is the apex and supreme authority of the Bank. It is res",
+      "expect_document_id": "50d76fb45cf545a2b5e95ec5fc634fc4",
+      "expect_section": "Chapter 4:  Review, Reinforcement Framework > 15 Roles and Responsibilities"
+    },
+    {
+      "id": "q016",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: Chapter 4: Risk Management and Assurance Framework > 16 Risk Management and Mitigation] Chapter 4: Risk Management and Assurance Framework > 16 Risk Management and Mitigation | **S.No** | **Risks** | **Mitigation** | |------------|-----------------",
+      "expect_document_id": "56d49c7fd8e3445784978c9593198185",
+      "expect_section": "Chapter 4: Risk Management and Assurance Framework > 16 Risk Management and Mitigation"
+    },
+    {
+      "id": "q017",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: 115 > Roles and Responsibilities] 115 > Roles and Responsibilities Identify, quantify to the extent possible, monitor, control and review reports and report risks in the daily business and opera",
+      "expect_document_id": "793d517a52354f72a7002e65270a058f",
+      "expect_section": "115 > Roles and Responsibilities"
+    },
+    {
+      "id": "q018",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: Chapter 4: Implementation, Review, and Reinforcement Framework > 24 Disclaimer] Chapter 4: Implementation, Review, and Reinforcement Framework > 24 Disclaimer This document is prepared as per the prevailing procedures, policies and guidelin",
+      "expect_document_id": "aa005f49bb7e452bab31bbd9a97ba3fe",
+      "expect_section": "Chapter 4: Implementation, Review, and Reinforcement Framework > 24 Disclaimer"
+    },
+    {
+      "id": "q019",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: Chapter 1: Introduction > 3 Related Regulatory Provisions] Chapter 1: Introduction > 3 Related Regulatory Provisions The Bank shall ensure compliance with the applicable provisions of the Bank and Financial Institution ",
+      "expect_document_id": "04932b8279c24c1d9ee6aba0e495ca03",
+      "expect_section": "Chapter 1: Introduction > 3 Related Regulatory Provisions"
+    },
+    {
+      "id": "q020",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: Chapter 3: Environmental and Social Risk Management Procedures > 11 E&S Risk Procedures > 11.3 Conducting E&S Due Diligence Transactions (ESDD)] Chapter 3: Environmental and Social Risk Management Procedures > 11 E&S Risk Procedures > 11.3 Conducting E&S Due Diligence Transactions (ESDD) Completion of th",
+      "expect_document_id": "32c4217f8f874f65b3a0ecf96cfb728b",
+      "expect_section": "Chapter 3: Environmental and Social Risk Management Procedures > 11 E&S Risk Procedures > 11.3 Conducting E&S Due Diligence Transactions (ESDD)"
+    },
+    {
+      "id": "q021",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: Chapter 2: CSR Policy of the Bank > 9 Modus Operandi for CSR Fund Utilization > 9.11 Declaration and Disclosure] Chapter 2: CSR Policy of the Bank > 9 Modus Operandi for CSR Fund Utilization > 9.11 Declaration and Disclosure NIC ASIA Bank shall ensure that CSR funds are no",
+      "expect_document_id": "50d76fb45cf545a2b5e95ec5fc634fc4",
+      "expect_section": "Chapter 2: CSR Policy of the Bank > 9 Modus Operandi for CSR Fund Utilization > 9.11 Declaration and Disclosure"
+    },
+    {
+      "id": "q022",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: Chapter 4: Risk Management and Assurance Framework > 18 AML/CFT Compliance and Assessment of ML/FT Risks and their Mitigation] Chapter 4: Risk Management and Assurance Framework > 18 AML/CFT Compliance and Assessment of ML/FT Risks and their Mitigation The Bank shall comply with the pro",
+      "expect_document_id": "56d49c7fd8e3445784978c9593198185",
+      "expect_section": "Chapter 4: Risk Management and Assurance Framework > 18 AML/CFT Compliance and Assessment of ML/FT Risks and their Mitigation"
+    },
+    {
+      "id": "q023",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: Confidentiality and Information Data Access Management Policy] | | | | | | | | | | | | | | | | | | | Reviewed By | Rupesh Luitel Chief Finance Officer | | | | Reviewed By | Bapin Rajbhandari Chief Technology Officer | | | |",
+      "expect_document_id": "793d517a52354f72a7002e65270a058f",
+      "expect_section": null
+    },
+    {
+      "id": "q024",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: Chapter 4: Implementation, Review, and Reinforcement Framework > 20 Internal Errors] Chapter 4: Implementation, Review, and Reinforcement Framework > 20 Internal Errors Even though the document outlines major procedures to be followed during a d",
+      "expect_document_id": "aa005f49bb7e452bab31bbd9a97ba3fe",
+      "expect_section": "Chapter 4: Implementation, Review, and Reinforcement Framework > 20 Internal Errors"
+    },
+    {
+      "id": "q025",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: Chapter 4: Credit Limit and Facilities > 15 Tenor of Loan] Chapter 4: Credit Limit and Facilities > 15 Tenor of Loan Credit risk generally increases with a longer tenor of credit limits due to uncertainty and the unpred",
+      "expect_document_id": "04932b8279c24c1d9ee6aba0e495ca03",
+      "expect_section": "Chapter 4: Credit Limit and Facilities > 15 Tenor of Loan"
+    },
+    {
+      "id": "q026",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: Chapter 3: Environmental and Social Risk Management Procedures > 11 E&S Risk Procedures > 11.3 Conducting E&S Due Diligence Transactions (ESDD)] Chapter 3: Environmental and Social Risk Management Procedures > 11 E&S Risk Procedures > 11.3 Conducting E&S Due Diligence Transactions (ESDD) E&S due diligenc",
+      "expect_document_id": "32c4217f8f874f65b3a0ecf96cfb728b",
+      "expect_section": "Chapter 3: Environmental and Social Risk Management Procedures > 11 E&S Risk Procedures > 11.3 Conducting E&S Due Diligence Transactions (ESDD)"
+    },
+    {
+      "id": "q027",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: CSR Policy] Initiator/Reviewer/Supporter Signature Initials Initiated By Samarpan Sharma Officer-Strategy Reviewed By Kiran Poudel Manager-Strategy Reviewed By Thakur Shres",
+      "expect_document_id": "50d76fb45cf545a2b5e95ec5fc634fc4",
+      "expect_section": null
+    },
+    {
+      "id": "q028",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: Chapter 1: Short Title, Commencement & Definitions > 4 Related Regulatory Provision] Chapter 1: Short Title, Commencement & Definitions > 4 Related Regulatory Provision | kl/R5]b–# lwtf]kqsf] ;fj{hlgs lgisfzg ;DaGwL Joj:yf | !$= lwtf]kqsf] yk ;f",
+      "expect_document_id": "56d49c7fd8e3445784978c9593198185",
+      "expect_section": "Chapter 1: Short Title, Commencement & Definitions > 4 Related Regulatory Provision"
+    },
+    {
+      "id": "q029",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: 55 Confidentiality & Information/ Data Access Management Policy > 55.3 Information/ Data Access Management > 55.3.5 Maintaining Digital Register of Information/ Data by Information/ Data Owner] 55 Confidentiality & Information/ Data Access Management Policy > 55.3 Information/ Data Access Management > 55.3.5 Maintaining Digital Register of Information/",
+      "expect_document_id": "793d517a52354f72a7002e65270a058f",
+      "expect_section": "55 Confidentiality & Information/ Data Access Management Policy > 55.3 Information/ Data Access Management > 55.3.5 Maintaining Digital Register of Information/ Data by Information/ Data Owner"
+    },
+    {
+      "id": "q030",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: Business Continuity Planning] | **Initiator/Reviewer/Supporter** | | **Signature** | **Initials** | |------------------------------------|----------------------------------------------------",
+      "expect_document_id": "aa005f49bb7e452bab31bbd9a97ba3fe",
+      "expect_section": null
+    },
+    {
+      "id": "q031",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: Chapter 13: Eligibility of Borrowers and Facilities > 61 Restructured Customer Facilities] Chapter 13: Eligibility of Borrowers and Facilities > 61 Restructured Customer Facilities Restructuring of facilities where a customer wishes to substantially c",
+      "expect_document_id": "04932b8279c24c1d9ee6aba0e495ca03",
+      "expect_section": "Chapter 13: Eligibility of Borrowers and Facilities > 61 Restructured Customer Facilities"
+    },
+    {
+      "id": "q032",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: ESRM Guidelines] | **Name of Initiator/Reviewer/Approver** | | **Full Signature** | **Initial** | |-------------------------------------------|----------------------------------",
+      "expect_document_id": "32c4217f8f874f65b3a0ecf96cfb728b",
+      "expect_section": null
+    },
+    {
+      "id": "q033",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: Chapter 2: CSR Policy of the Bank > 9 Modus Operandi for CSR Fund Utilization > 9.8 Disbursement] Chapter 2: CSR Policy of the Bank > 9 Modus Operandi for CSR Fund Utilization > 9.8 Disbursement The mode of disbursal of funds shall be decided on the nature a",
+      "expect_document_id": "50d76fb45cf545a2b5e95ec5fc634fc4",
+      "expect_section": "Chapter 2: CSR Policy of the Bank > 9 Modus Operandi for CSR Fund Utilization > 9.8 Disbursement"
+    },
+    {
+      "id": "q034",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: Chapter 3: Disclosures > 15 Other Disclosures] Chapter 3: Disclosures > 15 Other Disclosures The Bank’s business continuity plan and how it addresses the possibility of future significant business disruption",
+      "expect_document_id": "56d49c7fd8e3445784978c9593198185",
+      "expect_section": "Chapter 3: Disclosures > 15 Other Disclosures"
+    },
+    {
+      "id": "q035",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: Confidentiality and Information Data Access Management Policy] Approving Authority Full Signature Initial Signature Initiated By Luna Shrestha Assistant- Strategy Kiran Poudel Manager - Strategy Abhishek Maskey Information ",
+      "expect_document_id": "793d517a52354f72a7002e65270a058f",
+      "expect_section": null
+    },
+    {
+      "id": "q036",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: Chapter 2: Business Continuity Planning > 7 Strategy Development Phase] Chapter 2: Business Continuity Planning > 7 Strategy Development Phase Critical activities are those activities, if not performed, would impact the Bank from fi",
+      "expect_document_id": "aa005f49bb7e452bab31bbd9a97ba3fe",
+      "expect_section": "Chapter 2: Business Continuity Planning > 7 Strategy Development Phase"
+    },
+    {
+      "id": "q037",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: Chapter 20: Miscellaneous > 92 Relation of Policy with Other Document] Chapter 20: Miscellaneous > 92 Relation of Policy with Other Document Any contents not covered by the Policy shall be governed as per prevailing regulations of ",
+      "expect_document_id": "04932b8279c24c1d9ee6aba0e495ca03",
+      "expect_section": "Chapter 20: Miscellaneous > 92 Relation of Policy with Other Document"
+    },
+    {
+      "id": "q038",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: Chapter 2: Environmental and Social Risk for the Bank > 8 Applicability of the Guideline] Chapter 2: Environmental and Social Risk for the Bank > 8 Applicability of the Guideline The ESRM Guideline applies to SME finance, commercial leasing, term fin",
+      "expect_document_id": "32c4217f8f874f65b3a0ecf96cfb728b",
+      "expect_section": "Chapter 2: Environmental and Social Risk for the Bank > 8 Applicability of the Guideline"
+    },
+    {
+      "id": "q039",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: Chapter 3: CSR Activities of the Bank > 10 Areas of Corporate Social Responsibility (CSR)] Chapter 3: CSR Activities of the Bank > 10 Areas of Corporate Social Responsibility (CSR) The illustrative lists of CSR Activities that the Bank can contribute ",
+      "expect_document_id": "50d76fb45cf545a2b5e95ec5fc634fc4",
+      "expect_section": "Chapter 3: CSR Activities of the Bank > 10 Areas of Corporate Social Responsibility (CSR)"
+    },
+    {
+      "id": "q040",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: Chapter 5: Implementation and Reinforcement Framework > 23 Transition Management] Chapter 5: Implementation and Reinforcement Framework > 23 Transition Management The Bank shall manage the transition related to the changes in this Policy as u",
+      "expect_document_id": "56d49c7fd8e3445784978c9593198185",
+      "expect_section": "Chapter 5: Implementation and Reinforcement Framework > 23 Transition Management"
+    },
+    {
+      "id": "n001",
+      "kind": "unanswerable",
+      "question": "[REVIEW — write a question this department's corpus genuinely cannot answer]",
+      "why": "human-authored: no second populated department exists to borrow from"
+    },
+    {
+      "id": "n002",
+      "kind": "unanswerable",
+      "question": "[REVIEW — write a question this department's corpus genuinely cannot answer]",
+      "why": "human-authored: no second populated department exists to borrow from"
+    },
+    {
+      "id": "n003",
+      "kind": "unanswerable",
+      "question": "[REVIEW — write a question this department's corpus genuinely cannot answer]",
+      "why": "human-authored: no second populated department exists to borrow from"
+    },
+    {
+      "id": "n004",
+      "kind": "unanswerable",
+      "question": "[REVIEW — write a question this department's corpus genuinely cannot answer]",
+      "why": "human-authored: no second populated department exists to borrow from"
+    },
+    {
+      "id": "n005",
+      "kind": "unanswerable",
+      "question": "[REVIEW — write a question this department's corpus genuinely cannot answer]",
+      "why": "human-authored: no second populated department exists to borrow from"
+    },
+    {
+      "id": "n006",
+      "kind": "unanswerable",
+      "question": "[REVIEW — write a question this department's corpus genuinely cannot answer]",
+      "why": "human-authored: no second populated department exists to borrow from"
+    },
+    {
+      "id": "n007",
+      "kind": "unanswerable",
+      "question": "[REVIEW — write a question this department's corpus genuinely cannot answer]",
+      "why": "human-authored: no second populated department exists to borrow from"
+    },
+    {
+      "id": "n008",
+      "kind": "unanswerable",
+      "question": "[REVIEW — write a question this department's corpus genuinely cannot answer]",
+      "why": "human-authored: no second populated department exists to borrow from"
+    },
+    {
+      "id": "n009",
+      "kind": "unanswerable",
+      "question": "[REVIEW — write a question this department's corpus genuinely cannot answer]",
+      "why": "human-authored: no second populated department exists to borrow from"
+    },
+    {
+      "id": "n010",
+      "kind": "unanswerable",
+      "question": "[REVIEW — write a question this department's corpus genuinely cannot answer]",
+      "why": "human-authored: no second populated department exists to borrow from"
+    }
+  ]
+}
