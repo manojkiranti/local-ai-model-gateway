@@ -179,7 +179,11 @@ class Settings(BaseSettings):
     # --- RAG: retrieval (slice 3) ---
     rag_top_k: int = 12  # chunks handed to the model; also the tool's clamp ceiling
     rag_candidate_pool: int = 50  # per channel, before fusion
-    rag_rerank_pool: int = 20  # fused candidates a reranker would score
+    # Fused candidates the reranker scores. This is ALSO what retrieval fetches
+    # (`search_chunks(limit=...)`) — handed only `rag_top_k`, a reranker could do
+    # nothing but reorder what fusion already liked. 10 rather than 20 because
+    # the calls are concurrent but not free; the eval sweep measures both.
+    rag_rerank_pool: int = 10
     # Cormack et al. 2009's constant, not a universal law — kept configurable so
     # an eval can sweep it. RRF is used precisely so no weight has to be tuned
     # between a cosine distance and a ts_rank_cd score, which share no scale.
@@ -192,12 +196,18 @@ class Settings(BaseSettings):
     # MAX_TOOL_RESULT_CHARS (8000): a bare cut there would sever citation headers
     # mid-line, so the tool trims its own bodies instead and says that it did.
     rag_tool_result_max_chars: int = 7000
-    # Reranking is OFF for this slice: qwen3-reranker is not pulled, and RRF
-    # ordering is the baseline. Without it there is no calibrated relevance
-    # score, so there is no abstention threshold either — see rag/rerank.py.
+    # Reranking supplies the calibrated per-pair score that RRF cannot, and is
+    # therefore what makes abstention possible. Keep it FALSE until the eval
+    # sweep has fitted a threshold: enabling it on the placeholder below would
+    # ship refusals nobody measured. False is a supported configuration and
+    # behaves exactly as the system did before ranking existed.
     rag_rerank_enabled: bool = False
     rag_rerank_model: str = "qwen3-reranker:4b"
-    rag_relevance_threshold: float = 0.5  # only consulted when reranking is on
+    # PLACEHOLDER until `scripts/rag_eval_sweep.py` fits it. 0.5 is also
+    # disqualified on principle: it is exactly what `rerank.score_from_logprobs`
+    # returns for "no signal", so at 0.5 the least informative case sits on the
+    # boundary.
+    rag_relevance_threshold: float = 0.5
 
     # --- CORS (frontend talks only to this gateway) ---
     cors_origins: str = "*"  # comma-separated, or "*" for all (dev)

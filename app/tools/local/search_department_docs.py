@@ -21,6 +21,7 @@ from ...config import get_settings
 from ...ollama.client import OllamaClient, OllamaError
 from ...rag.context import current_department
 from ...rag.embedding import EmbeddingError, embed_texts
+from ...rag import ranking
 from ...rag.retrieval import RetrievedChunk, search_chunks
 from ...rag.sources import (
     RECOVERED_ROUTES as _RECOVERED_ROUTES,
@@ -38,6 +39,16 @@ NO_DEPARTMENT = (
 )
 
 MIN_BODY_CHARS = 200  # never trim a passage below this; drop the passage instead
+
+# Retrieval found candidates and ranking rejected all of them. Deliberately
+# shaped like the zero-results message: an empty or vague result reads to the
+# model as an unremarkable outcome and invites an answer from its own
+# parameters, which is the exact failure abstention exists to prevent.
+ABSTAIN = (
+    "No sufficiently relevant passages were found in the {code} department's "
+    "documents. Tell the user you could not find this in the {code} documents. "
+    "Do NOT answer from general knowledge."
+)
 
 
 def _clamp_top_k(raw: Any, default: int, ceiling: int) -> int:
@@ -216,43 +227,62 @@ async def _search_department_docs(args: dict[str, Any]) -> str:
     query = query[: settings.rag_max_query_chars]
     top_k = _clamp_top_k(args.get("top_k"), settings.rag_top_k, settings.rag_top_k)
 
+    # ONE client for the whole call: embedding and reranking both use it, so it
+    # is closed once, after ranking. Closing it after embedding (as an earlier
+    # version did) makes every rerank raise on a closed client.
     client = OllamaClient(settings.ollama_base_url, settings.ollama_timeout)
     try:
-        vectors = await embed_texts(
-            client,
-            [query],
-            mode="query",  # asymmetric: queries carry the instruction prefix
-            model=settings.rag_embed_model,
-            dim=settings.rag_embed_dim,
-            batch_size=1,
+        try:
+            vectors = await embed_texts(
+                client,
+                [query],
+                mode="query",  # asymmetric: queries carry the instruction prefix
+                model=settings.rag_embed_model,
+                dim=settings.rag_embed_dim,
+                batch_size=1,
+            )
+        except (EmbeddingError, OllamaError) as exc:
+            return f"ERROR: could not embed the query ({exc})."
+
+        chunks = await search_chunks(
+            department_id=department.id,
+            query_text=query,
+            query_vector=vectors[0],
+            # The POOL, not top_k: ranking does the final cut, and a reranker
+            # handed only what fusion liked can do nothing but reorder it.
+            limit=settings.rag_rerank_pool,
+            candidate_pool=settings.rag_candidate_pool,
+            rrf_k=settings.rag_rrf_k,
+            ef_search=settings.rag_hnsw_ef_search,
         )
-    except (EmbeddingError, OllamaError) as exc:
-        return f"ERROR: could not embed the query ({exc})."
+
+        if not chunks:
+            # Explicit, not an empty list: an empty result reads to the model as
+            # an unremarkable outcome and invites an answer from its own
+            # parameters.
+            return (
+                f"No matching passages were found in the {department.code} "
+                f"department's documents. Tell the user you could not find this "
+                f"in the {department.code} documents. Do NOT answer from "
+                f"general knowledge."
+            )
+
+        result = await ranking.apply(client, query, chunks, settings=settings)
     finally:
         await client.aclose()
 
-    chunks = await search_chunks(
-        department_id=department.id,
-        query_text=query,
-        query_vector=vectors[0],
-        limit=top_k,
-        candidate_pool=settings.rag_candidate_pool,
-        rrf_k=settings.rag_rrf_k,
-        ef_search=settings.rag_hnsw_ef_search,
-    )
-
-    if not chunks:
-        # Explicit, not an empty list: an empty result reads to the model as an
-        # unremarkable outcome and invites an answer from its own parameters.
-        return (
-            f"No matching passages were found in the {department.code} "
-            f"department's documents. Tell the user you could not find this in "
-            f"the {department.code} documents. Do NOT answer from general "
-            f"knowledge."
-        )
+    if result.abstained:
+        # A searched-but-empty result, recorded so the turn's `sources` can say
+        # "searched, nothing relevant" ([]) rather than "never searched" (null).
+        record_search(department.code, [])
+        return ABSTAIN.format(code=department.code)
 
     text, presented = _format(
-        chunks,
+        # Sliced AGAIN, and not redundantly: ranking cut at `settings.rag_top_k`
+        # while `top_k` is what the MODEL asked for, clamped. When the model asks
+        # for fewer, this is the cut that honours it. Removing it silently
+        # ignores the tool's own parameter.
+        result.kept[:top_k],
         department_code=department.code,
         budget=settings.rag_tool_result_max_chars,
     )
