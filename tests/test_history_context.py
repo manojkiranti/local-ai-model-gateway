@@ -118,3 +118,24 @@ def test_only_the_NEWEST_attachment_set_is_pinned():
     msgs += _thread(20)[2:]
     sel = select_turns(msgs, budget=1500)
     assert sel.pinned_attachments == new
+
+
+from app.history.context import budget_for
+
+
+class _Settings:
+    context_window_tokens = 32768
+    context_reserve_tokens = 6000
+    context_tool_schema_tokens = 4000
+
+
+def test_budget_is_the_window_less_everything_else_in_the_prompt():
+    assert budget_for(_Settings()) == 32768 - 6000 - 4000
+
+
+def test_a_tiny_window_yields_a_floor_not_a_negative_budget():
+    # A misconfigured window must not produce a negative budget, which would
+    # drop every turn including the current question.
+    class Tiny(_Settings):
+        context_window_tokens = 1000
+    assert budget_for(Tiny()) > 0

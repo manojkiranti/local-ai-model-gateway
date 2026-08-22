@@ -100,6 +100,35 @@ def _group_turns(messages: list) -> list[list]:
     return groups
 
 
+# A conversation may never be budgeted to nothing: the current question has to
+# fit or the turn is meaningless.
+MIN_HISTORY_BUDGET = 512
+
+
+def budget_for(settings: Any) -> int:
+    """Tokens available for CHAT HISTORY in one turn.
+
+    The window is shared: identity + date system prompt, the tool schemas, RAG
+    passages, tool results, and room for the answer all come out of it first.
+    `context_reserve_tokens` covers that last group.
+
+    `context_window_tokens` is a SECOND COPY of a number this process cannot
+    read. `OLLAMA_CONTEXT_LENGTH` is set on the Ollama service; `/v1` has no
+    `num_ctx` request field and the completions response does not report the
+    loaded window back (measured — see CLAUDE.md). Nothing reconciles the two
+    copies, so if Ollama is raised later, or a deploy omits the variable and
+    Ollama falls back to its 4096 default, this budget is wrong in silence.
+    That is why the turn path logs the estimate against the server's reported
+    `usage.prompt_tokens`.
+    """
+    available = (
+        settings.context_window_tokens
+        - settings.context_reserve_tokens
+        - settings.context_tool_schema_tokens
+    )
+    return max(MIN_HISTORY_BUDGET, available)
+
+
 def select_turns(messages: list, budget: int) -> Selection:
     """Newest whole turns that fit `budget`, oldest dropped first.
 

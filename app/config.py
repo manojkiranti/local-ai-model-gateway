@@ -94,6 +94,26 @@ class Settings(BaseSettings):
     agent_temperature: float = 0.1
     agent_max_iterations: int = 8
 
+    # --- Context window (how much CHAT HISTORY reaches the model) ---
+    # context_window_tokens MUST match OLLAMA_CONTEXT_LENGTH on the Ollama
+    # service. It is duplicated here because the /v1 surface has no num_ctx
+    # field and does not report the loaded window back, so this process cannot
+    # read the real value. A mismatch is silent: we budget confidently into an
+    # overflow, Ollama drops the FRONT of the prompt (where the identity and
+    # date system prompt lives), and the turn still returns a normal answer.
+    # app/history/context.py logs the estimate so drift is at least visible.
+    context_window_tokens: int = 32768
+    # Room kept for RAG passages, tool results and the answer itself.
+    context_reserve_tokens: int = 6000
+    # Measured floor for the local tool schemas. CLAUDE.md's 3475 figure was
+    # taken at 15 tools and LOCAL_TOOLS is now 17 — re-measure when it grows.
+    context_tool_schema_tokens: int = 4000
+    # DB-side bound on the context read, applied BEFORE the token budget so a
+    # 500-turn thread never materializes. Deliberately far more messages than
+    # any budget can hold, so it never decides selection; if it is ever the
+    # binding constraint the turn log will show it.
+    context_max_messages: int = 200
+
     # --- MCP (remote tools; the gateway is the MCP client) ---
     # Token read from env only, never hardcoded, never logged. Blank = no auth.
     mcp_server_url: str = ""
