@@ -139,3 +139,40 @@ def test_a_tiny_window_yields_a_floor_not_a_negative_budget():
     class Tiny(_Settings):
         context_window_tokens = 1000
     assert budget_for(Tiny()) > 0
+
+
+from app.history.context import TRUNCATION_NOTE, build_context_messages
+
+
+def test_the_truncation_note_is_absent_when_nothing_was_dropped():
+    # An always-present note trains the model to ignore it — the same
+    # over-warning reasoning as the citation caveats (docs §29.2).
+    ctx = build_context_messages(_thread(2), truncated=False)
+    assert all(TRUNCATION_NOTE not in m["content"] for m in ctx)
+
+
+def test_the_truncation_note_leads_the_context_when_turns_were_dropped():
+    # It must be FIRST. Without it the model sees a conversation that simply
+    # starts mid-way and will deny being told something it was told.
+    ctx = build_context_messages(_thread(2), truncated=True)
+    assert TRUNCATION_NOTE in ctx[0]["content"]
+
+
+def test_a_pinned_attachment_set_is_replayed_as_ACTIVE():
+    files = [{"id": "f1", "filename": "a.csv", "summary": "CSV, 3 rows"}]
+    ctx = build_context_messages(
+        _thread(2), truncated=True, pinned_attachments=files
+    )
+    joined = "\n".join(m["content"] for m in ctx)
+    assert "id=f1" in joined
+    assert "superseded" not in joined
+
+
+def test_a_pinned_set_supersedes_every_surviving_set():
+    # Two active sets would leave the model guessing which ids the user means.
+    old = [{"id": "old", "filename": "old.csv", "summary": ""}]
+    pinned = [{"id": "new", "filename": "new.csv", "summary": ""}]
+    msgs = [_msg(1, ROLE_USER, "hi", attachments=old), _msg(2, ROLE_ASSISTANT, "ok")]
+    ctx = build_context_messages(msgs, truncated=True, pinned_attachments=pinned)
+    notes = [m["content"] for m in ctx if "id=" in m["content"]]
+    assert sum(1 for n in notes if "superseded" not in n) == 1

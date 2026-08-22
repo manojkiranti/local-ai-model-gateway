@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app.history import repository as repo
+from app.history import context as repo
 from app.history.models import ChatMessage, ROLE_ASSISTANT, ROLE_USER
 
 

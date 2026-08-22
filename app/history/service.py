@@ -18,6 +18,7 @@ from ..files import repository as files_repo
 from ..rag.access import resolve_department
 from ..rag.context import DepartmentContext
 from ..users.models import User
+from . import context as ctx
 from . import repository as repo
 from .models import ChatSession
 
@@ -80,7 +81,7 @@ async def open_turn(
         dept_ctx = await resolve_department(session, user, department, chat_session)
         # A new upload supersedes every earlier one, so the replayed notes are
         # demoted and only the note appended below stays active.
-        context = repo.build_context_messages(
+        context = ctx.build_context_messages(
             chat_session.messages, pending_attachments=bool(attachments)
         )
     else:
@@ -111,7 +112,7 @@ async def open_turn(
         # only the role did. See build_context_messages, which replays notes for
         # the same reason.
         context.append(
-            {"role": "user", "content": repo.format_attachment_note(attachments)}
+            {"role": "user", "content": ctx.format_attachment_note(attachments)}
         )
     context.append({"role": "user", "content": message})
     return chat_session, context, dept_ctx

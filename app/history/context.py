@@ -36,8 +36,39 @@ DEVANAGARI_CHARS_PER_TOKEN = 1.0
 MESSAGE_OVERHEAD_TOKENS = 4
 SAFETY_MARGIN = 1.10
 
-from .models import ROLE_USER
-from .repository import format_attachment_note  # moves into this module in Task 4
+from .models import ROLE_ASSISTANT, ROLE_USER
+
+
+def format_attachment_note(attachments: list[dict[str, Any]], *, active: bool = True) -> str:
+    """A short note naming files attached to a user message, so the model knows
+    their ids and can call read_document / read_image / inspect_excel /
+    read_excel on them.
+    Pure/formatting only — the caller decides the role it is emitted under (see
+    `build_context_messages` and `service.open_turn`; both use `user`).
+
+    `active=False` marks a SUPERSEDED set — files attached earlier in the
+    conversation that a newer upload has replaced. Those are deliberately weaker:
+    different wording, and no summary. An identically-worded note for every
+    upload is what made a second file get ignored in favour of the first, which
+    had a fat summary and a whole assistant answer behind it.
+    """
+    if not active:
+        lines = ["Files attached earlier in this conversation (superseded — use "
+                 "one of these ONLY if the user names that file):"]
+        for a in attachments:
+            lines.append(f'- id={a.get("id", "")} "{a.get("filename", "")}"')
+        return "\n".join(lines)
+
+    lines = ["Active files for the current request (read documents with "
+             "read_document; images with read_image; for spreadsheets use "
+             "inspect_excel / read_excel, and total them with aggregate_excel):"]
+    for a in attachments:
+        fid = a.get("id", "")
+        name = a.get("filename", "")
+        summary = a.get("summary", "")
+        detail = f" ({summary})" if summary else ""
+        lines.append(f'- id={fid} "{name}"{detail}')
+    return "\n".join(lines)
 
 
 def _is_devanagari(ch: str) -> bool:
@@ -163,3 +194,71 @@ def select_turns(messages: list, budget: int) -> Selection:
             pinned = with_files[-1].attachments
 
     return Selection(messages=selected, truncated=dropped, pinned_attachments=pinned)
+
+
+# Emitted ONLY when turns were actually dropped. Same rule as _for_model's
+# [TRUNCATED …] note in agent/loop.py: a bare cut reads to the model as a
+# COMPLETE result, and a bare cut of history reads as a complete conversation —
+# so the model answers "you never told me that" about something it was told.
+TRUNCATION_NOTE = (
+    "[earlier turns in this conversation are not shown — they no longer fit "
+    "the context window. If the user refers to something from earlier that you "
+    "cannot see, say so and ask them to repeat it. Do not assume it was never "
+    "said.]"
+)
+
+
+def build_context_messages(
+    messages: list,
+    *,
+    pending_attachments: bool = False,
+    truncated: bool = False,
+    pinned_attachments: list[dict] | None = None,
+) -> list[dict[str, str]]:
+    """Clean visible turns -> the [{role, content}] the model sees.
+
+    Only role/content is replayed; agent turns contribute their final answer
+    (their `trace` is history, not context). A user message that carried file
+    attachments re-emits its attachment note (a system message) just before it,
+    so 'now total column B' on a later turn still knows the file ids without the
+    frontend resending them. Ordering is the caller's (seq).
+
+    Exactly ONE attachment set is ever active: the newest. Older sets are
+    replayed as superseded (see `format_attachment_note`) so the model doesn't
+    have to guess which of several ids the user means. `pending_attachments`
+    says the turn being opened carries its own upload — then EVERY replayed set
+    is superseded, because the caller appends the active note itself. With no
+    new upload, the most recent replayed set stays active.
+
+    `truncated` prepends TRUNCATION_NOTE — see that constant.
+    `pinned_attachments` is `Selection.pinned_attachments`: the newest
+    attachment set whose own message fell outside the budget. It is replayed as
+    the ACTIVE set, and every surviving set is demoted, because two active sets
+    leave the model guessing which ids the user means.
+    """
+    attached_at = [
+        i for i, m in enumerate(messages) if m.role == ROLE_USER and m.attachments
+    ]
+    # A pinned set is the active one, so nothing replayed inline may claim to be.
+    suppress_inline_active = pending_attachments or pinned_attachments is not None
+    active_idx = None if suppress_inline_active else (attached_at[-1] if attached_at else None)
+
+    out: list[dict[str, str]] = []
+    if truncated:
+        out.append({"role": "user", "content": TRUNCATION_NOTE})
+    if pinned_attachments and not pending_attachments:
+        out.append({
+            "role": "user",
+            "content": format_attachment_note(pinned_attachments, active=True),
+        })
+    for i, m in enumerate(messages):
+        if m.role == ROLE_USER and m.attachments:
+            # `user`, not `system` — see the measurement in service.open_turn. A
+            # system-role note is read but not acted on once tool schemas are in
+            # play, so the model asks for a file id it was already given.
+            out.append({
+                "role": "user",
+                "content": format_attachment_note(m.attachments, active=(i == active_idx)),
+            })
+        out.append({"role": m.role, "content": m.content})
+    return out

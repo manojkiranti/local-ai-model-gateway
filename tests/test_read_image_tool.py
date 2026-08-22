@@ -274,7 +274,7 @@ def test_the_tool_is_registered():
 def test_the_attachment_note_tells_the_model_which_tool_reads_an_image():
     """history/repository.format_attachment_note hardcodes the routing hint. An
     image whose note names no tool leaves the model guessing."""
-    from app.history.repository import format_attachment_note
+    from app.history.context import format_attachment_note
 
     note = format_attachment_note(
         [{"id": "abc", "filename": "scan.png", "summary": "PNG image, 900×128"}]

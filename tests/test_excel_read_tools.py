@@ -157,7 +157,7 @@ def test_attachment_note_routes_documents_to_read_document_not_read_excel():
     columns) rather than erroring. Asserting on SPEC.description alone (as the
     test above does) missed this for eight per-task reviews because the note
     text lives in a different module."""
-    from app.history.repository import format_attachment_note
+    from app.history.context import format_attachment_note
 
     note = format_attachment_note([
         {"id": "f1", "filename": "policy.pdf", "summary": "PDF, 3 pages, 40 lines"},

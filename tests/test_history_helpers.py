@@ -1,7 +1,8 @@
 """Unit tests for the DB-free history helpers (no Postgres needed)."""
 
 from app.history.models import ChatMessage
-from app.history.repository import build_context_messages, make_title
+from app.history.context import build_context_messages
+from app.history.repository import make_title
 
 
 def test_make_title_collapses_whitespace_and_keeps_short():
