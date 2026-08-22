@@ -77,10 +77,12 @@ All served by Ollama over the OpenAI-compatible surface
 | Chat / agent (server) | **`qwen3.5:35b-a3b`** — MoE, ~3B active params | GPU box | `AGENT_MODEL` |
 | Chat / agent (laptop dev) | `qwen2.5:latest` (7.6B) | local Ollama | `AGENT_MODEL` |
 | Department-RAG embeddings | **`qwen3-embedding:4b-q8_0`** | GPU box | `RAG_EMBED_MODEL` |
-| Reranker | `qwen3-reranker:4b` — **pulled but OFF** | GPU box | `RAG_RERANK_MODEL`, `RAG_RERANK_ENABLED=false` |
+| Reranker | `qwen3-reranker:4b` — **OFF, and NOT pulled on the laptop's Ollama** (11 models there, verified 2026-08-22; the GPU box was verified 2026-08-10) | GPU box | `RAG_RERANK_MODEL`, `RAG_RERANK_ENABLED=false` |
 | Legacy/fallback embed | `nomic-embed-text:latest` — not used by department RAG | both | `DEFAULT_EMBED_MODEL` |
 
-All four are pulled on the server's Ollama (verified 2026-08-10).
+All four were pulled on the server's Ollama (verified 2026-08-10). **The laptop's
+local Ollama has the embedding model but NOT the reranker** — so the retrieval
+eval sweep cannot run here until `ollama pull qwen3-reranker:4b`.
 
 Model facts that bite:
 
@@ -90,9 +92,17 @@ Model facts that bite:
 - **Native embedding output is 2560 dims, MRL-truncated to 1536** because
   pgvector's HNSW index caps at 2000. `RAG_EMBED_DIM=1536` must match the
   schema's `vector(1536)`; the worker's preflight refuses to start on a mismatch.
-- **Reranking is off**, so there is no calibrated relevance score and therefore
-  no abstention threshold. `RAG_RELEVANCE_THRESHOLD` is only consulted when
-  reranking is turned on.
+- **Reranking is off, but it is now WIRED.** `app/rag/ranking.py` scores the
+  candidate pool with the cross-encoder and can abstain; `RAG_RERANK_ENABLED=false`
+  routes every search down the `degraded` path instead, which is RRF order and
+  never a refusal — byte-identical to the behaviour before abstention existed. So
+  there is still no calibrated relevance score in production, and
+  `RAG_RELEVANCE_THRESHOLD` is still an **unfitted placeholder**. Note that its
+  current value `0.5` is disqualified on principle: it is exactly what
+  `rerank.score_from_logprobs` returns for "no signal", so it would refuse on a
+  missing signal. Fitting it means freezing the eval cohort, pulling the reranker
+  and running `scripts/rag_eval_sweep.py` — see
+  `docs/superpowers/specs/2026-08-22-rag-abstention-and-retrieval-eval-design.md`.
 - **Tool-calling behaviour is model- and shim-dependent.** The 35B MoE has not
   been fully re-verified for multi-tool turns; the local 7B was the reference.
 
@@ -161,8 +171,11 @@ file.
 | `RAG_DOCS_DIR` | `rag_documents` | `documents.storage_key` is **relative** to this |
 | `RAG_CHUNK_MAX_CHARS` / `_OVERLAP_CHARS` | 2000 / 200 | |
 | `RAG_EMBED_BATCH` | 32 | texts per `/v1/embeddings` call |
-| `RAG_TOP_K` | 12 | chunks handed to the model |
+| `RAG_TOP_K` | 12 | chunks handed to the model; now the **post-rerank** cut |
 | `RAG_CANDIDATE_POOL` | 50 | per channel, before fusion |
+| `RAG_RERANK_POOL` | 20 | what retrieval FETCHES (`search_chunks(limit=)`), and what the reranker scores. **Must stay ≥ `RAG_TOP_K`** — a smaller pool caps presentation invisibly; a `Settings` validator now refuses to start otherwise |
+| `RAG_RERANK_ENABLED` | `false` | off until the sweep fits a threshold |
+| `RAG_RELEVANCE_THRESHOLD` | 0.5 | **placeholder, and disqualified** — 0.5 is `score_from_logprobs`' own "no signal" value |
 | `RAG_RRF_K` | 60 | reciprocal-rank fusion constant |
 | `RAG_HNSW_EF_SEARCH` | 100 | must be ≥ per-channel pool |
 | `RAG_TOOL_RESULT_MAX_CHARS` | 7000 | under the loop's 8000 cap, so citations aren't severed |
@@ -170,7 +183,9 @@ file.
 | `RAG_INGEST_STALE_MINUTES` / `_HEARTBEAT_SECONDS` | 10 / 30 | heartbeat keeps long parses from being swept |
 
 Retrieval is **hybrid**: pgvector cosine (dense) + `ts_rank_cd` (keyword), fused
-by RRF. The department is **never a tool argument** — it comes from the session
+by RRF, then (once enabled) cross-encoder reranked and thresholded — an RRF score
+is rank-derived and carries no absolute meaning, which is why abstention needs the
+reranker rather than a cutoff on `rrf_score`. The department is **never a tool argument** — it comes from the session
 via a contextvar, so prompt injection has nothing to target.
 
 **Ingestion is a separate process:** `.venv/bin/python -m app.rag.worker` (its

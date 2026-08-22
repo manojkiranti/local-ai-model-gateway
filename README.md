@@ -34,7 +34,14 @@ Implemented: **auth + users + health**, the **agent loop + chat** (`/v1/chat`,
 streaming and not), **local + MCP tools**, **per-user files** (upload + tool
 output), and **department-scoped RAG** — schema + access control (slice 1),
 ingestion via the worker (slice 2), and hybrid retrieval wired into chat
-(slice 3). Retrieval eval set and a reranker model are deferred follow-ups.
+(slice 3). A **retrieval eval harness** and cross-encoder **abstention** are now
+built but **inert**: ranking can refuse to answer when nothing relevant is
+retrieved, yet `RAG_RERANK_ENABLED=false` and the relevance threshold is an
+unfitted placeholder, so the serving path is unchanged. Enabling it needs a
+human-authored frozen question cohort and `ollama pull qwen3-reranker:4b`, then
+`scripts/rag_eval_sweep.py` to fit the threshold from data — a threshold guessed
+rather than measured would refuse questions the corpus can answer, which is worse
+than the over-confidence it replaces.
 
 Also in progress: the **NRB corpus pipeline** (`app/nrb/`, driven by
 `scripts/nrb_*.py`). Nepal Rastra Bank's 18,266-file public corpus is
