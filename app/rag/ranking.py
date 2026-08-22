@@ -126,6 +126,15 @@ async def apply(
 
     if not settings.rag_rerank_enabled:
         # Not an error path: an untuned deployment runs exactly as it does today.
+        # Logged all the same, because `degraded=True` otherwise cannot be told
+        # apart from a reranker that broke — and DEBUG rather than the fail-open
+        # path's WARNING, since this is today's steady state and INFO would emit a
+        # line per search forever.
+        logger.debug(
+            "ranking degraded by configuration: RAG_RERANK_ENABLED is false, "
+            "so %d candidates keep RRF order and abstention is impossible",
+            len(chunks),
+        )
         return _degraded(chunks, settings.rag_top_k)
 
     try:
@@ -152,18 +161,30 @@ async def apply(
         threshold=settings.rag_relevance_threshold,
         top_k=settings.rag_top_k,
     )
-    # Diagnostics, deliberately at INFO for the ordinary case and carrying the
-    # DROPPED scores too — those are the interesting half when someone asks why
-    # the assistant refused. No query text: it is user input and may carry
-    # confidential detail, so only its length is recorded.
+    # Diagnostics, at INFO for the ordinary case. Per-turn score persistence is
+    # deferred, so this line is the ONLY data a future threshold refit will have —
+    # hence the whole DISTRIBUTION (min / median / max over every candidate,
+    # rejected ones included) rather than just the best score. Emitted fields:
+    # candidate count, query LENGTH, the threshold in force, min/median/max score,
+    # how many were kept, and whether it abstained. Never the query text: it is
+    # user input and may carry confidential detail.
     ranked = sorted(result.scores.values(), reverse=True)
+    if ranked:
+        mid = len(ranked) // 2
+        median = (
+            ranked[mid]
+            if len(ranked) % 2
+            else (ranked[mid - 1] + ranked[mid]) / 2
+        )
+        spread = f"min={ranked[-1]:.3f} median={median:.3f} max={ranked[0]:.3f}"
+    else:
+        spread = "min=n/a median=n/a max=n/a"
     logger.info(
-        "ranked %d candidates (query_chars=%d threshold=%.2f top=%s) -> "
-        "kept %d%s",
+        "ranked %d candidates (query_chars=%d threshold=%.2f %s) -> kept %d%s",
         len(chunks),
         len(query),
         settings.rag_relevance_threshold,
-        f"{ranked[0]:.3f}" if ranked else "n/a",
+        spread,
         len(result.kept),
         ", abstained" if result.abstained else "",
     )

@@ -236,6 +236,24 @@ class Settings(BaseSettings):
             raise ValueError("LOGIN_MAX_ATTEMPTS must be at least 1")
         return self
 
+    @model_validator(mode="after")
+    def _check_rerank_pool(self) -> "Settings":
+        """`rag_rerank_pool` is the candidate list; `rag_top_k` is what may be
+        shown. A pool smaller than top_k caps presentation below the configured
+        limit with NO visible symptom — the answer simply cites fewer passages
+        than the deployment asked for. It also breaks the property that a
+        rerank-DISABLED deployment is byte-identical to the pre-abstention
+        behaviour (fusion orders by rrf_score DESC, so the first top_k of a larger
+        pool are the same rows in the same order).
+        """
+        if self.rag_rerank_pool < self.rag_top_k:
+            raise ValueError(
+                f"RAG_RERANK_POOL ({self.rag_rerank_pool}) must be >= RAG_TOP_K "
+                f"({self.rag_top_k}); a smaller pool silently caps how many "
+                "passages can be presented"
+            )
+        return self
+
     # --- parsed helpers ---
     @staticmethod
     def _csv(value: str) -> list[str]:

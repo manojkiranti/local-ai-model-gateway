@@ -1,13 +1,21 @@
 """Sweep the abstention threshold and pool size over the frozen cohort.
 
-Scores each question ONCE per pool size and reuses those scores across every
-threshold — the reranker is the expensive part and a threshold is just a
-comparison. 9 thresholds x 2 pools over 50 questions costs 2 scoring passes,
-not 18.
+Scores each question ONCE and reuses those scores across every threshold — the
+reranker is the expensive part and a threshold is just a comparison. 9 thresholds
+x 2 pools over 50 questions costs ONE scoring pass, not 18.
+
+The pools are scored ONCE too: `search_chunks` differs between pool sizes only by
+the final LIMIT over an RRF-ordered set, so the pool-10 candidate list is exactly
+the first 10 of the pool-20 list. Scoring the largest pool and slicing halves the
+reranker passes.
+
+`RAG_RERANK_ENABLED` is deliberately NOT required: the sweep calls `rerank`
+directly rather than going through `ranking.apply`, so the flag has no effect
+here. The flag gates the SERVING path, and it stays false until this sweep has
+fitted a threshold.
 
 Usage:
-  DATABASE_URL=... RAG_RERANK_ENABLED=true \
-    .venv/bin/python scripts/rag_eval_sweep.py
+  DATABASE_URL=... .venv/bin/python scripts/rag_eval_sweep.py
 """
 
 from __future__ import annotations
@@ -108,9 +116,20 @@ async def main() -> None:
     rows = []
     client = OllamaClient(settings.ollama_base_url, settings.ollama_timeout)
     try:
+        # Score the LARGEST pool only, then slice for the smaller ones. Valid
+        # because the pool is the retrieval query's final LIMIT over a set already
+        # ordered by rrf_score DESC: the first N rows of a wider pool are exactly
+        # the pool-N rows, in the same order. Scores are per (query, passage), so a
+        # sliced score list still pairs with its sliced chunk list. This halves the
+        # GPU cost of the sweep — the reranker is the only expensive part.
+        largest = max(POOLS)
+        print(f"scoring at pool={largest} …", flush=True)
+        full = await _scored(client, dept_id, cohort, largest, settings)
         for pool in POOLS:
-            print(f"scoring at pool={pool} …", flush=True)
-            scored = await _scored(client, dept_id, cohort, pool, settings)
+            scored = (
+                full if pool == largest
+                else [(q, c[:pool], s[:pool]) for q, c, s in full]
+            )
             for threshold in THRESHOLDS:
                 report = _report_for(scored, threshold, settings.rag_top_k)
                 rows.append((pool, threshold, report))

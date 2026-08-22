@@ -207,3 +207,81 @@ def test_a_degraded_ranking_is_logged_as_a_warning(caplog):
         asyncio.run(apply_ranking(BrokenClient(), "q", [chunk(1)],
                                   settings=FakeSettings()))
     assert any(r.levelname == "WARNING" for r in caplog.records)
+
+
+class MidPoolFailureClient:
+    """Fails on one passage; the rest take a turn of the loop to finish.
+
+    Models the real hazard: a bare `gather` re-raises immediately, the caller's
+    `finally` closes the shared client, and the still-running siblings blow up on
+    a closed client — noise on the very log an operator reads to diagnose a
+    degraded deployment.
+    """
+
+    def __init__(self, fail_on: int = 2):
+        self.fail_on = fail_on
+        self.started = 0
+        self.settled = 0
+
+    async def chat(self, payload):
+        self.started += 1
+        mine = self.started
+        try:
+            await asyncio.sleep(0)
+            await asyncio.sleep(0)
+            if mine == self.fail_on:
+                raise RuntimeError("GPU is on fire")
+            return {
+                "choices": [
+                    {"logprobs": {"content": [
+                        {"top_logprobs": [{"token": "yes", "logprob": 0.0}]}
+                    ]}}
+                ]
+            }
+        finally:
+            self.settled += 1
+
+
+def test_a_mid_pool_failure_settles_every_task_and_still_raises():
+    from app.rag.rerank import rerank
+
+    client = MidPoolFailureClient(fail_on=2)
+    with pytest.raises(RuntimeError):
+        asyncio.run(rerank(client, "q", ["a", "b", "c", "d"], model="m"))
+    assert client.started == 4
+    assert client.settled == 4, "a sibling was still in flight when we unwound"
+
+
+def test_a_mid_pool_failure_still_degrades_rather_than_abstaining():
+    client = MidPoolFailureClient(fail_on=2)
+    result = asyncio.run(apply_ranking(
+        client, "q", [chunk(i) for i in range(1, 5)], settings=FakeSettings()))
+    assert result.degraded is True and result.abstained is False
+    assert client.settled == 4
+
+
+def test_the_disabled_path_says_why_it_degraded(caplog):
+    # The fail-open path warns; the config path used to say nothing at all, so
+    # "off by configuration" and "the reranker broke" were indistinguishable.
+    # DEBUG, not INFO: this is the steady state today and would flood the log.
+    with caplog.at_level("DEBUG", logger="app.rag.ranking"):
+        asyncio.run(apply_ranking(
+            BrokenClient(), "q", [chunk(1)],
+            settings=FakeSettings(rag_rerank_enabled=False)))
+    assert any(
+        "RAG_RERANK_ENABLED" in r.getMessage() and r.levelname == "DEBUG"
+        for r in caplog.records
+    ), caplog.text
+
+
+def test_the_score_distribution_is_logged_not_only_the_best(caplog):
+    # This log line is the only data a future threshold refit will have, since
+    # per-turn persistence is deferred.
+    client = ScriptedClient([0.0, -1.0, -9.0])
+    with caplog.at_level("INFO", logger="app.rag.ranking"):
+        asyncio.run(apply_ranking(
+            client, "q", [chunk(1), chunk(2), chunk(3)],
+            settings=FakeSettings(rag_relevance_threshold=0.2)))
+    text = caplog.text
+    assert "min=" in text and "median=" in text and "max=" in text
+    assert "query_chars=1" in text  # length only, never the query itself
