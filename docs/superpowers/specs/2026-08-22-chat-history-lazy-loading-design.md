@@ -117,6 +117,10 @@ get_context_tail(session_id, user_id, max_messages)
   `trace` and `sources` are never in a prompt and they are the fat columns;
   loading them to discard them is most of the current cost. This is a DB-side
   bound *before* the token budget, so a 500-turn thread never materializes.
+  `max_messages` is 200 — comfortably more messages than any plausible budget
+  can hold, so it never decides selection (the token budget does), while still
+  capping the read. If it is ever reached the budget was not the binding
+  constraint, which the turn log will show.
 - Ownership stays in the same `WHERE` as the page — never fetch-then-check.
 
 `get_session_with_messages` is **deleted**, not deprecated. Left in place,
