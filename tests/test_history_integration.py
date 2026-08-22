@@ -285,3 +285,83 @@ def test_tool_free_streaming_turn_sends_no_trace():
             assert done["trace"] is None
         finally:
             _cleanup(client, headers)
+
+
+def test_a_long_thread_does_not_grow_the_prompt_without_bound(monkeypatch):
+    """The turn path must budget history. Before this, a long conversation
+    overflowed the window and Ollama silently dropped the FRONT of the prompt —
+    the identity and date system prompt — while still returning a normal answer.
+    """
+    from app.config import get_settings
+
+    with TestClient(app) as client:
+        headers = _auth_headers(client)
+        app.state.mcp = FakeMCP()
+
+        # A small window makes the budget bite within a handful of turns.
+        settings = get_settings()
+        monkeypatch.setattr(settings, "context_window_tokens", 8000, raising=False)
+
+        seen_prompt_sizes = []
+
+        class Recording(FakeOllama):
+            async def stream_chat(self, payload):
+                seen_prompt_sizes.append(
+                    sum(len(m["content"]) for m in payload["messages"])
+                )
+                async for chunk in super().stream_chat(payload):
+                    yield chunk
+
+        app.state.ollama = Recording()
+
+        try:
+            session_id = None
+            for i in range(12):
+                body = {"message": "x" * 3000, "stream": False}
+                if session_id:
+                    body["session_id"] = session_id
+                resp = client.post("/v1/chat", json=body, headers=headers)
+                assert resp.status_code == 200
+                session_id = resp.json()["session_id"]
+
+            # The prompt stops growing rather than climbing with every turn.
+            assert seen_prompt_sizes[-1] < seen_prompt_sizes[5] * 2
+            assert max(seen_prompt_sizes[6:]) <= max(seen_prompt_sizes[:6]) * 2
+        finally:
+            _cleanup(client, headers)
+
+
+def test_the_model_is_told_when_earlier_turns_were_dropped(monkeypatch):
+    from app.config import get_settings
+    from app.history.context import TRUNCATION_NOTE
+
+    with TestClient(app) as client:
+        headers = _auth_headers(client)
+        app.state.mcp = FakeMCP()
+        monkeypatch.setattr(get_settings(), "context_window_tokens", 8000, raising=False)
+
+        prompts = []
+
+        class Recording(FakeOllama):
+            async def stream_chat(self, payload):
+                prompts.append(payload["messages"])
+                async for chunk in super().stream_chat(payload):
+                    yield chunk
+
+        app.state.ollama = Recording()
+
+        try:
+            session_id = None
+            for _ in range(12):
+                body = {"message": "y" * 3000, "stream": False}
+                if session_id:
+                    body["session_id"] = session_id
+                session_id = client.post(
+                    "/v1/chat", json=body, headers=headers
+                ).json()["session_id"]
+
+            assert any(
+                TRUNCATION_NOTE in m["content"] for m in prompts[-1]
+            ), "a truncated context must announce itself to the model"
+        finally:
+            _cleanup(client, headers)

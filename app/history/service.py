@@ -9,10 +9,12 @@ the rebuilt context (prior clean turns + the new user message) for the model.
 from __future__ import annotations
 
 import asyncio
+import logging
 
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..config import get_settings
 from ..files import ingest, readers
 from ..files import repository as files_repo
 from ..rag.access import resolve_department
@@ -21,6 +23,24 @@ from ..users.models import User
 from . import context as ctx
 from . import repository as repo
 from .models import ChatSession
+
+logger = logging.getLogger(__name__)
+
+
+def _log_budget(session_id, tail, selection, budget) -> None:
+    """Why this is logged, not merely computed: `context_window_tokens` is a
+    duplicate of a value set on the Ollama service that this process cannot read
+    back. If the two disagree, every symptom looks like a healthy turn. This
+    line is the only place the disagreement becomes visible, and it is the
+    dataset the estimator's constants get calibrated against — compare it with
+    the server's reported usage.prompt_tokens.
+    """
+    spent = sum(ctx.estimate_message_tokens(m) for m in selection.messages)
+    logger.info(
+        "context session=%s read=%d selected=%d est_tokens=%d budget=%d truncated=%s",
+        session_id, len(tail), len(selection.messages), spent, budget,
+        selection.truncated,
+    )
 
 
 async def _resolve_attachments(
@@ -71,7 +91,8 @@ async def open_turn(
     attachments = await _resolve_attachments(session, user_id=user_id, file_ids=file_ids)
 
     if session_id:
-        chat_session = await repo.get_session_with_messages(
+        # The session ROW only — its messages are read separately and bounded.
+        chat_session = await repo.get_owned_session(
             session, session_id=session_id, user_id=user_id
         )
         if chat_session is None:
@@ -79,11 +100,24 @@ async def open_turn(
         # Re-checked on EVERY turn, which is what makes a revoked grant take
         # effect on the next turn rather than at token expiry.
         dept_ctx = await resolve_department(session, user, department, chat_session)
+        settings = get_settings()
+        tail = await repo.get_context_tail(
+            session,
+            session_id=session_id,
+            user_id=user_id,
+            max_messages=settings.context_max_messages,
+        )
+        budget = ctx.budget_for(settings)
+        selection = ctx.select_turns(tail, budget)
         # A new upload supersedes every earlier one, so the replayed notes are
         # demoted and only the note appended below stays active.
         context = ctx.build_context_messages(
-            chat_session.messages, pending_attachments=bool(attachments)
+            selection.messages,
+            pending_attachments=bool(attachments),
+            truncated=selection.truncated,
+            pinned_attachments=selection.pinned_attachments,
         )
+        _log_budget(session_id, tail, selection, budget)
     else:
         # chat_session=None tells resolve_department this is a NEW session, which
         # MAY open in a department — unlike an existing general chat, which may

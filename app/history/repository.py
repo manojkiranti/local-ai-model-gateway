@@ -65,6 +65,49 @@ async def get_owned_session(
     return result.scalar_one_or_none()
 
 
+async def get_context_tail(
+    session: AsyncSession, *, session_id: str, user_id: int, max_messages: int
+) -> list[ChatMessage]:
+    """The newest `max_messages` of a thread, ascending by seq, for the PROMPT.
+
+    Two things make this distinct from a thread page:
+
+    `trace` and `sources` are NOT selected. Neither is ever in a prompt and they
+    are the fat JSONB columns — loading them only to discard them was most of
+    the old cost.
+
+    This is a DB-side bound applied BEFORE the token budget, so a 500-turn
+    thread never materializes. `max_messages` is far more than any budget can
+    hold, so it never decides what the model sees; the budget does.
+
+    Ownership is in the same WHERE as the page — never fetch-then-check.
+    """
+    newest = (
+        select(
+            ChatMessage.seq,
+            ChatMessage.role,
+            ChatMessage.content,
+            ChatMessage.attachments,
+        )
+        .join(ChatSession, ChatSession.id == ChatMessage.session_id)
+        .where(ChatSession.id == session_id, ChatSession.user_id == user_id)
+        .order_by(ChatMessage.seq.desc())
+        .limit(max_messages)
+        .subquery()
+    )
+    result = await session.execute(select(newest).order_by(newest.c.seq.asc()))
+    # Detached, partially-populated ChatMessage objects: the pure context module
+    # reads role/content/attachments and nothing else.
+    out = []
+    for row in result.all():
+        m = ChatMessage(
+            session_id=session_id, seq=row.seq, role=row.role, content=row.content
+        )
+        m.attachments = row.attachments
+        out.append(m)
+    return out
+
+
 async def get_session_with_messages(
     session: AsyncSession, *, session_id: str, user_id: int
 ) -> Optional[ChatSession]:
