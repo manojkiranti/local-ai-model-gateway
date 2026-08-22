@@ -23,7 +23,7 @@ in the design doc.
 from __future__ import annotations
 
 import math
-import unicodedata
+from dataclasses import dataclass
 from typing import Any
 
 # Devanagari block: U+0900..U+097F, plus the extended block U+A8E0..U+A8FF.
@@ -36,6 +36,7 @@ DEVANAGARI_CHARS_PER_TOKEN = 1.0
 MESSAGE_OVERHEAD_TOKENS = 4
 SAFETY_MARGIN = 1.10
 
+from .models import ROLE_USER
 from .repository import format_attachment_note  # moves into this module in Task 4
 
 
@@ -64,3 +65,72 @@ def estimate_message_tokens(message: Any) -> int:
         total += estimate_tokens(format_attachment_note(message.attachments))
         total += MESSAGE_OVERHEAD_TOKENS
     return total
+
+
+@dataclass
+class Selection:
+    """The tail of a conversation that fits the budget.
+
+    `truncated` says something was DROPPED, not merely that the thread is long —
+    it gates the note that tells the model there is history it cannot see.
+    `pinned_attachments` is the newest attachment set when the message carrying
+    it fell outside the budget: the file ids have to survive even though the
+    turn did not.
+    """
+
+    messages: list
+    truncated: bool
+    pinned_attachments: list[dict] | None
+
+
+def _group_turns(messages: list) -> list[list]:
+    """Split an ascending message list into whole turns.
+
+    A turn starts at a user message and runs to just before the next one, so
+    user+assistant stay together and selection can never sever them. A leading
+    assistant message (possible only in malformed history) forms its own group
+    rather than being silently dropped.
+    """
+    groups: list[list] = []
+    for m in messages:
+        if m.role == ROLE_USER or not groups:
+            groups.append([m])
+        else:
+            groups[-1].append(m)
+    return groups
+
+
+def select_turns(messages: list, budget: int) -> Selection:
+    """Newest whole turns that fit `budget`, oldest dropped first.
+
+    The last turn is ALWAYS kept even if it alone exceeds the budget: an empty
+    context is strictly worse than an over-long one, because the model then has
+    no question to answer. That case reports `truncated=False` — nothing was
+    dropped, it simply does not fit, and claiming otherwise would emit a note
+    about history that does not exist.
+    """
+    if not messages:
+        return Selection(messages=[], truncated=False, pinned_attachments=None)
+
+    groups = _group_turns(messages)
+    kept: list[list] = []
+    spent = 0
+    for group in reversed(groups):
+        cost = sum(estimate_message_tokens(m) for m in group)
+        if kept and spent + cost > budget:
+            break
+        kept.insert(0, group)
+        spent += cost
+
+    selected = [m for group in kept for m in group]
+    dropped = len(selected) < len(messages)
+
+    # The newest attachment set is what `build_context_messages` treats as
+    # active. If its message did not survive, carry the record forward.
+    pinned = None
+    if dropped:
+        with_files = [m for m in messages if m.role == ROLE_USER and m.attachments]
+        if with_files and with_files[-1] not in selected:
+            pinned = with_files[-1].attachments
+
+    return Selection(messages=selected, truncated=dropped, pinned_attachments=pinned)
