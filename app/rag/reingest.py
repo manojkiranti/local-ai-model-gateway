@@ -47,21 +47,37 @@ async def reingest(
 
     `dry_run=True` enqueues nothing at all — the loop below never calls
     `jobs_repo.enqueue` in that branch, so there is nothing to roll back.
+
+    The scan selects plain (id, title) TUPLES, never ORM `Document` instances,
+    and that is load-bearing rather than a micro-optimisation. `jobs_repo.enqueue`
+    calls `session.rollback()` on an IntegrityError, and `rollback()` expires every
+    persistent object in the session — independent of `expire_on_commit`, which
+    governs `commit()` only. Holding ORM rows across that rollback means the NEXT
+    iteration's `doc.id` triggers an implicit synchronous refresh, which raises
+    `MissingGreenlet` under an `AsyncSession` and kills the whole run partway
+    through with no summary. Tuples cannot expire.
+
+    `ORDER BY id` is likewise deliberate: without it the scan order is whatever
+    Postgres happens to return, so the failure above appeared only when a
+    conflicted document sorted before a clean one — an intermittent crash in a
+    backfill command, which is the worst way to find out.
     """
-    stmt = select(Document).where(Document.status != STATUS_ARCHIVED)
+    stmt = select(Document.id, Document.title).where(
+        Document.status != STATUS_ARCHIVED
+    )
     if department_code:
         stmt = stmt.join(Department, Department.id == Document.department_id).where(
             Department.code == department_code
         )
-    documents = list((await session.execute(stmt)).scalars())
+    documents = list((await session.execute(stmt.order_by(Document.id))).all())
 
     queued = skipped = 0
-    for doc in documents:
+    for doc_id, title in documents:
         if dry_run:
-            log.info("would queue %s (%s)", doc.id, doc.title)
+            log.info("would queue %s (%s)", doc_id, title)
             continue
         try:
-            await jobs_repo.enqueue(session, document_id=doc.id)
+            await jobs_repo.enqueue(session, document_id=doc_id)
             await session.commit()
             queued += 1
         except jobs_repo.JobConflict:

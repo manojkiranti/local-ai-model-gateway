@@ -1286,14 +1286,26 @@ it was folded in.
 - Test login: `admin@example.com` / `supersecret123` (persisted in Postgres).
 
 ## Not done yet
-Frontend (unblocked now) — including **rendering chat citations**: `/v1/chat`,
-the stream's `done` event and session replay all carry `sources` now (§30), and
-nothing draws them yet. A source with `machine_recovered` MUST render its
-`verify_note`; the contract is in `docs/frontend-sync-prompt.md`. History
-follow-ups (title rename, context-window truncation). File follow-ups (pagination, orphan cleanup of root-level
-pre-scoping files). Client-side stream cancellation/abort.
-Deployment hardening (firewall internal deps to the gateway IP) is deferred by
-the user for now.
+**The frontend EXISTS and is substantially built** — it lives in the separate repo
+`../react/local-ai-model-frontend` (React 19 + Vite + Tailwind 4, vitest). Auth,
+chat, files, department scoping, the NRB ops page, and citations
+(`components/chat/SourcesPanel.tsx` + `OcrNotice.tsx` for the machine-recovered
+`verify_note`) are all implemented. Do not assume it is unbuilt: check that repo
+before claiming a contract is unconsumed. Its per-department roles UI is on branch
+`feat/roles` and **ships together with this repo's `feat/role`** — a roles frontend
+against a gateway without the level field receives no `role`, fails closed, and
+silently hides every RAG admin control.
+
+Still open here: history follow-ups (title rename, context-window truncation);
+file follow-ups (pagination, orphan cleanup of root-level pre-scoping files);
+client-side stream cancellation/abort. Deployment hardening (firewall internal
+deps to the gateway IP) is deferred by the user for now.
+
+**Known broken test, unrelated to any feature:**
+`tests/test_rag_reingest_integration.py::test_department_filter_restricts_the_set`
+asserts `every["total"] == 2` after seeding two documents, but `reingest` with no
+department counts the WHOLE table, so it fails on any developer database with real
+data (781 documents here). A test-isolation bug, not a `reingest` bug.
 
 **NRB, in the order they became unblocked** (full reasoning in
 `docs/nrb-integration.md` §26.11): the thin admin UI over `/v1/nrb/*` (built in a
