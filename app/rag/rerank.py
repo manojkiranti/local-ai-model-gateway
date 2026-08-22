@@ -106,4 +106,17 @@ async def rerank(
 
     # Order is preserved by gather, and it is load-bearing: decide() zips these
     # against the chunk list.
-    return list(await asyncio.gather(*(one(p) for p in passages)))
+    #
+    # `return_exceptions=True` is NOT about swallowing failures — the first
+    # exception is still re-raised below, so `ranking.apply` still degrades. It is
+    # about *when*: a bare gather propagates immediately while up to pool-1 sibling
+    # requests are still in flight, and the caller's `finally` then closes the
+    # shared client under them ("Cannot send a request, as the client has been
+    # closed" plus "Task exception was never retrieved" noise) — corrupting exactly
+    # the log an operator reads to diagnose a degraded deployment. Collecting
+    # settles every task before we unwind.
+    results = await asyncio.gather(*(one(p) for p in passages), return_exceptions=True)
+    for result in results:
+        if isinstance(result, BaseException):
+            raise result
+    return list(results)
