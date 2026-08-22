@@ -103,3 +103,29 @@ def test_kept_passages_are_what_gets_formatted(wired, monkeypatch):
     out = asyncio.run(tool._search_department_docs({"query": "q"}))
     assert "Doc 2" in out
     assert "Doc 1" not in out
+
+
+def test_with_reranking_disabled_the_tool_presents_as_many_passages_as_before(wired, monkeypatch):
+    # The constraint: RAG_RERANK_ENABLED=false must behave exactly as the system
+    # did before ranking existed. A pool smaller than rag_top_k silently caps
+    # presentation below top_k, which is a quality regression invisible in output.
+    from app.config import get_settings
+
+    settings = get_settings()
+    assert settings.rag_rerank_pool >= settings.rag_top_k, (
+        "the candidate pool must be at least rag_top_k, or top_k is unreachable"
+    )
+
+    chunks = [chunk(i) for i in range(1, settings.rag_rerank_pool + 1)]
+    wired["_returns"] = chunks
+
+    async def fake_apply(client, query, chunks_in, *, settings):
+        # mirror ranking._degraded: RRF order, no abstention
+        return Ranking(
+            kept=list(chunks_in[: settings.rag_top_k]), scores={},
+            abstained=False, degraded=True,
+        )
+
+    monkeypatch.setattr(tool.ranking, "apply", fake_apply)
+    out = asyncio.run(tool._search_department_docs({"query": "q"}))
+    assert f"{settings.rag_top_k} passage(s)" in out

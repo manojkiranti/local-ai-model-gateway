@@ -180,10 +180,17 @@ class Settings(BaseSettings):
     rag_top_k: int = 12  # chunks handed to the model; also the tool's clamp ceiling
     rag_candidate_pool: int = 50  # per channel, before fusion
     # Fused candidates the reranker scores. This is ALSO what retrieval fetches
-    # (`search_chunks(limit=...)`) — handed only `rag_top_k`, a reranker could do
-    # nothing but reorder what fusion already liked. 10 rather than 20 because
-    # the calls are concurrent but not free; the eval sweep measures both.
-    rag_rerank_pool: int = 10
+    # (`search_chunks(limit=...)`) -- handed only `rag_top_k`, a reranker could do
+    # nothing but reorder what fusion already liked.
+    #
+    # MUST be >= rag_top_k. The pool is the candidate set top_k is selected FROM,
+    # so a smaller pool makes top_k unreachable: at pool 10 and top_k 12 the tool
+    # can never present 12 passages, reranking enabled or not. Keeping it >= top_k
+    # also means a RERANK-DISABLED deployment is byte-identical to the pre-ranking
+    # behaviour -- fusion orders by rrf_score DESC, so taking the first top_k of a
+    # larger pool returns the same rows in the same order as fetching top_k did.
+    # The eval sweep measures 10 vs 20; until it has run this stays at 20.
+    rag_rerank_pool: int = 20
     # Cormack et al. 2009's constant, not a universal law — kept configurable so
     # an eval can sweep it. RRF is used precisely so no weight has to be tuned
     # between a cosine distance and a ts_rank_cd score, which share no scale.
