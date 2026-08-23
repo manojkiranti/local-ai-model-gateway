@@ -111,11 +111,29 @@ class ExtractResponse(BaseModel):
     text: str = Field(
         description="Lines joined with newlines. Empty for a spreadsheet — see `sheets`."
     )
-    lines: list[ExtractLine]
+    lines: list[ExtractLine] = Field(
+        description=(
+            "One entry per line of text, in document order, each with an "
+            "optional per-line confidence (present for an OCR'd source, null "
+            "for a native one). Empty for a spreadsheet — see `sheets`. For a "
+            "PDF, page boundaries appear as `[page N]` marker lines within "
+            "this same stream, so there is only one paging unit."
+        )
+    )
     sheets: list[ExtractSheet] = Field(
         description="Populated for .xlsx/.csv only; empty for every other format."
     )
-    source: ExtractSource
+    source: ExtractSource = Field(
+        description=(
+            "Where the text came from and how far to trust it — read this "
+            "before the text. `route` is \"native\" (the document's own text "
+            "layer, exact) or \"ocr\" (machine-read). `caveat` is present ONLY "
+            "for a machine-read source; the key is absent entirely for a "
+            "native one, so test for its presence rather than for a null. "
+            "`partial` flags that something was skipped — a multi-frame image "
+            "beyond frame 1, a PDF beyond the page cap, or a truncated sheet."
+        )
+    )
     request_id: str = Field(
         description=(
             "Echoed from `X-Request-Id`. Present on a 200 only — every error "

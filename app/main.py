@@ -106,10 +106,29 @@ app = FastAPI(
             "name": "api-keys",
             "description": (
                 "Admin-only (JWT) management of the API keys that authenticate "
-                "the `ocr` endpoints via `X-API-Key`. Minting, listing and "
+                "the external endpoints (`ocr`, `extract`) via `X-API-Key`. "
+                "A key carries explicit scopes — `ocr:read` and `document:read` "
+                "are separate grants, and one does not imply the other. "
+                "Minting, listing and "
                 "revoking a key is a human, privileged act — a key can never "
                 "manage keys. Gated behind `EXTERNAL_API_ENABLED`; absent when "
                 "the switch is off. See docs/external-api.md."
+            ),
+        },
+        {
+            "name": "extract",
+            "description": (
+                "External, API-key-authenticated document extraction. "
+                "`POST /v1/extract` returns the text and structure of one "
+                "uploaded PDF, DOCX, TXT, MD, JSON, XLSX, CSV or image. "
+                "**Read the `source` block first:** `route: \"native\"` means "
+                "the text came from the document's own text layer and is exact "
+                "(`authoritative: true`, no caveat); `route: \"ocr\"` means it "
+                "was machine-read, and no figure, date or account number from "
+                "it should be trusted without checking the original. Requires "
+                "scope `document:read` — an `ocr:read` key is refused with 403, "
+                "not 401. Gated behind `EXTERNAL_API_ENABLED`; absent when the "
+                "switch is off. See docs/external-api.md."
             ),
         },
     ],
