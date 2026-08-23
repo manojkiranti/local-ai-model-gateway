@@ -285,6 +285,14 @@ turn-open, `router`=upload
 `POST /v1/files` + `GET /v1/files` list + owner-scoped `/v1/files/{id}`; feeds
 create_excel/html/chart/pdf/csv/docx and inspect_excel/read_excel/
 read_document/read_image),
+`apikeys/` (external API-key credentials, off unless `EXTERNAL_API_ENABLED`:
+`keygen`+`policy` are PURE — mint / verify / may-this-key-act — `models`+
+`repository` are the tables and their access, `throttle` = per-key token
+bucket plus the reused login lockout (both counters PER PROCESS),
+`dependencies` = `require_api_client(scope)` returning an **`ApiClient`,
+never a `User`**, `router` = admin `/v1/api-keys`), `publicapi/` (the
+external HTTP surface: `POST /v1/ocr` only; imports no OCR stack at module
+scope — `tests/test_ocr_api_boundaries.py` asserts that by subprocess),
 `history/` (chat-history: `models` = `chat_sessions`
 + `chat_messages`, `repository` = data access, `service.open_turn` = shared
 turn-open used by chat, `router` = `/v1/sessions`),
@@ -376,6 +384,20 @@ model calls local/MCP tools when useful). `stream:false` → JSON
 NDJSON typed events (`token`/`tool_call`/`tool_result`/`done`, with `sources` on
 `done`) + the new id in the `X-Session-Id` header. **There is no `/v1/agent`** —
 it was folded in.
+External (API key, `X-API-Key`, only when `EXTERNAL_API_ENABLED=true` — the
+flag is read once at process start, so toggling it needs a restart):
+`POST /v1/ocr` (scope `ocr:read`; multipart image + optional `lang` →
+`{text, lines[{text,confidence}], authoritative:false, caveat, partial, image,
+engine, request_id}`; 400 not-an-image/corrupt/pixel-bomb/empty/bad-lang, 401
+any credential fault, 403 missing scope, 413 over cap, 429 rate limited, 503
+OCR absent **or** at capacity, **500 an unexpected engine failure — logged,
+never echoed to the caller, and still writes a usage row**).
+`X-Request-Id` is returned on the **200 only**: every error path raises an
+`HTTPException` before the header reaches the outgoing response, so there is
+no id to hand back on a failure — locate that row by key + time + status
+instead. Admin (JWT): `POST /v1/api-keys` (201, plaintext key returned ONCE,
+same flag), `GET /v1/api-keys`, `DELETE /v1/api-keys/{id}` (revokes, row
+retained). Runbook: `docs/external-api.md`.
 
 ## Conventions / gotchas
 - **A chat answer's `sources` are collected out of band, and only the passages the
@@ -1334,6 +1356,74 @@ it was folded in.
   chunk *content* because `tsv` indexes content alone. Model prereq for a live
   run: `ollama pull qwen3-embedding:4b-q8_0` (not pulled by default; the
   embedding-live and e2e tests skip until it is).
+- **An API key is an `ApiClient`, never a `User`, and that separation is the
+  whole design.** `app/apikeys/` resolves external callers and
+  `app/auth/dependencies.py` resolves humans; neither knows about the other, so
+  a leaked key cannot reach a JWT route (`/v1/chat`, `/users`, a department, an
+  admin route) and a JWT cannot authenticate on `/v1/ocr` — asserted in BOTH
+  directions (`test_an_api_key_cannot_reach_a_jwt_route`,
+  `test_a_jwt_cannot_be_used_on_the_ocr_route`). Folding key handling into
+  `auth/dependencies.py` would put two identity types in the highest-consequence
+  file in the repo. Six things a rewrite must not lose: (1) **verification is
+  prefix-indexed SHA-256, deliberately not bcrypt** — the secret is 32 bytes,
+  hex-encoded via `secrets.token_hex` rather than `token_urlsafe` (measured:
+  48.6% of `token_urlsafe(32)` secrets contain `_`, the token's own delimiter,
+  which would make the prefix/secret split ambiguous) — so a work factor buys
+  nothing and would cost ~100 ms on every request; `hmac.compare_digest` is
+  AST-asserted because `==` on a hash is a timing oracle that reads as correct
+  code; (2) **401 is one message for six causes** (absent, malformed, unknown
+  prefix, wrong secret, revoked, expired) — distinguishing them tells an
+  attacker which prefixes are real and whether a valid key ever existed; the
+  log distinguishes them, the response never does; (3) **a scope failure is
+  403, not 401**, because the credential is genuine and the caller must not
+  rotate a working key chasing the wrong bug; (4) **an unusable key does not
+  consume a throttle attempt** — a revoked key presented by an honest caller
+  would otherwise lock out the prefix on top of being refused, the
+  `UNAVAILABLE`-must-not-consume-an-attempt rule from AD login; (5)
+  `require_api_client` is a dependency **FACTORY** so the ROUTE owns the
+  required scope — a dependency reading the scope from the request would let
+  the caller choose which check they face; (6) `ck_api_keys_scopes` and
+  `policy.ALL_SCOPES` are two copies on purpose: the CHECK stops a typo being
+  stored, the set stops one being honoured. Also note: `touch_last_used` writes
+  `api_keys.last_used_at` on **every** authenticated request, inside the
+  dependency, before the route body runs — a per-request write on the hot
+  path, fine at this endpoint's intended volume but worth knowing before
+  pointing a high-frequency caller at it. And both the rate limiter and the
+  key-lockout counter in `app/apikeys/throttle.py` are **per process**, the
+  same caveat as the login throttle: N uvicorn workers means N x the configured
+  limit is actually available, which is fine for capacity protection and would
+  not be for a billing quota.
+- **`/v1/ocr` runs OCR in a thread behind a semaphore, and both halves are
+  load-bearing.** `image_ocr.ocr_image` is synchronous and CPU-bound, so calling
+  it directly in an `async def` route **stalls the event loop** — one 4-second
+  OCR freezes every in-flight chat stream in that worker. `asyncio.to_thread`
+  fixes that (the `app/rag/worker.py` pattern for Docling); the separate
+  `asyncio.Semaphore(OCR_MAX_CONCURRENT)` exists because `to_thread`'s default
+  executor is far larger and would run many OCRs at once, each spawning
+  onnxruntime's own intra-op threads. Waiting for a slot is **bounded** — 503 +
+  `Retry-After`, distinct from 429 (429 = you sent too much, 503 = the box is
+  busy) — because an unbounded queue turns a load spike into an outage. And the
+  route **never returns 200 with empty `lines` unless the engine actually ran**:
+  §18's whole lesson is that every way an OCR deployment breaks looks like a
+  clean deployment, and an empty `lines: []` with a 200 is the worst outcome
+  available, because the caller writes "no text found" into a client file. A
+  stack that could not run is 503, never inferred from emptiness. An
+  unexpected exception from inside the engine (anything besides the two
+  documented failure types) is caught at the route and turned into a generic
+  500 — logged with the real exception, never echoed to the caller — rather
+  than a raw 500 crash or, worse, a silently swallowed error; a usage row is
+  still written on that path, because it is the only evidence of what a key
+  did. The temp file is unlinked in `finally` on every path including the
+  400s — we told the caller we do not store their images.
+- **The OCR caveat is ONE constant with TWO readers.** `image_ocr.OCR_CAVEAT` is
+  rendered into the model's context by `read_image` and published as `/v1/ocr`'s
+  `caveat` field; a second copy drifts, and then the API field contradicts the
+  chat answer and the reader cannot tell which to believe — the
+  `sources.VERIFY_NOTE` rule.
+  `test_the_caveat_is_one_constant_with_two_readers` locks it. Related:
+  `authoritative` is always False and **no code compares a confidence to a
+  literal** (AST-asserted) — §16.6 measured orthographic well-formedness, which
+  is not a per-field correctness estimate.
 - Test login: `admin@example.com` / `supersecret123` (persisted in Postgres).
 
 ## Not done yet
@@ -1368,6 +1458,17 @@ Still open here: history follow-ups (title rename, context-window truncation);
 file follow-ups (pagination, orphan cleanup of root-level pre-scoping files);
 client-side stream cancellation/abort. Deployment hardening (firewall internal
 deps to the gateway IP) is deferred by the user for now.
+
+The external API (`docs/external-api.md`) ships **off** — `EXTERNAL_API_ENABLED`
+defaults false and is read once at process start, so a deployment that never
+sets it is byte-identical to before this feature existed. Turning it on also
+needs the `INSTALL_OCR=true` image for `/v1/ocr` specifically (`/v1/api-keys`
+itself needs no OCR stack, only the flag). Its live eval
+(`tests/test_ocr_api_eval.py`, `OCR_LIVE_TESTS=1`) is 15 cases built on top of
+the existing 9-case `read_image` eval's own thresholds, not a byte-equality
+check against the tool — the engine's Devanagari output is measurably
+nondeterministic run to run, so "the API and the tool return the same lines"
+was never a viable regression guard and is not what this eval asserts.
 
 **Known broken test, unrelated to any feature:**
 `tests/test_rag_reingest_integration.py::test_department_filter_restricts_the_set`
