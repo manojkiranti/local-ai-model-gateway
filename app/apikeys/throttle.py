@@ -24,7 +24,12 @@ from typing import Callable
 from ..auth.throttle import LoginThrottle
 from ..config import get_settings
 
-__all__ = ["RateLimiter", "get_rate_limiter", "get_auth_throttle"]
+__all__ = [
+    "RateLimiter",
+    "get_rate_limiter",
+    "get_extract_rate_limiter",
+    "get_auth_throttle",
+]
 
 DEFAULT_MAX_TRACKED = 10_000
 
@@ -95,6 +100,7 @@ class RateLimiter:
 
 
 _rate_limiter: RateLimiter | None = None
+_extract_rate_limiter: RateLimiter | None = None
 _auth_throttle: LoginThrottle | None = None
 
 
@@ -108,6 +114,24 @@ def get_rate_limiter() -> RateLimiter:
             burst=settings.ocr_rate_burst,
         )
     return _rate_limiter
+
+
+def get_extract_rate_limiter() -> RateLimiter:
+    """Process-wide singleton for /v1/extract's own bucket.
+
+    Deliberately NOT the OCR limiter: a text parse costs a fraction of an OCR
+    call, and making an extract consume an OCR token would silently couple two
+    unrelated capacity decisions. Same reasoning as keeping the API-key
+    lockout tuning separate from `LOGIN_MAX_ATTEMPTS`.
+    """
+    global _extract_rate_limiter
+    if _extract_rate_limiter is None:
+        settings = get_settings()
+        _extract_rate_limiter = RateLimiter(
+            per_minute=settings.extract_rate_per_minute,
+            burst=settings.extract_rate_burst,
+        )
+    return _extract_rate_limiter
 
 
 def get_auth_throttle() -> LoginThrottle:

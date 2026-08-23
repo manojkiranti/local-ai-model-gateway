@@ -20,6 +20,7 @@ from .mcp.client import MCPClient
 from .mcp.router import router as mcp_router
 from .nrb.router import router as nrb_router
 from .ollama.client import OllamaClient, OllamaError
+from .publicapi.extract_router import router as extract_router
 from .publicapi.middleware import UploadContentLengthGuard
 from .publicapi.ocr_router import router as ocr_router
 from .rag.jobs_router import router as ingest_jobs_router
@@ -180,6 +181,7 @@ app.include_router(nrb_router)
 if get_settings().external_api_enabled:
     app.include_router(api_keys_router)
     app.include_router(ocr_router)
+    app.include_router(extract_router)
     # `UploadContentLengthGuard` itself is registered further up, alongside
     # CORSMiddleware — see the comment there for why the ordering matters. It
     # rejects a declared-oversized upload body before FastAPI spools it to

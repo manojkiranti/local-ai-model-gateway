@@ -35,9 +35,9 @@ def test_neither_the_router_nor_the_schemas_compare_a_confidence_to_a_literal():
     well-formedness, which is not a per-field correctness estimate; a constant
     derived from it would dress a guess as a measurement.
     """
-    from app.publicapi import extract_schemas, ocr_router, schemas
+    from app.publicapi import extract_router, extract_schemas, ocr_router, schemas
 
-    for module in (ocr_router, schemas, extract_schemas):
+    for module in (ocr_router, schemas, extract_schemas, extract_router):
         tree = ast.parse(Path(module.__file__).read_text())
         for node in ast.walk(tree):
             if not isinstance(node, ast.Compare):
@@ -293,6 +293,33 @@ def test_with_the_switch_enabled_the_ocr_routes_are_present_in_openapi():
     )
     assert out.returncode == 0, out.stderr
     assert out.stdout.strip() == "OK"
+
+
+def test_with_the_switch_unset_the_extract_route_is_absent_from_openapi():
+    """The same merge-safety property as the OCR routers, for `/v1/extract`:
+    the master switch defaults false, so merging this route changes nothing
+    about any existing deployment.
+    """
+    import importlib
+    import os
+
+    from app.config import get_settings
+
+    previous = os.environ.get("EXTERNAL_API_ENABLED")
+    os.environ["EXTERNAL_API_ENABLED"] = "false"
+    get_settings.cache_clear()
+    try:
+        import app.main
+
+        importlib.reload(app.main)
+        assert "/v1/extract" not in app.main.app.openapi()["paths"]
+    finally:
+        if previous is None:
+            os.environ.pop("EXTERNAL_API_ENABLED", None)
+        else:
+            os.environ["EXTERNAL_API_ENABLED"] = previous
+        get_settings.cache_clear()
+        importlib.reload(app.main)
 
 
 def test_the_ocr_route_declares_a_real_api_key_security_scheme():
