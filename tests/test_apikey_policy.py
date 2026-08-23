@@ -77,4 +77,30 @@ def test_the_401_detail_is_one_message_for_every_cause():
 
 
 def test_the_scope_vocabulary_is_closed_and_matches_the_db_check():
-    assert policy.ALL_SCOPES == frozenset({"ocr:read"})
+    assert policy.ALL_SCOPES == frozenset({"ocr:read", "document:read"})
+
+
+def test_document_read_is_in_the_closed_vocabulary():
+    from app.apikeys import policy
+
+    assert policy.SCOPE_DOCUMENT_READ == "document:read"
+    assert policy.SCOPE_DOCUMENT_READ in policy.ALL_SCOPES
+    assert policy.SCOPE_OCR_READ in policy.ALL_SCOPES
+
+
+def test_a_key_holding_only_ocr_read_is_refused_document_read():
+    from app.apikeys import policy
+
+    facts = policy.KeyFacts(
+        is_active=True, expires_at=None, scopes=(policy.SCOPE_OCR_READ,)
+    )
+    refusal = policy.scope_refusal(facts, required=policy.SCOPE_DOCUMENT_READ)
+    assert refusal is not None
+    assert "document:read" in refusal
+
+
+def test_a_scope_outside_the_vocabulary_satisfies_nothing():
+    from app.apikeys import policy
+
+    facts = policy.KeyFacts(is_active=True, expires_at=None, scopes=("made:up",))
+    assert policy.scope_refusal(facts, required=policy.SCOPE_OCR_READ) is not None

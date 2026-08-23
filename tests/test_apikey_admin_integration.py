@@ -305,3 +305,26 @@ def test_a_prefix_collision_is_a_clear_503_not_a_bare_500():
             )
             assert second.status_code == 503
             assert second.json()["detail"] == "could not mint a key; retry"
+
+
+def test_a_key_can_be_minted_with_the_document_read_scope():
+    with _client() as client:
+        headers = {"Authorization": f"Bearer {_admin_token(client)}"}
+        resp = client.post(
+            "/v1/api-keys",
+            json={"name": "extract-test", "scopes": ["document:read"]},
+            headers=headers,
+        )
+        assert resp.status_code == 201, resp.text
+        assert resp.json()["scopes"] == ["document:read"]
+
+
+def test_a_typod_scope_is_still_rejected_before_it_reaches_the_check():
+    with _client() as client:
+        headers = {"Authorization": f"Bearer {_admin_token(client)}"}
+        resp = client.post(
+            "/v1/api-keys",
+            json={"name": "bad-scope", "scopes": ["document:reed"]},
+            headers=headers,
+        )
+        assert resp.status_code == 422, resp.text

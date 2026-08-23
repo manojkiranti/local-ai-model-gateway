@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 
 __all__ = [
     "SCOPE_OCR_READ",
+    "SCOPE_DOCUMENT_READ",
     "ALL_SCOPES",
     "INVALID_KEY",
     "KeyFacts",
@@ -25,11 +26,12 @@ __all__ = [
 ]
 
 SCOPE_OCR_READ = "ocr:read"
+SCOPE_DOCUMENT_READ = "document:read"
 
 # Closed vocabulary, mirroring `ck_api_keys_scopes`. Adding a scope means
 # editing BOTH — that duplication is deliberate: the CHECK stops a typo being
 # stored, this set stops one being honoured.
-ALL_SCOPES = frozenset({SCOPE_OCR_READ})
+ALL_SCOPES = frozenset({SCOPE_OCR_READ, SCOPE_DOCUMENT_READ})
 
 # ONE message for all six 401 causes: header absent, malformed, unknown prefix,
 # hash mismatch, revoked, expired. The log records which; the response never
