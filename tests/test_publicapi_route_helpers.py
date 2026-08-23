@@ -5,7 +5,10 @@ hand-copying them starts silently going wrong, so they moved here first.
 """
 
 import asyncio
+import tempfile
 from dataclasses import dataclass
+from pathlib import Path
+from uuid import uuid4
 
 import pytest
 from fastapi import HTTPException
@@ -72,6 +75,9 @@ def test_finish_raises_when_given_a_detail_and_still_records_first():
     session, exc = asyncio.run(go())
     assert exc.status_code == 413 and exc.detail == "too big"
     assert len(session.added) == 1, "the row must be written BEFORE the raise"
+    # `add` before `raise` is not enough on its own: `add -> raise -> commit`
+    # would satisfy the assertion above while never persisting the row.
+    assert session.commits == 1, "the row must be COMMITTED before the raise"
 
 
 def test_finish_passes_extra_columns_through():
@@ -92,7 +98,7 @@ def test_a_request_id_is_minted_per_recorder():
     assert len(a.request_id) == 32
 
 
-def test_stream_to_temp_writes_the_bytes_and_reports_the_size(tmp_path):
+def test_stream_to_temp_writes_the_bytes_and_reports_the_size():
     async def go():
         up = _FakeUpload(b"hello world, this is a body")
         return await _route.stream_to_temp(
@@ -124,6 +130,73 @@ def test_stream_to_temp_stops_at_the_cap_and_still_returns_a_path_to_unlink():
         assert streamed.path.exists()
     finally:
         streamed.path.unlink(missing_ok=True)
+
+
+class _RaisingUpload:
+    """Yields one chunk, then fails — a client disconnecting mid-upload."""
+
+    def __init__(self, payload: bytes, error: BaseException):
+        self._data = payload
+        self._error = error
+        self._calls = 0
+
+    async def read(self, n):
+        self._calls += 1
+        if self._calls == 1:
+            return self._data
+        raise self._error
+
+
+def _leftovers(prefix: str) -> list[Path]:
+    """Temp files stream_to_temp created under this run's unique prefix."""
+    return sorted(Path(tempfile.gettempdir()).glob(prefix + "*"))
+
+
+def test_stream_to_temp_removes_the_partial_file_when_the_read_raises():
+    """No StreamedUpload is returned on this path, so the caller has no path to
+    unlink in its own `finally` — the leak the over-cap branch avoids by
+    returning one. A read genuinely can raise here (a client disconnecting
+    mid-upload is the ordinary case) and the endpoint promises it does not keep
+    caller uploads, so the partial file must not survive the exception."""
+    prefix = f"leak-{uuid4().hex}-"
+    boom = ValueError("connection dropped")
+
+    async def go():
+        up = _RaisingUpload(b"x" * 64, boom)
+        with pytest.raises(ValueError) as exc:
+            await _route.stream_to_temp(
+                up, prefix=prefix, suffix=".bin", max_bytes=10_000
+            )
+        return exc.value
+
+    raised = asyncio.run(go())
+    assert raised is boom, "the exception must propagate unchanged, not be wrapped"
+    assert _leftovers(prefix) == [], "the partial upload was left on disk"
+
+
+def test_stream_to_temp_removes_the_partial_file_when_the_request_is_cancelled():
+    """The case that discriminates: `asyncio.CancelledError` is a
+    `BaseException`, NOT an `Exception`. A future edit narrowing
+    `except BaseException` to `except Exception` — which reads like a tidy-up —
+    silently reintroduces the leak for every cancelled upload, and a test that
+    only raised `ValueError` would stay green through it."""
+    prefix = f"leak-{uuid4().hex}-"
+    cancelled = asyncio.CancelledError()
+    assert not isinstance(cancelled, Exception), (
+        "if this ever becomes an Exception the test below stops discriminating"
+    )
+
+    async def go():
+        up = _RaisingUpload(b"x" * 64, cancelled)
+        with pytest.raises(asyncio.CancelledError) as exc:
+            await _route.stream_to_temp(
+                up, prefix=prefix, suffix=".bin", max_bytes=10_000
+            )
+        return exc.value
+
+    raised = asyncio.run(go())
+    assert raised is cancelled, "cancellation must propagate unchanged"
+    assert _leftovers(prefix) == [], "a cancelled upload was left on disk"
 
 
 def test_enforce_rate_limit_is_a_no_op_when_the_bucket_allows():
