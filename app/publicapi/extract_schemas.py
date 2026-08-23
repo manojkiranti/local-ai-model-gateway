@@ -127,17 +127,20 @@ class ExtractResponse(BaseModel):
 def build_extract_response(
     extracted: ExtractedText, request_id: str
 ) -> ExtractResponse:
-    # Named `scores`, not `confidences` — a Compare node naming the latter
-    # trips the "no threshold comparison" AST test below (the substring
-    # "confidence" would appear in the comparison, even though this one is an
-    # None-check, not a threshold). Same value, `extracted.line_confidences`.
-    scores = extracted.line_confidences
+    # `extracted.line_confidences` is documented as either `None` (nothing
+    # OCR'd, so nothing to report) or a tuple the SAME length as `lines`. `or`
+    # compiles to a BoolOp, not a Compare, so padding the absent case up front
+    # keeps this file free of any Compare node naming a confidence/score
+    # identifier — the property `test_neither_the_router_nor_the_schemas_
+    # compare_a_confidence_to_a_literal` (tests/test_ocr_api_boundaries.py)
+    # holds honestly rather than by renaming something around the check.
+    # `zip(..., strict=True)` then means a genuinely mismatched-length tuple
+    # raises instead of stitching the wrong score to the wrong line or
+    # silently dropping one.
+    per_line_scores = extracted.line_confidences or (None,) * len(extracted.lines)
     lines = [
-        ExtractLine(
-            text=text,
-            confidence=scores[i] if scores is not None else None,
-        )
-        for i, text in enumerate(extracted.lines)
+        ExtractLine(text=text, confidence=value)
+        for text, value in zip(extracted.lines, per_line_scores, strict=True)
     ]
     return ExtractResponse(
         kind=extracted.kind,

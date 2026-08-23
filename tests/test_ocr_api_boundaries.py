@@ -35,9 +35,9 @@ def test_neither_the_router_nor_the_schemas_compare_a_confidence_to_a_literal():
     well-formedness, which is not a per-field correctness estimate; a constant
     derived from it would dress a guess as a measurement.
     """
-    from app.publicapi import ocr_router, schemas
+    from app.publicapi import extract_schemas, ocr_router, schemas
 
-    for module in (ocr_router, schemas):
+    for module in (ocr_router, schemas, extract_schemas):
         tree = ast.parse(Path(module.__file__).read_text())
         for node in ast.walk(tree):
             if not isinstance(node, ast.Compare):

@@ -89,16 +89,3 @@ def test_page_facts_survive_and_null_pages_are_not_dropped():
         extraction.ExtractedText(kind="CSV", route=extraction.NATIVE_ROUTE), "r"
     ).model_dump()
     assert "pages" in csv_dump["source"] and csv_dump["source"]["pages"] is None
-
-
-def test_nothing_in_the_schemas_compares_a_confidence_to_a_literal():
-    # §16.6 declines to invent a threshold from an orthography measurement.
-    # Same AST rule the OCR schemas are already held to.
-    import ast
-    import pathlib
-
-    src = pathlib.Path("app/publicapi/extract_schemas.py").read_text()
-    for node in ast.walk(ast.parse(src)):
-        if isinstance(node, ast.Compare):
-            text = ast.dump(node)
-            assert "confidence" not in text, f"threshold comparison: {text}"
