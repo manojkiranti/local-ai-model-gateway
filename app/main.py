@@ -88,6 +88,23 @@ app = FastAPI(
 )
 
 _settings = get_settings()
+
+# M-a: `OcrContentLengthGuard` must be added to the middleware stack BEFORE
+# `CORSMiddleware`. `Starlette.add_middleware` inserts each new middleware at
+# position 0 of `app.user_middleware`, and the ASGI app is built by wrapping
+# in REVERSE of that list — so the LAST middleware added ends up OUTERMOST,
+# the opposite of how this reads. Adding the guard here, before CORS, means
+# CORS is added second, lands at index 0, and ends up outermost — wrapping
+# the guard. That is what makes the guard's pre-auth 413 (a response it sends
+# directly, without ever calling the inner app) pass back OUT through CORS's
+# response handling and pick up `access-control-allow-origin` — verified with
+# an `Origin:` header (see docs/external-api.md and
+# tests/test_ocr_api_boundaries.py). Registering it AFTER CORS (the previous
+# order) made the guard outermost instead, so its 413 never reached CORS at
+# all and a browser client saw an opaque network failure.
+if _settings.external_api_enabled:
+    app.add_middleware(OcrContentLengthGuard)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_settings.cors_origin_list,
@@ -136,8 +153,9 @@ app.include_router(nrb_router)
 if get_settings().external_api_enabled:
     app.include_router(api_keys_router)
     app.include_router(ocr_router)
-    # Rejects a declared-oversized /v1/ocr body before FastAPI spools it to
-    # disk, and before authentication runs — see the module docstring for why
-    # that ordering matters. Added only in this branch, so a deployment with
-    # the feature off gains no middleware.
-    app.add_middleware(OcrContentLengthGuard)
+    # `OcrContentLengthGuard` itself is registered further up, alongside
+    # CORSMiddleware — see the comment there for why the ordering matters. It
+    # rejects a declared-oversized /v1/ocr body before FastAPI spools it to
+    # disk, and before authentication runs. Still gated on the same
+    # `external_api_enabled` flag: a deployment with the feature off gains no
+    # middleware.

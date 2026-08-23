@@ -357,6 +357,49 @@ def test_an_unauthenticated_oversized_upload_is_413_not_401():
             get_settings.cache_clear()
 
 
+def test_the_guards_413_carries_cors_headers_for_an_allowed_origin():
+    """M-a: the guard's `JSONResponse` is sent directly, without ever calling
+    the inner app — so it only picks up CORS headers if CORS wraps it (is
+    OUTERMOST). Registering the guard AFTER CORSMiddleware in `app/main.py`
+    made the guard outermost instead (`Starlette.add_middleware` inserts at
+    index 0, and the stack is built by wrapping in REVERSE order), so a
+    browser client from an allowed origin used to see this 413 with no
+    `access-control-allow-origin` at all — an opaque network failure instead
+    of the documented response. Compares against the route's own (post-auth)
+    401, which has always carried the header, to show the guard is now no
+    different.
+    """
+    with _client() as client:
+        os.environ["OCR_MAX_UPLOAD_BYTES"] = "1024"
+        from app.config import get_settings
+
+        get_settings.cache_clear()
+        try:
+            big = b"\x00" * 5000
+            resp = client.post(
+                "/v1/ocr",
+                files={"file": ("a.png", big, "image/png")},
+                headers={"X-API-Key": "garbage", "Origin": "https://example.com"},
+            )
+            assert resp.status_code == 413
+            assert resp.headers.get("access-control-allow-origin"), (
+                f"the guard's 413 carries no CORS header: {dict(resp.headers)}"
+            )
+        finally:
+            os.environ.pop("OCR_MAX_UPLOAD_BYTES", None)
+            get_settings.cache_clear()
+
+        # The route's own (post-auth) 401 has always had this header; this
+        # confirms the guard is no longer the odd one out.
+        auth_resp = client.post(
+            "/v1/ocr",
+            files={"file": ("a.png", _png(), "image/png")},
+            headers={"X-API-Key": "garbage", "Origin": "https://example.com"},
+        )
+        assert auth_resp.status_code == 401
+        assert auth_resp.headers.get("access-control-allow-origin")
+
+
 def test_a_chunked_request_with_no_content_length_is_not_refused_by_the_guard():
     """The guard must let a request with NO declared `Content-Length` through
     unconditionally — refusing it would break a legitimate client that
@@ -556,6 +599,45 @@ def test_a_wrong_secret_on_a_real_prefix_writes_an_attributable_401_row():
         assert _usage_count(minted["id"], 401) == 1
 
 
+def test_a_usage_log_write_fault_still_answers_the_byte_identical_401():
+    """R1: `record_usage`/`commit` faulting (disk full, a statement timeout, a
+    role with SELECT but not INSERT) must not turn a clean credential
+    rejection into a 500 — a usage row is evidence, not a precondition for
+    refusing a credential. Reproduced by making `record_usage` raise on the
+    wrong-secret path, the first cause with a real key id to attribute to."""
+    with _client() as client:
+        minted = _mint(client, "record-usage-fault")
+        tampered = minted["key"].rsplit("_", 1)[0] + "_" + "z" * 43
+
+        from app.apikeys import repository
+
+        async def _boom(*args, **kwargs):
+            raise RuntimeError("db is down")
+
+        original = repository.record_usage
+        repository.record_usage = _boom
+        try:
+            faulted = _post(client, tampered)
+        finally:
+            repository.record_usage = original
+
+        assert faulted.status_code == 401
+        assert faulted.json()["detail"] == "Invalid API key"
+
+        # Byte-identical to the same rejection with no write fault at all —
+        # a different tampered secret so this second call is its own,
+        # independent wrong-secret rejection rather than a lockout retry.
+        tampered2 = minted["key"].rsplit("_", 1)[0] + "_" + "y" * 43
+        baseline = _post(client, tampered2)
+        assert baseline.status_code == 401
+        assert faulted.content == baseline.content
+        assert dict(faulted.headers) == dict(baseline.headers)
+
+        # The faulted write left no row (it never committed) and the session
+        # was left usable — proved by the very next request against the same
+        # key succeeding normally afterwards, further down this test module.
+
+
 def test_an_unknown_prefix_writes_no_usage_row_at_all():
     """The other 401 shape: no row matches the prefix, so there is no real
     `api_keys.id` to attribute anything to. Unattributable, and the docs say
@@ -611,10 +693,11 @@ def test_a_key_lacking_scope_writes_an_attributable_403_row():
 
 
 def test_a_credential_lockout_429_writes_an_attributable_row_for_a_real_key():
-    """The lockout 429 fires BEFORE the dependency looks the key up for
-    authentication purposes — so attributing a row to it needs its own
-    lookup by prefix. That extra query only happens on this already-rejected
-    path, and only when the prefix belongs to a real key."""
+    """R2: the lockout row is written once, at the TRANSITION — by the wrong-
+    secret request whose own `record_failure` call trips the lock — not by
+    this later, already-locked request. This request performs no lookup and
+    writes nothing further; it only confirms the row from the transition is
+    already there and attributed to the right key."""
     with _client() as client:
         minted = _mint(client, "lockout-usage")
         from app.config import get_settings
@@ -630,7 +713,64 @@ def test_a_credential_lockout_429_writes_an_attributable_row_for_a_real_key():
         resp = _post(client, minted["key"])  # correct secret, but locked out
         assert resp.status_code == 429
         assert resp.json()["detail"] == "Too many failed attempts for this key"
-        assert _usage_count(minted["id"], 429) >= 1
+        assert _usage_count(minted["id"], 429) == 1
+
+
+def test_the_lockout_transition_writes_exactly_one_row():
+    """R2 (a): however many wrong-secret attempts it takes to reach
+    `API_KEY_MAX_ATTEMPTS`, exactly one 429 usage row results — the one
+    written by the attempt that actually trips the lock, not one per
+    request."""
+    with _client() as client:
+        minted = _mint(client, "lockout-transition")
+        from app.config import get_settings
+
+        settings = get_settings()
+        tampered = minted["key"].rsplit("_", 1)[0] + "_" + "z" * 43
+        for _ in range(settings.api_key_max_attempts):
+            _post(client, tampered)
+
+        assert _usage_count(minted["id"], 429) == 1
+
+
+def test_further_locked_requests_write_no_rows_and_look_up_nothing():
+    """R2 (b)+(c): once locked, N further requests must cost ZERO database
+    access — no `find_by_prefix`, no usage row — and still answer 429 with
+    `Retry-After`. Before the fix, every one of these did its own lookup and
+    wrote its own row: a leaked prefix with no valid secret at all turned the
+    cheapest rejection into the most expensive one, for the whole lockout
+    window."""
+    with _client() as client:
+        minted = _mint(client, "lockout-noamplify")
+        from app.config import get_settings
+
+        settings = get_settings()
+        tampered = minted["key"].rsplit("_", 1)[0] + "_" + "z" * 43
+        for _ in range(settings.api_key_max_attempts):
+            _post(client, tampered)
+        assert _usage_count(minted["id"], 429) == 1
+
+        from app.apikeys import repository
+
+        original = repository.find_by_prefix
+        calls = []
+
+        async def _spy(*args, **kwargs):
+            calls.append((args, kwargs))
+            return await original(*args, **kwargs)
+
+        repository.find_by_prefix = _spy
+        try:
+            for _ in range(3):
+                resp = _post(client, minted["key"])
+                assert resp.status_code == 429
+                assert resp.json()["detail"] == "Too many failed attempts for this key"
+                assert "Retry-After" in resp.headers
+        finally:
+            repository.find_by_prefix = original
+
+        assert calls == [], "the already-locked path performed a key lookup"
+        assert _usage_count(minted["id"], 429) == 1
 
 
 def test_the_rate_limit_answers_429_with_a_retry_after():

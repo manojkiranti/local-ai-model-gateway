@@ -185,6 +185,91 @@ def test_with_the_switch_unset_the_ocr_routes_are_absent_from_openapi():
     assert out.stdout.strip() == "OK"
 
 
+def test_with_the_switch_unset_the_guard_middleware_is_absent():
+    """M-d: the merge-safety test above only asserted on the ROUTERS. If
+    `app.add_middleware(OcrContentLengthGuard)` were dedented out of the
+    `external_api_enabled` block in `app/main.py`, nothing would fail — and a
+    feature-disabled deployment would answer 413 instead of 404 to an
+    oversized `POST /v1/ocr`, revealing the route exists on a deployment that
+    never enabled it. Same gap shape as the routers, for the middleware the
+    residual-fix wave added.
+    """
+    env = dict(os.environ)
+    env.pop("EXTERNAL_API_ENABLED", None)
+    script = (
+        "import app.main;"
+        "names = [m.cls.__name__ for m in app.main.app.user_middleware];"
+        "assert 'OcrContentLengthGuard' not in names, "
+        "f'guard present with the switch unset: {names}';"
+        "print('OK')"
+    )
+    out = subprocess.run(
+        [sys.executable, "-c", script],
+        capture_output=True,
+        text=True,
+        env=env,
+        cwd=Path(__file__).resolve().parent.parent,
+    )
+    assert out.returncode == 0, out.stderr
+    assert out.stdout.strip() == "OK"
+
+
+def test_with_the_switch_enabled_the_guard_middleware_is_present():
+    """The other direction: turning the switch on must actually register the
+    guard, not just avoid crashing."""
+    env = dict(os.environ)
+    env["EXTERNAL_API_ENABLED"] = "true"
+    script = (
+        "import app.main;"
+        "names = [m.cls.__name__ for m in app.main.app.user_middleware];"
+        "assert 'OcrContentLengthGuard' in names, "
+        "f'guard missing with the switch enabled: {names}';"
+        "print('OK')"
+    )
+    out = subprocess.run(
+        [sys.executable, "-c", script],
+        capture_output=True,
+        text=True,
+        env=env,
+        cwd=Path(__file__).resolve().parent.parent,
+    )
+    assert out.returncode == 0, out.stderr
+    assert out.stdout.strip() == "OK"
+
+
+def test_the_guard_is_registered_outside_cors_so_its_413_carries_cors_headers():
+    """M-a, proved by construction rather than by an HTTP round trip: since
+    `Starlette.add_middleware` inserts at position 0 and the stack is built by
+    wrapping in REVERSE of that list, the middleware whose position in
+    `user_middleware` comes AFTER CORSMiddleware is the one added FIRST, and
+    ends up wrapped INSIDE it (closer to the app) — meaning CORS is outermost
+    and processes the guard's response on the way back out. The end-to-end
+    behavioural check (an actual 413 carrying `access-control-allow-origin`)
+    is `test_the_guards_413_carries_cors_headers_for_an_allowed_origin` in
+    tests/test_ocr_api_integration.py.
+    """
+    env = dict(os.environ)
+    env["EXTERNAL_API_ENABLED"] = "true"
+    script = (
+        "import app.main;"
+        "names = [m.cls.__name__ for m in app.main.app.user_middleware];"
+        "guard_ix = names.index('OcrContentLengthGuard');"
+        "cors_ix = names.index('CORSMiddleware');"
+        "assert guard_ix > cors_ix, "
+        "f'guard must come AFTER cors in user_middleware (outer wraps inner): {names}';"
+        "print('OK')"
+    )
+    out = subprocess.run(
+        [sys.executable, "-c", script],
+        capture_output=True,
+        text=True,
+        env=env,
+        cwd=Path(__file__).resolve().parent.parent,
+    )
+    assert out.returncode == 0, out.stderr
+    assert out.stdout.strip() == "OK"
+
+
 def test_with_the_switch_enabled_the_ocr_routes_are_present_in_openapi():
     """The other direction of the same property: turning it on must actually
     register both routers, not just avoid crashing."""

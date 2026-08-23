@@ -25,6 +25,23 @@ a substitute for a reverse-proxy body cap (e.g. nginx's
 only the proxy stops the bytes from arriving on the wire in the first place: a
 client that lies about its own Content-Length, or omits it, sails past this
 middleware exactly as it would past any other declared-length check.
+
+**M-e caveat:** the path check below is an EXACT match on `scope["path"]`,
+which is the path AFTER Starlette strips any mounted `root_path` — but a
+reverse proxy that forwards under a prefix and sets `--root-path` (e.g.
+`--root-path /api`) makes `scope["path"]` `/api/v1/ocr`, not `/v1/ocr`. The
+`!=` comparison then fails for every request, and this guard quietly stops
+existing while every test here still passes (none of them run behind a
+`root_path`). Chose a comment over a suffix match (`path.endswith(OCR_PATH)`)
+deliberately: a suffix match widens the check to any path ending in
+`/v1/ocr`, including one this route was never meant to guard behind a proxy
+that rewrites paths in less predictable ways, and this module's whole job is
+to be a narrow, provably-correct pre-auth gate — trading that for a guess at
+every possible proxy prefix is the wrong direction for a bank's first
+externally-reachable upload endpoint. If this gateway is ever deployed behind
+a path-prefixing proxy, that prerequisite belongs in the runbook (it does —
+see docs/external-api.md's "Turning it on" section) and/or `OCR_PATH` needs to
+become configurable, not this comparison guessed at.
 """
 
 from __future__ import annotations
@@ -52,6 +69,11 @@ class OcrContentLengthGuard:
         if (
             scope["type"] != "http"
             or scope.get("method") != "POST"
+            # M-e: EXACT match on the post-root_path path. Behind a
+            # path-prefixing reverse proxy running with `--root-path /api`,
+            # `scope["path"]` is `/api/v1/ocr` and this never matches — see
+            # the module docstring for why that stays a documented
+            # prerequisite rather than a suffix match here.
             or scope.get("path") != OCR_PATH
         ):
             await self.app(scope, receive, send)
