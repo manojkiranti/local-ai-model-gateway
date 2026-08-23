@@ -47,6 +47,17 @@ is the same shape of gap `POST /v1/files` has always had; it matters more here
 because `/v1/ocr` is the first endpoint in this gateway that accepts uploads
 from OUTSIDE the organisation.
 
+**Prerequisite: do not put this gateway behind a path-prefixing reverse
+proxy (`--root-path`) without checking `OcrContentLengthGuard` first.** The
+guard matches `scope["path"]` against `/v1/ocr` EXACTLY. Under a proxy that
+forwards under a prefix and runs Uvicorn/Gunicorn with e.g. `--root-path
+/api`, `scope["path"]` becomes `/api/v1/ocr` and the guard's comparison never
+matches — it silently stops existing, with no error and no failing test,
+while the rest of the request pipeline (auth, the route's own streamed byte
+cap) still works. This gateway is not currently deployed behind such a proxy,
+so it is not a live gap, but it is exactly the kind of change that would
+reintroduce one without anyone noticing at deploy time.
+
 **Verify a deployment by making a real call with a known image, never by
 whether the container started.** `docs/nrb-integration.md` §18 found five
 distinct OCR deployment defects that all produced *successful* operations with
@@ -130,13 +141,28 @@ populated, which is the proof the engine actually ran. A stack that could
 | 413 | Over `OCR_MAX_UPLOAD_BYTES` (default 10 MB) — from the Content-Length guard before the body is read, or from the route's own streamed count if the caller understated its Content-Length | Downscale before sending |
 | 429 | This key's rate limit (`OCR_RATE_PER_MINUTE`/`OCR_RATE_BURST`) — detail "Rate limit exceeded for this API key" | Honour `Retry-After` |
 | 429 | This key's PREFIX is credential-locked (`API_KEY_MAX_ATTEMPTS` bad attempts within `API_KEY_ATTEMPT_WINDOW_SECONDS`) — detail "Too many failed attempts for this key" | This is checked BEFORE the secret or scope, so it can fire on a perfectly good key whose prefix was probed by someone else. Wait for `Retry-After`; if it recurs, ask an admin to check for a leaked/probed prefix |
-| 503 | OCR unavailable, **or** at capacity (`OCR_MAX_CONCURRENT`/`OCR_QUEUE_WAIT_SECONDS`) | Retry on `Retry-After`; if the detail says "not enabled", it is a deployment fault, not a transient one |
-| 500 | An unexpected exception inside the OCR engine — including an `OcrUnavailable` raised by a specific image while the stack itself loads fine (distinguished from the 503 case by `image_ocr.available()`) | **Report it, do not blindly retry.** The real exception is logged server-side and never returned to the caller (the client only ever sees the generic detail `OCR failed unexpectedly`) — this is a server fault, and retrying the same image against the same bug wastes a call. Ask an operator to check the logs around the `request_id`/time of the call. |
+| 503 | The OCR PACKAGE itself is not importable (`image_ocr.available()` is `False` — `INSTALL_OCR` was not set at build time, or rapidocr/onnxruntime are genuinely absent), **or** the box is at capacity right now (`OCR_MAX_CONCURRENT`/`OCR_QUEUE_WAIT_SECONDS`) | Retry on `Retry-After`; if the detail says "not enabled", it is a deployment fault (rebuild with `INSTALL_OCR=true`), not a transient one |
+| 500 | `available()` is `True` (the package imports) but the call still failed — either the ONNX models could not be BUILT (root-owned model dir, a missing lexicon, a `torch.compile` failure — the §18 deployment-defect class in `docs/nrb-integration.md`) or an unexpected exception from a specific image while the engine itself is fine | **Report it, do not blindly retry.** The real exception is logged server-side and never returned to the caller (the client only ever sees the generic detail `OCR failed unexpectedly`) — this is a server fault, and retrying the same image against the same bug wastes a call. Both causes log the same line, `ocr unavailable (request <id>): <exc>` — the `<exc>` text is what distinguishes them: `could not load the OCR engine (<ExceptionType>)` means the MODELS failed to build (this is the deployment-defect class, and it is diagnosable from that message alone), anything else is a genuinely unexpected per-image failure. Ask an operator to check the logs around the `request_id`/time of the call. |
 
 401 is one message for all six credential causes on purpose — distinguishing
 them tells an attacker which prefixes are real. The server log distinguishes
-them; ask an operator. **Only four of those six causes leave a usage row**
+them; ask an operator. **Only three of those six causes leave a usage row**
 (see Operating, below, for exactly which).
+
+**The uniform-401 property holds for the response body and headers, but not
+for latency.** The three attributable causes (wrong secret, revoked, expired)
+write a usage row before answering, which is measurably slower than an
+unknown-prefix or absent-header rejection (medians 2.91 ms vs 1.82 ms over 30
+samples) — so a caller with no valid credential at all can, in principle,
+learn by timing whether an 8-character PREFIX is provisioned. This is
+accepted as-is rather than engineered around: a prefix is a NON-secret lookup
+handle by design (`app/apikeys/models.py` stores it in plaintext precisely
+because it is not a secret), the secret half is 256 bits, and knowing a
+prefix is real buys an attacker no access — so a timing side-channel on that
+one fact is not worth a nullable FK and a sentinel-row migration to close.
+R2's fix (above) already removes the timing differential on the lockout path,
+since a locked-out prefix now costs the same near-zero time whether or not it
+belongs to a real key.
 
 **`X-Request-Id` is on the 200 response only.** It is set on the FastAPI
 `Response` object early in the handler, but every non-200 path raises an
@@ -168,16 +194,29 @@ count, duration — and no image bytes and no OCR text.
 outcome EXCEPT two.** The route's own checks (rate limit, upload guards, OCR
 failure) always run with an authenticated `ApiClient` already resolved, so
 every one of those — the 429 rate limit, the 413s, the 400s, the 503s, the
-500 — gets a row. Inside `require_api_client` itself, four of the six
-credential-rejection causes also have a real key in hand and get a row too:
-wrong secret, a revoked/expired key, a missing-scope 403, and the
-credential-lockout 429 (looked up by prefix specifically to attribute this
-one, since the throttle check itself never touches the database). The
-remaining two causes — the header absent or malformed, and an unknown prefix
-— never resolve to a key row at all, so there is nothing to attach a usage
-row to; they leave no row, by construction, not by omission. An earlier
-version of this doc claimed a row "on every path", which was never true for
-those two.
+500 — gets a row. Inside `require_api_client` itself: of the SIX 401
+credential-rejection causes, **three** have a real key in hand and get a row —
+wrong secret, revoked, expired (an earlier version of this doc said "four",
+folding in the missing-scope 403 and the credential-lockout 429, neither of
+which is one of the six). The remaining two of the six — the header absent or
+malformed, and an unknown prefix — never resolve to a key row at all, so
+there is nothing to attach a usage row to; they leave no row, by
+construction, not by omission. A missing-scope 403 is a separate outcome
+(the credential is genuine) and always gets its own row.
+
+**The credential-lockout 429 gets exactly ONE row per lockout episode, not
+one per request.** Before a fix on 2026-08-23, every request that arrived
+while a prefix was already locked did its own `find_by_prefix` lookup plus a
+`record_usage` + `commit` — so a leaked prefix with no valid secret at all
+turned the cheapest possible rejection into the most expensive one, at
+whatever rate the network allowed, for the whole `API_KEY_LOCKOUT_SECONDS`
+window, with zero authentication cost to the caller. The one attributable row
+is now written by the specific request whose own credential-failure call
+trips the lock; every later request while still locked is answered with no
+database access at all. An earlier version of this doc claimed a row "on
+every path", which was never true for the two unattributable causes above,
+and briefly implied "every locked request", which was true but not by
+design.
 
 Two facts worth knowing before pointing a high-frequency caller at this
 endpoint:

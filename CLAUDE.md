@@ -298,7 +298,13 @@ PROCESS), `dependencies` = `require_api_client(scope)` returning an
 as ASGI middleware ahead of routing, so an oversized declared body is
 rejected before FastAPI parses the multipart form and before
 `require_api_client` runs at all; imports no OCR stack at module scope —
-`tests/test_ocr_api_boundaries.py` asserts that by subprocess),
+`tests/test_ocr_api_boundaries.py` asserts that by subprocess. The guard
+matches `scope["path"]` against `/v1/ocr` EXACTLY — behind a path-prefixing
+reverse proxy running with `--root-path`, `scope["path"]` gains the prefix
+and the guard silently stops matching anything, with no error and no failing
+test; documented as a deployment prerequisite in `docs/external-api.md`
+rather than guessed at with a suffix match, since this gateway is not
+currently deployed behind one),
 `history/` (chat-history: `models` = `chat_sessions`
 + `chat_messages`, `repository` = data access, `service.open_turn` = shared
 turn-open used by chat, `router` = `/v1/sessions`),
@@ -1424,20 +1430,62 @@ retained). Runbook: `docs/external-api.md`.
   raising it to unblock a misbehaving external integrator would silently raise
   AD-lockout exposure on every account in the company, so the two throttle
   INSTANCES being separate was never enough; the TUNING had to be too.
-- **`api_key_usage` gets a row for four of the six 401/403 credential causes,
-  not all six, and the docs say so explicitly now.** `require_api_client`
-  needs a real `api_keys.id` to attach a row to, so a wrong secret, a
-  revoked/expired key, a missing-scope 403 and the credential-lockout 429
-  (looked up by prefix specifically for this, since the throttle check itself
-  never touches the DB) all write one; an absent/malformed header and an
-  unknown prefix never resolve to a key row and write nothing — not an
-  omission, there is nothing to attach to. An earlier version of both this
-  file and `docs/external-api.md` claimed a row "on every path", which made
-  the review-loop SQL's own "locate the row by key + approximate time +
-  status" instruction impossible for a 401 and left the highest-value signal
-  (a nonzero 401 count on a provisioned key) unobservable. Fixed in
+- **`api_key_usage` gets a row for three of the six 401 credential causes, not
+  all six (and not four — that count silently folded in the 403 and the
+  lockout 429, which are not among the six), and the docs say so explicitly
+  now.** `require_api_client` needs a real `api_keys.id` to attach a row to,
+  so a wrong secret, a revoked key and an expired key write one; an
+  absent/malformed header and an unknown prefix never resolve to a key row and
+  write nothing — not an omission, there is nothing to attach to. A
+  missing-scope 403 is a separate outcome (the credential is genuine) and
+  always gets its own row. An earlier version of both this file and
+  `docs/external-api.md` claimed a row "on every path", which made the
+  review-loop SQL's own "locate the row by key + approximate time + status"
+  instruction impossible for a 401 and left the highest-value signal (a
+  nonzero 401 count on a provisioned key) unobservable. Fixed in
   `app/apikeys/dependencies.py`; both docs now state exactly which outcomes
   are attributable.
+- **The credential lockout writes exactly ONE row per lockout episode, not
+  one per request (R2, 2026-08-23) — restoring the throttle's whole reason to
+  exist.** Before the fix, `require_api_client`'s pre-check branch (the
+  already-locked path) did its own `find_by_prefix` lookup plus
+  `record_usage` + `commit` on EVERY request while a prefix stayed locked, so
+  a leaked PREFIX with no valid secret at all turned the cheapest rejection
+  path into the most expensive one, at whatever rate the network allowed, for
+  the whole `API_KEY_LOCKOUT_SECONDS` window — with the per-key rate limiter
+  unreachable, because it lives in the route, after auth. The fix moves
+  attribution to the ONE request whose own `record_failure` call actually
+  trips the lock (`_record_failure` in `app/apikeys/dependencies.py`, checking
+  `throttle.retry_after(prefix)` immediately before and immediately after
+  `record_failure` — not reused from the pre-check earlier in the same
+  request, because a concurrent request can trip the lock in between, and
+  there is no `await` between the two reads, so nothing can interleave with
+  THIS pair); the pre-check branch itself is now unconditional zero-DB, for
+  every later request while still locked. Deliberately adds no state to
+  `LoginThrottle` — `app/auth/throttle.py` stays untouched.
+- **The uniform-401 property (R3, documented not re-engineered, 2026-08-23)
+  holds for the response body and headers, but not for latency.** Writing a
+  usage row for the three attributable causes measurably slows them relative
+  to an unknown-prefix or absent-header rejection (medians 2.91 ms vs 1.82 ms
+  over 30 samples), so a caller with no valid credential can, in principle,
+  learn by timing whether an 8-char prefix is provisioned. Left as-is rather
+  than closed with a nullable FK + sentinel-row migration: the prefix is a
+  NON-secret lookup handle by design (stored in plaintext in
+  `app/apikeys/models.py` precisely because it is not one), the secret is 256
+  bits, and knowing a prefix is real buys no access — disproportionate to
+  close, and R2 already removes the differential on the lockout path.
+- **The 500/503 split on `/v1/ocr` needed a correction too (M-c).** `available()`
+  only checks that `rapidocr` IMPORTS — it never builds the engine — so
+  `image_ocr._engine()` raising `OcrUnavailable` when the ONNX models fail to
+  BUILD (root-owned model dir, a missing lexicon, a `torch.compile` failure —
+  the §18 deployment-defect class) lands on the 500 side of the split
+  alongside a genuinely unexpected per-image failure, not on 503's "not
+  enabled on this deployment" — even though it is just as much a deployment
+  fault as a genuinely absent package. Both causes log the identical line
+  (`ocr unavailable (request <id>): <exc>`); the `<exc>` text is what
+  distinguishes them (`could not load the OCR engine (<ExceptionType>)` means
+  the models failed to build). `docs/external-api.md`'s status table now says
+  this explicitly instead of describing only the per-image case.
 - **`/v1/ocr` runs OCR in a thread behind a semaphore, and both halves are
   load-bearing.** `image_ocr.ocr_image` is synchronous and CPU-bound, so calling
   it directly in an `async def` route **stalls the event loop** — one 4-second
@@ -1469,6 +1517,26 @@ retained). Runbook: `docs/external-api.md`.
   present-but-this-image-broke-it is 500, genuinely absent is still 503. The
   temp file is unlinked in `finally` on every path including the
   400s — we told the caller we do not store their images.
+- **`OcrContentLengthGuard` is added to the middleware stack BEFORE
+  `CORSMiddleware` in `app/main.py` (M-a, 2026-08-23), and that ordering is the
+  opposite of how it reads.** `Starlette.add_middleware` inserts each new
+  middleware at position 0 of `app.user_middleware`, and the ASGI app is built
+  by wrapping in REVERSE of that list — so the LAST middleware added ends up
+  OUTERMOST. The guard sends its 413 directly, without ever calling the inner
+  app, so it only picks up CORS response headers if CORS wraps it (is
+  outermost) — which needs the guard added FIRST. Registering it after CORS
+  (the original order) made the guard outermost instead, so a browser client
+  from an allowed origin saw the 413 with no `access-control-allow-origin` at
+  all — an opaque network failure instead of the documented response.
+  `tests/test_ocr_api_boundaries.py` asserts the ordering by construction
+  (`user_middleware` index comparison) and
+  `tests/test_ocr_api_integration.py::test_the_guards_413_carries_cors_headers_for_an_allowed_origin`
+  proves it end-to-end with a real `Origin` header. Both the router inclusion
+  AND this middleware registration stay gated on `external_api_enabled`
+  (M-d) — a dedicated test asserts the guard's absence/presence in
+  `app.user_middleware` directly, not just the routers' absence from
+  `openapi()['paths']`, because a feature-disabled deployment answering 413
+  instead of 404 to an oversized `POST /v1/ocr` would reveal the route exists.
 - **The OCR caveat is ONE constant with TWO readers.** `image_ocr.OCR_CAVEAT` is
   rendered into the model's context by `read_image` and published as `/v1/ocr`'s
   `caveat` field; a second copy drifts, and then the API field contradicts the
@@ -1528,6 +1596,22 @@ the existing 9-case `read_image` eval's own thresholds, not a byte-equality
 check against the tool — the engine's Devanagari output is measurably
 nondeterministic run to run, so "the API and the tool return the same lines"
 was never a viable regression guard and is not what this eval asserts.
+**The Swagger/OpenAPI surface for all three routes is filled in (2026-08-23):**
+`openapi_tags` on the `FastAPI(...)` constructor describes the `ocr` and
+`api-keys` tags, every route's docstring is its OpenAPI description (`POST
+/v1/ocr`'s spells out the 7 accepted extensions, the two `lang` values,
+"retrieval text, not a transcription", and what `partial` means),
+`responses={}` is complete on all five endpoints including both `/v1/ocr` 503
+causes and `/v1/api-keys`' formerly-missing 401/403, and `OcrResponse`/
+`ApiKeyCreated`/`ApiKeyOut` carry a realistic `json_schema_extra` example
+(the fake key is `lgw_live_a1b2c3d4_<64 hex chars>`, and `image.kind` in the
+example is `"PNG image"`, not `"png"` — that error already shipped twice in
+this feature) plus `Field(description=...)` on the fields worth explaining
+(`authoritative`, `partial`, `caveat`, `confidence`, `request_id`,
+`expires_at`'s UTC/past-rejected rule). `APIKeyHeader(auto_error=False)` is
+unchanged — verified after these edits that `POST /v1/ocr` still carries a
+`security` entry and the absent-header 401 is still byte-identical to the
+wrong-secret one.
 
 **Known broken test, unrelated to any feature:**
 `tests/test_rag_reingest_integration.py::test_department_filter_restricts_the_set`
