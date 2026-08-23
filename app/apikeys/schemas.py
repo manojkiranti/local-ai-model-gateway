@@ -7,7 +7,7 @@ a loud 422, not a silently ignored field. Same rule as `UserPatch` refusing
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -32,6 +32,29 @@ class ApiKeyCreate(BaseModel):
             )
         if not value:
             raise ValueError("a key with no scopes can do nothing")
+        return value
+
+    @field_validator("expires_at")
+    @classmethod
+    def _future_utc_expiry(cls, value: datetime | None) -> datetime | None:
+        """A naive datetime is interpreted in the SERVER's timezone by the
+        driver on the way into Postgres — measured: a naive
+        `2027-01-01T00:00:00` stores as `2026-12-31T18:15:00+00` (this
+        server's +05:45 offset). Behind a server on UTC the same input would
+        expire up to ~12h LATE, silently fail-open. Normalise here, at the
+        boundary, rather than trusting every future caller of this schema to
+        remember.
+
+        A past `expires_at` is rejected outright: without this an admin could
+        mint a 201 for a key that 401s forever and get no signal that
+        anything is wrong.
+        """
+        if value is None:
+            return value
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        if value <= datetime.now(timezone.utc):
+            raise ValueError("expires_at must be in the future")
         return value
 
 

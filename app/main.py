@@ -20,6 +20,7 @@ from .mcp.client import MCPClient
 from .mcp.router import router as mcp_router
 from .nrb.router import router as nrb_router
 from .ollama.client import OllamaClient, OllamaError
+from .publicapi.middleware import OcrContentLengthGuard
 from .publicapi.ocr_router import router as ocr_router
 from .rag.jobs_router import router as ingest_jobs_router
 from .rag.router import router as departments_router
@@ -50,15 +51,26 @@ async def lifespan(app: FastAPI):
     app.state.mcp = _build_mcp_client(settings)
     file_store.configure(settings.files_dir)
     # Optional: pay the OCR model load at startup instead of charging it to the
-    # first caller. Failure is logged and ignored — a deployment without the
-    # OCR stack must still boot, and /v1/ocr answers 503 on its own.
+    # first caller. `prewarm()` actually builds the engine (available() alone
+    # only imports the package — see its docstring); failure is logged and
+    # ignored either way, because a deployment without the OCR stack must
+    # still boot, and /v1/ocr answers 503 on its own.
     if settings.external_api_enabled and settings.ocr_prewarm:
         from .files import image_ocr as _image_ocr
 
         try:
-            await asyncio.to_thread(_image_ocr.available)
+            loaded = await asyncio.to_thread(_image_ocr.prewarm)
         except Exception as exc:  # pragma: no cover - best effort
             logger.warning("OCR pre-warm failed: %s", exc)
+        else:
+            if loaded:
+                logger.info(
+                    "OCR pre-warm: engine loaded (lang=%s)", _image_ocr.DEFAULT_LANG
+                )
+            else:
+                logger.warning(
+                    "OCR pre-warm: OCR stack unavailable; first call will 503"
+                )
     try:
         yield
     finally:
@@ -124,3 +136,8 @@ app.include_router(nrb_router)
 if get_settings().external_api_enabled:
     app.include_router(api_keys_router)
     app.include_router(ocr_router)
+    # Rejects a declared-oversized /v1/ocr body before FastAPI spools it to
+    # disk, and before authentication runs — see the module docstring for why
+    # that ordering matters. Added only in this branch, so a deployment with
+    # the feature off gains no middleware.
+    app.add_middleware(OcrContentLengthGuard)

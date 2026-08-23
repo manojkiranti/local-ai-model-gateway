@@ -13,6 +13,7 @@ from __future__ import annotations
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..auth.dependencies import require_admin
@@ -56,16 +57,27 @@ async def create_api_key(
 ):
     """Returns the plaintext key ONCE. It is never recoverable afterwards."""
     minted = keygen.mint(get_settings().api_key_prefix)
-    key = await repository.create_key(
-        session,
-        key_id=uuid4().hex,
-        name=body.name,
-        key_prefix=minted.prefix,
-        key_hash=minted.key_hash,
-        scopes=list(body.scopes),
-        expires_at=body.expires_at,
-        created_by_user_id=admin.id,
-    )
+    try:
+        key = await repository.create_key(
+            session,
+            key_id=uuid4().hex,
+            name=body.name,
+            key_prefix=minted.prefix,
+            key_hash=minted.key_hash,
+            scopes=list(body.scopes),
+            expires_at=body.expires_at,
+            created_by_user_id=admin.id,
+        )
+    except IntegrityError:
+        # An 8-hex-char prefix collision — astronomically unlikely (32 bits,
+        # a handful of live keys) and not worth a retry loop. An admin who
+        # sees this should just try again; a bare 500 with an empty body
+        # would read as an alarm instead of an instruction.
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="could not mint a key; retry",
+        )
     await session.commit()
     return ApiKeyCreated(
         id=key.id,

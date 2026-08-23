@@ -59,6 +59,7 @@ __all__ = [
     "OcrUnavailable",
     "OcrResult",
     "available",
+    "prewarm",
     "engine_version",
     "ocr_config",
     "ocr_params",
@@ -203,9 +204,33 @@ def _rapidocr():
 
 
 def available() -> bool:
-    """Whether the OCR stack can be loaded at all (never raises)."""
+    """Whether the OCR stack can be loaded at all (never raises).
+
+    This only checks that `import rapidocr` succeeds — it does NOT build the
+    engine, so it says nothing about whether the three ONNX models can
+    actually be loaded. Use `prewarm()` to pay that cost eagerly.
+    """
     try:
         _rapidocr()
+    except OcrUnavailable:
+        return False
+    return True
+
+
+def prewarm(lang: str = DEFAULT_LANG) -> bool:
+    """Actually build the engine for `lang`, paying the ~0.7s model-load cost
+    now instead of charging it to the first caller.
+
+    `available()` alone does NOT do this — it only imports the package, which
+    measured 0.002s against the engine load's 0.683s, so calling `available()`
+    from a "prewarm" setting moved 2ms to startup and left the real cost on
+    the first request. This is the function a genuine prewarm must call.
+
+    Never raises: returns False when the stack is absent or the engine fails
+    to load, so a deployment without OCR still boots.
+    """
+    try:
+        _engine(lang)
     except OcrUnavailable:
         return False
     return True

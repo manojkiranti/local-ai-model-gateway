@@ -99,10 +99,7 @@ _auth_throttle: LoginThrottle | None = None
 
 
 def get_rate_limiter() -> RateLimiter:
-    """Process-wide singleton for the per-key rate limiter.
-
-    Raises AttributeError until Task 6 adds ocr_rate_per_minute and ocr_rate_burst to settings.
-    """
+    """Process-wide singleton for the per-key rate limiter."""
     global _rate_limiter
     if _rate_limiter is None:
         settings = get_settings()
@@ -116,16 +113,26 @@ def get_rate_limiter() -> RateLimiter:
 def get_auth_throttle() -> LoginThrottle:
     """Lockout on repeated bad keys, keyed on the presented PREFIX.
 
-    Reuses the login throttle unchanged, which brings its eviction rule with it:
-    eviction PREFERS UNLOCKED entries, so a flood of junk prefixes cannot evict
-    a locked one and thereby clear a lockout.
+    Reuses the `LoginThrottle` CLASS, but is built from its OWN dedicated
+    settings (`api_key_max_attempts`/`api_key_attempt_window_seconds`/
+    `api_key_lockout_seconds`) rather than `login_max_attempts` and friends.
+    That used to be shared tuning, and it was a trap: `LOGIN_MAX_ATTEMPTS` must
+    stay below the AD domain's own lockout threshold (a bank-critical
+    constraint on human logins), while an external integrator's retry loop has
+    nothing to do with AD — raising the shared knob to unblock a misbehaving
+    caller would have silently raised AD-lockout exposure on every account in
+    the company. The two `LoginThrottle` INSTANCES were already separate (a
+    flood of bad keys cannot lock out human logins); this is what makes the
+    TUNING separate too. Brings the class's eviction rule with it: eviction
+    PREFERS UNLOCKED entries, so a flood of junk prefixes cannot evict a locked
+    one and thereby clear a lockout.
     """
     global _auth_throttle
     if _auth_throttle is None:
         settings = get_settings()
         _auth_throttle = LoginThrottle(
-            max_attempts=settings.login_max_attempts,
-            window_seconds=settings.login_attempt_window_seconds,
-            lockout_seconds=settings.login_lockout_seconds,
+            max_attempts=settings.api_key_max_attempts,
+            window_seconds=settings.api_key_attempt_window_seconds,
+            lockout_seconds=settings.api_key_lockout_seconds,
         )
     return _auth_throttle

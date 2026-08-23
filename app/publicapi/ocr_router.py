@@ -144,9 +144,14 @@ async def ocr(
         #    reading, and handing page 1 to an OCR engine would discard it.
         ext = Path(file.filename or "").suffix.lower()
         if ext not in ingest.IMAGE_EXTS:
+            # `file.filename` is the CALLER's own, unbounded string, reflected
+            # straight into the response. JSON-encoded so this is not an
+            # injection, but it is attacker-controlled and otherwise
+            # unbounded — truncate before it goes back to the sender.
+            shown = (ext or (file.filename or ""))[:100]
             await finish(
                 400,
-                f"'{ext or file.filename}' is not an image — /v1/ocr accepts "
+                f"'{shown}' is not an image — /v1/ocr accepts "
                 f"{', '.join(sorted(ingest.IMAGE_EXTS))}",
             )
 
@@ -204,9 +209,17 @@ async def ocr(
         try:
             result = await asyncio.to_thread(image_ocr.ocr_image, dest, lang=chosen)
         except image_ocr.OcrUnavailable as exc:
-            # The stack is absent or the engine could not run. 503 and a clear
-            # reason — NEVER an empty 200. See the module docstring.
+            # `ocr_image` wraps EVERY runtime exception from the engine call in
+            # OcrUnavailable, so this branch covers TWO different facts: the
+            # stack never loaded at all, or it loaded fine and THIS image broke
+            # it. Collapsing both into the deployment-level 503 sends an
+            # operator chasing a rebuild-with-INSTALL_OCR that is already set —
+            # any caller could trigger that false diagnosis on demand. So ask
+            # `available()` (cheap: it only checks the import, never reloads
+            # the engine) which fact this is.
             logger.warning("ocr unavailable (request %s): %s", request_id, exc)
+            if image_ocr.available():
+                await finish(500, "OCR failed unexpectedly")
             await finish(503, STACK_MISSING)
         except ValueError as exc:
             await finish(400, str(exc))

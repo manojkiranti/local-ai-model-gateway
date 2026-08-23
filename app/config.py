@@ -279,13 +279,32 @@ class Settings(BaseSettings):
     # Load the OCR models at startup instead of making the first caller pay.
     ocr_prewarm: bool = False
 
+    # --- API-key credential lockout (deliberately SEPARATE from the login
+    # throttle) ---
+    # `LOGIN_MAX_ATTEMPTS` must stay below the AD domain's own lockout
+    # threshold (see that setting's comment) — that is a bank-critical
+    # constraint on human logins. An external integrator's key is a different
+    # risk profile entirely: their retry loop misfiring has nothing to do with
+    # AD, and support raising ONE shared knob to unblock them would silently
+    # raise AD-lockout exposure on every account in the company. The two
+    # `LoginThrottle` INSTANCES were already separate (a flood of bad keys
+    # cannot lock out human logins); these settings make the TUNING separate
+    # too.
+    api_key_max_attempts: int = 5
+    api_key_attempt_window_seconds: int = 300
+    api_key_lockout_seconds: int = 900
+
     # --- validation ---
     @model_validator(mode="after")
-    def _check_ad_auth(self) -> "Settings":
-        """Fail at import, not at the first login attempt.
+    def _validate_auth_and_external_api_settings(self) -> "Settings":
+        """Fail at import, not at the first login/OCR-call attempt.
 
-        A deployment that switches AD on but forgets the URL would otherwise
-        look configured and then answer 503 to every directory user.
+        Originally AD-only (hence the historical name `_check_ad_auth`); now
+        also validates the login throttle, the API-key lockout, and the six
+        OCR/external-API settings, because all of them are the same shape of
+        mistake — a deployment that looks configured and then answers wrong
+        (503, an unthrottled endpoint, a limiter that refuses everything) to
+        every caller instead of failing loudly at startup.
         """
         if self.ad_auth_enabled and not self.ad_auth_base_url.strip():
             raise ValueError(
@@ -307,6 +326,12 @@ class Settings(BaseSettings):
             )
         if not self.api_key_prefix.strip():
             raise ValueError("API_KEY_PREFIX must not be blank")
+        if self.api_key_max_attempts < 1:
+            raise ValueError("API_KEY_MAX_ATTEMPTS must be at least 1")
+        if self.api_key_attempt_window_seconds < 1:
+            raise ValueError("API_KEY_ATTEMPT_WINDOW_SECONDS must be at least 1")
+        if self.api_key_lockout_seconds < 1:
+            raise ValueError("API_KEY_LOCKOUT_SECONDS must be at least 1")
         return self
 
     @model_validator(mode="after")
