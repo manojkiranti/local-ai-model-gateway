@@ -14,18 +14,20 @@ from pathlib import Path
 import pytest
 
 
-def test_the_caveat_is_one_constant_with_two_readers():
-    """A second copy drifts, and then the API and the chat answer caveat
-    differently — leaving the reader unable to tell which to believe. Same rule
-    as sources.VERIFY_NOTE.
+def test_the_caveat_is_one_constant_with_three_readers():
+    """`read_image` (chat), `/v1/ocr` and `/v1/extract` all render the SAME
+    sentence. A second copy drifts, and then two surfaces disagree about the
+    wording and a reader cannot tell which to believe. Same rule as
+    sources.VERIFY_NOTE.
     """
     from app.files import image_ocr
-    from app.publicapi import schemas
+    from app.publicapi import extract_schemas, schemas
     from app.tools.local import read_image
 
     assert image_ocr.OCR_CAVEAT
     assert read_image.CAVEAT is image_ocr.OCR_CAVEAT
     assert schemas.CAVEAT is image_ocr.OCR_CAVEAT
+    assert extract_schemas.OCR_CAVEAT is image_ocr.OCR_CAVEAT
 
 
 def test_neither_the_router_nor_the_schemas_compare_a_confidence_to_a_literal():
