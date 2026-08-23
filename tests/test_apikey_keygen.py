@@ -92,13 +92,31 @@ def test_verify_uses_a_constant_time_comparison():
     ), "verify() must not use == / != on secret material"
 
 
-def test_parse_with_extra_underscores_finds_the_first_hex_prefix():
-    """parse() correctly handles secrets containing underscores and hex runs.
+def test_a_minted_secret_never_contains_the_delimiter():
+    """Secret is hex (see `mint`), so it can never contain "_".
 
-    token_urlsafe produces base64url, which uses '_' and '-', so a secret can
-    contain underscores. parse() finds the FIRST 8-character hex string (the prefix)
-    and treats everything after it as the secret, not the last-two-fields approach.
+    base64url contains "_" and measured, 48.6% of token_urlsafe(32) secrets
+    have one, which would break the split. Hex cannot, so the split is exact.
     """
-    # Token with underscore in the secret: lgw_live_<aabbccdd>_<deadbeef_tail>
+    for _ in range(200):
+        _, secret = keygen.parse(keygen.mint().token)
+        assert "_" not in secret
+
+
+def test_verify_accepts_200_consecutive_minted_tokens():
+    """Round trip on many mints, not just one. A single-mint test passes 51%
+    of the time on code with 48.6% failure rate — this catches it.
+    """
+    for _ in range(200):
+        minted = keygen.mint()
+        assert keygen.verify(minted.token, minted.key_hash) is True
+
+
+def test_parse_returns_the_last_two_underscore_delimited_fields():
+    """The split is positional: last two fields are prefix and secret.
+
+    The label may contain underscores ("lgw_live"), but the secret is hex
+    (never contains "_"), so the split is exact and no searching is needed.
+    """
     parsed = keygen.parse("lgw_live_aabbccdd_deadbeef_tail")
-    assert parsed == ("aabbccdd", "deadbeef_tail")
+    assert parsed == ("deadbeef", "tail")
