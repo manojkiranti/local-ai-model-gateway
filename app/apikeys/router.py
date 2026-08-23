@@ -47,7 +47,14 @@ def _out(key) -> ApiKeyOut:
     responses={
         401: {"description": "Missing/invalid JWT."},
         403: {"description": "Not an admin."},
-        422: {"description": "Unknown scope, or an unexpected field."},
+        422: {"description": "Unknown scope, an empty scope list, a past `expires_at`, or an unexpected field."},
+        503: {
+            "description": (
+                "Could not mint a key (an astronomically unlikely 8-hex-char "
+                "prefix collision). Retry — this is not a sign anything is "
+                "wrong."
+            )
+        },
     },
 )
 async def create_api_key(
@@ -55,7 +62,15 @@ async def create_api_key(
     admin: User = Depends(require_admin),
     session: AsyncSession = Depends(get_session),
 ):
-    """Returns the plaintext key ONCE. It is never recoverable afterwards."""
+    """Mint a new API key for an external caller and return its plaintext
+    **once** — `ApiKeyCreated.key` is never recoverable afterwards; a lost
+    key can only be revoked and re-minted.
+
+    `scopes` defaults to `["ocr:read"]`, the only scope that exists today; an
+    empty list is rejected (a key with no scopes can do nothing). `expires_at`
+    is optional; a naive datetime is treated as UTC, and a value in the past
+    is rejected outright rather than minting a key that would 401 forever.
+    """
     minted = keygen.mint(get_settings().api_key_prefix)
     try:
         key = await repository.create_key(
@@ -93,13 +108,22 @@ async def create_api_key(
     "/api-keys",
     response_model=list[ApiKeyOut],
     summary="List API keys, newest first (admin)",
+    responses={
+        401: {"description": "Missing/invalid JWT."},
+        403: {"description": "Not an admin."},
+    },
 )
 async def list_api_keys(
     admin: User = Depends(require_admin),
     session: AsyncSession = Depends(get_session),
 ):
-    """Revoked keys are listed too — `is_active` says which. They are never
-    deleted, so a leaked key's history stays attributable."""
+    """List every API key, newest first. Never includes the plaintext key or
+    its hash — only `ApiKeyCreated` (mint time, once) ever carries the
+    plaintext.
+
+    Revoked keys are listed too — `is_active` says which. They are never
+    deleted, so a leaked key's history stays attributable.
+    """
     return [_out(k) for k in await repository.list_keys(session)]
 
 
@@ -107,15 +131,24 @@ async def list_api_keys(
     "/api-keys/{key_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Revoke an API key (admin)",
-    responses={404: {"description": "No such active key."}},
+    responses={
+        401: {"description": "Missing/invalid JWT."},
+        403: {"description": "Not an admin."},
+        404: {"description": "No such active key (unknown id, or already revoked)."},
+    },
 )
 async def revoke_api_key(
     key_id: str,
     admin: User = Depends(require_admin),
     session: AsyncSession = Depends(get_session),
 ):
-    """Revocation is `is_active=false` + `revoked_at`, never a DELETE: the
-    usage rows are the only evidence of what this key did."""
+    """Revoke a key immediately — it takes effect on the holder's very next
+    call.
+
+    Revocation is `is_active=false` + `revoked_at`, never a DELETE: the usage
+    rows are the only evidence of what this key did, and they carry an
+    `ON DELETE RESTRICT` foreign key that a hard delete would violate.
+    """
     if not await repository.revoke(session, key_id):
         raise HTTPException(status_code=404, detail="No such active API key")
     await session.commit()

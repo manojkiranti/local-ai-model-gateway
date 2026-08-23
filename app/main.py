@@ -85,6 +85,33 @@ app = FastAPI(
     version="0.3.0",
     description="Single authenticated front door: auth + users + chat + agent/tools/files over Ollama.",
     lifespan=lifespan,
+    # Only the two tags this residual-fix wave added get a description here.
+    # Every other tag in the app renders with a bare name and no description
+    # too, and inventing text for a feature this wave did not review would be
+    # a guess dressed as documentation — see docs/external-api.md for the
+    # full runbook either tag's routes point back to.
+    openapi_tags=[
+        {
+            "name": "ocr",
+            "description": (
+                "External, API-key-authenticated OCR. `POST /v1/ocr` reads "
+                "an image and returns machine-read text — never a "
+                "transcription, and never authoritative. Gated behind "
+                "`EXTERNAL_API_ENABLED`; absent when the switch is off. "
+                "See docs/external-api.md."
+            ),
+        },
+        {
+            "name": "api-keys",
+            "description": (
+                "Admin-only (JWT) management of the API keys that authenticate "
+                "the `ocr` endpoints via `X-API-Key`. Minting, listing and "
+                "revoking a key is a human, privileged act — a key can never "
+                "manage keys. Gated behind `EXTERNAL_API_ENABLED`; absent when "
+                "the switch is off. See docs/external-api.md."
+            ),
+        },
+    ],
 )
 
 _settings = get_settings()

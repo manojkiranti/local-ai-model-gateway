@@ -17,9 +17,27 @@ from .policy import ALL_SCOPES, SCOPE_OCR_READ
 class ApiKeyCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    name: str = Field(min_length=1, max_length=255)
-    scopes: list[str] = Field(default_factory=lambda: [SCOPE_OCR_READ])
-    expires_at: datetime | None = None
+    name: str = Field(
+        min_length=1,
+        max_length=255,
+        description="A human-readable label for this key, e.g. the calling app's name.",
+    )
+    scopes: list[str] = Field(
+        default_factory=lambda: [SCOPE_OCR_READ],
+        description=(
+            "What this key may do. Defaults to every scope that exists today "
+            f"({sorted(ALL_SCOPES)}). An empty list is rejected — a key with "
+            "no scopes can do nothing."
+        ),
+    )
+    expires_at: datetime | None = Field(
+        default=None,
+        description=(
+            "Optional expiry. A naive value (no timezone) is treated as UTC. "
+            "A value in the past is rejected outright, rather than minting a "
+            "key that would 401 forever with no signal anything is wrong."
+        ),
+    )
 
     @field_validator("scopes")
     @classmethod
@@ -61,10 +79,34 @@ class ApiKeyCreate(BaseModel):
 class ApiKeyCreated(BaseModel):
     """The ONLY response that ever carries the plaintext key."""
 
-    id: str
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "id": "9f1c2a6e4b3d4f7c8a1e2b3c4d5e6f70",
+                "name": "odin-crm-ocr",
+                "prefix": "a1b2c3d4",
+                "key": (
+                    "lgw_live_a1b2c3d4_"
+                    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+                ),
+                "scopes": ["ocr:read"],
+                "expires_at": None,
+            }
+        }
+    )
+
+    id: str = Field(description="The key's id — use this to revoke it later.")
     name: str
-    prefix: str
-    key: str
+    prefix: str = Field(
+        description="The non-secret lookup handle at the start of `key`, also shown by GET /v1/api-keys."
+    )
+    key: str = Field(
+        description=(
+            "The plaintext credential, shown here and NEVER AGAIN. Store it "
+            "in the calling app's secret manager immediately; there is no "
+            "recovery, only revoking this key and minting a new one."
+        )
+    )
     scopes: list[str]
     expires_at: datetime | None
 
@@ -72,11 +114,28 @@ class ApiKeyCreated(BaseModel):
 class ApiKeyOut(BaseModel):
     """A listed key. Deliberately has no `key` and no `key_hash` field."""
 
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "id": "9f1c2a6e4b3d4f7c8a1e2b3c4d5e6f70",
+                "name": "odin-crm-ocr",
+                "prefix": "a1b2c3d4",
+                "scopes": ["ocr:read"],
+                "is_active": True,
+                "created_at": "2026-08-23T09:15:00Z",
+                "last_used_at": "2026-08-23T10:02:11Z",
+                "expires_at": None,
+            }
+        }
+    )
+
     id: str
     name: str
-    prefix: str
+    prefix: str = Field(description="The non-secret lookup handle; the full key is never listed.")
     scopes: list[str]
-    is_active: bool
+    is_active: bool = Field(description="False once revoked. Revoked keys are listed, never deleted.")
     created_at: datetime
-    last_used_at: datetime | None
+    last_used_at: datetime | None = Field(
+        description="Updated on every authenticated request this key makes, before the route body runs."
+    )
     expires_at: datetime | None

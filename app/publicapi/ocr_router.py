@@ -71,13 +71,60 @@ def _semaphore() -> asyncio.Semaphore:
     response_model=OcrResponse,
     summary="Read the text of one image (API key, scope ocr:read)",
     responses={
-        400: {"description": "Not an image, corrupt, too many pixels, or a bad lang."},
-        401: {"description": "Missing/invalid API key."},
-        403: {"description": "The key lacks the ocr:read scope."},
-        413: {"description": "Image exceeds the size limit."},
-        429: {"description": "Rate limited. See Retry-After."},
-        503: {"description": "OCR unavailable, or no capacity right now."},
-        500: {"description": "Unexpected OCR failure (logged; should not happen)."},
+        400: {
+            "description": (
+                "Not an image (extension outside the accepted list), corrupt, "
+                "too many pixels (a decompression-bomb guard), an empty "
+                "upload, or an unsupported `lang`."
+            )
+        },
+        401: {
+            "description": (
+                "The API key is missing, malformed, unknown, wrong, revoked "
+                "or expired — one message for all six causes on purpose, so "
+                "the response never tells a caller which of the six it hit."
+            )
+        },
+        403: {
+            "description": (
+                "The key is genuine but lacks the `ocr:read` scope. Ask an "
+                "admin to re-mint it with that scope — do not rotate the key."
+            )
+        },
+        413: {"description": "The image exceeds `OCR_MAX_UPLOAD_BYTES` (default 10 MB)."},
+        429: {
+            "description": (
+                "Either this key's own rate limit "
+                "(`OCR_RATE_PER_MINUTE`/`OCR_RATE_BURST`), or this key's "
+                "PREFIX is credential-locked after repeated bad secrets "
+                "(`API_KEY_MAX_ATTEMPTS` within "
+                "`API_KEY_ATTEMPT_WINDOW_SECONDS`) — the detail text and "
+                "`Retry-After` distinguish which."
+            )
+        },
+        503: {
+            "description": (
+                "Two distinct, unrelated causes share this status because "
+                "OpenAPI keys responses by code: the OCR stack is not "
+                "installed/enabled on this deployment (detail: 'image OCR is "
+                "not enabled on this deployment' — a deployment fault, not "
+                "transient), OR the box is at capacity right now "
+                "(`OCR_MAX_CONCURRENT`/`OCR_QUEUE_WAIT_SECONDS` — honour "
+                "`Retry-After`, this one is transient)."
+            )
+        },
+        500: {
+            "description": (
+                "An unexpected failure inside the OCR engine — either a "
+                "genuinely unforeseen exception, or `OcrUnavailable` raised "
+                "by a specific image or model load while the stack itself is "
+                "present (import succeeded). The real exception is logged "
+                "server-side (never echoed to the caller); ask an operator to "
+                "check the logs for 'ocr failed unexpectedly' or 'could not "
+                "load the OCR engine' around the request time. Report it — "
+                "do not blindly retry the same image."
+            )
+        },
     },
 )
 async def ocr(
@@ -87,6 +134,27 @@ async def ocr(
     client: ApiClient = Depends(require_api_client(SCOPE_OCR_READ)),
     session: AsyncSession = Depends(get_session),
 ):
+    """Read the text of one image and return it as retrieval text — **not** a
+    transcription.
+
+    Accepts exactly one image per call: `.png`, `.jpg`, `.jpeg`, `.webp`,
+    `.tif`, `.tiff`, or `.bmp`. Anything else (including a PDF, which may have
+    its own text layer worth reading via a different tool) is a 400.
+
+    `lang` is `devanagari` (the default — it reads English too) or `en`; any
+    other value is a 400 before the file is even read.
+
+    The response text comes from PP-OCRv5, an OCR engine, and is meant for
+    search and retrieval — it is measurably not a transcription: whole words
+    and lines can be dropped or misread, and latin runs (emails, reference
+    numbers) can come out as noise. `authoritative` is **always** `false` and
+    `caveat` is **always** present for that reason; never treat a figure,
+    date, account number or contact detail from this endpoint as correct
+    without checking it against the image. `partial: true` means the upload
+    had more than one frame (e.g. a multi-page TIFF) and only the first frame
+    was read — the rest were silently skipped, as `read_document` reports for
+    the same case. See docs/external-api.md for the full contract.
+    """
     settings = get_settings()
     request_id = uuid4().hex
     response.headers["X-Request-Id"] = request_id
