@@ -6,6 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from .apikeys.router import router as api_keys_router
 from .auth.router import router as auth_router
 from .chat.router import router as chat_router
 from .config import Settings, get_settings
@@ -102,3 +103,8 @@ app.include_router(ingest_jobs_router)
 # NRB operations (admin): pipeline trigger + run/status. Thin — every handler
 # calls one `app.nrb.pipeline` service and shapes the answer.
 app.include_router(nrb_router)
+# The external API is opt-in. When disabled the routes do not exist at all —
+# see the comment on `Settings.external_api_enabled` for why 404 is right here
+# and 503 is right for a missing OCR stack.
+if get_settings().external_api_enabled:
+    app.include_router(api_keys_router)

@@ -255,6 +255,30 @@ class Settings(BaseSettings):
     # --- CORS (frontend talks only to this gateway) ---
     cors_origins: str = "*"  # comma-separated, or "*" for all (dev)
 
+    # --- External API (API-key callers) -----------------------------------
+    # Master switch. FALSE by default so merging this changes nothing about any
+    # existing deployment: both /v1/api-keys and /v1/ocr go unregistered.
+    # Note the deliberate asymmetry with the OCR-stack case: a deployment that
+    # MEANS to serve this API but has no OCR stack answers 503, because a 404
+    # there is indistinguishable from a wrong URL. A deployment that was never
+    # asked to serve it has no route at all, which is honest and is a smaller
+    # attack surface than a disabled one.
+    external_api_enabled: bool = False
+    # OCR is CPU-bound and synchronous. This cap is separate from the thread
+    # offload because `asyncio.to_thread`'s default executor is much larger and
+    # would run many OCRs at once, each spawning onnxruntime's own intra-op
+    # threads, oversubscribing the box.
+    ocr_max_concurrent: int = 2
+    # Bounded waiting. An unbounded queue turns a load spike into an outage.
+    ocr_queue_wait_seconds: int = 10
+    ocr_max_upload_bytes: int = 10 * 1024 * 1024
+    ocr_rate_per_minute: int = 30
+    ocr_rate_burst: int = 10
+    # So a dev key is visibly not a prod key at a glance in a config file.
+    api_key_prefix: str = "lgw_live"
+    # Load the OCR models at startup instead of making the first caller pay.
+    ocr_prewarm: bool = False
+
     # --- validation ---
     @model_validator(mode="after")
     def _check_ad_auth(self) -> "Settings":
@@ -270,6 +294,19 @@ class Settings(BaseSettings):
             )
         if self.login_max_attempts < 1:
             raise ValueError("LOGIN_MAX_ATTEMPTS must be at least 1")
+        if self.ocr_max_concurrent < 1:
+            raise ValueError("OCR_MAX_CONCURRENT must be at least 1")
+        if self.ocr_queue_wait_seconds < 1:
+            raise ValueError("OCR_QUEUE_WAIT_SECONDS must be at least 1")
+        if self.ocr_max_upload_bytes < 1024:
+            raise ValueError("OCR_MAX_UPLOAD_BYTES must be at least 1024")
+        if self.ocr_rate_per_minute < 1 or self.ocr_rate_burst < 1:
+            raise ValueError(
+                "OCR_RATE_PER_MINUTE and OCR_RATE_BURST must be at least 1 "
+                "(the limiter fails closed, so 0 would refuse every call)"
+            )
+        if not self.api_key_prefix.strip():
+            raise ValueError("API_KEY_PREFIX must not be blank")
         return self
 
     @model_validator(mode="after")
