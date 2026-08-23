@@ -1335,9 +1335,13 @@ set -a && . ./.env && set +a
 .venv/bin/pytest tests/test_ocr_api_integration.py tests/test_ocr_api_boundaries.py \
                  tests/test_apikey_rate_limit.py -q
 ```
-Expected: 46 passed, 1 skipped in the integration module (the "OCR stack
+Expected: **36 passed, 1 skipped** in the integration module (the "OCR stack
 absent" negative) and 12 passed in boundaries — **the same counts as before
-the refactor**, with no test file edited in this task. If any test needed a
+the refactor**, with no test file edited in this task. (An earlier draft of this
+plan said 46; that was two modules' combined total, miscopied. If you want to
+prove the invariant rather than trust the number, `git stash` your change, run
+the module, and compare — that is what establishes behaviour preservation, not
+the absolute count.) If any test needed a
 change, revert and redo: the refactor altered behaviour.
 
 - [ ] **Step 7: Run the live eval too, since it exercises the real 200 path**
