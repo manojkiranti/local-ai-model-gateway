@@ -78,20 +78,21 @@ def parse(token: str) -> tuple[str, str] | None:
     if not token:
         return None
     parts = token.split("_")
-    # label may itself contain underscores ("lgw_live"), so search from the END.
-    # The prefix is exactly PREFIX_LEN (8) hex chars, secret may contain underscores.
+    # label may itself contain underscores ("lgw_live"), so search from the start
+    # for the first 8-character hex segment (the prefix). The secret is everything
+    # after that prefix and the next underscore.
     if len(parts) < 3:
         return None
-    # Search backwards for an 8-character hex string (the prefix)
-    for i in range(len(parts) - 2, -1, -1):
-        potential_prefix = parts[i]
-        if len(potential_prefix) == PREFIX_LEN:
+    # Search for the first 8-hex-char segment; it's the prefix
+    for i in range(len(parts) - 1):
+        candidate = parts[i]
+        if len(candidate) == PREFIX_LEN:
             try:
-                int(potential_prefix, 16)
-                # Found a valid hex prefix! Everything after it is the secret.
+                int(candidate, 16)
+                # Found the prefix! Everything after it (joined by _) is the secret
                 secret = "_".join(parts[i + 1:])
                 if secret:
-                    return potential_prefix, secret
+                    return candidate, secret
             except ValueError:
                 continue
     return None

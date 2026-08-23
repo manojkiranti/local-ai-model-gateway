@@ -90,3 +90,15 @@ def test_verify_uses_a_constant_time_comparison():
     assert not any(
         isinstance(op, (ast.Eq, ast.NotEq)) for c in comparisons for op in c.ops
     ), "verify() must not use == / != on secret material"
+
+
+def test_parse_with_extra_underscores_finds_the_first_hex_prefix():
+    """parse() correctly handles secrets containing underscores and hex runs.
+
+    token_urlsafe produces base64url, which uses '_' and '-', so a secret can
+    contain underscores. parse() finds the FIRST 8-character hex string (the prefix)
+    and treats everything after it as the secret, not the last-two-fields approach.
+    """
+    # Token with underscore in the secret: lgw_live_<aabbccdd>_<deadbeef_tail>
+    parsed = keygen.parse("lgw_live_aabbccdd_deadbeef_tail")
+    assert parsed == ("aabbccdd", "deadbeef_tail")
