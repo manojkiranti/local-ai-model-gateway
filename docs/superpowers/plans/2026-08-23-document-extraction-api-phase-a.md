@@ -176,7 +176,9 @@ Expected: one head (`b7e1c4d92a03`), lineage test PASS.
 - [ ] **Step 7: Prove the CHECK actually accepts the new scope**
 
 Append to `tests/test_apikey_admin_integration.py` (it already has `_client`
-and `_admin_headers`; reuse them, do not re-declare):
+and `_admin_token(client)` — NOT `_admin_headers`, which does not exist in that
+file; build the header inline as every other test there does, e.g.
+`headers={"Authorization": f"Bearer {_admin_token(client)}"}`):
 
 ```python
 def test_a_key_can_be_minted_with_the_document_read_scope():
@@ -184,7 +186,7 @@ def test_a_key_can_be_minted_with_the_document_read_scope():
         resp = client.post(
             "/v1/api-keys",
             json={"name": "extract-test", "scopes": ["document:read"]},
-            headers=_admin_headers(client),
+            headers={"Authorization": f"Bearer {_admin_token(client)}"},
         )
         assert resp.status_code == 201, resp.text
         assert resp.json()["scopes"] == ["document:read"]
@@ -195,7 +197,7 @@ def test_a_typod_scope_is_still_rejected_before_it_reaches_the_check():
         resp = client.post(
             "/v1/api-keys",
             json={"name": "bad-scope", "scopes": ["document:reed"]},
-            headers=_admin_headers(client),
+            headers={"Authorization": f"Bearer {_admin_token(client)}"},
         )
         assert resp.status_code == 422, resp.text
 ```
