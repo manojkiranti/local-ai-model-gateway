@@ -17,6 +17,7 @@ asserting the disabled-by-default behaviour is not silently broken by this
 file having flipped the switch and left it flipped.
 """
 
+import asyncio
 import contextlib
 import io
 import os
@@ -186,6 +187,62 @@ def test_a_key_without_the_scope_gets_403_not_401():
         assert "ocr:read" in resp.json()["detail"]
 
 
+def test_an_expired_key_is_the_same_401_as_every_other_cause():
+    """The sixth credential cause, proven END-TO-END rather than only against
+    the pure `policy.is_usable` function: an expired ROW must reach the live
+    dependency and come back indistinguishable from a wrong secret.
+    """
+    with _client() as client:
+        minted = _mint(client, "expired")
+        import asyncio
+        from datetime import datetime, timedelta, timezone
+
+        from sqlalchemy import update
+        from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+        from sqlalchemy.pool import NullPool
+
+        from app.apikeys import keygen
+        from app.apikeys.models import ApiKey
+        from app.apikeys.throttle import get_auth_throttle
+
+        async def expire():
+            engine = create_async_engine(DB_URL, poolclass=NullPool)
+            maker = async_sessionmaker(engine, expire_on_commit=False)
+            async with maker() as s:
+                await s.execute(
+                    update(ApiKey)
+                    .where(ApiKey.id == minted["id"])
+                    .values(expires_at=datetime.now(timezone.utc) - timedelta(days=1))
+                )
+                await s.commit()
+            await engine.dispose()
+
+        asyncio.run(expire())
+
+        # This key's prefix is freshly random and has never been presented
+        # before, so the throttle has no entry for it yet. Checked in-process
+        # (TestClient runs the ASGI app in THIS Python process, so the
+        # throttle's module-level singleton is the real, live one) rather than
+        # asserted from memory.
+        prefix, _secret = keygen.parse(minted["key"])
+        throttle = get_auth_throttle()
+        assert throttle.retry_after(prefix) is None
+        assert prefix not in throttle._entries
+
+        resp = _post(client, minted["key"])
+        assert resp.status_code == 401
+        assert resp.json()["detail"] == "Invalid API key"
+
+        # The property that makes this cause interesting: an expired key is
+        # NOT a guess, so presenting one honestly must not consume a throttle
+        # attempt (require_api_client's "not a guess" branch) — otherwise an
+        # honest caller with a key that quietly expired would get locked out
+        # of retrying with a NEW key from the same prefix on top of the
+        # expiry itself. Directly observable here because of the in-process
+        # TestClient noted above.
+        assert prefix not in throttle._entries
+
+
 # --- input guards --------------------------------------------------------
 
 def test_a_pdf_is_rejected_with_a_pointer_to_what_is_accepted():
@@ -315,6 +372,119 @@ def test_the_rate_limit_answers_429_with_a_retry_after():
             assert int(second.headers["Retry-After"]) >= 1
         finally:
             throttle._rate_limiter = None
+
+
+def test_no_capacity_is_503_and_is_not_the_same_answer_as_429():
+    """429 says the CALLER sent too much; 503 says the box is busy with other
+    callers. A client that backs off its own rate on a 503 fixes nothing, so
+    these must be distinguishable answers, not one message reused — and the
+    503 must be distinguishable from the OTHER 503 (missing stack) too, since
+    both share a status code but must not share a cause.
+
+    Driven deterministically: the module-global semaphore is swapped for an
+    already-exhausted one, exactly as the test above swaps the rate limiter.
+    No real load, no sleeping on a real OCR.
+    """
+    with _client() as client:
+        minted = _mint(client, "no-capacity")
+        os.environ["OCR_QUEUE_WAIT_SECONDS"] = "1"
+        from app.config import get_settings
+
+        get_settings.cache_clear()
+        from app.publicapi import ocr_router
+
+        saved = ocr_router._slots
+        ocr_router._slots = asyncio.Semaphore(0)  # every slot already taken
+        try:
+            resp = _post(client, minted["key"])
+            assert resp.status_code == 503
+            assert resp.headers["Retry-After"] == "5"
+            detail = resp.json()["detail"].lower()
+            assert "capacity" in detail
+            # Not the missing-stack message — same status code, different
+            # cause, and a test that only checked `== 503` would pass against
+            # either.
+            assert resp.json()["detail"] != ocr_router.STACK_MISSING
+        finally:
+            ocr_router._slots = saved
+            os.environ.pop("OCR_QUEUE_WAIT_SECONDS", None)
+            get_settings.cache_clear()
+
+        # The row is the only evidence of what a key did — confirm one exists
+        # for THIS status code, not just that the count went up by one.
+        from sqlalchemy import func, select
+        from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+        from sqlalchemy.pool import NullPool
+
+        from app.apikeys.models import ApiKeyUsage
+
+        async def count_503():
+            engine = create_async_engine(DB_URL, poolclass=NullPool)
+            maker = async_sessionmaker(engine, expire_on_commit=False)
+            async with maker() as s:
+                n = await s.scalar(
+                    select(func.count())
+                    .select_from(ApiKeyUsage)
+                    .where(
+                        ApiKeyUsage.api_key_id == minted["id"],
+                        ApiKeyUsage.status_code == 503,
+                    )
+                )
+            await engine.dispose()
+            return n
+
+        assert asyncio.run(count_503()) == 1
+
+
+def test_an_unexpected_ocr_failure_is_500_with_a_usage_row_not_a_crash():
+    """`image_ocr.ocr_image` documents `OcrUnavailable`/`ValueError` only;
+    nothing structurally enforces that (e.g. a bad enum lookup inside
+    `image_ocr._engine` could surface as `AttributeError`/`KeyError`). The
+    route must still answer (never a raw 500 traceback body) and must still
+    write a usage row — the row is the only evidence of what a key did, and
+    losing it on the one path most likely to be a real bug would be exactly
+    backwards. Stack-independent: `ocr_image` is monkeypatched, so this runs
+    whether or not rapidocr is installed here.
+    """
+    from unittest.mock import patch
+
+    from sqlalchemy import func, select
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+    from sqlalchemy.pool import NullPool
+
+    from app.apikeys.models import ApiKeyUsage
+    from app.publicapi import ocr_router
+
+    with _client() as client:
+        minted = _mint(client, "unexpected-failure")
+
+        def _boom(*args, **kwargs):
+            raise KeyError("not one of OcrUnavailable/ValueError")
+
+        with patch.object(ocr_router.image_ocr, "ocr_image", _boom):
+            resp = _post(client, minted["key"])
+
+        assert resp.status_code == 500
+        assert resp.json()["detail"] == "OCR failed unexpectedly"
+        # The internal exception must never reach the caller.
+        assert "KeyError" not in resp.text
+
+        async def count_500():
+            engine = create_async_engine(DB_URL, poolclass=NullPool)
+            maker = async_sessionmaker(engine, expire_on_commit=False)
+            async with maker() as s:
+                n = await s.scalar(
+                    select(func.count())
+                    .select_from(ApiKeyUsage)
+                    .where(
+                        ApiKeyUsage.api_key_id == minted["id"],
+                        ApiKeyUsage.status_code == 500,
+                    )
+                )
+            await engine.dispose()
+            return n
+
+        assert asyncio.run(count_500()) == 1
 
 
 @pytest.mark.skipif(image_ocr.available(), reason="the OCR stack IS installed")

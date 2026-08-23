@@ -77,6 +77,7 @@ def _semaphore() -> asyncio.Semaphore:
         413: {"description": "Image exceeds the size limit."},
         429: {"description": "Rate limited. See Retry-After."},
         503: {"description": "OCR unavailable, or no capacity right now."},
+        500: {"description": "Unexpected OCR failure (logged; should not happen)."},
     },
 )
 async def ocr(
@@ -209,6 +210,18 @@ async def ocr(
             await finish(503, STACK_MISSING)
         except ValueError as exc:
             await finish(400, str(exc))
+        except Exception:
+            # ocr_image documents OcrUnavailable/ValueError only, but nothing
+            # enforces that contract (e.g. a bad enum lookup inside
+            # image_ocr._engine could surface as AttributeError/KeyError). A
+            # usage row is the only evidence of what a key did, so an
+            # unexpected failure must still leave one — and the caller gets a
+            # generic message, never an internal exception string. Deliberately
+            # `Exception`, not `BaseException`: asyncio.CancelledError must stay
+            # uncaught, because a cancelled request is not a server error and
+            # swallowing it breaks cancellation.
+            logger.exception("ocr failed unexpectedly (request %s)", request_id)
+            await finish(500, "OCR failed unexpectedly")
         finally:
             _semaphore().release()
 
