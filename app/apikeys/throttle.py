@@ -99,6 +99,10 @@ _auth_throttle: LoginThrottle | None = None
 
 
 def get_rate_limiter() -> RateLimiter:
+    """Process-wide singleton for the per-key rate limiter.
+
+    Raises AttributeError until Task 6 adds ocr_rate_per_minute and ocr_rate_burst to settings.
+    """
     global _rate_limiter
     if _rate_limiter is None:
         settings = get_settings()

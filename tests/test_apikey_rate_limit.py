@@ -47,11 +47,19 @@ def test_tokens_refill_over_time():
 
 
 def test_refill_never_exceeds_the_burst():
+    """An hour of idling must not bank an hour of tokens.
+
+    The clock advance has to happen AFTER the bucket exists: a fresh bucket is
+    built with updated=now, so elapsed is 0 on its first refill and an advance
+    before creation is silently discarded — which is how the original version of
+    this test passed with the clamp deleted.
+    """
     limiter, clock = _limiter(per_minute=60, burst=2)
-    clock.advance(3600)
-    assert limiter.check("k1") is None
-    assert limiter.check("k1") is None
-    assert limiter.check("k1") is not None
+    limiter.check("k1")            # creates the bucket and spends one token -> 1 left
+    clock.advance(3600)            # unclamped this would bank ~3600 tokens
+    assert limiter.check("k1") is None      # 1st of the clamped burst
+    assert limiter.check("k1") is None      # 2nd -> bucket empty
+    assert limiter.check("k1") is not None  # refused: refill was capped at burst=2
 
 
 def test_keys_are_limited_independently():
