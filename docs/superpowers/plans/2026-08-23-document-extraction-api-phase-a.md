@@ -2353,8 +2353,13 @@ The full suite OOM-kills this box in one process. Split it:
 
 ```bash
 set -a && . ./.env && set +a
-ls tests/test_*.py | head -65 > /tmp/h1.txt
-ls tests/test_*.py | tail -70 > /tmp/h2.txt
+# Compute the midpoint — do NOT hardcode 65/70. At 137 files a fixed
+# `head -65` + `tail -70` covers only 135 and silently SKIPS two files
+# (measured: test_nrb_extract_integration.py, test_nrb_extraction.py).
+N=$(ls tests/test_*.py | wc -l); H=$(( (N + 1) / 2 ))
+ls tests/test_*.py | head -n "$H"        > /tmp/h1.txt
+ls tests/test_*.py | tail -n "+$((H+1))" > /tmp/h2.txt
+wc -l /tmp/h1.txt /tmp/h2.txt   # the two must sum to N
 .venv/bin/pytest -q -p no:randomly $(cat /tmp/h1.txt) | tail -3
 .venv/bin/pytest -q -p no:randomly $(cat /tmp/h2.txt) | tail -3
 ```
