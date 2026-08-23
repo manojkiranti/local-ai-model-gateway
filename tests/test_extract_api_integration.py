@@ -192,17 +192,106 @@ def test_a_scanned_pdf_is_422_and_says_so():
 
 
 def test_a_usage_row_is_written_for_a_success_and_for_a_403():
+    """Scoped by THIS test's OWN key ids, not a floor against the whole
+    table. The original version of this test asserted `>= 1` across every row
+    ever written for this route, with no run scoping at all — after one
+    green run, table residue satisfies `>= 1` even if `record_usage` were
+    deleted outright. Minting fresh keys and counting exactly their own rows
+    is the only way this test can fail when it should.
+    """
     import asyncio
 
     from sqlalchemy import text as sql_text
 
     with _client() as client:
-        good = _mint(client, "e9-good", ["document:read"])
-        bad = _mint(client, "e9-bad", ["ocr:read"])
-        assert _post(client, good).status_code == 200
-        assert _post(client, bad).status_code == 403
+        good_resp = client.post(
+            "/v1/api-keys",
+            json={"name": "e9-good", "scopes": ["document:read"]},
+            headers=_admin_headers(client),
+        )
+        assert good_resp.status_code == 201, good_resp.text
+        good_id, good_key = good_resp.json()["id"], good_resp.json()["key"]
 
-    async def count():
+        bad_resp = client.post(
+            "/v1/api-keys",
+            json={"name": "e9-bad", "scopes": ["ocr:read"]},
+            headers=_admin_headers(client),
+        )
+        assert bad_resp.status_code == 201, bad_resp.text
+        bad_id, bad_key = bad_resp.json()["id"], bad_resp.json()["key"]
+
+        assert _post(client, good_key).status_code == 200
+        assert _post(client, bad_key).status_code == 403
+
+    async def count(key_id, status_code):
+        from sqlalchemy.ext.asyncio import create_async_engine
+
+        engine = create_async_engine(DB_URL, poolclass=None)
+        try:
+            async with engine.connect() as conn:
+                row = await conn.execute(
+                    sql_text(
+                        "SELECT count(*) FROM api_key_usage "
+                        "WHERE route = 'POST /v1/extract' AND api_key_id = :kid "
+                        "AND status_code = :code"
+                    ),
+                    {"kid": key_id, "code": status_code},
+                )
+                return row.scalar_one()
+        finally:
+            await engine.dispose()
+
+    assert asyncio.run(count(good_id, 200)) == 1
+    assert asyncio.run(count(bad_id, 403)) == 1
+
+
+# --- regressions found by the Task 6 review --------------------------------
+
+
+def test_a_response_build_failure_is_500_with_exactly_one_row_no_false_200():
+    """`build_extract_response` pairs lines to confidences with
+    `zip(..., strict=True)`, so a genuine length mismatch raises `ValueError`.
+    The route builds the body BEFORE writing the success row for exactly this
+    reason: writing a `200` usage row first and building the body second
+    would leave that row on record for a request that actually failed — a
+    false success in the one place `api_key_usage` exists to be trustworthy
+    evidence. Forces the raise by monkeypatching `build_extract_response`
+    (the same technique `test_an_unexpected_ocr_failure_is_500_with_a_usage_
+    row_not_a_crash` in tests/test_ocr_api_integration.py uses for the
+    sibling route) rather than crafting real mismatched data, because the
+    mismatch is not reachable through any real input — proving the guard is
+    correct in the failure case it exists for still needs some way to force
+    it.
+    """
+    import asyncio
+    from unittest.mock import patch
+
+    from sqlalchemy import text as sql_text
+
+    from app.publicapi import extract_router
+
+    with _client() as client:
+        key_resp = client.post(
+            "/v1/api-keys",
+            json={"name": "build-fail", "scopes": ["document:read"]},
+            headers=_admin_headers(client),
+        )
+        assert key_resp.status_code == 201, key_resp.text
+        key_id, key = key_resp.json()["id"], key_resp.json()["key"]
+
+        def _boom(*args, **kwargs):
+            raise ValueError("lines/confidences length mismatch")
+
+        with patch.object(extract_router, "build_extract_response", _boom):
+            resp = _post(client, key)
+
+        assert resp.status_code == 500, resp.text
+        assert resp.json()["detail"] == "extraction failed unexpectedly"
+        # The internal exception must never reach the caller.
+        assert "ValueError" not in resp.text
+        assert "length mismatch" not in resp.text
+
+    async def counts():
         from sqlalchemy.ext.asyncio import create_async_engine
 
         engine = create_async_engine(DB_URL, poolclass=None)
@@ -211,13 +300,118 @@ def test_a_usage_row_is_written_for_a_success_and_for_a_403():
                 rows = await conn.execute(
                     sql_text(
                         "SELECT status_code, count(*) FROM api_key_usage "
-                        "WHERE route = 'POST /v1/extract' GROUP BY 1"
-                    )
+                        "WHERE route = 'POST /v1/extract' AND api_key_id = :kid "
+                        "GROUP BY 1"
+                    ),
+                    {"kid": key_id},
                 )
                 return dict(rows.all())
         finally:
             await engine.dispose()
 
-    by_status = asyncio.run(count())
-    assert by_status.get(200, 0) >= 1
-    assert by_status.get(403, 0) >= 1
+    by_status = asyncio.run(counts())
+    # Exactly one row for this request, and it must be the 500 — never a
+    # false 200 alongside or instead of it.
+    assert by_status == {500: 1}, by_status
+
+
+def test_413_from_the_routes_own_streamed_count_not_the_middleware():
+    """`UploadContentLengthGuard` only ever sees a DECLARED `Content-Length`;
+    a request that omits it (chunked, or any client that streams without one)
+    sails straight through the middleware unconditionally — exactly as
+    `test_a_chunked_request_with_no_content_length_is_not_refused_by_the_
+    guard` proves for `/v1/ocr`. The route's OWN cap is `_route.stream_to_
+    temp`, which counts bytes as they arrive off the wire and stops once
+    `max_bytes` is passed. Sending the multipart body as a generator (rather
+    than a plain `bytes`/`files=` payload) makes httpx negotiate chunked
+    transfer encoding with no `Content-Length` header at all — verified
+    directly against `httpx.Request` before relying on it here — so the ONLY
+    guard that can be answering this 413 is the route's own streamed count.
+    """
+    with _client() as client:
+        key = _mint(client, "stream-413", ["document:read"])
+        os.environ["EXTRACT_MAX_UPLOAD_BYTES"] = "2048"  # the config minimum
+        from app.config import get_settings
+
+        get_settings.cache_clear()
+        try:
+            boundary = "----extracttestboundary"
+            payload = b"x" * 5000  # over the 2048-byte cap above
+
+            def gen():
+                body = (
+                    f"--{boundary}\r\n"
+                    'Content-Disposition: form-data; name="file"; '
+                    'filename="big.txt"\r\n'
+                    "Content-Type: text/plain\r\n\r\n"
+                ).encode() + payload + f"\r\n--{boundary}--\r\n".encode()
+                for i in range(0, len(body), 1024):
+                    yield body[i : i + 1024]
+
+            resp = client.post(
+                "/v1/extract",
+                content=gen(),
+                headers={
+                    "Content-Type": f"multipart/form-data; boundary={boundary}",
+                    "X-API-Key": key,
+                },
+            )
+            assert "content-length" not in {k.lower() for k in resp.request.headers}
+            assert resp.status_code == 413, resp.text
+            assert "limit" in resp.json()["detail"].lower()
+        finally:
+            os.environ.pop("EXTRACT_MAX_UPLOAD_BYTES", None)
+            get_settings.cache_clear()
+
+
+def test_no_capacity_is_503_with_retry_after():
+    """The bounded semaphore wait expiring. Driven deterministically by
+    swapping the module-global semaphore for an already-exhausted one and
+    dropping the queue-wait to 1s, the same technique `test_no_capacity_is_
+    503_and_is_not_the_same_answer_as_429` uses for `/v1/ocr` — no real load,
+    no sleeping on a real extraction.
+    """
+    import asyncio
+
+    from app.publicapi import extract_router
+
+    with _client() as client:
+        key = _mint(client, "no-capacity", ["document:read"])
+        os.environ["EXTRACT_QUEUE_WAIT_SECONDS"] = "1"
+        from app.config import get_settings
+
+        get_settings.cache_clear()
+        saved = extract_router._slots
+        extract_router._slots = asyncio.Semaphore(0)  # every slot already taken
+        try:
+            resp = _post(client, key)
+            assert resp.status_code == 503, resp.text
+            assert resp.headers["Retry-After"] == "5"
+            assert "capacity" in resp.json()["detail"].lower()
+        finally:
+            extract_router._slots = saved
+            os.environ.pop("EXTRACT_QUEUE_WAIT_SECONDS", None)
+            get_settings.cache_clear()
+
+
+def test_no_temp_file_survives_a_success_or_a_rejected_request():
+    """The endpoint promises it does not retain caller uploads. Checked on
+    BOTH a 200 (the ordinary path through `finally: dest.unlink(...)`) and a
+    400 (an empty upload, which still calls `stream_to_temp` before the
+    empty-body check runs) — the same pairing
+    `test_no_temp_file_survives_a_rejected_request` uses for `/v1/ocr`, with
+    a real success added since a leak on the happy path is just as real a
+    leak as one on a rejection.
+    """
+    import tempfile
+    from pathlib import Path
+
+    with _client() as client:
+        key = _mint(client, "temp-cleanup", ["document:read"])
+        before = set(Path(tempfile.gettempdir()).glob("extract-*"))
+        ok = _post(client, key)
+        assert ok.status_code == 200, ok.text
+        empty = _post(client, key, data=b"")
+        assert empty.status_code == 400, empty.text
+        after = set(Path(tempfile.gettempdir()).glob("extract-*"))
+        assert after == before, after - before

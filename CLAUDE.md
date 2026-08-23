@@ -293,18 +293,32 @@ MAX_ATTEMPTS`/`_ATTEMPT_WINDOW_SECONDS`/`_LOCKOUT_SECONDS` — deliberately NOT
 `LOGIN_MAX_ATTEMPTS`, see the login-throttle gotcha below; both counters PER
 PROCESS), `dependencies` = `require_api_client(scope)` returning an
 **`ApiClient`, never a `User`**, `router` = admin `/v1/api-keys`),
-`publicapi/` (the external HTTP surface: `POST /v1/ocr` plus
-`middleware.OcrContentLengthGuard` — a `Content-Length`-based 413 registered
-as ASGI middleware ahead of routing, so an oversized declared body is
-rejected before FastAPI parses the multipart form and before
+`publicapi/` (the external HTTP surface: `POST /v1/ocr` and `POST
+/v1/extract` share `_route.py` (`UsageRecorder` = the row-per-attributable-
+outcome policy, `stream_to_temp` = streamed-and-counted upload with the temp
+path always returned so the caller's `finally` can unlink it, `enforce_
+rate_limit` = 429 + `Retry-After` before any disk touch — invented inline in
+`ocr_router.py` first, then extracted here so `extract_router.py` did not
+re-derive any of the five; **a new external route uses this module rather
+than reinventing its policies**) plus
+`middleware.UploadContentLengthGuard` — a `Content-Length`-based 413
+registered as ASGI middleware ahead of routing, so an oversized declared body
+is rejected before FastAPI parses the multipart form and before
 `require_api_client` runs at all; imports no OCR stack at module scope —
-`tests/test_ocr_api_boundaries.py` asserts that by subprocess. The guard
-matches `scope["path"]` against `/v1/ocr` EXACTLY — behind a path-prefixing
-reverse proxy running with `--root-path`, `scope["path"]` gains the prefix
-and the guard silently stops matching anything, with no error and no failing
-test; documented as a deployment prerequisite in `docs/external-api.md`
-rather than guessed at with a suffix match, since this gateway is not
-currently deployed behind one),
+`tests/test_ocr_api_boundaries.py` asserts that by subprocess. The guard is
+now **path-aware** (`UPLOAD_CAPS: dict[path, settings attr]`, covering both
+`/v1/ocr` and `/v1/extract` with their own separate caps) rather than
+hardcoded to one route, and matches `scope["path"]` EXACTLY — behind a
+path-prefixing reverse proxy running with `--root-path`, `scope["path"]`
+gains the prefix and the guard silently stops matching either path, with no
+error and no failing test; documented as a deployment prerequisite in
+`docs/external-api.md` rather than guessed at with a suffix match, since this
+gateway is not currently deployed behind one. `extraction.py` is the pure
+extension→route dispatch (`EXTRACT_EXTS`, native vs. OCR) shared by nothing
+outside this route; `extract_schemas.py` is the response envelope
+(`ExtractResponse`/`build_extract_response` — `caveat` dropped, not nulled,
+for a native source); `extract_router.py` is `POST /v1/extract` itself,
+scope `document:read`),
 `history/` (chat-history: `models` = `chat_sessions`
 + `chat_messages`, `repository` = data access, `service.open_turn` = shared
 turn-open used by chat, `router` = `/v1/sessions`),
@@ -408,6 +422,24 @@ the credential lockout (checked before the secret/scope, so it can fire on a
 good key whose prefix was probed), 503 OCR absent **or** at capacity, **500 a
 per-image engine failure OR an unexpected exception — logged, never echoed to
 the caller, and still writes a usage row**).
+`POST /v1/extract` (scope `document:read`; multipart document + optional
+`lang` (image uploads only) → `{kind, text, lines[{text,confidence}],
+sheets[{name,headers,rows,total_rows,truncated}], source{route,authoritative,
+caveat?,pages,text_pages,pages_skipped,partial}, request_id}`; accepts
+`.pdf .docx .txt .md .json` (native text layer), `.xlsx .csv` (native, as
+`sheets` — `text` stays `""`), `.png .jpg .jpeg .webp .tif .tiff .bmp` (OCR,
+same engine as `/v1/ocr`); 400 unsupported ext/empty/corrupt/bad-lang, 401 any
+credential fault, 403 missing scope, 413 over `EXTRACT_MAX_UPLOAD_BYTES`
+(default 25 MB, checked twice like `/v1/ocr`), **422 a PDF with pages but no
+text layer at all** (its own status code — `/v1/ocr` has no equivalent,
+because every OCR input is presumed textless already), 429 rate limit
+(`EXTRACT_RATE_PER_MINUTE`/`EXTRACT_RATE_BURST`, its own bucket) or credential
+lockout, 503 at capacity or — image uploads only — OCR absent, 500 an
+unexpected failure **or** the response failing to build after extraction
+genuinely succeeded (a `zip(strict=True)` lines/confidences mismatch; the
+route builds the body BEFORE writing the success row for exactly this
+reason, so that failure gets one 500 row and never a false 200 —
+`tests/test_extract_api_integration.py::test_a_response_build_failure_is_500_with_exactly_one_row_no_false_200`).
 `X-Request-Id` is returned on the **200 only**: every error path raises an
 `HTTPException` before the header reaches the outgoing response, so there is
 no id to hand back on a failure — locate that row by key + time + status
@@ -1537,15 +1569,39 @@ retained). Runbook: `docs/external-api.md`.
   `app.user_middleware` directly, not just the routers' absence from
   `openapi()['paths']`, because a feature-disabled deployment answering 413
   instead of 404 to an oversized `POST /v1/ocr` would reveal the route exists.
-- **The OCR caveat is ONE constant with TWO readers.** `image_ocr.OCR_CAVEAT` is
-  rendered into the model's context by `read_image` and published as `/v1/ocr`'s
-  `caveat` field; a second copy drifts, and then the API field contradicts the
-  chat answer and the reader cannot tell which to believe — the
-  `sources.VERIFY_NOTE` rule.
-  `test_the_caveat_is_one_constant_with_two_readers` locks it. Related:
-  `authoritative` is always False and **no code compares a confidence to a
-  literal** (AST-asserted) — §16.6 measured orthographic well-formedness, which
-  is not a per-field correctness estimate.
+- **The OCR caveat is ONE constant with THREE readers.** `image_ocr.OCR_CAVEAT`
+  is rendered into the model's context by `read_image`, published as `/v1/ocr`'s
+  `caveat` field, and published as `/v1/extract`'s `source.caveat` for its
+  OCR-routed responses; a second copy drifts, and then a surface contradicts
+  another one and the reader cannot tell which to believe — the
+  `sources.VERIFY_NOTE` rule. `tests/test_ocr_api_boundaries.py::
+  test_the_caveat_is_one_constant_with_three_readers` locks it (an earlier,
+  two-endpoint version of this same test was `..._with_two_readers`; adding
+  `/v1/extract` made it three, not a new test). Related: `authoritative` is
+  always False for an OCR-routed response and **no code compares a confidence
+  to a literal** (AST-asserted, across `ocr_router.py`/`schemas.py`/
+  `extract_schemas.py`/`extract_router.py` now) — §16.6 measured orthographic
+  well-formedness, which is not a per-field correctness estimate.
+- **`app/publicapi/_route.py` is where the five per-external-route policies
+  now live** (usage-row-before-raise, `X-Request-Id` on the 200 only,
+  streamed-and-counted upload with the temp path always returned, rate-limit-
+  before-disk, `stream_to_temp`'s `BaseException` cleanup on a client
+  disconnect mid-upload) — invented inline in `ocr_router.py`, then extracted
+  once `extract_router.py` needed the identical five for `POST /v1/extract`.
+  **A new external route uses `_route.py`'s `UsageRecorder`/`stream_to_temp`/
+  `enforce_rate_limit` rather than re-deriving any of them inline** — that is
+  exactly the mistake `_route.py` exists to stop a second route from making.
+  Separately: **`caveat` is absent from `/v1/extract`'s JSON entirely, not
+  `null`, for a native-routed response.** `/v1/ocr` only ever sees images, so
+  an unconditional caveat is correct there; `/v1/extract` also reads DOCX/PDF
+  text layers/XLSX/CSV, whose text is exact, and attaching the same warning to
+  those trains a reader to ignore it — then it is missing on the one page that
+  actually needed it (an OCR'd page inside an otherwise-native PDF). Same rule
+  as `docs/nrb-integration.md` §29.2 (native NRB chat citations carry no
+  caveat either) and the same mechanism `sources.py` uses: a `model_serializer`
+  in `extract_schemas.ExtractSource` drops the key rather than emitting it as
+  `null`, because `pages: null` on a CSV is still a fact worth transmitting but
+  a null caveat still reads as a field that might one day be filled in.
 - Test login: `admin@example.com` / `supersecret123` (persisted in Postgres).
 
 ## Not done yet

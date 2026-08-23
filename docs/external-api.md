@@ -1,4 +1,4 @@
-# The external API: API keys and `POST /v1/ocr`
+# The external API: API keys, `POST /v1/ocr` and `POST /v1/extract`
 
 Design and reasoning: `docs/superpowers/specs/2026-08-23-external-api-keys-and-ocr-endpoint-design.md`.
 This file is the runbook.
@@ -327,3 +327,166 @@ as `read_image`'s — still the open Nepali review (`docs/nrb-integration.md`
 §15) that `docs/image-ocr.md` §8 also points to. This endpoint does not close
 it, which is exactly why `authoritative` is always `false` and the caveat
 ships on every response.
+
+# `POST /v1/extract`: text and structure of one document
+
+Same `EXTERNAL_API_ENABLED` switch, same `X-API-Key` header, a different
+scope (`document:read` rather than `ocr:read` — a key minted for one cannot
+reach the other, in either direction:
+`tests/test_extract_api_integration.py::test_an_ocr_only_key_is_403_not_401`
+and `::test_a_document_read_key_cannot_reach_the_ocr_route`). Everything under
+"Turning it on", "Minting the first key" and "Revoking" above applies
+unchanged. This section covers what is specific to `/v1/extract`.
+
+## Calling it
+
+    curl -s -X POST localhost:8000/v1/extract \
+      -H "X-API-Key: lgw_live_..." \
+      -F file=@payslip.pdf | jq
+
+Accepted extensions, and which route each family takes:
+
+| Extension | Route | Notes |
+|---|---|---|
+| `.pdf` `.docx` `.txt` `.md` `.json` | `native` | Read from the document's own text layer. A PDF with no text layer is a **422**, not empty text — see below. |
+| `.xlsx` `.csv` | `native` | Returned as `sheets`, never flattened into `text` (`text` is `""` for these two). |
+| `.png` `.jpg` `.jpeg` `.webp` `.tif` `.tiff` `.bmp` | `ocr` | The same engine `/v1/ocr` uses. `lang` (`devanagari` default, or `en`) applies to these only. |
+
+There is no field-extraction mode here (`/v1/extract/fields` is a separate,
+not-yet-built endpoint) and no model call happens on this path at all — a key
+provisioned only for `document:read` cannot buy model access by adding a form
+field.
+
+## Reading the response
+
+Body shape: `{kind, text, lines[{text, confidence}], sheets[{name, headers,
+rows, total_rows, truncated}], source{route, authoritative, caveat?, pages,
+text_pages, pages_skipped, partial}, request_id}`.
+
+**Read `source` first.** `route: "native"` means the text came from the
+document's own text layer and is exact: `authoritative` is `true` and
+**`caveat` is absent from the JSON entirely — not `null`, absent.** `route:
+"ocr"` means it was machine-read exactly like `/v1/ocr`: `authoritative` is
+`false`, `caveat` is present, and no figure, date, account number or contact
+detail should be treated as correct without checking it against the original.
+
+The reason `caveat` is dropped rather than sent as `null` for a native source,
+not just omitted by convention: `/v1/ocr` only ever sees images, so an
+unconditional caveat is right there. This endpoint also reads DOCX, PDF text
+layers, XLSX and CSV, whose text is exact — attaching the same warning to
+those trains a reader to ignore it, and then it is missing on the one page
+that actually needed it (an OCR'd page inside an otherwise-native PDF; see
+`docs/nrb-integration.md` §29.2, and `app/rag/sources.py`'s identical rule for
+native NRB chat citations). The wording itself, when it does appear, is the
+*same* `image_ocr.OCR_CAVEAT` constant `read_image` and `/v1/ocr` already use
+— three readers, one constant
+(`tests/test_ocr_api_boundaries.py::test_the_caveat_is_one_constant_with_three_readers`).
+
+`sheets` is populated for `.xlsx`/`.csv` only and empty for every other
+format; `text` is the inverse (empty for a spreadsheet, populated for
+everything else). `lines[].confidence` is `null` for a native source (nothing
+uncertain to report) and populated only when `route == "ocr"` — reported,
+never enforced, same as `/v1/ocr`.
+
+## Status codes
+
+| Code | Meaning | What the caller should do |
+|---|---|---|
+| 400 | Unsupported extension, empty upload, a corrupt/unreadable file, or a bad `lang` | Fix the input |
+| 401 | The key is absent, malformed, unknown, wrong, revoked or expired — one message for all six causes | Check the secret; ask an admin whether it was revoked |
+| 403 | The key is genuine but lacks `document:read` | Ask an admin to re-mint with the scope. Do NOT rotate the key |
+| 413 | Over `EXTRACT_MAX_UPLOAD_BYTES` (default 25 MB) — from the Content-Length guard before the body is read, or from the route's own streamed count if the caller understated or omitted its Content-Length | Downscale/split before sending |
+| 422 | A PDF whose pages carry no text layer at all — a scanned document with no OCR available for it on this endpoint | Do not retry as-is. `/v1/extract` never OCRs a PDF (unlike an image upload, where OCR is the whole point); the caller needs either a text-layer version of the document or to route the individual page images through `/v1/ocr` itself |
+| 429 | This key's rate limit (`EXTRACT_RATE_PER_MINUTE`/`EXTRACT_RATE_BURST`) or its prefix is credential-locked — same two-cause split as `/v1/ocr`, distinguished by `Retry-After` and the detail text | Honour `Retry-After` |
+| 503 | The box is at capacity right now (`EXTRACT_MAX_CONCURRENT`/`EXTRACT_QUEUE_WAIT_SECONDS`), or — for an image upload only — the OCR stack is not installed on this deployment | Retry on `Retry-After`; a "not enabled" detail is a deployment fault (rebuild with `INSTALL_OCR=true`), not a transient one |
+| 500 | An unexpected failure — including the response body failing to build after a genuinely successful extraction (a `zip(strict=True)` length mismatch between lines and confidences) | Report it; the real exception is logged server-side and never echoed. Exactly **one** usage row is written for this outcome, never a false 200 alongside it — see `tests/test_extract_api_integration.py::test_a_response_build_failure_is_500_with_exactly_one_row_no_false_200` |
+
+Same 401 uniformity, same `X-Request-Id`-on-200-only rule, same
+per-attributable-cause usage-row split as `/v1/ocr` — see those sections
+above; none of it differs for this route.
+
+## Two things that differ from `/v1/ocr`, and one that does not
+
+- **The upload cap is bigger, and the reverse-proxy prerequisite now has to
+  cover BOTH.** `EXTRACT_MAX_UPLOAD_BYTES` defaults to **25 MB** against
+  `/v1/ocr`'s 10 MB (a PDF or DOCX is routinely bigger than a phone-camera
+  scan). The nginx `client_max_body_size` prerequisite in "Turning it on"
+  above must be sized for the **larger** of the two caps actually configured,
+  with headroom for multipart framing — e.g. `client_max_body_size 30m;` at
+  the current defaults, not `12m`. Sizing it to only the OCR cap would make
+  nginx itself reject a legitimately-sized `/v1/extract` upload before this
+  gateway ever saw it, with nginx's own error page instead of this route's
+  413 JSON body.
+- **The `--root-path` path-matching caveat now applies to two routes, not
+  one.** `UploadContentLengthGuard` (and `UPLOAD_CAPS`, the table it reads)
+  covers `/v1/ocr` and `/v1/extract` by exact `scope["path"]` match. Behind a
+  path-prefixing reverse proxy running with `--root-path` (e.g. `/api`), both
+  paths gain the prefix and the guard silently stops matching *either* one —
+  same failure mode as before, just twice the surface. This is still not a
+  live gap (this gateway is not currently deployed behind such a proxy), and
+  still a deploy-time prerequisite rather than a suffix-match guess, for the
+  same reasons given above.
+- **The wording of a route-level 413 is NOT the same string on the two
+  routes, even though the shared middleware's 413 is.**
+  `UploadContentLengthGuard` (the pre-auth, declared-`Content-Length` guard)
+  says `"upload exceeds the … MB limit"` for both paths — one string, one
+  `UPLOAD_CAPS` table. But each route's OWN streamed-count check (the one
+  that catches a caller who understated or omitted `Content-Length`) is
+  independent code: `/v1/extract`'s says `"upload exceeds the … MB limit"`
+  too, while `/v1/ocr`'s own check still says `"image exceeds the … MB
+  limit"` (`app/publicapi/ocr_router.py`, not touched by this change). So a
+  413 from `/v1/ocr` can read either way depending on which of the two guards
+  caught it, while a 413 from `/v1/extract` always reads the same regardless
+  of which guard caught it. Documented as the current state, not fixed here —
+  changing `ocr_router.py`'s wording is a one-line, separate change with its
+  own review, not a side effect of adding a second route.
+- **Its own rate bucket, same shape as `/v1/ocr`'s.** `EXTRACT_RATE_PER_MINUTE`
+  / `EXTRACT_RATE_BURST` are independent settings from `OCR_RATE_PER_MINUTE`
+  / `OCR_RATE_BURST`, enforced by a separate `RateLimiter` instance
+  (`get_extract_rate_limiter()`), **per process** like every other limiter in
+  this codebase — N uvicorn workers means N × the configured limit is
+  actually available across the fleet. A key holding both scopes is throttled
+  against each route independently; spending the OCR bucket does not touch
+  the extract one.
+
+## Evaluation & Improvement
+
+**Success metric.** Same shape as `/v1/ocr`'s: the share of `200` responses
+the consuming app uses without a re-parse or a manual fix-up. Not directly
+observable from the gateway, so the owned proxy is `api_key_usage`: the
+status-code split for `route = 'POST /v1/extract'`, plus the non-empty-text
+rate per key (a `200` with `text == ""` and `sheets == []` — which should
+essentially never happen for a native document, since anything that would
+produce it goes through the 422 branch first).
+
+**Eval.** `tests/test_extract_api_eval.py`, gated only on `DATABASE_URL` (no
+live model, no OCR stack — every case is a native format built in-process).
+Unlike `tests/test_ocr_api_eval.py`, this one asserts **exact** output: native
+extraction is deterministic (the same DOCX yields the same lines every run),
+so exact assertions are both possible and correct here, whereas the OCR eval
+next door scores aggregates because that engine is measurably nondeterministic
+on Devanagari. The image case is deliberately excluded rather than re-scored
+under looser assertions — that engine is already evaluated in
+`test_ocr_api_eval.py`, and re-scoring it here would just import its
+nondeterminism into a file whose whole point is exactness. 7 cases (`.txt`,
+`.md`, `.json`, `.docx`, `.xlsx`, `.csv`, and a dedicated
+native-carries-no-caveat check) plus one aggregate pass/fail so a partial
+regression cannot hide inside an otherwise-green module.
+
+**Pass rate measured 2026-08-23: 8/8** (`.venv/bin/pytest
+tests/test_extract_api_eval.py -q` → `8 passed`).
+
+**Feedback capture.** `api_key_usage` only, same columns and same absence of
+content as `/v1/ocr`'s row — route, status, bytes in, `lines_out`, duration,
+and (on a 200) a `request_id`. No document bytes and no extracted text are
+ever stored.
+
+**Review loop.** Folded into the same monthly review as `/v1/ocr`'s (the SQL
+in "Operating" above, scoped to `route = 'POST /v1/extract'`): the status-code
+split per key, a rising 422 share (more scanned PDFs arriving than expected —
+a caller-side signal, not a code fault), and any nonzero 401/500 count, which
+always needs a human. **Re-run the eval on any change to
+`app/files/documents.py`, `app/files/readers.py`, or the
+pypdf/openpyxl/python-docx version pins** — none of those files are covered
+by a live model or an external service, so there is no excuse for a change to
+any of them landing without a green `test_extract_api_eval.py` run.
