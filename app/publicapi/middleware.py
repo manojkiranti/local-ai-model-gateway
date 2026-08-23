@@ -1,4 +1,4 @@
-"""ASGI guard: reject a declared-oversized `POST /v1/ocr` before the body is
+"""ASGI guard: reject a declared-oversized upload `POST` before the body is
 spooled to disk.
 
 FastAPI resolves `await request.form()` (which is how it reads a multipart
@@ -10,14 +10,14 @@ all can send an arbitrarily large file part and make the gateway read and
 spool the whole thing to the container's temp filesystem before it ever
 answers 401. Concurrent repeats fill the disk.
 
-This checks only `Content-Length`, and only for this one path+method, and it
-is registered beside the routers inside the SAME `external_api_enabled` guard
-in `app/main.py` — a deployment with the feature off gains no middleware. A
-CHUNKED request (no `Content-Length` header at all) is let through
-unconditionally: refusing it would break a legitimate client that streams
-without declaring a length, and the streamed byte-counting cap already in
-`ocr_router.py` (`OCR_MAX_UPLOAD_BYTES`, enforced chunk by chunk as the body is
-read) still applies once such a request is actually processed.
+This checks only `Content-Length`, and only for the paths named in
+`UPLOAD_CAPS`, and it is registered beside the routers inside the SAME
+`external_api_enabled` guard in `app/main.py` — a deployment with the feature
+off gains no middleware. A CHUNKED request (no `Content-Length` header at
+all) is let through unconditionally: refusing it would break a legitimate
+client that streams without declaring a length, and each route's own
+streamed byte-counting cap (enforced chunk by chunk as the body is read)
+still applies once such a request is actually processed.
 
 This is a cheap, early rejection for the declared-length case ONLY — it is NOT
 a substitute for a reverse-proxy body cap (e.g. nginx's
@@ -30,18 +30,20 @@ middleware exactly as it would past any other declared-length check.
 which is the path AFTER Starlette strips any mounted `root_path` — but a
 reverse proxy that forwards under a prefix and sets `--root-path` (e.g.
 `--root-path /api`) makes `scope["path"]` `/api/v1/ocr`, not `/v1/ocr`. The
-`!=` comparison then fails for every request, and this guard quietly stops
+dict lookup then misses for every request, and this guard quietly stops
 existing while every test here still passes (none of them run behind a
-`root_path`). Chose a comment over a suffix match (`path.endswith(OCR_PATH)`)
-deliberately: a suffix match widens the check to any path ending in
-`/v1/ocr`, including one this route was never meant to guard behind a proxy
-that rewrites paths in less predictable ways, and this module's whole job is
-to be a narrow, provably-correct pre-auth gate — trading that for a guess at
-every possible proxy prefix is the wrong direction for a bank's first
-externally-reachable upload endpoint. If this gateway is ever deployed behind
-a path-prefixing proxy, that prerequisite belongs in the runbook (it does —
-see docs/external-api.md's "Turning it on" section) and/or `OCR_PATH` needs to
-become configurable, not this comparison guessed at.
+`root_path`) — and this now applies to EVERY key in `UPLOAD_CAPS`, not just
+`/v1/ocr`; the trap gets worse with each upload path added. Chose a comment
+over a suffix match (`path.endswith(...)`) deliberately: a suffix match
+widens the check to any path ending in one of these, including one this
+guard was never meant to cover behind a proxy that rewrites paths in less
+predictable ways, and this module's whole job is to be a narrow,
+provably-correct pre-auth gate — trading that for a guess at every possible
+proxy prefix is the wrong direction for a bank's first externally-reachable
+upload endpoints. If this gateway is ever deployed behind a path-prefixing
+proxy, that prerequisite belongs in the runbook (it does — see
+docs/external-api.md's "Turning it on" section) and/or `UPLOAD_CAPS`'s keys
+need to become configurable, not this comparison guessed at.
 """
 
 from __future__ import annotations
@@ -52,30 +54,30 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from ..config import get_settings
 
-# Kept as a constant rather than imported from ocr_router: importing that
-# module here would be harmless today, but this file's whole job is to run
-# BEFORE any dependency in that router does, so it stays decoupled from it.
-OCR_PATH = "/v1/ocr"
+# Request path -> the `Settings` attribute holding that path's cap. Two upload
+# paths with two different numbers: a 10 MB image cap is the wrong cap for a
+# PDF. Adding a third upload route means adding a line here, and the M-e
+# caveat above then applies to it too.
+UPLOAD_CAPS: dict[str, str] = {
+    "/v1/ocr": "ocr_max_upload_bytes",
+    "/v1/extract": "extract_max_upload_bytes",
+}
 
 
-class OcrContentLengthGuard:
-    """413s a `POST /v1/ocr` whose declared `Content-Length` exceeds
-    `OCR_MAX_UPLOAD_BYTES`, before Starlette/FastAPI parse the body at all."""
+class UploadContentLengthGuard:
+    """413s an upload whose DECLARED `Content-Length` exceeds its path's cap,
+    before Starlette/FastAPI parse the body at all."""
 
     def __init__(self, app: ASGIApp) -> None:
         self.app = app
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if (
-            scope["type"] != "http"
-            or scope.get("method") != "POST"
-            # M-e: EXACT match on the post-root_path path. Behind a
-            # path-prefixing reverse proxy running with `--root-path /api`,
-            # `scope["path"]` is `/api/v1/ocr` and this never matches — see
-            # the module docstring for why that stays a documented
-            # prerequisite rather than a suffix match here.
-            or scope.get("path") != OCR_PATH
-        ):
+        setting = (
+            UPLOAD_CAPS.get(scope.get("path"))
+            if scope["type"] == "http" and scope.get("method") == "POST"
+            else None
+        )
+        if setting is None:
             await self.app(scope, receive, send)
             return
 
@@ -88,13 +90,13 @@ class OcrContentLengthGuard:
             if length is not None:
                 # Read fresh every request (not cached at construction) so a
                 # settings-cache-clearing test, or a live config reload, is
-                # honoured the same way the route's own check already is.
-                max_bytes = get_settings().ocr_max_upload_bytes
+                # honoured the same way the routes' own checks already are.
+                max_bytes = getattr(get_settings(), setting)
                 if length > max_bytes:
                     response = JSONResponse(
                         {
                             "detail": (
-                                f"image exceeds the {max_bytes // (1024 * 1024)} "
+                                f"upload exceeds the {max_bytes // (1024 * 1024)} "
                                 "MB limit"
                             )
                         },

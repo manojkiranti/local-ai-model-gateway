@@ -20,7 +20,7 @@ from .mcp.client import MCPClient
 from .mcp.router import router as mcp_router
 from .nrb.router import router as nrb_router
 from .ollama.client import OllamaClient, OllamaError
-from .publicapi.middleware import OcrContentLengthGuard
+from .publicapi.middleware import UploadContentLengthGuard
 from .publicapi.ocr_router import router as ocr_router
 from .rag.jobs_router import router as ingest_jobs_router
 from .rag.router import router as departments_router
@@ -116,7 +116,7 @@ app = FastAPI(
 
 _settings = get_settings()
 
-# M-a: `OcrContentLengthGuard` must be added to the middleware stack BEFORE
+# M-a: `UploadContentLengthGuard` must be added to the middleware stack BEFORE
 # `CORSMiddleware`. `Starlette.add_middleware` inserts each new middleware at
 # position 0 of `app.user_middleware`, and the ASGI app is built by wrapping
 # in REVERSE of that list — so the LAST middleware added ends up OUTERMOST,
@@ -130,7 +130,7 @@ _settings = get_settings()
 # order) made the guard outermost instead, so its 413 never reached CORS at
 # all and a browser client saw an opaque network failure.
 if _settings.external_api_enabled:
-    app.add_middleware(OcrContentLengthGuard)
+    app.add_middleware(UploadContentLengthGuard)
 
 app.add_middleware(
     CORSMiddleware,
@@ -180,9 +180,9 @@ app.include_router(nrb_router)
 if get_settings().external_api_enabled:
     app.include_router(api_keys_router)
     app.include_router(ocr_router)
-    # `OcrContentLengthGuard` itself is registered further up, alongside
+    # `UploadContentLengthGuard` itself is registered further up, alongside
     # CORSMiddleware — see the comment there for why the ordering matters. It
-    # rejects a declared-oversized /v1/ocr body before FastAPI spools it to
+    # rejects a declared-oversized upload body before FastAPI spools it to
     # disk, and before authentication runs. Still gated on the same
     # `external_api_enabled` flag: a deployment with the feature off gains no
     # middleware.

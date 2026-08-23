@@ -48,7 +48,7 @@ because `/v1/ocr` is the first endpoint in this gateway that accepts uploads
 from OUTSIDE the organisation.
 
 **Prerequisite: do not put this gateway behind a path-prefixing reverse
-proxy (`--root-path`) without checking `OcrContentLengthGuard` first.** The
+proxy (`--root-path`) without checking `UploadContentLengthGuard` first.** The
 guard matches `scope["path"]` against `/v1/ocr` EXACTLY. Under a proxy that
 forwards under a prefix and runs Uvicorn/Gunicorn with e.g. `--root-path
 /api`, `scope["path"]` becomes `/api/v1/ocr` and the guard's comparison never

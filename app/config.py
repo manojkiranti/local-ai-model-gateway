@@ -272,6 +272,10 @@ class Settings(BaseSettings):
     # Bounded waiting. An unbounded queue turns a load spike into an outage.
     ocr_queue_wait_seconds: int = 10
     ocr_max_upload_bytes: int = 10 * 1024 * 1024
+    # A PDF is legitimately bigger than a scanned page image, so /v1/extract
+    # carries its own cap. Two upload paths, two numbers — one shared cap
+    # would either starve documents or over-admit images.
+    extract_max_upload_bytes: int = 25 * 1024 * 1024
     ocr_rate_per_minute: int = 30
     ocr_rate_burst: int = 10
     # So a dev key is visibly not a prod key at a glance in a config file.
@@ -319,6 +323,8 @@ class Settings(BaseSettings):
             raise ValueError("OCR_QUEUE_WAIT_SECONDS must be at least 1")
         if self.ocr_max_upload_bytes < 1024:
             raise ValueError("OCR_MAX_UPLOAD_BYTES must be at least 1024")
+        if self.extract_max_upload_bytes < 1024:
+            raise ValueError("EXTRACT_MAX_UPLOAD_BYTES must be at least 1024")
         if self.ocr_rate_per_minute < 1 or self.ocr_rate_burst < 1:
             raise ValueError(
                 "OCR_RATE_PER_MINUTE and OCR_RATE_BURST must be at least 1 "

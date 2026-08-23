@@ -189,7 +189,7 @@ def test_with_the_switch_unset_the_ocr_routes_are_absent_from_openapi():
 
 def test_with_the_switch_unset_the_guard_middleware_is_absent():
     """M-d: the merge-safety test above only asserted on the ROUTERS. If
-    `app.add_middleware(OcrContentLengthGuard)` were dedented out of the
+    `app.add_middleware(UploadContentLengthGuard)` were dedented out of the
     `external_api_enabled` block in `app/main.py`, nothing would fail — and a
     feature-disabled deployment would answer 413 instead of 404 to an
     oversized `POST /v1/ocr`, revealing the route exists on a deployment that
@@ -201,7 +201,7 @@ def test_with_the_switch_unset_the_guard_middleware_is_absent():
     script = (
         "import app.main;"
         "names = [m.cls.__name__ for m in app.main.app.user_middleware];"
-        "assert 'OcrContentLengthGuard' not in names, "
+        "assert 'UploadContentLengthGuard' not in names, "
         "f'guard present with the switch unset: {names}';"
         "print('OK')"
     )
@@ -224,7 +224,7 @@ def test_with_the_switch_enabled_the_guard_middleware_is_present():
     script = (
         "import app.main;"
         "names = [m.cls.__name__ for m in app.main.app.user_middleware];"
-        "assert 'OcrContentLengthGuard' in names, "
+        "assert 'UploadContentLengthGuard' in names, "
         "f'guard missing with the switch enabled: {names}';"
         "print('OK')"
     )
@@ -255,7 +255,7 @@ def test_the_guard_is_registered_outside_cors_so_its_413_carries_cors_headers():
     script = (
         "import app.main;"
         "names = [m.cls.__name__ for m in app.main.app.user_middleware];"
-        "guard_ix = names.index('OcrContentLengthGuard');"
+        "guard_ix = names.index('UploadContentLengthGuard');"
         "cors_ix = names.index('CORSMiddleware');"
         "assert guard_ix > cors_ix, "
         "f'guard must come AFTER cors in user_middleware (outer wraps inner): {names}';"

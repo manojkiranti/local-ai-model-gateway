@@ -329,7 +329,7 @@ def test_a_gif_renamed_png_never_reaches_the_gif_decoder():
 
 
 def test_an_unauthenticated_oversized_upload_is_413_not_401():
-    """`OcrContentLengthGuard` runs as ASGI middleware, BEFORE FastAPI even
+    """`UploadContentLengthGuard` runs as ASGI middleware, BEFORE FastAPI even
     parses the multipart body — and therefore before `require_api_client`
     ever runs. Without it, an attacker holding NO valid key could still make
     the gateway read and spool an arbitrarily large file part to disk before
@@ -410,7 +410,7 @@ def test_a_chunked_request_with_no_content_length_is_not_refused_by_the_guard():
     """
     import asyncio
 
-    from app.publicapi.middleware import OcrContentLengthGuard
+    from app.publicapi.middleware import UploadContentLengthGuard
 
     calls = []
 
@@ -419,7 +419,7 @@ def test_a_chunked_request_with_no_content_length_is_not_refused_by_the_guard():
         await send({"type": "http.response.start", "status": 200, "headers": []})
         await send({"type": "http.response.body", "body": b"ok"})
 
-    guard = OcrContentLengthGuard(inner_app)
+    guard = UploadContentLengthGuard(inner_app)
 
     scope = {
         "type": "http",
@@ -447,13 +447,13 @@ def test_the_guard_ignores_every_path_except_post_v1_ocr():
     intercepted, even with a huge declared Content-Length."""
     import asyncio
 
-    from app.publicapi.middleware import OcrContentLengthGuard
+    from app.publicapi.middleware import UploadContentLengthGuard
 
     async def inner_app(scope, receive, send):
         await send({"type": "http.response.start", "status": 200, "headers": []})
         await send({"type": "http.response.body", "body": b"ok"})
 
-    guard = OcrContentLengthGuard(inner_app)
+    guard = UploadContentLengthGuard(inner_app)
 
     async def receive():
         return {"type": "http.request", "body": b"", "more_body": False}
