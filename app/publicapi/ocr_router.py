@@ -27,29 +27,24 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
-import tempfile
-import time
 from pathlib import Path
-from uuid import uuid4
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Response, UploadFile, status
+from fastapi import APIRouter, Depends, Form, Response, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..apikeys.dependencies import ApiClient, require_api_client
 from ..apikeys.policy import SCOPE_OCR_READ
-from ..apikeys.repository import record_usage
 from ..apikeys.throttle import get_rate_limiter
 from ..config import get_settings
 from ..db.session import get_session
 from ..files import image_ocr, images, ingest
+from . import _route
 from .schemas import OcrResponse, build_response
 
 logger = logging.getLogger("app.publicapi.ocr")
 
 router = APIRouter(prefix="/v1", tags=["ocr"])
 
-_CHUNK = 1024 * 1024
 _ROUTE = "POST /v1/ocr"
 
 STACK_MISSING = "image OCR is not enabled on this deployment"
@@ -156,48 +151,27 @@ async def ocr(
     the same case. See docs/external-api.md for the full contract.
     """
     settings = get_settings()
-    request_id = uuid4().hex
+    recorder = _route.UsageRecorder(session, client=client, route=_ROUTE)
+    request_id = recorder.request_id
     response.headers["X-Request-Id"] = request_id
-    started = time.monotonic()
     dest: Path | None = None
     size = 0
     summary = None
 
     async def finish(status_code: int, detail: str | None = None, lines: int | None = None):
         """Record the usage row, then raise or return. Called on EVERY path."""
-        await record_usage(
-            session,
-            api_key_id=client.key_id,
-            route=_ROUTE,
-            status_code=status_code,
+        await recorder.finish(
+            status_code,
+            detail,
             bytes_in=size,
-            duration_ms=int((time.monotonic() - started) * 1000),
             width=summary.width if summary else None,
             height=summary.height if summary else None,
             lines_out=lines,
         )
-        await session.commit()
-        if detail is not None:
-            raise HTTPException(status_code=status_code, detail=detail)
 
     try:
         # 1) rate limit, before touching disk
-        wait = get_rate_limiter().check(client.key_id)
-        if wait is not None:
-            await record_usage(
-                session,
-                api_key_id=client.key_id,
-                route=_ROUTE,
-                status_code=429,
-                bytes_in=0,
-                duration_ms=int((time.monotonic() - started) * 1000),
-            )
-            await session.commit()
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Rate limit exceeded for this API key",
-                headers={"Retry-After": str(wait)},
-            )
+        await _route.enforce_rate_limit(get_rate_limiter(), recorder)
 
         # 2) language, before any IO — a bad value must not cost an upload
         chosen = (lang or image_ocr.DEFAULT_LANG).strip()
@@ -224,21 +198,16 @@ async def ocr(
             )
 
         # 4) stream to a temp file, counting bytes (413 before any decode)
-        fd, temp_name = tempfile.mkstemp(prefix="ocr-", suffix=ext)
-        dest = Path(temp_name)
-        with os.fdopen(fd, "wb") as out:
-            while True:
-                chunk = await file.read(_CHUNK)
-                if not chunk:
-                    break
-                size += len(chunk)
-                if size > settings.ocr_max_upload_bytes:
-                    await finish(
-                        413,
-                        f"image exceeds the "
-                        f"{settings.ocr_max_upload_bytes // (1024 * 1024)} MB limit",
-                    )
-                out.write(chunk)
+        streamed = await _route.stream_to_temp(
+            file, prefix="ocr-", suffix=ext, max_bytes=settings.ocr_max_upload_bytes
+        )
+        dest, size = streamed.path, streamed.size
+        if streamed.exceeded:
+            await finish(
+                413,
+                f"image exceeds the "
+                f"{settings.ocr_max_upload_bytes // (1024 * 1024)} MB limit",
+            )
         if size == 0:
             await finish(400, "uploaded file is empty")
 
@@ -257,21 +226,13 @@ async def ocr(
                 _semaphore().acquire(), timeout=settings.ocr_queue_wait_seconds
             )
         except asyncio.TimeoutError:
-            await record_usage(
-                session,
-                api_key_id=client.key_id,
-                route=_ROUTE,
-                status_code=503,
+            await recorder.finish(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "OCR is at capacity; retry shortly",
                 bytes_in=size,
-                duration_ms=int((time.monotonic() - started) * 1000),
+                headers={"Retry-After": "5"},
                 width=summary.width,
                 height=summary.height,
-            )
-            await session.commit()
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="OCR is at capacity; retry shortly",
-                headers={"Retry-After": "5"},
             )
 
         try:
@@ -311,7 +272,7 @@ async def ocr(
             "ocr ok request=%s key=%s lines=%d %dx%d frames=%d %dms",
             request_id, client.key_id, len(result.lines),
             summary.width, summary.height, summary.frames,
-            int((time.monotonic() - started) * 1000),
+            recorder.elapsed_ms,
         )
         return build_response(result, summary, request_id)
     finally:
