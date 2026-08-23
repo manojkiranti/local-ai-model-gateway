@@ -38,12 +38,10 @@ READ_IMAGE_MAX_LINES = 400
 HEADER_BUDGET = 700
 IMAGE_MAX_CHARS = MODEL_RESULT_CAP - HEADER_BUDGET  # 7300
 
-CAVEAT = (
-    "CAVEAT: this is machine-read text (OCR), not a transcription — words and "
-    "whole lines can be dropped or misread. VERIFY every figure, date, account "
-    "number and contact detail against the image itself before relying on it, "
-    "and say so when you quote one."
-)
+# The tool's caveat and the external API's are ONE constant — see
+# image_ocr.OCR_CAVEAT for why. Re-exported under the old name so the rest of
+# this module (and its tests) read unchanged.
+CAVEAT = image_ocr.OCR_CAVEAT
 
 
 def _header(

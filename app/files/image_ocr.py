@@ -55,6 +55,7 @@ __all__ = [
     "OCR_BACKEND",
     "DEFAULT_LANG",
     "SUPPORTED_LANGS",
+    "OCR_CAVEAT",
     "OcrUnavailable",
     "OcrResult",
     "available",
@@ -77,6 +78,21 @@ OCR_BACKEND = "onnxruntime"
 # returns *nothing* for Nepali. Degraded latin beats absent Devanagari.
 DEFAULT_LANG = "devanagari"
 SUPPORTED_LANGS = {"devanagari", "en"}
+
+# ONE constant, TWO readers: `app/tools/local/read_image.py` renders it into the
+# model's context, and `app/publicapi/schemas.py` publishes it to an external
+# caller. A second copy drifts, and then a UI badge or an API field contradicts
+# the answer text, leaving the reader unable to tell which to believe — exactly
+# the reasoning behind `app/rag/sources.py`'s VERIFY_NOTE.
+#
+# It says what §16.6 measured: PP-OCRv5 drops letterheads and subject lines,
+# mangles latin runs, and misreads dates (२०६९।१।३१ as २०६९।९।३१).
+OCR_CAVEAT = (
+    "CAVEAT: this is machine-read text (OCR), not a transcription — words and "
+    "whole lines can be dropped or misread. VERIFY every figure, date, account "
+    "number and contact detail against the image itself before relying on it, "
+    "and say so when you quote one."
+)
 
 # The configuration, declared as plain strings so it can be asserted in an
 # environment where rapidocr is not installed — which is exactly the environment
