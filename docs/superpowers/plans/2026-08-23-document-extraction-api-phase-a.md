@@ -663,17 +663,19 @@ def test_page_facts_survive_and_null_pages_are_not_dropped():
     assert "pages" in csv_dump["source"] and csv_dump["source"]["pages"] is None
 
 
-def test_nothing_in_the_schemas_compares_a_confidence_to_a_literal():
-    # §16.6 declines to invent a threshold from an orthography measurement.
-    # Same AST rule the OCR schemas are already held to.
-    import ast
-    import pathlib
-
-    src = pathlib.Path("app/publicapi/extract_schemas.py").read_text()
-    for node in ast.walk(ast.parse(src)):
-        if isinstance(node, ast.Compare):
-            text = ast.dump(node)
-            assert "confidence" not in text, f"threshold comparison: {text}"
+# NOTE (corrected during execution — do NOT add a second AST test here).
+# The repo ALREADY enforces the no-threshold rule, rigorously, at
+# tests/test_ocr_api_boundaries.py::test_neither_the_router_nor_the_schemas_
+# compare_a_confidence_to_a_literal — it collects `ast.Attribute.attr` /
+# `ast.Name.id` from every `ast.Compare` and fails on an intersection with
+# {"confidence","score","scores","mean_score","min_score"}. An earlier draft of
+# this plan added a SECOND, weaker check here (a raw substring search on
+# `ast.dump()`); the two disagreed about what they forbade, and the duplicate is
+# exactly the "one rule, two surfaces that drift" failure this codebase objects
+# to elsewhere. Instead: add `extract_schemas` to that existing test's module
+# tuple, and write `build_extract_response` with no `Compare` naming a
+# confidence/score identifier at all (`or`-pad then `zip(..., strict=True)` —
+# `or` is a BoolOp, so the property holds honestly rather than by renaming).
 ```
 
 - [ ] **Step 2: Run them and watch them fail**
@@ -2110,6 +2112,16 @@ async def extract(
             dest.unlink(missing_ok=True)
         await file.close()
 ```
+
+- [ ] **Step 5b: Put the new router under the existing no-threshold AST test**
+
+Add `extract_router` to the module tuple in
+`tests/test_ocr_api_boundaries.py::test_neither_the_router_nor_the_schemas_compare_a_confidence_to_a_literal`,
+so it reads `for module in (ocr_router, schemas, extract_schemas, extract_router):`.
+Change nothing else about that test. Do NOT write a new AST test — there is one
+enforcement of this rule and this is it (see the note in Task 3). If the router
+then fails it, the router is wrong, not the test: rewrite the offending line so
+it contains no `Compare` naming a confidence/score identifier.
 
 - [ ] **Step 6: Register the router**
 
