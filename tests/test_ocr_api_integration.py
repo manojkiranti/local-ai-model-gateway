@@ -487,6 +487,73 @@ def test_an_unexpected_ocr_failure_is_500_with_a_usage_row_not_a_crash():
         assert asyncio.run(count_500()) == 1
 
 
+def test_an_unavailable_engine_is_503_with_the_exact_detail_and_a_usage_row():
+    """The §18 path, proven by EXECUTION rather than by reading the code.
+
+    The sibling test below skips wherever the OCR stack is installed (true on
+    this machine), and Task 9's subprocess test only checks that the
+    STACK_MISSING constant exists under an import blocker — neither one ever
+    actually calls the route's handler. So without this test, the route's own
+    `except image_ocr.OcrUnavailable` -> 503 branch has never executed in a
+    test run. An empty `lines: []` with a 200 is the worst outcome this route
+    has (§18: the caller writes "no text found" into a client file), so this
+    checks both the status AND that the body is shaped like a failure, not a
+    disguised empty success.
+
+    Both this test and the skip-gated one below stay: this one is the
+    always-runs proof that the handler branch executes correctly; that one is
+    the real-deployment proof that `image_ocr.available()` itself reports
+    False when the stack is truly absent. Neither subsumes the other.
+    """
+    from sqlalchemy import func, select
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+    from sqlalchemy.pool import NullPool
+
+    from app.apikeys.models import ApiKeyUsage
+    from app.publicapi import ocr_router
+
+    with _client() as client:
+        minted = _mint(client, "engine-unavailable")
+
+        saved = ocr_router.image_ocr.ocr_image
+
+        def _unavailable(*args, **kwargs):
+            raise ocr_router.image_ocr.OcrUnavailable("stack absent for the test")
+
+        ocr_router.image_ocr.ocr_image = _unavailable
+        try:
+            resp = _post(client, minted["key"])
+        finally:
+            ocr_router.image_ocr.ocr_image = saved
+
+        assert resp.status_code == 503
+        body = resp.json()
+        # Exact, not a substring — and distinct from the capacity 503, whose
+        # own test asserts its detail `!= STACK_MISSING`. Together the two
+        # prove the pair is discriminated in both directions.
+        assert body["detail"] == ocr_router.STACK_MISSING
+        # No partial-success body: a failure must not be dressed up as an
+        # empty success.
+        assert "lines" not in body
+
+        async def count_503():
+            engine = create_async_engine(DB_URL, poolclass=NullPool)
+            maker = async_sessionmaker(engine, expire_on_commit=False)
+            async with maker() as s:
+                n = await s.scalar(
+                    select(func.count())
+                    .select_from(ApiKeyUsage)
+                    .where(
+                        ApiKeyUsage.api_key_id == minted["id"],
+                        ApiKeyUsage.status_code == 503,
+                    )
+                )
+            await engine.dispose()
+            return n
+
+        assert asyncio.run(count_503()) == 1
+
+
 @pytest.mark.skipif(image_ocr.available(), reason="the OCR stack IS installed")
 def test_a_missing_ocr_stack_is_503_never_an_empty_200():
     """§18's lesson: every way an OCR deployment breaks looks like a clean
