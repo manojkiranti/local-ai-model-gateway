@@ -117,6 +117,31 @@ def test_every_bad_credential_gets_the_same_401_body(key):
         assert resp.json()["detail"] == "Invalid API key"
 
 
+def test_a_truly_absent_header_is_byte_identical_to_a_wrong_secret_401():
+    """`APIKeyHeader(auto_error=False)` must keep the absent-header case
+    OURS — same status, same body — rather than falling through to the
+    generic 403 FastAPI's own security dependency raises by default when a
+    scheme is missing and `auto_error` is left True. This sends NO
+    `X-API-Key` header at all, which is a different wire shape from the
+    parametrized `""` case above (that one still SENDS the header, with an
+    empty value) — and compares raw response BYTES, not just status/JSON
+    shape, against a wrong-secret rejection on a real key.
+    """
+    with _client() as client:
+        minted = _mint(client, "byte-identical-check")
+
+        absent = client.post(
+            "/v1/ocr", files={"file": ("a.png", _png(), "image/png")}
+        )
+
+        tampered = minted["key"].rsplit("_", 1)[0] + "_" + "z" * 43
+        wrong_secret = _post(client, tampered)
+
+        assert absent.status_code == 401 == wrong_secret.status_code
+        assert absent.content == wrong_secret.content
+        assert absent.json()["detail"] == "Invalid API key"
+
+
 def test_a_wrong_secret_on_a_real_prefix_is_the_same_401():
     """Distinguishing this from an unknown prefix tells an attacker which
     prefixes are real."""
@@ -233,14 +258,20 @@ def test_an_expired_key_is_the_same_401_as_every_other_cause():
         assert resp.status_code == 401
         assert resp.json()["detail"] == "Invalid API key"
 
-        # The property that makes this cause interesting: an expired key is
-        # NOT a guess, so presenting one honestly must not consume a throttle
-        # attempt (require_api_client's "not a guess" branch) — otherwise an
-        # honest caller with a key that quietly expired would get locked out
-        # of retrying with a NEW key from the same prefix on top of the
-        # expiry itself. Directly observable here because of the in-process
-        # TestClient noted above.
-        assert prefix not in throttle._entries
+        # The property that makes this cause interesting, REVERSED from an
+        # earlier version of this test: an expired key now DOES consume a
+        # throttle attempt. The original exemption copied AD login's rule
+        # that an unreachable directory must not cost an attempt — but that
+        # protects an honest caller from a TRANSIENT fault (the directory
+        # recovers, the account is fine). Revocation and expiry are the
+        # opposite: PERMANENT for this prefix (no route un-revokes one, and
+        # re-minting hands out a fresh random prefix), so the exemption never
+        # spared an honest caller anything, while it let an attacker probe a
+        # dead key unboundedly AND told them "429 means the secret was right,
+        # 401-forever means it was wrong" — exactly the six-causes-one-message
+        # boundary this module exists to hide. Directly observable here
+        # because of the in-process TestClient noted above.
+        assert prefix in throttle._entries
 
 
 # --- input guards --------------------------------------------------------
@@ -253,6 +284,19 @@ def test_a_pdf_is_rejected_with_a_pointer_to_what_is_accepted():
         assert ".png" in resp.json()["detail"]
 
 
+def test_a_very_long_extensionless_filename_is_truncated_in_the_400_body():
+    """`file.filename` is the caller's own, unbounded string, reflected
+    straight into the 400 detail. JSON-encoded so this isn't an injection,
+    but it is attacker-controlled and was previously unbounded."""
+    with _client() as client:
+        minted = _mint(client, "long-filename")
+        long_name = "a" * 500  # no extension, so the raw name is what's shown
+        resp = _post(client, minted["key"], data=b"not an image", filename=long_name)
+        assert resp.status_code == 400
+        detail = resp.json()["detail"]
+        assert len(detail) < 250, f"detail not bounded: {len(detail)} chars"
+
+
 def test_an_empty_upload_is_rejected():
     with _client() as client:
         minted = _mint(client, "empty")
@@ -261,12 +305,130 @@ def test_an_empty_upload_is_rejected():
 
 
 def test_a_gif_renamed_png_never_reaches_the_gif_decoder():
-    """images._KINDS is a decoder allowlist on the SNIFFED format."""
+    """images._KINDS is a decoder allowlist on the SNIFFED format.
+
+    Uses a REAL, Pillow-written GIF. An earlier version of this test used a
+    hand-built byte string (`b"GIF89a" + b"\\x01\\x00\\x01\\x00" + b"\\x00" * 20`)
+    that never reached `_KINDS` at all — measured, Pillow itself raises
+    UnidentifiedImageError on those bytes before the format allowlist is ever
+    consulted, so the test passed for a reason unrelated to its own name and
+    would have kept passing if 'GIF' were added to `_KINDS` tomorrow. A real
+    GIF actually exercises the allowlist rejection path, which is why the
+    detail assertion below checks for THAT specific message rather than just
+    the status code.
+    """
     with _client() as client:
         minted = _mint(client, "renamed-gif")
-        gif = b"GIF89a" + b"\x01\x00\x01\x00" + b"\x00" * 20
-        resp = _post(client, minted["key"], data=gif, filename="a.png")
+        from PIL import Image
+
+        buf = io.BytesIO()
+        Image.new("P", (4, 4)).save(buf, format="GIF")
+        resp = _post(client, minted["key"], data=buf.getvalue(), filename="a.png")
         assert resp.status_code == 400
+        assert "unsupported image format" in resp.json()["detail"]
+
+
+def test_an_unauthenticated_oversized_upload_is_413_not_401():
+    """`OcrContentLengthGuard` runs as ASGI middleware, BEFORE FastAPI even
+    parses the multipart body — and therefore before `require_api_client`
+    ever runs. Without it, an attacker holding NO valid key could still make
+    the gateway read and spool an arbitrarily large file part to disk before
+    the auth dependency got a chance to answer 401 (Starlette's own
+    `max_part_size` only bounds non-file form parts). Proven here by sending
+    a garbage credential together with an oversized declared body: if auth
+    ran first this would be 401, not 413.
+    """
+    with _client() as client:
+        os.environ["OCR_MAX_UPLOAD_BYTES"] = "1024"
+        from app.config import get_settings
+
+        get_settings.cache_clear()
+        try:
+            big = b"\x00" * 5000
+            resp = client.post(
+                "/v1/ocr",
+                files={"file": ("a.png", big, "image/png")},
+                headers={"X-API-Key": "garbage"},
+            )
+            assert resp.status_code == 413
+            assert "limit" in resp.json()["detail"].lower()
+        finally:
+            os.environ.pop("OCR_MAX_UPLOAD_BYTES", None)
+            get_settings.cache_clear()
+
+
+def test_a_chunked_request_with_no_content_length_is_not_refused_by_the_guard():
+    """The guard must let a request with NO declared `Content-Length` through
+    unconditionally — refusing it would break a legitimate client that
+    streams without one. Exercised directly at the ASGI layer (constructing a
+    real chunked HTTP/1.1 request through TestClient is not practical), which
+    also keeps this test independent of the DB/app-reload machinery every
+    other test in this file needs.
+    """
+    import asyncio
+
+    from app.publicapi.middleware import OcrContentLengthGuard
+
+    calls = []
+
+    async def inner_app(scope, receive, send):
+        calls.append(scope["path"])
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await send({"type": "http.response.body", "body": b"ok"})
+
+    guard = OcrContentLengthGuard(inner_app)
+
+    scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/v1/ocr",
+        "headers": [],  # no content-length at all
+    }
+
+    sent = []
+
+    async def receive():
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    async def send(message):
+        sent.append(message)
+
+    asyncio.run(guard(scope, receive, send))
+
+    assert calls == ["/v1/ocr"], "the inner app must have been reached"
+    assert sent[0]["status"] == 200
+
+
+def test_the_guard_ignores_every_path_except_post_v1_ocr():
+    """Scoped narrowly: neither the wrong method nor the wrong path should be
+    intercepted, even with a huge declared Content-Length."""
+    import asyncio
+
+    from app.publicapi.middleware import OcrContentLengthGuard
+
+    async def inner_app(scope, receive, send):
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await send({"type": "http.response.body", "body": b"ok"})
+
+    guard = OcrContentLengthGuard(inner_app)
+
+    async def receive():
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    for method, path in (("GET", "/v1/ocr"), ("POST", "/v1/other")):
+        scope = {
+            "type": "http",
+            "method": method,
+            "path": path,
+            "headers": [(b"content-length", str(10**9).encode())],
+        }
+        sent = []
+
+        async def send(message, _sent=sent):
+            _sent.append(message)
+
+        asyncio.run(guard(scope, receive, send))
+        assert sent[0]["status"] == 200, f"{method} {path} was wrongly intercepted"
 
 
 def test_an_oversized_upload_is_413_and_never_decoded():
@@ -354,6 +516,121 @@ def test_a_usage_row_is_written_even_for_a_rejected_request():
         before = asyncio.run(count())
         _post(client, minted["key"], data=b"%PDF-1.4\n", filename="a.pdf")
         assert asyncio.run(count()) == before + 1
+
+
+def _usage_count(key_id, status_code):
+    from sqlalchemy import func, select
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+    from sqlalchemy.pool import NullPool
+
+    from app.apikeys.models import ApiKeyUsage
+
+    async def count():
+        engine = create_async_engine(DB_URL, poolclass=NullPool)
+        maker = async_sessionmaker(engine, expire_on_commit=False)
+        async with maker() as s:
+            n = await s.scalar(
+                select(func.count())
+                .select_from(ApiKeyUsage)
+                .where(
+                    ApiKeyUsage.api_key_id == key_id,
+                    ApiKeyUsage.status_code == status_code,
+                )
+            )
+        await engine.dispose()
+        return n
+
+    return asyncio.run(count())
+
+
+def test_a_wrong_secret_on_a_real_prefix_writes_an_attributable_401_row():
+    """The credential is genuine (a real key exists at this prefix), so this
+    401 is the FIRST of the six causes that has a real `api_keys.id` to
+    attach a row to — the dependency must not stay silent just because it
+    never reaches the route body."""
+    with _client() as client:
+        minted = _mint(client, "wrong-secret-usage")
+        tampered = minted["key"].rsplit("_", 1)[0] + "_" + "z" * 43
+        resp = _post(client, tampered)
+        assert resp.status_code == 401
+        assert _usage_count(minted["id"], 401) == 1
+
+
+def test_an_unknown_prefix_writes_no_usage_row_at_all():
+    """The other 401 shape: no row matches the prefix, so there is no real
+    `api_keys.id` to attribute anything to. Unattributable, and the docs say
+    so rather than claiming a row on every path — checked by asserting the
+    TABLE'S total row count is unchanged, since there is no key id to filter
+    a per-key count by."""
+    from sqlalchemy import func, select
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+    from sqlalchemy.pool import NullPool
+
+    from app.apikeys.models import ApiKeyUsage
+
+    async def total():
+        engine = create_async_engine(DB_URL, poolclass=NullPool)
+        maker = async_sessionmaker(engine, expire_on_commit=False)
+        async with maker() as s:
+            n = await s.scalar(select(func.count()).select_from(ApiKeyUsage))
+        await engine.dispose()
+        return n
+
+    with _client() as client:
+        before = asyncio.run(total())
+        resp = _post(client, "lgw_live_deadbeef_" + "0" * 64)
+        assert resp.status_code == 401
+        assert asyncio.run(total()) == before
+
+
+def test_a_key_lacking_scope_writes_an_attributable_403_row():
+    with _client() as client:
+        minted = _mint(client, "scope-usage")
+        import asyncio as _asyncio
+
+        from sqlalchemy import update
+        from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+        from sqlalchemy.pool import NullPool
+
+        from app.apikeys.models import ApiKey
+
+        async def strip():
+            engine = create_async_engine(DB_URL, poolclass=NullPool)
+            maker = async_sessionmaker(engine, expire_on_commit=False)
+            async with maker() as s:
+                await s.execute(
+                    update(ApiKey).where(ApiKey.id == minted["id"]).values(scopes=[])
+                )
+                await s.commit()
+            await engine.dispose()
+
+        _asyncio.run(strip())
+        resp = _post(client, minted["key"])
+        assert resp.status_code == 403
+        assert _usage_count(minted["id"], 403) == 1
+
+
+def test_a_credential_lockout_429_writes_an_attributable_row_for_a_real_key():
+    """The lockout 429 fires BEFORE the dependency looks the key up for
+    authentication purposes — so attributing a row to it needs its own
+    lookup by prefix. That extra query only happens on this already-rejected
+    path, and only when the prefix belongs to a real key."""
+    with _client() as client:
+        minted = _mint(client, "lockout-usage")
+        from app.config import get_settings
+
+        settings = get_settings()
+        # Trip the lockout with wrong secrets first (each one already writes
+        # its own 401 usage row, which is fine — this test only cares about
+        # the LOCKOUT row that follows).
+        tampered = minted["key"].rsplit("_", 1)[0] + "_" + "z" * 43
+        for _ in range(settings.api_key_max_attempts):
+            _post(client, tampered)
+
+        resp = _post(client, minted["key"])  # correct secret, but locked out
+        assert resp.status_code == 429
+        assert resp.json()["detail"] == "Too many failed attempts for this key"
+        assert _usage_count(minted["id"], 429) >= 1
 
 
 def test_the_rate_limit_answers_429_with_a_retry_after():
@@ -504,6 +781,13 @@ def test_an_unavailable_engine_is_503_with_the_exact_detail_and_a_usage_row():
     always-runs proof that the handler branch executes correctly; that one is
     the real-deployment proof that `image_ocr.available()` itself reports
     False when the stack is truly absent. Neither subsumes the other.
+
+    Patches `available` to False as well as `ocr_image`: the route now asks
+    `available()` to tell a genuinely-absent stack apart from a present one
+    that merely failed on this image (Important 5's fix), so simulating "the
+    stack is absent" must patch both — on a machine where the real OCR stack
+    IS installed (true here), leaving `available` unpatched would route this
+    to the OTHER branch (500) and this test would fail for the wrong reason.
     """
     from sqlalchemy import func, select
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -515,16 +799,19 @@ def test_an_unavailable_engine_is_503_with_the_exact_detail_and_a_usage_row():
     with _client() as client:
         minted = _mint(client, "engine-unavailable")
 
-        saved = ocr_router.image_ocr.ocr_image
+        saved_ocr_image = ocr_router.image_ocr.ocr_image
+        saved_available = ocr_router.image_ocr.available
 
         def _unavailable(*args, **kwargs):
             raise ocr_router.image_ocr.OcrUnavailable("stack absent for the test")
 
         ocr_router.image_ocr.ocr_image = _unavailable
+        ocr_router.image_ocr.available = lambda: False
         try:
             resp = _post(client, minted["key"])
         finally:
-            ocr_router.image_ocr.ocr_image = saved
+            ocr_router.image_ocr.ocr_image = saved_ocr_image
+            ocr_router.image_ocr.available = saved_available
 
         assert resp.status_code == 503
         body = resp.json()
@@ -552,6 +839,43 @@ def test_an_unavailable_engine_is_503_with_the_exact_detail_and_a_usage_row():
             return n
 
         assert asyncio.run(count_503()) == 1
+
+
+def test_an_engine_present_ocr_unavailable_is_500_not_503():
+    """A per-image engine failure must not be reported as 'the deployment has
+    no OCR stack'. `image_ocr.ocr_image` wraps EVERY runtime exception from
+    the engine call in `OcrUnavailable`, so an image Pillow accepted but
+    onnxruntime chokes on used to make the route claim the deployment has no
+    OCR stack at all — sending an operator on a rebuild-with-INSTALL_OCR
+    chase that is already satisfied, and any caller could trigger that false
+    diagnosis on demand. Now the route asks `available()`: present but this
+    image broke it is 500; genuinely absent is 503 (the sibling tests above
+    and below).
+
+    Patches `available` explicitly (rather than relying on the local
+    machine's real OCR install state) so this holds in any environment.
+    """
+    from app.publicapi import ocr_router
+
+    with _client() as client:
+        minted = _mint(client, "engine-present-image-failure")
+
+        saved_ocr_image = ocr_router.image_ocr.ocr_image
+        saved_available = ocr_router.image_ocr.available
+
+        def _boom(*args, **kwargs):
+            raise ocr_router.image_ocr.OcrUnavailable("this image broke the engine")
+
+        ocr_router.image_ocr.ocr_image = _boom
+        ocr_router.image_ocr.available = lambda: True
+        try:
+            resp = _post(client, minted["key"])
+        finally:
+            ocr_router.image_ocr.ocr_image = saved_ocr_image
+            ocr_router.image_ocr.available = saved_available
+
+        assert resp.status_code == 500
+        assert resp.json()["detail"] == "OCR failed unexpectedly"
 
 
 @pytest.mark.skipif(image_ocr.available(), reason="the OCR stack IS installed")

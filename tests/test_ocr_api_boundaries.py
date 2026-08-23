@@ -6,6 +6,7 @@ property is invisible in ordinary output right up to the moment it matters.
 """
 
 import ast
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -147,3 +148,94 @@ def test_the_public_api_never_returns_a_user():
         assert "users.models import User" not in source, (
             f"{module_path} imports User; an API key must never resolve to one"
         )
+
+
+def test_with_the_switch_unset_the_ocr_routes_are_absent_from_openapi():
+    """The property that makes this whole branch safe to merge — the master
+    switch defaults false, so merging changes nothing about any existing
+    deployment. Nothing else asserts this: a future edit moving
+    `include_router` outside the `if external_api_enabled:` block in
+    `app/main.py` would keep the rest of the suite green.
+
+    SUBPROCESS, and with an explicit `env=` (not just deleting the var in THIS
+    process): `EXTERNAL_API_ENABLED` and the imported `app.main` module are
+    both process-global, and other test files in this suite deliberately flip
+    the switch on and reload `app.main` (see `test_apikey_admin_integration.py`
+    and `test_ocr_api_integration.py`'s `_client()` helpers) — inheriting
+    `os.environ` unchanged into a subprocess would make this pass or fail by
+    accident of test ORDER within the same pytest run.
+    """
+    env = dict(os.environ)
+    env.pop("EXTERNAL_API_ENABLED", None)
+    script = (
+        "import app.main;"
+        "paths = app.main.app.openapi()['paths'];"
+        "assert '/v1/ocr' not in paths, 'route present with the switch unset';"
+        "assert '/v1/api-keys' not in paths, 'route present with the switch unset';"
+        "print('OK')"
+    )
+    out = subprocess.run(
+        [sys.executable, "-c", script],
+        capture_output=True,
+        text=True,
+        env=env,
+        cwd=Path(__file__).resolve().parent.parent,
+    )
+    assert out.returncode == 0, out.stderr
+    assert out.stdout.strip() == "OK"
+
+
+def test_with_the_switch_enabled_the_ocr_routes_are_present_in_openapi():
+    """The other direction of the same property: turning it on must actually
+    register both routers, not just avoid crashing."""
+    env = dict(os.environ)
+    env["EXTERNAL_API_ENABLED"] = "true"
+    script = (
+        "import app.main;"
+        "paths = app.main.app.openapi()['paths'];"
+        "assert '/v1/ocr' in paths, 'route missing with the switch enabled';"
+        "assert '/v1/api-keys' in paths, 'route missing with the switch enabled';"
+        "print('OK')"
+    )
+    out = subprocess.run(
+        [sys.executable, "-c", script],
+        capture_output=True,
+        text=True,
+        env=env,
+        cwd=Path(__file__).resolve().parent.parent,
+    )
+    assert out.returncode == 0, out.stderr
+    assert out.stdout.strip() == "OK"
+
+
+def test_the_ocr_route_declares_a_real_api_key_security_scheme():
+    """Before this, `x_api_key` was a bare `Header(default=None, ...)`, which
+    OpenAPI renders as an ordinary OPTIONAL parameter with no security scheme
+    at all — Swagger shows no lock, and a generated client marks the header
+    optional. Using `fastapi.security.APIKeyHeader` as the dependency's
+    source makes the schema honest. SUBPROCESS + explicit env for the same
+    reason as the sibling tests above: the switch and `app.main` are both
+    process-global.
+    """
+    env = dict(os.environ)
+    env["EXTERNAL_API_ENABLED"] = "true"
+    script = (
+        "import app.main;"
+        "spec = app.main.app.openapi();"
+        "schemes = spec['components']['securitySchemes'];"
+        "api_key_schemes = [s for s in schemes.values() "
+        "if s.get('type') == 'apiKey' and s.get('name') == 'X-API-Key'];"
+        "assert api_key_schemes, f'no X-API-Key apiKey scheme found: {schemes}';"
+        "ocr_op = spec['paths']['/v1/ocr']['post'];"
+        "assert ocr_op.get('security'), 'POST /v1/ocr has no security requirement';"
+        "print('OK')"
+    )
+    out = subprocess.run(
+        [sys.executable, "-c", script],
+        capture_output=True,
+        text=True,
+        env=env,
+        cwd=Path(__file__).resolve().parent.parent,
+    )
+    assert out.returncode == 0, out.stderr
+    assert out.stdout.strip() == "OK"

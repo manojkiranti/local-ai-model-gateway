@@ -88,9 +88,21 @@ from tests.test_image_ocr_eval import CASES, SPIKE_PAGES, Case, _payload  # noqa
 TEXT_CASES = [c for c in CASES if not c.expect_error]
 ERROR_CASES = {c.name: c for c in CASES if c.expect_error}
 
-assert SPIKE_PAGES.exists(), f"real-scan fixtures missing at {SPIKE_PAGES}"
-assert len(TEXT_CASES) == 7, f"expected 7 text cases, found {len(TEXT_CASES)}"
-assert set(ERROR_CASES) == {"blank_image_has_no_text", "not_really_an_image"}
+
+@pytest.fixture(scope="module", autouse=True)
+def _validate_fixture_shape():
+    """Sanity-checks on the imported fixture table, deliberately NOT bare
+    module-level asserts. A bare assert here would run at COLLECTION time,
+    outside the `pytestmark` skip gate above (module-level code executes on
+    import regardless of a skip marker) — so a pruned fixture directory would
+    become a COLLECTION ERROR for the whole test suite instead of the clean,
+    isolated skip this file is supposed to produce. An autouse fixture's body
+    only runs when a test in this module actually executes, which is exactly
+    what the skip gate already controls.
+    """
+    assert SPIKE_PAGES.exists(), f"real-scan fixtures missing at {SPIKE_PAGES}"
+    assert len(TEXT_CASES) == 7, f"expected 7 text cases, found {len(TEXT_CASES)}"
+    assert set(ERROR_CASES) == {"blank_image_has_no_text", "not_really_an_image"}
 
 
 @contextlib.contextmanager
@@ -295,9 +307,18 @@ def test_a_scoped_out_key_is_403_not_401():
 
 def test_the_whole_eval_set_passes():
     """The one number the review loop watches. Real count, not the plan's
-    guessed target: 7 text cases + 2 mapped error cases + 5 API-shaped cases
-    = 14 assertions total, run as one pass/fail here so a partial regression
-    cannot hide behind an otherwise-green module."""
+    guessed target: 7 text cases + 2 mapped error cases = 9 assertions, run as
+    one pass/fail here so a partial regression cannot hide behind an
+    otherwise-green module. The 5 API-shaped cases (corrupt image, pixel
+    bomb, wrong content type, oversized upload, scoped-out key) are NOT part
+    of this aggregate — each already has its own dedicated test function
+    earlier in this file, so folding them in here too would only duplicate
+    coverage, not add any. `docs/external-api.md`'s "15 cases" IS correct —
+    that is the total pytest-collected item count for this whole module
+    (the 7-case parametrized test expands to 7 items, plus the other 7
+    standalone tests, plus this one = 15) — but it is a DIFFERENT number
+    from the 9 this one test's own denominator counts, and the two should
+    not be conflated."""
     failures: dict[str, str] = {}
 
     with _client_and_key() as (client, key):

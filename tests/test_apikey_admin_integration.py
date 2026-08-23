@@ -154,20 +154,37 @@ def _client():
     constraint the module docstring above already documents for the
     hand-rolled `_run` helper, met here with the tool this file didn't have
     before: a `with` block instead of a second engine.
+
+    Restores `EXTERNAL_API_ENABLED` to whatever it was before the test ran
+    (and re-clears the settings cache) on the way out — mirrors
+    `test_ocr_api_integration.py`'s `_client()`. Without this, this file used
+    to leave the switch flipped ON for the rest of the pytest process, so a
+    later module's "the switch defaults off" assertion could pass only by
+    accident of test ORDER rather than because the property actually holds
+    (see `test_ocr_api_boundaries.py`'s subprocess tests, which exist
+    precisely so that property is checked in a fresh process instead).
     """
     from fastapi.testclient import TestClient
 
-    os.environ["EXTERNAL_API_ENABLED"] = "true"
     from app.config import get_settings
 
+    previous = os.environ.get("EXTERNAL_API_ENABLED")
+    os.environ["EXTERNAL_API_ENABLED"] = "true"
     get_settings.cache_clear()
     import importlib
 
     import app.main
 
     importlib.reload(app.main)
-    with TestClient(app.main.app) as client:
-        yield client
+    try:
+        with TestClient(app.main.app) as client:
+            yield client
+    finally:
+        if previous is None:
+            os.environ.pop("EXTERNAL_API_ENABLED", None)
+        else:
+            os.environ["EXTERNAL_API_ENABLED"] = previous
+        get_settings.cache_clear()
 
 
 def _admin_token(client):
@@ -261,3 +278,30 @@ def test_a_revoked_key_is_still_listed_so_its_history_stays_attributable():
             if k["id"] == key_id
         )
         assert row["is_active"] is False
+
+
+def test_a_prefix_collision_is_a_clear_503_not_a_bare_500():
+    """32 bits of prefix entropy against a handful of live keys makes a real
+    collision astronomically unlikely — not worth a retry loop — but the
+    router must still turn the resulting `IntegrityError` into an
+    instruction, not an alarm. Forces the collision by monkeypatching
+    `keygen.mint` to hand back the SAME prefix twice."""
+    from unittest.mock import patch
+
+    from app.apikeys import keygen, router as apikeys_router
+
+    with _client() as client:
+        headers = {"Authorization": f"Bearer {_admin_token(client)}"}
+        fixed = keygen.mint()
+
+        with patch.object(apikeys_router.keygen, "mint", lambda *a, **k: fixed):
+            first = client.post(
+                "/v1/api-keys", json={"name": "collide-1"}, headers=headers
+            )
+            assert first.status_code == 201, first.text
+
+            second = client.post(
+                "/v1/api-keys", json={"name": "collide-2"}, headers=headers
+            )
+            assert second.status_code == 503
+            assert second.json()["detail"] == "could not mint a key; retry"
