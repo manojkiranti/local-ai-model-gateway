@@ -288,11 +288,17 @@ read_document/read_image),
 `apikeys/` (external API-key credentials, off unless `EXTERNAL_API_ENABLED`:
 `keygen`+`policy` are PURE — mint / verify / may-this-key-act — `models`+
 `repository` are the tables and their access, `throttle` = per-key token
-bucket plus the reused login lockout (both counters PER PROCESS),
-`dependencies` = `require_api_client(scope)` returning an **`ApiClient`,
-never a `User`**, `router` = admin `/v1/api-keys`), `publicapi/` (the
-external HTTP surface: `POST /v1/ocr` only; imports no OCR stack at module
-scope — `tests/test_ocr_api_boundaries.py` asserts that by subprocess),
+bucket plus a lockout counter with its OWN dedicated settings (`API_KEY_
+MAX_ATTEMPTS`/`_ATTEMPT_WINDOW_SECONDS`/`_LOCKOUT_SECONDS` — deliberately NOT
+`LOGIN_MAX_ATTEMPTS`, see the login-throttle gotcha below; both counters PER
+PROCESS), `dependencies` = `require_api_client(scope)` returning an
+**`ApiClient`, never a `User`**, `router` = admin `/v1/api-keys`),
+`publicapi/` (the external HTTP surface: `POST /v1/ocr` plus
+`middleware.OcrContentLengthGuard` — a `Content-Length`-based 413 registered
+as ASGI middleware ahead of routing, so an oversized declared body is
+rejected before FastAPI parses the multipart form and before
+`require_api_client` runs at all; imports no OCR stack at module scope —
+`tests/test_ocr_api_boundaries.py` asserts that by subprocess),
 `history/` (chat-history: `models` = `chat_sessions`
 + `chat_messages`, `repository` = data access, `service.open_turn` = shared
 turn-open used by chat, `router` = `/v1/sessions`),
@@ -389,9 +395,13 @@ flag is read once at process start, so toggling it needs a restart):
 `POST /v1/ocr` (scope `ocr:read`; multipart image + optional `lang` →
 `{text, lines[{text,confidence}], authoritative:false, caveat, partial, image,
 engine, request_id}`; 400 not-an-image/corrupt/pixel-bomb/empty/bad-lang, 401
-any credential fault, 403 missing scope, 413 over cap, 429 rate limited, 503
-OCR absent **or** at capacity, **500 an unexpected engine failure — logged,
-never echoed to the caller, and still writes a usage row**).
+any credential fault, 403 missing scope, 413 over cap (checked twice: a
+`Content-Length`-based ASGI middleware before the body is parsed at all, then
+the route's own streamed count), 429 **either** the per-key rate limit **or**
+the credential lockout (checked before the secret/scope, so it can fire on a
+good key whose prefix was probed), 503 OCR absent **or** at capacity, **500 a
+per-image engine failure OR an unexpected exception — logged, never echoed to
+the caller, and still writes a usage row**).
 `X-Request-Id` is returned on the **200 only**: every error path raises an
 `HTTPException` before the header reaches the outgoing response, so there is
 no id to hand back on a failure — locate that row by key + time + status
@@ -510,7 +520,13 @@ retained). Runbook: `docs/external-api.md`.
   process** — N uvicorn workers means N x the limit — and eviction under the size
   bound deliberately **prefers UNLOCKED entries**, because if a flood of distinct
   identifiers could evict a locked one, the flood would be a way to clear a
-  lockout.
+  lockout. **`app/apikeys/throttle.py`'s key lockout is now tuned SEPARATELY**
+  (`API_KEY_MAX_ATTEMPTS`/`API_KEY_ATTEMPT_WINDOW_SECONDS`/
+  `API_KEY_LOCKOUT_SECONDS`), not from `LOGIN_MAX_ATTEMPTS` — an earlier
+  version shared the setting, which was a trap: an external integrator's
+  retry loop misfiring and getting locked out has nothing to do with AD, but
+  raising the shared knob to unblock them would have silently raised
+  AD-lockout exposure on every account in the company. Keep them separate.
 - **A test that creates a user must now supply a password_hash or an admin token.**
   Two consequences of the above that already bit once: a fixture inserting
   `auth_provider='local'` with a NULL hash violates `ck_users_credential` (it was
@@ -1376,10 +1392,19 @@ retained). Runbook: `docs/external-api.md`.
   attacker which prefixes are real and whether a valid key ever existed; the
   log distinguishes them, the response never does; (3) **a scope failure is
   403, not 401**, because the credential is genuine and the caller must not
-  rotate a working key chasing the wrong bug; (4) **an unusable key does not
-  consume a throttle attempt** — a revoked key presented by an honest caller
-  would otherwise lock out the prefix on top of being refused, the
-  `UNAVAILABLE`-must-not-consume-an-attempt rule from AD login; (5)
+  rotate a working key chasing the wrong bug; (4) **an unusable (revoked or
+  expired) key DOES consume a throttle attempt** — reversed from an earlier
+  version of this bullet, which copied AD login's rule that an unreachable
+  directory must not cost an attempt. That rule protects an honest caller from
+  a TRANSIENT fault: the directory recovers and the account is fine, so
+  charging the attempt would only add insult to an outage nobody caused.
+  Revocation and expiry are the opposite — PERMANENT for a given prefix, since
+  no route un-revokes one and re-minting hands out a fresh random prefix — so
+  the old exemption never spared an honest caller anything, while it let an
+  attacker probe a dead key unboundedly AND leaked exactly the fact the
+  one-message-for-six-causes rule exists to hide (wrong secret locks out at
+  the threshold; a correct secret on a dead key never does, which tells the
+  holder of a leaked secret that it is genuine); (5)
   `require_api_client` is a dependency **FACTORY** so the ROUTE owns the
   required scope — a dependency reading the scope from the request would let
   the caller choose which check they face; (6) `ck_api_keys_scopes` and
@@ -1392,7 +1417,27 @@ retained). Runbook: `docs/external-api.md`.
   key-lockout counter in `app/apikeys/throttle.py` are **per process**, the
   same caveat as the login throttle: N uvicorn workers means N x the configured
   limit is actually available, which is fine for capacity protection and would
-  not be for a billing quota.
+  not be for a billing quota. **The lockout counter's TUNING is also its own
+  knob now** — `API_KEY_MAX_ATTEMPTS`/`API_KEY_ATTEMPT_WINDOW_SECONDS`/
+  `API_KEY_LOCKOUT_SECONDS`, separate from `LOGIN_MAX_ATTEMPTS` and friends.
+  `LOGIN_MAX_ATTEMPTS` must stay below the AD domain's own lockout threshold —
+  raising it to unblock a misbehaving external integrator would silently raise
+  AD-lockout exposure on every account in the company, so the two throttle
+  INSTANCES being separate was never enough; the TUNING had to be too.
+- **`api_key_usage` gets a row for four of the six 401/403 credential causes,
+  not all six, and the docs say so explicitly now.** `require_api_client`
+  needs a real `api_keys.id` to attach a row to, so a wrong secret, a
+  revoked/expired key, a missing-scope 403 and the credential-lockout 429
+  (looked up by prefix specifically for this, since the throttle check itself
+  never touches the DB) all write one; an absent/malformed header and an
+  unknown prefix never resolve to a key row and write nothing — not an
+  omission, there is nothing to attach to. An earlier version of both this
+  file and `docs/external-api.md` claimed a row "on every path", which made
+  the review-loop SQL's own "locate the row by key + approximate time +
+  status" instruction impossible for a 401 and left the highest-value signal
+  (a nonzero 401 count on a provisioned key) unobservable. Fixed in
+  `app/apikeys/dependencies.py`; both docs now state exactly which outcomes
+  are attributable.
 - **`/v1/ocr` runs OCR in a thread behind a semaphore, and both halves are
   load-bearing.** `image_ocr.ocr_image` is synchronous and CPU-bound, so calling
   it directly in an `async def` route **stalls the event loop** — one 4-second
@@ -1413,7 +1458,16 @@ retained). Runbook: `docs/external-api.md`.
   500 — logged with the real exception, never echoed to the caller — rather
   than a raw 500 crash or, worse, a silently swallowed error; a usage row is
   still written on that path, because it is the only evidence of what a key
-  did. The temp file is unlinked in `finally` on every path including the
+  did. **`OcrUnavailable` itself now splits two ways, not one.**
+  `image_ocr.ocr_image` wraps EVERY runtime exception from the engine call in
+  `OcrUnavailable`, so an image Pillow accepted but onnxruntime chokes on used
+  to come back as the SAME 503 "not enabled on this deployment" a genuinely
+  absent stack gives — a false deployment-level diagnosis any caller could
+  trigger on demand, sending an operator to rebuild with a flag that is
+  already set. The route now asks `image_ocr.available()` (cheap — it only
+  checks the import, never rebuilds the engine) inside that `except` clause:
+  present-but-this-image-broke-it is 500, genuinely absent is still 503. The
+  temp file is unlinked in `finally` on every path including the
   400s — we told the caller we do not store their images.
 - **The OCR caveat is ONE constant with TWO readers.** `image_ocr.OCR_CAVEAT` is
   rendered into the model's context by `read_image` and published as `/v1/ocr`'s
@@ -1463,7 +1517,12 @@ The external API (`docs/external-api.md`) ships **off** — `EXTERNAL_API_ENABLE
 defaults false and is read once at process start, so a deployment that never
 sets it is byte-identical to before this feature existed. Turning it on also
 needs the `INSTALL_OCR=true` image for `/v1/ocr` specifically (`/v1/api-keys`
-itself needs no OCR stack, only the flag). Its live eval
+itself needs no OCR stack, only the flag). `OCR_PREWARM=true` (default false)
+pays the ~0.7s model load at process startup instead of charging it to the
+first caller — `image_ocr.prewarm()` actually builds the engine;
+`image_ocr.available()` alone only checks the import (measured 0.002s vs
+0.683s, which is why an earlier version of `app/main.py` calling `available()`
+under this setting achieved nothing). Its live eval
 (`tests/test_ocr_api_eval.py`, `OCR_LIVE_TESTS=1`) is 15 cases built on top of
 the existing 9-case `read_image` eval's own thresholds, not a byte-equality
 check against the tool — the engine's Devanagari output is measurably

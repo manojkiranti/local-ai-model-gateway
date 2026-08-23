@@ -22,10 +22,41 @@ deployment that means to serve OCR and cannot, which is a different fact from
 a deployment that was never asked to (there the route simply does not exist —
 404, not 503).
 
+**Prerequisite: cap the body size at the reverse proxy, before the gateway
+ever sees it.** `POST /v1/ocr` is an ASGI app's own request handling reading a
+multipart body, and FastAPI parses the whole form (spooling any file part to a
+temp file) before ANY dependency — including the API-key check — ever runs.
+The gateway does what it can: a `Content-Length`-based middleware in front of
+this one route rejects a request whose DECLARED size is over
+`OCR_MAX_UPLOAD_BYTES` before the body is read at all, and the route itself
+counts bytes as it streams the body and cuts it off mid-transfer past the same
+cap. Neither one stops the bytes from arriving on the wire in the first place
+— a client that lies about its own `Content-Length`, or a chunked request that
+omits the header entirely, sails past the middleware exactly as it would past
+any other declared-length check. Only a reverse proxy in front of the gateway
+can do that. Set it there too:
+
+    # nginx
+    client_max_body_size 12m;
+
+(a little above `OCR_MAX_UPLOAD_BYTES`'s default 10 MB, to leave room for
+multipart framing overhead). Without this, an attacker holding no API key at
+all can still make the gateway spend CPU and disk reading and spooling an
+oversized body before answering 401 — concurrent repeats fill the disk. This
+is the same shape of gap `POST /v1/files` has always had; it matters more here
+because `/v1/ocr` is the first endpoint in this gateway that accepts uploads
+from OUTSIDE the organisation.
+
 **Verify a deployment by making a real call with a known image, never by
 whether the container started.** `docs/nrb-integration.md` §18 found five
 distinct OCR deployment defects that all produced *successful* operations with
 no text.
+
+**`OCR_PREWARM=true`** loads the three ONNX models at process startup instead
+of charging the ~0.7s load (plus onnxruntime's first-inference warmup) to
+whichever caller happens to make the first request. Off by default. Failure to
+load is logged and ignored either way — a deployment without the OCR stack
+installed still boots, and `/v1/ocr` answers its own 503 on the first call.
 
 ## Minting the first key
 
@@ -62,7 +93,9 @@ OCR'ing page 1 of a document that may have a text layer would discard it, and
 
 Body shape: `{text, lines[{text, confidence}], authoritative, caveat,
 partial, image{kind,width,height,frames}, engine{name,model,backend,lang,
-version}, request_id}`.
+version}, request_id}`. `image.kind` is the human string `images._KINDS` maps
+the sniffed Pillow format to (`"PNG image"`, `"JPEG image"`, `"WebP image"`,
+`"TIFF image"`, `"BMP image"`) — **not** the bare format name (`"png"`).
 
 `authoritative` is always `false` and `caveat` is always present, and they
 mean it: PP-OCRv5 drops letterheads and subject lines, mangles latin runs, and
@@ -94,14 +127,16 @@ populated, which is the proof the engine actually ran. A stack that could
 | 401 | The key is absent, malformed, unknown, wrong, revoked or expired | Check the secret; ask an admin whether it was revoked |
 | 403 | The key is genuine but lacks `ocr:read` | Ask an admin to re-mint with the scope. Do NOT rotate the key |
 | 400 | Not an image, corrupt, too many pixels, empty upload, or a bad `lang` | Fix the input |
-| 413 | Over `OCR_MAX_UPLOAD_BYTES` (default 10 MB) | Downscale before sending |
-| 429 | This key's rate limit (`OCR_RATE_PER_MINUTE`/`OCR_RATE_BURST`) | Honour `Retry-After` |
+| 413 | Over `OCR_MAX_UPLOAD_BYTES` (default 10 MB) — from the Content-Length guard before the body is read, or from the route's own streamed count if the caller understated its Content-Length | Downscale before sending |
+| 429 | This key's rate limit (`OCR_RATE_PER_MINUTE`/`OCR_RATE_BURST`) — detail "Rate limit exceeded for this API key" | Honour `Retry-After` |
+| 429 | This key's PREFIX is credential-locked (`API_KEY_MAX_ATTEMPTS` bad attempts within `API_KEY_ATTEMPT_WINDOW_SECONDS`) — detail "Too many failed attempts for this key" | This is checked BEFORE the secret or scope, so it can fire on a perfectly good key whose prefix was probed by someone else. Wait for `Retry-After`; if it recurs, ask an admin to check for a leaked/probed prefix |
 | 503 | OCR unavailable, **or** at capacity (`OCR_MAX_CONCURRENT`/`OCR_QUEUE_WAIT_SECONDS`) | Retry on `Retry-After`; if the detail says "not enabled", it is a deployment fault, not a transient one |
-| 500 | An unexpected exception inside the OCR engine | **Report it, do not blindly retry.** The real exception is logged server-side and never returned to the caller (the client only ever sees the generic detail `OCR failed unexpectedly`) — this is a server fault, and retrying the same image against the same bug wastes a call. Ask an operator to check the logs around the `request_id`/time of the call. |
+| 500 | An unexpected exception inside the OCR engine — including an `OcrUnavailable` raised by a specific image while the stack itself loads fine (distinguished from the 503 case by `image_ocr.available()`) | **Report it, do not blindly retry.** The real exception is logged server-side and never returned to the caller (the client only ever sees the generic detail `OCR failed unexpectedly`) — this is a server fault, and retrying the same image against the same bug wastes a call. Ask an operator to check the logs around the `request_id`/time of the call. |
 
 401 is one message for all six credential causes on purpose — distinguishing
 them tells an attacker which prefixes are real. The server log distinguishes
-them; ask an operator.
+them; ask an operator. **Only four of those six causes leave a usage row**
+(see Operating, below, for exactly which).
 
 **`X-Request-Id` is on the 200 response only.** It is set on the FastAPI
 `Response` object early in the handler, but every non-200 path raises an
@@ -110,9 +145,9 @@ directly — the header set on the (unused) success `Response` never reaches
 the client. So there is **no request id to quote on an error**, including the
 500. Do not tell a caller "check the `X-Request-Id` header" for anything but a
 successful call. To find the row for a *failed* call, locate it by key +
-approximate time + status instead — `api_key_usage` gets a row on every path,
-success or failure (see Operating, below), it is just not addressable by an
-id the client never received.
+approximate time + status instead — when the failure is attributable to a
+real key at all (see Operating, below, for exactly which outcomes get a row);
+it is not addressable by an id the client never received either way.
 
 ## Revoking
 
@@ -127,9 +162,22 @@ deleted.
 
 `api_key_usage` holds one row per call: route, status, bytes in, image
 dimensions (null for a call that never got as far as decoding one), line
-count, duration — and no image bytes and no OCR text. A row is written on
-**every** path, including a 429 before any upload, a 413 mid-upload, and the
-500 catch-all.
+count, duration — and no image bytes and no OCR text.
+
+**A row needs a real `api_keys.id` to attach to, so it is written for every
+outcome EXCEPT two.** The route's own checks (rate limit, upload guards, OCR
+failure) always run with an authenticated `ApiClient` already resolved, so
+every one of those — the 429 rate limit, the 413s, the 400s, the 503s, the
+500 — gets a row. Inside `require_api_client` itself, four of the six
+credential-rejection causes also have a real key in hand and get a row too:
+wrong secret, a revoked/expired key, a missing-scope 403, and the
+credential-lockout 429 (looked up by prefix specifically to attribute this
+one, since the throttle check itself never touches the database). The
+remaining two causes — the header absent or malformed, and an unknown prefix
+— never resolve to a key row at all, so there is nothing to attach a usage
+row to; they leave no row, by construction, not by omission. An earlier
+version of this doc claimed a row "on every path", which was never true for
+those two.
 
 Two facts worth knowing before pointing a high-frequency caller at this
 endpoint:
@@ -145,6 +193,24 @@ endpoint:
   stops one key from monopolising a box); it is **not** a billing quota — do
   not size a contract around `OCR_RATE_PER_MINUTE` without knowing the worker
   count.
+- **The credential-lockout tuning (`API_KEY_MAX_ATTEMPTS` /
+  `API_KEY_ATTEMPT_WINDOW_SECONDS` / `API_KEY_LOCKOUT_SECONDS`) is SEPARATE
+  from `LOGIN_MAX_ATTEMPTS`.** That setting must stay below the AD domain's
+  own lockout threshold — a bank-critical constraint on human logins that has
+  nothing to do with an external integrator's key. Raise the API-key knobs,
+  never the login one, to accommodate a caller's retry behaviour.
+- **`api_key_usage` has no retention policy** — one row per call, never
+  pruned, `ON DELETE RESTRICT` against the owning key so a row cannot outlive
+  evidence of who made the call. Important 3 (above) means every 401/403/429
+  now writes one too, not just successful and 400+ calls, so the table grows
+  faster than it did at launch. There is no automatic cleanup: an operator
+  should schedule a periodic
+
+      DELETE FROM api_key_usage WHERE created_at < now() - interval '1 year';
+
+  (or whatever retention period the deployment's audit/compliance policy
+  calls for) rather than let it grow unbounded. Nothing in this codebase runs
+  that for you.
 
 Monthly review, per the Evaluation section below:
 

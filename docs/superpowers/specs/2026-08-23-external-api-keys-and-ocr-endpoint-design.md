@@ -145,7 +145,7 @@ optional field `lang` (`devanagari` default, or `en`).
   ],
   "authoritative": false,
   "caveat": "machine-read text (OCR), not a transcription — words and whole lines can be dropped or misread. VERIFY every figure, date, account number and contact detail against the image itself.",
-  "image": {"kind": "png", "width": 1654, "height": 2339, "frames": 1},
+  "image": {"kind": "PNG image", "width": 1654, "height": 2339, "frames": 1},
   "engine": {"name": "rapidocr", "model": "PP-OCRv5", "backend": "onnxruntime",
              "lang": "devanagari", "version": "..."},
   "request_id": "..."
