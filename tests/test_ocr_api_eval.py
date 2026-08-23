@@ -262,11 +262,12 @@ def test_a_scoped_out_key_is_403_not_401():
 
     from app.apikeys.models import ApiKey
 
-    with _client_and_key() as (client, key):
-        from tests.test_ocr_api_integration import _mint  # for the key id
+    from tests.test_ocr_api_integration import _mint
 
-        # _client_and_key already minted one key; mint a second so we have
-        # its id to strip without touching the fixture used elsewhere.
+    with _client_and_key() as (client, key):
+        # _client_and_key already minted one key (unused here); mint a
+        # second, dedicated one so stripping its scope cannot affect any
+        # other case sharing this connection.
         minted = _mint(client, "eval-scopeless")
 
         async def strip():
