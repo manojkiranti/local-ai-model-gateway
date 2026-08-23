@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import zipfile
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Form, Response, UploadFile, status
@@ -188,6 +189,23 @@ async def extract(
             )
         if size == 0:
             await finish(400, "uploaded file is empty")
+
+        # zip-bomb guard for the OOXML formats: refuse absurd expansion. Same
+        # cap, same wording as `app/files/router.py`'s upload path — one
+        # physical risk (an OOXML member inflating past
+        # `upload_xlsx_max_uncompressed` in-process) should read as one
+        # message to a caller, not a variant coined because this endpoint
+        # happens to be reached with an API key instead of a JWT. Checked
+        # before the semaphore is acquired: a crafted file should not spend a
+        # concurrency slot to be rejected.
+        if ext in (".xlsx", ".docx"):
+            try:
+                with zipfile.ZipFile(dest) as zf:
+                    uncompressed = sum(i.file_size for i in zf.infolist())
+            except zipfile.BadZipFile:
+                await finish(400, f"file is not a valid {ext} document")
+            if uncompressed > settings.upload_xlsx_max_uncompressed:
+                await finish(400, "file expands too large to process safely")
 
         try:
             await asyncio.wait_for(

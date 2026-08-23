@@ -415,3 +415,61 @@ def test_no_temp_file_survives_a_success_or_a_rejected_request():
         assert empty.status_code == 400, empty.text
         after = set(Path(tempfile.gettempdir()).glob("extract-*"))
         assert after == before, after - before
+
+
+def _fake_xlsx_bomb() -> bytes:
+    """A tiny, well-formed .xlsx whose CENTRAL DIRECTORY claims one member
+    inflates past `upload_xlsx_max_uncompressed` (200 MB) — the exact shape
+    `app/files/router.py`'s own guard was written to catch, mirrored here so
+    the /v1/extract guard is exercised the same way rather than by actually
+    writing 200+ MB of real bytes into the request body. All-zero content
+    compresses to a few bytes under DEFLATE, so the .xlsx on disk (and the
+    request body) stays tiny while `zipfile.ZipFile(...).infolist()` still
+    reports the true (huge) uncompressed size — that field is what the guard
+    reads, and it is set from `len(data)` regardless of how compressible
+    `data` is."""
+    import io as _io
+    import zipfile as _zipfile
+
+    buf = _io.BytesIO()
+    with _zipfile.ZipFile(buf, "w", _zipfile.ZIP_DEFLATED) as zf:
+        # +1: the cap check is strict `>`, so exactly-at-cap would not trip it.
+        zf.writestr("xl/worksheets/sheet1.xml", b"\0" * (200 * 1024 * 1024 + 1))
+    return buf.getvalue()
+
+
+def test_a_zip_bomb_xlsx_is_400_not_processed():
+    """Would FAIL if the guard were removed: the bomb's actual bytes are a
+    tiny, well-formed, all-zero .xlsx that `openpyxl` can open without
+    complaint, so absent this guard the upload would sail through to a 200
+    (or, on a real payload, run `readers.load_table` against gigabytes of
+    inflated XML in this process). The assertion is specifically the
+    "expands too large" wording the guard raises, not just any 400 — an
+    unrelated 400 (bad extension, empty body) would not prove this."""
+    with _client() as client:
+        key = _mint(client, "zip-bomb", ["document:read"])
+        resp = _post(
+            client, key, filename="bomb.xlsx", data=_fake_xlsx_bomb(),
+            ctype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        assert resp.status_code == 400, resp.text
+        assert "too large" in resp.json()["detail"]
+
+
+def test_a_corrupt_xlsx_is_400_not_500():
+    """Bytes that pass the extension allowlist and the empty-body check but
+    are not a zip at all. Without `zipfile.BadZipFile` caught explicitly,
+    `zipfile.ZipFile(dest)` raises straight out of the route and FastAPI
+    turns an unhandled exception into a 500 — this proves the guard's own
+    `except zipfile.BadZipFile` branch runs, not merely that SOME 400 exists
+    for bad input (an unsupported-extension 400 would pass this filename
+    with no guard involved at all, which is why the extension stays
+    `.xlsx`)."""
+    with _client() as client:
+        key = _mint(client, "bad-zip", ["document:read"])
+        resp = _post(
+            client, key, filename="broken.xlsx", data=b"not a zip file at all",
+            ctype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        assert resp.status_code == 400, resp.text
+        assert "not a valid" in resp.json()["detail"]

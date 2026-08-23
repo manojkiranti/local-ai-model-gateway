@@ -388,6 +388,41 @@ everything else). `lines[].confidence` is `null` for a native source (nothing
 uncertain to report) and populated only when `route == "ocr"` — reported,
 never enforced, same as `/v1/ocr`.
 
+## Caps inherited from the chat-oriented extractors, and why there is no paging
+
+`/v1/extract` reads documents through the same engines the chat agent's
+`read_document`/`inspect_excel`/`read_excel` tools use, and it inherits their
+caps unchanged — nothing here was raised, lowered or removed for the external
+API:
+
+- **`documents.MAX_PDF_PAGES = 500`.** A PDF with more than 500 pages only has
+  its first 500 read. `source.pages` is always the document's true page
+  count; `source.pages_skipped` is how many were left unread
+  (`pages - pages_skipped` is what was actually extracted); `source.partial`
+  is `true` whenever `pages_skipped > 0`.
+- **`readers.READ_MAX_ROWS = 200`.** At most 200 data rows of a sheet are ever
+  returned. `sheets[].total_rows` is the sheet's real row count;
+  `sheets[].truncated` is `true` whenever more rows exist than were returned.
+- **`readers.READ_MAX_CHARS = 40_000`.** Independently of the row cap, the
+  rows already selected are trimmed from the end, whole rows at a time, if
+  their combined character count would pass this budget — so a sheet with
+  well under 200 rows but very wide or long cells can still come back with
+  `truncated: true` and fewer than 200 rows.
+
+**Say plainly what this means: there is no paging parameter on this
+endpoint.** A caller uploading a 5,000-row CSV gets rows 1–200 and
+`truncated: true` — full stop. There is no `start_row`/`page`/`cursor` field
+here to fetch row 201 onward, unlike the in-chat `read_excel` tool, which the
+model can call again with a different `start_row`. The same holds for a PDF
+past its first 500 pages: nothing on this endpoint can retrieve the rest of
+the document. A runbook that lists a cap without saying the remainder is
+unreachable is worse than one that omits the cap entirely, so: the remainder
+is unreachable through this endpoint, and paging is tracked as follow-up work,
+not built here. What keeps this a *limitation* rather than a silent
+correctness bug is that nothing is ever presented as complete when it isn't —
+every cap announces itself, via `partial`, `pages_skipped` or `truncated`, on
+the very response that hit it.
+
 ## Status codes
 
 | Code | Meaning | What the caller should do |
