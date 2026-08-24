@@ -1,0 +1,102 @@
+"""Unit tests for the pure MCP grant core.
+
+No database, no HTTP, no app import beyond the module under test — the same
+rule `tests/test_department_permissions.py` follows for `app/rag/permissions.py`.
+"""
+
+import ast
+import pathlib
+
+import pytest
+
+from app.mcp import grants
+
+
+def test_the_vocabulary_is_exactly_the_six_agreed_strings():
+    assert grants.ROLES == frozenset({"mcp-hrms", "mcp-izone", "mcp-ems"})
+    assert grants.PERMISSIONS == frozenset(
+        {"mcp.hrms.full", "mcp.hrms.tasks", "mcp.ems.query"}
+    )
+    assert grants.ALL_GRANTS == grants.ROLES | grants.PERMISSIONS
+    assert len(grants.ALL_GRANTS) == 6
+
+
+def test_roles_and_permissions_do_not_overlap():
+    # A string in both sets would be sorted into both header fields and the
+    # MCP server would see it twice under different meanings.
+    assert not (grants.ROLES & grants.PERMISSIONS)
+
+
+def test_from_grants_splits_a_flat_key_set_by_kind():
+    identity = grants.McpIdentity.from_grants(
+        email="person@example.com",
+        grant_keys=["mcp-hrms", "mcp.hrms.full", "mcp-ems"],
+    )
+    assert identity.roles == frozenset({"mcp-hrms", "mcp-ems"})
+    assert identity.permissions == frozenset({"mcp.hrms.full"})
+
+
+def test_an_unknown_grant_key_is_dropped_not_raised():
+    """Fail-closed rule 3: the two sides deploy independently.
+
+    A row that predates a vocabulary change, or a hand-inserted key, must not
+    500 the chat endpoint — and must not be forwarded either, or the MCP server
+    would be asked to reason about a grant this build does not define.
+    """
+    identity = grants.McpIdentity.from_grants(
+        email="person@example.com", grant_keys=["mcp-hrms", "mcp-payroll", "nonsense"]
+    )
+    assert identity.roles == frozenset({"mcp-hrms"})
+    assert identity.permissions == frozenset()
+
+
+def test_an_identity_with_no_grants_is_representable():
+    identity = grants.McpIdentity.from_grants(email="a@b.c", grant_keys=[])
+    assert identity.roles == frozenset()
+    assert identity.permissions == frozenset()
+    # The email still travels: the MCP server logs refusals against it.
+    assert grants.header_values(identity) == {"x-user-email": "a@b.c"}
+
+
+def test_header_values_omits_empty_fields_entirely():
+    """An empty header and an absent one mean the same thing to the server, but
+    sending `x-user-roles: ` invites a future parser to treat '' as a grant."""
+    identity = grants.McpIdentity(email=None, roles=frozenset(), permissions=frozenset())
+    assert grants.header_values(identity) == {}
+
+
+def test_header_values_are_sorted_so_they_are_deterministic():
+    identity = grants.McpIdentity.from_grants(
+        email="p@e.com", grant_keys=["mcp-izone", "mcp-ems", "mcp-hrms"]
+    )
+    assert grants.header_values(identity)["x-user-roles"] == "mcp-ems,mcp-hrms,mcp-izone"
+
+
+def test_header_values_of_none_is_empty():
+    # An unauthenticated or identity-less call must not forward anything.
+    assert grants.header_values(None) == {}
+
+
+def test_the_identity_is_frozen():
+    """It is captured by a streaming generator and read after the request
+    scope ends; a mutable identity could be edited mid-turn."""
+    from dataclasses import FrozenInstanceError
+
+    identity = grants.McpIdentity.from_grants(email="a@b.c", grant_keys=["mcp-hrms"])
+    with pytest.raises(FrozenInstanceError):
+        identity.email = "other@b.c"  # type: ignore[misc]
+
+
+def test_the_module_is_pure_no_database_and_no_http():
+    """AST-asserted, not grepped: the value of this module is that a capability
+    boundary can be proved without a database or a network."""
+    source = pathlib.Path("app/mcp/grants.py").read_text()
+    tree = ast.parse(source)
+    imported: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imported.update(alias.name.split(".")[0] for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            imported.add(node.module.split(".")[0])
+    forbidden = {"sqlalchemy", "httpx", "fastapi", "app"}
+    assert not (imported & forbidden), f"grants.py must stay pure; found {imported & forbidden}"
