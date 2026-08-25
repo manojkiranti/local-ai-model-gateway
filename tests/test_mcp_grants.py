@@ -219,3 +219,35 @@ def test_it_says_no_grants_rather_than_printing_an_empty_list():
 
 def test_it_handles_no_identity_at_all():
     assert describe_identity(None) == "no identity"
+
+
+def test_get_mcp_identity_never_reads_user_dot_role():
+    """AST-asserted, not grepped, matching
+    `test_the_module_is_pure_no_database_and_no_http` above: the rule this
+    guards is a DATABASE invariant (`test_an_admin_role_alone_confers_no_grant`
+    in tests/test_mcp_grants_integration.py) and an HTTP-level one
+    (`test_a_fresh_admin_holds_no_grants` in tests/test_mcp_grants_routes.py),
+    but both skip when Postgres is unreachable — leaving a DB-less CI run with
+    no guard at all on design §3.4: a global gateway admin holds no MCP grant
+    implicitly. Gateway admin is an IT/ops role, and auto-conferring
+    `Salary_Level` plus an expenses SQL console on whoever operates the gateway
+    is exactly the escalation an audit objects to — so `get_mcp_identity` must
+    build the caller's `McpIdentity` from stored grants alone, never from
+    `user.role`. Parses the module and fails if any `ast.Attribute` node reads
+    `.role`, so a future `if user.role == "admin": ...` added here is caught
+    with no database required.
+    """
+    import ast
+    import pathlib
+
+    source = pathlib.Path("app/mcp/dependencies.py").read_text()
+    tree = ast.parse(source)
+    role_reads = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Attribute) and node.attr == "role"
+    ]
+    assert not role_reads, (
+        "app/mcp/dependencies.py reads .role somewhere — a global admin must "
+        "never be handed an MCP grant implicitly"
+    )

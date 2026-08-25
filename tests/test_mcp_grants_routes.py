@@ -6,16 +6,47 @@ when Postgres is down — the same shape as tests/test_document_upload.py.
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.pool import NullPool
 from starlette.testclient import TestClient
 
+from app.config import get_settings
 from app.main import app
 from app.mcp import grants
 
 MEMBER = "mcpgrant-member@example.com"
+# A dedicated, disposable account this file promotes to role=admin directly in
+# the database (there is no HTTP route to promote an existing account). Used
+# ONLY by test_a_fresh_admin_holds_no_grants, so the "role confers no grant"
+# rule can be exercised through the HTTP surface without ever touching the
+# operational seeded admin — see Finding 1 of the 2026-08-25 branch review.
+FRESH_ADMIN = "mcpgrant-fresh-admin@example.com"
 PASSWORD = "supersecret123"
 SEEDED_ADMIN_EMAIL = "admin@example.com"
 SEEDED_ADMIN_PASSWORD = "supersecret123"
+
+
+def _promote_to_admin(user_id):
+    """Flip a user's role directly in the database. Same fresh-NullPool-engine
+    idiom as tests/test_login_dispatch.py, because the app's module-level
+    engine is bound to the first event loop."""
+
+    async def run():
+        engine = create_async_engine(get_settings().database_url, poolclass=NullPool)
+        try:
+            async with engine.begin() as conn:
+                await conn.execute(
+                    text("UPDATE users SET role = 'admin' WHERE id = :uid"),
+                    {"uid": user_id},
+                )
+        finally:
+            await engine.dispose()
+
+    asyncio.run(run())
 
 
 def _ensure_user(client, email, password):
@@ -181,11 +212,21 @@ def test_an_unknown_user_is_404():
 def test_a_fresh_admin_holds_no_grants():
     """Design §3.4 through the HTTP surface: admin confers the ability to
     grant, never the grants. The single most likely thing a later refactor
-    "fixes" back into an implicit bypass."""
+    "fixes" back into an implicit bypass.
+
+    Runs against a dedicated throwaway account promoted to role=admin, never
+    against the operational seeded admin (`SEEDED_ADMIN_EMAIL`). An earlier
+    version of this test called `_clear` on the seeded admin's own account —
+    six committed HTTP DELETEs against whatever real grants that account held
+    — which is exactly the silent capability loss this feature exists to make
+    impossible. `_clear` here only ever touches `FRESH_ADMIN`.
+    """
     with TestClient(app) as client:
         admin = _auth(client, SEEDED_ADMIN_EMAIL)
-        uid = _my_id(client, admin)
-        _clear(client, admin, uid)
+        member = _auth(client, FRESH_ADMIN)
+        uid = _my_id(client, member)
+        _promote_to_admin(uid)
+        _clear(client, admin, uid)  # defensive: only this throwaway account's history
         listed = client.get(f"/v1/users/{uid}/mcp-grants", headers=admin)
         assert listed.status_code == 200
         assert listed.json()["items"] == []
