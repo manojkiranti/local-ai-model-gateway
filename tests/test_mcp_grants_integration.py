@@ -142,3 +142,90 @@ def test_the_audit_columns_survive_the_granter_being_deleted():
         assert definition == "n", "granted_by must be ON DELETE SET NULL"
 
     _run(go)
+
+
+def test_re_granting_does_not_rewrite_the_audit_timestamp():
+    """The `POST .../members` lesson: an upsert that overwrites audit columns
+    reports success while destroying the record of when access was given."""
+
+    async def go(session):
+        from app.mcp import repository as repo
+
+        admin_id = await _an_admin_id(session)
+        await repo.grant(
+            session, user_id=admin_id, grant_key=grants.ROLE_IZONE, granted_by=admin_id
+        )
+        await session.flush()
+        first = await session.scalar(
+            select(UserMcpGrant.granted_at).where(
+                UserMcpGrant.user_id == admin_id,
+                UserMcpGrant.grant_key == grants.ROLE_IZONE,
+            )
+        )
+        await repo.grant(
+            session, user_id=admin_id, grant_key=grants.ROLE_IZONE, granted_by=admin_id
+        )
+        await session.flush()
+        second = await session.scalar(
+            select(UserMcpGrant.granted_at).where(
+                UserMcpGrant.user_id == admin_id,
+                UserMcpGrant.grant_key == grants.ROLE_IZONE,
+            )
+        )
+        assert first == second, "a re-grant rewrote granted_at"
+        await session.rollback()
+
+    _run(go)
+
+
+def test_revoking_is_idempotent_and_reports_whether_anything_changed():
+    async def go(session):
+        from app.mcp import repository as repo
+
+        admin_id = await _an_admin_id(session)
+        await repo.grant(
+            session, user_id=admin_id, grant_key=grants.ROLE_EMS, granted_by=admin_id
+        )
+        await session.flush()
+        assert await repo.revoke(session, user_id=admin_id, grant_key=grants.ROLE_EMS) is True
+        assert await repo.revoke(session, user_id=admin_id, grant_key=grants.ROLE_EMS) is False
+        await session.rollback()
+
+    _run(go)
+
+
+def test_grant_keys_for_returns_a_flat_set():
+    async def go(session):
+        from app.mcp import repository as repo
+
+        admin_id = await _an_admin_id(session)
+        await repo.grant(
+            session, user_id=admin_id, grant_key=grants.ROLE_EMS, granted_by=admin_id
+        )
+        await repo.grant(
+            session, user_id=admin_id, grant_key=grants.PERM_EMS_QUERY, granted_by=admin_id
+        )
+        await session.flush()
+        keys = await repo.grant_keys_for(session, admin_id)
+        assert grants.ROLE_EMS in keys and grants.PERM_EMS_QUERY in keys
+        await session.rollback()
+
+    _run(go)
+
+
+def test_an_admin_role_alone_confers_no_grant():
+    """Design §3.4. This is the departure from effective_level that a later
+    refactor is most likely to "fix" back — hence a test that names it."""
+
+    async def go(session):
+        from app.mcp import repository as repo
+
+        admin_id = await _an_admin_id(session)
+        await session.execute(
+            text("DELETE FROM user_mcp_grants WHERE user_id = :uid"), {"uid": admin_id}
+        )
+        keys = await repo.grant_keys_for(session, admin_id)
+        assert keys == set(), "a global admin was handed grants implicitly"
+        await session.rollback()
+
+    _run(go)
