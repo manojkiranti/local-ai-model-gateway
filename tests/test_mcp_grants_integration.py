@@ -45,6 +45,18 @@ async def _an_admin_id(session):
     return row
 
 
+async def _a_different_user_id(session, exclude_id):
+    """Any user id other than `exclude_id`, or None if the table has only one
+    row. Used to discriminate a re-grant's `granted_by` without depending on
+    the clock: `now()` is fixed for the life of an open transaction, so two
+    `repo.grant` calls sharing one uncommitted transaction see the identical
+    timestamp regardless of `DO NOTHING` vs `DO UPDATE` — `granted_by` does
+    not have that problem, because it is whatever value the caller passes."""
+    from app.users.models import User
+
+    return await session.scalar(select(User.id).where(User.id != exclude_id).limit(1))
+
+
 def test_the_check_constraint_and_the_frozenset_are_the_same_vocabulary():
     """The two copies are deliberate; drifting apart is not.
 
@@ -144,35 +156,60 @@ def test_the_audit_columns_survive_the_granter_being_deleted():
     _run(go)
 
 
-def test_re_granting_does_not_rewrite_the_audit_timestamp():
+def test_re_granting_does_not_rewrite_the_audit_columns():
     """The `POST .../members` lesson: an upsert that overwrites audit columns
-    reports success while destroying the record of when access was given."""
+    reports success while destroying the record of when access was given.
+
+    `granted_by` is the column that actually discriminates `DO NOTHING` from
+    `DO UPDATE` here. `granted_at` does not: both `repo.grant` calls below run
+    inside ONE open, uncommitted transaction (only `session.flush()` between
+    them), and PostgreSQL's `now()`/`CURRENT_TIMESTAMP` is fixed for the whole
+    transaction — a `DO UPDATE ... SET granted_at = now()` would compute the
+    identical value both times, so a `granted_at`-only assertion here would
+    pass under EITHER implementation and prove nothing (measured; see
+    task-10-report.md's fix-up section). Re-granting with a DIFFERENT
+    `granted_by` and asserting the ORIGINAL value survives has no such
+    blind spot: it fails immediately under `DO UPDATE`, with no dependence on
+    transaction timing.
+    """
 
     async def go(session):
         from app.mcp import repository as repo
 
         admin_id = await _an_admin_id(session)
+        other_id = await _a_different_user_id(session, admin_id)
+        if other_id is None:
+            pytest.skip(
+                "need a second user row to distinguish granted_by on a re-grant"
+            )
+
         await repo.grant(
             session, user_id=admin_id, grant_key=grants.ROLE_IZONE, granted_by=admin_id
         )
         await session.flush()
-        first = await session.scalar(
+        first_at = await session.scalar(
             select(UserMcpGrant.granted_at).where(
                 UserMcpGrant.user_id == admin_id,
                 UserMcpGrant.grant_key == grants.ROLE_IZONE,
             )
         )
+
+        # Re-grant the SAME key, but attribute it to a DIFFERENT admin.
         await repo.grant(
-            session, user_id=admin_id, grant_key=grants.ROLE_IZONE, granted_by=admin_id
+            session, user_id=admin_id, grant_key=grants.ROLE_IZONE, granted_by=other_id
         )
         await session.flush()
-        second = await session.scalar(
-            select(UserMcpGrant.granted_at).where(
-                UserMcpGrant.user_id == admin_id,
-                UserMcpGrant.grant_key == grants.ROLE_IZONE,
+        row = (
+            await session.execute(
+                select(UserMcpGrant.granted_by, UserMcpGrant.granted_at).where(
+                    UserMcpGrant.user_id == admin_id,
+                    UserMcpGrant.grant_key == grants.ROLE_IZONE,
+                )
             )
-        )
-        assert first == second, "a re-grant rewrote granted_at"
+        ).one()
+
+        assert row.granted_by == admin_id, "a re-grant rewrote granted_by"
+        assert row.granted_at == first_at, "a re-grant rewrote granted_at"
         await session.rollback()
 
     _run(go)
