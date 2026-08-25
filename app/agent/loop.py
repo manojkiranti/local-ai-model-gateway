@@ -389,6 +389,21 @@ async def _loop_events(
     )
 
 
+def describe_identity(identity: McpIdentity | None) -> str:
+    """One-line rendering of who is asking and what they hold.
+
+    Logged next to the tool count so a MISSING capability is detectable. The
+    loud failure (a tool ran without its grant) would show up on its own; the
+    quiet one — an entitled user whose tool never appeared — is only visible if
+    the grants and the resulting list sit in the same line.
+    """
+    if identity is None:
+        return "no identity"
+    held = sorted(identity.roles) + sorted(identity.permissions)
+    who = identity.email or "anonymous"
+    return f"{who} ({', '.join(held) if held else 'no grants'})"
+
+
 async def stream_turn(
     *,
     messages: list[dict[str, Any]],
@@ -411,13 +426,23 @@ async def stream_turn(
     if mcp.configured:
         async with mcp.session(identity=identity) as session:
             await registry.load_mcp_tools(mcp, session)
-            logger.info("agent run: %d tool(s) available %s", len(registry.tool_names()), registry.tool_names())
+            logger.info(
+                "agent run: %s -> %d tool(s) available %s",
+                describe_identity(identity),
+                len(registry.tool_names()),
+                registry.tool_names(),
+            )
             async for event in _loop_events(registry, messages, ollama, settings):
                 yield event
         return
 
     logger.warning("MCP not configured — running with local tools only.")
-    logger.info("agent run: %d tool(s) available %s", len(registry.tool_names()), registry.tool_names())
+    logger.info(
+        "agent run: %s -> %d tool(s) available %s",
+        describe_identity(identity),
+        len(registry.tool_names()),
+        registry.tool_names(),
+    )
     async for event in _loop_events(registry, messages, ollama, settings):
         yield event
 

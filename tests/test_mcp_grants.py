@@ -9,6 +9,7 @@ import pathlib
 
 import pytest
 
+from app.agent.loop import describe_identity
 from app.mcp import grants
 
 
@@ -194,3 +195,27 @@ def test_no_call_site_still_passes_user_email_to_the_mcp_client():
                 assert keyword.arg != "user_email", (
                     f"{path} still passes user_email= to an MCP call"
                 )
+
+
+def test_the_log_line_pairs_grants_held_with_tools_available():
+    """The §10 metric: a lost capability is only detectable if the grants and
+    the resulting tool list appear together. Two log lines on opposite sides of
+    the wire cannot be correlated after the fact."""
+    identity = grants.McpIdentity.from_grants(
+        email="person@example.com", grant_keys=["mcp-hrms", "mcp.hrms.full"]
+    )
+    rendered = describe_identity(identity)
+    assert "person@example.com" in rendered
+    assert "mcp-hrms" in rendered
+    assert "mcp.hrms.full" in rendered
+
+
+def test_it_says_no_grants_rather_than_printing_an_empty_list():
+    """`roles=[]` reads as a logging artefact; "no grants" reads as the fact it
+    is — which is what someone scanning for a mis-provisioned account needs."""
+    identity = grants.McpIdentity.from_grants(email="a@b.c", grant_keys=[])
+    assert "no grants" in describe_identity(identity)
+
+
+def test_it_handles_no_identity_at_all():
+    assert describe_identity(None) == "no identity"
