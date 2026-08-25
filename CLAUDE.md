@@ -361,7 +361,12 @@ email substring, LIKE wildcards literal), `PATCH /users/{id}` (admin,
 `POST /v1/chat`,
 `POST /v1/nrb/runs` (admin, 202 `{started, run}` / 409 same shape when busy),
 `GET /v1/nrb/runs/{id}` (admin), `GET /v1/nrb/status` (admin, `?department=`),
-`GET /v1/tools`, `GET /v1/mcp/status`, `POST /v1/files` (upload .xlsx/.csv/
+`GET /v1/tools`, `GET /v1/mcp/status`,
+`GET|POST /v1/users/{id}/mcp-grants` (admin; per-user MCP tool grants — POST is
+idempotent and does NOT rewrite `granted_at`, 422 unknown grant key or an
+extra field, 404 unknown user), `DELETE /v1/users/{id}/mcp-grants/{grant_key}`
+(admin; 204 whether or not the row existed, 404 unknown user),
+`POST /v1/files` (upload .xlsx/.csv/
 .pdf/.docx/.txt/.md/.json/.png/.jpg/.jpeg/.webp/.tif/.tiff/.bmp →
 `generated_files` row `source=uploaded`; 400 bad
 ext/corrupt/zip-bomb/pixel-bomb/non-allowlisted image format, 413 over size
@@ -985,6 +990,43 @@ retained). Runbook: `docs/external-api.md`.
 - MCP: gateway is the MCP client (streamable HTTP). Set `MCP_SERVER_URL` to enable;
   blank = agent runs with local tools only. `mcp` SDK v2: fn is `streamable_http_client`,
   tool field is `input_schema`.
+- **MCP tool access is a per-user GRANT, and the gateway keeps no tool→grant
+  map.** Six strings live in `app/mcp/grants.py` (`mcp-hrms`/`mcp-izone`/`mcp-ems`
+  name a SYSTEM; `mcp.hrms.full`/`mcp.hrms.tasks`/`mcp.ems.query` name a SHARP
+  EDGE inside one), stored in `user_mcp_grants` behind
+  `ck_user_mcp_grants_key`, administered by `GET|POST|DELETE
+  /v1/users/{id}/mcp-grants` (admin-only, `granted_by` on every row), and
+  forwarded as `x-user-roles`/`x-user-permissions` beside the existing
+  `x-user-email`. Five things a rewrite must not lose: (1) **the gateway does
+  NOT know which grant gates which tool** — FastMCP applies `canAccess` at
+  session construction, so `tools/list` already returns the authorized set, and
+  a second copy of that mapping here would drift in the silent direction
+  ("gateway hides a tool the MCP would allow" is a lost capability with no error
+  on either side, the §18 failure class); (2) **a global admin holds no grant
+  implicitly** — deliberately unlike `permissions.effective_level`, because
+  gateway admin is an IT/ops role and auto-conferring `Salary_Level` plus an
+  expenses SQL console on whoever operates the gateway is the escalation an
+  audit objects to, so admins grant themselves explicitly and leave a row
+  (`get_mcp_identity` in `app/mcp/dependencies.py` never reads `user.role`);
+  (3) the identity is a **per-call argument to `MCPClient.session()`, never
+  client state** — `MCPClient` lives on `app.state.mcp` as a process-wide
+  singleton, and two concurrent turns storing identity on it would race each
+  other's grants; (4) **absent headers mean NO grants**, inverting
+  `app/rag/ranking.py`'s fail-open rule for the reason `app/nrb/` fails closed —
+  withholding an answer asserts something false, withholding a tool withholds
+  somebody's salary data; (5) an **unknown grant key is dropped, never raised**
+  — the two sides deploy independently and version skew must cost access, not
+  produce a 500. `McpIdentity` is a frozen dataclass and NOT a contextvar, so
+  unlike `turn_files`/`rag_context` it needs no set-inside-the-generator care.
+- **`x-user-roles` is only as trustworthy as the MCP token, and that is the
+  documented deployment contract.** `local-llm-mcp` binds `127.0.0.1` and its
+  README already states that possession of the shared token grants every tool.
+  The gateway holds that token and its users never see it, so a chat user cannot
+  forge a grant; `canAccess` additionally covers a gateway filtering bug or a
+  second client added later. **If that server is ever bound to `0.0.0.0`, the
+  header becomes forgeable by any token holder and the transport must move to a
+  signed assertion or a callback** — the same class of deployment prerequisite as
+  `docs/external-api.md`'s `--root-path` note.
 - File downloads are behind JWT — the frontend must fetch with the Bearer header
   and make a blob URL (an `<a href>` can't send the header). Files are **per-user**
   now: every generated file gets a `generated_files` row owned by the caller;

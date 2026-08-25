@@ -1,7 +1,7 @@
 # Role-based MCP tool access
 
 **Date:** 2026-08-24
-**Status:** design, approved in chat; implementation plan not yet written
+**Status:** implemented 2026-08-24; see docs/superpowers/plans/2026-08-24-mcp-role-based-tool-access.md
 **Scope:** `local-llm-mcp` (`src/auth/`, `src/tools/`), and in this repo
 `app/mcp/`, `app/users/`, a migration, and a new admin route
 
