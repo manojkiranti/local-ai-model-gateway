@@ -4,6 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from ..auth.dependencies import get_current_user
 from ..mcp.client import MCPClient, MCPUnavailableError
+from ..mcp.dependencies import get_mcp_identity
+from ..mcp.grants import McpIdentity
 from ..users.models import User
 from .registry import LOCAL_TOOLS
 from .schemas import ExposedToolInfo, FilteredToolInfo, ToolsResponse
@@ -21,7 +23,9 @@ router = APIRouter(prefix="/v1", tags=["tools"])
     },
 )
 async def list_tools(
-    request: Request, user: User = Depends(get_current_user)
+    request: Request,
+    user: User = Depends(get_current_user),
+    identity: McpIdentity = Depends(get_mcp_identity),
 ) -> ToolsResponse:
     mcp: MCPClient = request.app.state.mcp
 
@@ -34,7 +38,7 @@ async def list_tools(
 
     if mcp.configured:
         try:
-            toolset = await mcp.describe(user_email=user.email)
+            toolset = await mcp.describe(identity=identity)
         except MCPUnavailableError as exc:
             raise HTTPException(status_code=502, detail=exc.message) from exc
         exposed.extend(

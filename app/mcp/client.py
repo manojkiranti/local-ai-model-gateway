@@ -24,6 +24,9 @@ import httpx
 from mcp import ClientSession
 from mcp.client.streamable_http import create_mcp_http_client, streamable_http_client
 
+from . import grants
+from .grants import McpIdentity
+
 logger = logging.getLogger("app.mcp")
 
 # Cap how much of a tool result we ever hand back to the model.
@@ -103,14 +106,18 @@ class MCPClient:
     def configured(self) -> bool:
         return bool(self.server_url)
 
-    def _session_headers(self, user_email: str | None) -> dict[str, str]:
-        """Auth header + the authenticated user's identity forwarded to the MCP
-        server (it reads `x-user-email` to scope per-user business tools). The
-        gateway is the front door, so it — not the model — asserts who's asking.
+    def _session_headers(self, identity: McpIdentity | None) -> dict[str, str]:
+        """Auth header plus the caller's identity and grants.
+
+        The gateway is the front door, so it — not the model — asserts who is
+        asking and what they hold. The identity is a per-call ARGUMENT and never
+        client state: this object is a process-wide singleton, so storing it
+        would let two concurrent turns race each other's grants.
+
+        A fresh dict every call, for the same reason.
         """
         headers = dict(self._auth_headers)
-        if user_email:
-            headers["x-user-email"] = user_email
+        headers.update(grants.header_values(identity))
         return headers
 
     # ---- filtering (applied before any tool is shown to the model) ----
@@ -197,20 +204,21 @@ class MCPClient:
             await self._probe_reachable()
 
     @asynccontextmanager
-    async def session(self, *, user_email: str | None = None) -> AsyncIterator[ClientSession]:
+    async def session(self, *, identity: McpIdentity | None = None) -> AsyncIterator[ClientSession]:
         """Open an initialized MCP session for the duration of the block.
 
-        `user_email` is forwarded to the server as `x-user-email` so per-user
-        business tools can scope their data to the authenticated caller.
-        Connection/initialize failures are raised as MCPUnavailableError;
-        errors raised by the caller inside the block propagate unchanged.
+        `identity` is forwarded to the server as `x-user-email`/`x-user-roles`/
+        `x-user-permissions` so it can scope per-user business tools AND gate
+        which tools this caller may even see. Connection/initialize failures
+        are raised as MCPUnavailableError; errors raised by the caller inside
+        the block propagate unchanged.
         """
         if not self.configured:
             raise MCPUnavailableError("MCP_SERVER_URL is not configured.")
 
         await self._probe_reachable()
 
-        headers = self._session_headers(user_email)
+        headers = self._session_headers(identity)
         stack = AsyncExitStack()
         try:
             http_client = create_mcp_http_client(headers=headers or None)
@@ -243,9 +251,9 @@ class MCPClient:
         )
         return toolset
 
-    async def describe(self, *, user_email: str | None = None) -> ToolSet:
+    async def describe(self, *, identity: McpIdentity | None = None) -> ToolSet:
         """Connect, list, filter — for the GET /v1/tools endpoint."""
-        async with self.session(user_email=user_email) as session:
+        async with self.session(identity=identity) as session:
             return await self.load_toolset(session)
 
     async def call_tool(

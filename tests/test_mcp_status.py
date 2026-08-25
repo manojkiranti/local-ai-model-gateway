@@ -10,6 +10,8 @@ from starlette.testclient import TestClient
 from app.auth.dependencies import get_current_user
 from app.main import app
 from app.mcp.client import ExposedTool, MCPUnavailableError, ToolSet
+from app.mcp.dependencies import get_mcp_identity
+from app.mcp.grants import McpIdentity
 
 
 class _User:
@@ -27,7 +29,7 @@ class FakeMCP:
         self._tools = tools or []
         self._error = error
 
-    async def describe(self, *, user_email=None):
+    async def describe(self, *, identity=None):
         if not self._reachable:
             raise MCPUnavailableError(self._error)
         return ToolSet(
@@ -40,6 +42,12 @@ class FakeMCP:
 
 def _client(mcp: FakeMCP) -> TestClient:
     app.dependency_overrides[get_current_user] = lambda: _User()
+    # This endpoint's identity is exercised separately in test_mcp_grants.py /
+    # test_mcp_grants_routes.py; here the fake user carries no `.id`, so the
+    # real dependency (which queries user_mcp_grants by id) is overridden too.
+    app.dependency_overrides[get_mcp_identity] = lambda: McpIdentity.from_grants(
+        email="tester@example.com", grant_keys=[]
+    )
     app.state.mcp = mcp
     return TestClient(app)
 

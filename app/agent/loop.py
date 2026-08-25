@@ -29,6 +29,7 @@ from .. import localtime
 from ..config import Settings
 from ..rag.context import current_department
 from ..mcp.client import MCPClient, MCPUnavailableError
+from ..mcp.grants import McpIdentity
 from ..ollama.client import OllamaClient, OllamaError
 from ..tools.registry import ToolRegistry, UnknownToolError
 
@@ -394,12 +395,13 @@ async def stream_turn(
     ollama: OllamaClient,
     mcp: MCPClient,
     settings: Settings,
-    user_email: str | None = None,
+    identity: McpIdentity | None = None,
 ) -> AsyncIterator[dict[str, Any]]:
     """Build the tool registry (local + MCP) and stream the loop's events.
 
-    A single MCP session spans the whole run. `user_email` is forwarded to the
-    MCP server (x-user-email) so its tools can scope to the authenticated caller.
+    A single MCP session spans the whole run. `identity` is forwarded to the
+    MCP server (x-user-email/x-user-roles/x-user-permissions) so its tools can
+    scope to the authenticated caller and gate which tools are even visible.
     A connect-time failure raises MCPUnavailableError (streaming callers pre-flight
     reachability); a mid-run failure surfaces as a `done` event, stop_reason=error.
     """
@@ -407,7 +409,7 @@ async def stream_turn(
     registry.register_local_tools()
 
     if mcp.configured:
-        async with mcp.session(user_email=user_email) as session:
+        async with mcp.session(identity=identity) as session:
             await registry.load_mcp_tools(mcp, session)
             logger.info("agent run: %d tool(s) available %s", len(registry.tool_names()), registry.tool_names())
             async for event in _loop_events(registry, messages, ollama, settings):
@@ -426,7 +428,7 @@ async def run_turn(
     ollama: OllamaClient,
     mcp: MCPClient,
     settings: Settings,
-    user_email: str | None = None,
+    identity: McpIdentity | None = None,
 ) -> dict[str, Any]:
     """Collect stream_turn's events into the result dict (non-streaming callers).
 
@@ -436,7 +438,7 @@ async def run_turn(
     """
     done: dict[str, Any] | None = None
     async for event in stream_turn(
-        messages=messages, ollama=ollama, mcp=mcp, settings=settings, user_email=user_email
+        messages=messages, ollama=ollama, mcp=mcp, settings=settings, identity=identity
     ):
         if event.get("type") == "done":
             done = event

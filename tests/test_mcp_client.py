@@ -9,6 +9,7 @@ the streamable-HTTP transport's internal cancel scope.
 import pytest
 
 from app.mcp.client import MCPClient, MCPUnavailableError
+from app.mcp.grants import McpIdentity
 
 # A port nothing should be listening on -> connection refused.
 DEAD_URL = "http://127.0.0.1:59999/mcp"
@@ -39,10 +40,11 @@ def test_session_headers_forward_auth_and_user_email():
         read_prefixes=["get"],
         write_keywords=[],
     )
-    with_email = mcp._session_headers("alice@example.com")
+    identity = McpIdentity.from_grants(email="alice@example.com", grant_keys=[])
+    with_email = mcp._session_headers(identity)
     assert with_email["Authorization"] == "Bearer tok"
     assert with_email["x-user-email"] == "alice@example.com"
-    # No email -> no header (server treats userEmail as null).
+    # No identity -> no header (server treats userEmail as null).
     assert "x-user-email" not in mcp._session_headers(None)
 
 

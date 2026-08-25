@@ -30,6 +30,8 @@ from ..files.source import turn_files
 from ..history import repository as repo
 from ..history.service import open_turn
 from ..mcp.client import MCPClient, MCPUnavailableError
+from ..mcp.dependencies import get_mcp_identity
+from ..mcp.grants import McpIdentity
 from ..rag.context import rag_context
 from ..rag.sources import (
     SourceCollector,
@@ -98,6 +100,7 @@ async def chat(
     request: Request,
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
+    identity: McpIdentity = Depends(get_mcp_identity),
 ):
     ollama: OllamaClient = request.app.state.ollama
     mcp: MCPClient = request.app.state.mcp
@@ -146,7 +149,7 @@ async def chat(
                         source_scope(collector):
                     async for event in stream_turn(
                         messages=context, ollama=ollama, mcp=mcp,
-                        settings=run_settings, user_email=user.email,
+                        settings=run_settings, identity=identity,
                     ):
                         if event.get("type") == "done":
                             stop_reason = event.get("stop_reason")
@@ -209,7 +212,7 @@ async def chat(
                 source_scope(collector):
             result = await run_turn(
                 messages=context, ollama=ollama, mcp=mcp,
-                settings=run_settings, user_email=user.email,
+                settings=run_settings, identity=identity,
             )
     except MCPUnavailableError as exc:
         raise HTTPException(status_code=502, detail=exc.message) from exc

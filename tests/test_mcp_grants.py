@@ -100,3 +100,97 @@ def test_the_module_is_pure_no_database_and_no_http():
             imported.add(node.module.split(".")[0])
     forbidden = {"sqlalchemy", "httpx", "fastapi", "app"}
     assert not (imported & forbidden), f"grants.py must stay pure; found {imported & forbidden}"
+
+
+def _client():
+    from app.mcp.client import MCPClient
+
+    return MCPClient(
+        server_url="http://127.0.0.1:3333/mcp",
+        auth_token="secret",
+        tool_mode="read_only",
+        allowlist=[],
+        read_prefixes=["get", "list"],
+        write_keywords=["create"],
+    )
+
+
+def test_session_headers_carry_the_identity():
+    identity = grants.McpIdentity.from_grants(
+        email="person@example.com",
+        grant_keys=["mcp-hrms", "mcp.hrms.full"],
+    )
+    headers = _client()._session_headers(identity)
+    assert headers["Authorization"] == "Bearer secret"
+    assert headers["x-user-email"] == "person@example.com"
+    assert headers["x-user-roles"] == "mcp-hrms"
+    assert headers["x-user-permissions"] == "mcp.hrms.full"
+
+
+def test_session_headers_omit_grant_fields_for_an_ungranted_caller():
+    identity = grants.McpIdentity.from_grants(email="person@example.com", grant_keys=[])
+    headers = _client()._session_headers(identity)
+    assert "x-user-roles" not in headers
+    assert "x-user-permissions" not in headers
+    # The auth token still goes: the caller is authenticated, just unprovisioned.
+    assert headers["Authorization"] == "Bearer secret"
+
+
+def test_no_identity_forwards_no_user_headers():
+    headers = _client()._session_headers(None)
+    assert headers == {"Authorization": "Bearer secret"}
+
+
+def test_the_client_holds_no_identity_state_between_calls():
+    """MCPClient is a process-wide singleton on app.state.mcp. If the identity
+    were stored on it, two concurrent turns would race each other's grants and
+    one user would act with another's permissions."""
+    client = _client()
+    hrms = grants.McpIdentity.from_grants(email="a@b.c", grant_keys=["mcp-hrms"])
+    ems = grants.McpIdentity.from_grants(email="d@e.f", grant_keys=["mcp-ems"])
+
+    first = client._session_headers(hrms)
+    second = client._session_headers(ems)
+    third = client._session_headers(hrms)
+
+    assert first["x-user-roles"] == "mcp-hrms"
+    assert second["x-user-roles"] == "mcp-ems"
+    assert third == first
+    assert "identity" not in vars(client)
+
+
+def test_the_returned_headers_are_a_fresh_dict_each_call():
+    """A shared dict would let one turn's mutation reach another's request."""
+    client = _client()
+    identity = grants.McpIdentity.from_grants(email="a@b.c", grant_keys=["mcp-hrms"])
+    first = client._session_headers(identity)
+    first["x-user-roles"] = "mcp-ems"
+    assert client._session_headers(identity)["x-user-roles"] == "mcp-hrms"
+
+
+def test_no_call_site_still_passes_user_email_to_the_mcp_client():
+    """AST check across the call sites: a forgotten one would compile,
+    forward no grants, and present as 'the tools stopped working' with no error
+    anywhere — the §18 failure class.
+
+    Four files, not the brief's original three: app/chat/router.py is the
+    primary call site — the one that actually runs a chat turn — and omitting
+    it from this very check would defeat the point of the check.
+    """
+    import ast
+    import pathlib
+
+    for path in (
+        "app/tools/router.py",
+        "app/mcp/router.py",
+        "app/agent/loop.py",
+        "app/chat/router.py",
+    ):
+        tree = ast.parse(pathlib.Path(path).read_text())
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            for keyword in node.keywords:
+                assert keyword.arg != "user_email", (
+                    f"{path} still passes user_email= to an MCP call"
+                )

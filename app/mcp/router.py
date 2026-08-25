@@ -14,6 +14,8 @@ from pydantic import BaseModel
 from ..auth.dependencies import get_current_user
 from ..users.models import User
 from .client import MCPClient, MCPUnavailableError
+from .dependencies import get_mcp_identity
+from .grants import McpIdentity
 
 router = APIRouter(prefix="/v1", tags=["mcp"])
 
@@ -34,7 +36,9 @@ class McpStatusResponse(BaseModel):
     responses={401: {"description": "Missing/invalid JWT."}},
 )
 async def mcp_status(
-    request: Request, user: User = Depends(get_current_user)
+    request: Request,
+    user: User = Depends(get_current_user),
+    identity: McpIdentity = Depends(get_mcp_identity),
 ) -> McpStatusResponse:
     mcp: MCPClient = request.app.state.mcp
 
@@ -49,7 +53,7 @@ async def mcp_status(
         )
 
     try:
-        toolset = await mcp.describe(user_email=user.email)
+        toolset = await mcp.describe(identity=identity)
     except MCPUnavailableError as exc:
         return McpStatusResponse(
             configured=True,
