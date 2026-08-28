@@ -52,7 +52,7 @@ def test_p95_picks_the_nearest_rank_not_the_max():
     latencies = [float(i) for i in range(1, 21)]
     out = summarize(latencies, wall_seconds=2.0)
     assert out["p95_ms"] == 19.0
-    assert out["p50_ms"] == 10.0
+    assert out["p50_ms"] == 10.5   # statistics.median of 1..20 is 10.5, not 10.0
 
 
 def test_throughput_is_requests_over_wall_clock_not_sum_of_latencies():
