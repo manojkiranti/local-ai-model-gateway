@@ -65,11 +65,27 @@ class Settings(BaseSettings):
     login_attempt_window_seconds: int = 300
     login_lockout_seconds: int = 900
 
-    # --- Ollama ---
+    # --- Model servers ---
+    # `ollama_base_url` is the EMBEDDINGS/reranker backend and keeps its name.
+    # `agent_base_url` is the chat/agent backend, which may be a different
+    # server (vLLM on the GPU box, for throughput). Blank means "same server as
+    # embeddings", so a dev laptop — where vLLM is impractical — sets nothing
+    # and keeps talking to one local Ollama exactly as before the split.
+    # Read `chat_base_url`, never `agent_base_url`, when opening a chat client.
     ollama_base_url: str = "http://localhost:11434"
+    agent_base_url: str = ""
     ollama_timeout: float = 120.0
     default_chat_model: str = "qwen2.5:latest"
     default_embed_model: str = "nomic-embed-text:latest"
+
+    @property
+    def chat_base_url(self) -> str:
+        """Where the chat/agent model lives — `agent_base_url` or, blank, Ollama.
+
+        One place owns the fallback so the chat client and the health badge
+        cannot disagree about which server they mean.
+        """
+        return self.agent_base_url or self.ollama_base_url
 
     # --- Assistant identity (deployment branding) ---
     # What the assistant calls itself. Defaults stay generic so the same build

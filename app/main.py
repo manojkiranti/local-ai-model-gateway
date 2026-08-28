@@ -47,8 +47,16 @@ def _build_mcp_client(settings: Settings) -> MCPClient:
 async def lifespan(app: FastAPI):
     settings = get_settings()
     app.state.settings = settings
-    # One shared Ollama client (connection pool) for the whole process.
-    app.state.ollama = OllamaClient(settings.ollama_base_url, settings.ollama_timeout)
+    # One shared chat client (connection pool) for the whole process. This is
+    # the CHAT backend, which may be a different server than the embeddings one
+    # (vLLM for chat, Ollama for embeddings) — see Settings.chat_base_url.
+    # Logged because AGENT_BASE_URL is silently dropped when misspelled
+    # (`extra="ignore"`), and the fallback to Ollama would otherwise look
+    # exactly like a successful cutover.
+    app.state.ollama = OllamaClient(settings.chat_base_url, settings.ollama_timeout)
+    logger.info(
+        "chat backend: %s (model %s)", settings.chat_base_url, settings.agent_model
+    )
     # MCP client (the gateway is the MCP client) + file store for generated files.
     app.state.mcp = _build_mcp_client(settings)
     file_store.configure(settings.files_dir)
@@ -169,14 +177,20 @@ async def _ollama_error_handler(request: Request, exc: OllamaError) -> JSONRespo
 
 @app.get("/health", tags=["health"])
 async def health(request: Request) -> JSONResponse:
-    """Liveness + Ollama reachability. 200 when reachable, 503 when degraded."""
+    """Liveness + CHAT backend reachability. 200 when reachable, 503 when degraded.
+
+    The reported url is `chat_base_url`, not `ollama_base_url`: once chat moves
+    to vLLM those differ, and printing the embeddings server here would tell an
+    operator the cutover was fine while showing them the wrong machine. The key
+    is still named `ollama` so existing clients keep parsing it.
+    """
     settings = request.app.state.settings
     reachable = await request.app.state.ollama.is_healthy()
     return JSONResponse(
         status_code=200 if reachable else 503,
         content={
             "status": "ok" if reachable else "degraded",
-            "ollama": {"base_url": settings.ollama_base_url, "reachable": reachable},
+            "ollama": {"base_url": settings.chat_base_url, "reachable": reachable},
         },
     )
 
