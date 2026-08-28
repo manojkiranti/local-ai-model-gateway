@@ -136,7 +136,7 @@ def _score(case: dict, calls: list[dict], answer: str) -> tuple[bool, str]:
 
 
 async def _run_case(case: dict, settings, mcp) -> dict:
-    ollama = OllamaClient(settings.ollama_base_url, settings.ollama_timeout)
+    ollama = OllamaClient(settings.chat_base_url, settings.ollama_timeout)
     t0 = time.time()
     try:
         out = await run_turn(
@@ -167,7 +167,7 @@ async def main() -> int:
     mcp = _build_mcp_client(settings)
     repeat = int(os.environ.get("EVAL_REPEAT", "1"))
 
-    print(f"model={settings.agent_model}  server={settings.ollama_base_url}  "
+    print(f"model={settings.agent_model}  server={settings.chat_base_url}  "
           f"mcp={'on' if settings.mcp_server_url else 'off'}  repeat={repeat}")
     print("=" * 78)
 

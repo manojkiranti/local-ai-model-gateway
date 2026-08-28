@@ -83,9 +83,12 @@ class Settings(BaseSettings):
         """Where the chat/agent model lives — `agent_base_url` or, blank, Ollama.
 
         One place owns the fallback so the chat client and the health badge
-        cannot disagree about which server they mean.
+        cannot disagree about which server they mean. `.strip()` so a
+        whitespace-only `AGENT_BASE_URL` (e.g. `"   "` from a stray env-file
+        value) falls back to Ollama instead of being treated as a set,
+        truthy, unusable URL.
         """
-        return self.agent_base_url or self.ollama_base_url
+        return self.agent_base_url.strip() or self.ollama_base_url
 
     # --- Assistant identity (deployment branding) ---
     # What the assistant calls itself. Defaults stay generic so the same build

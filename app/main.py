@@ -45,6 +45,19 @@ def _build_mcp_client(settings: Settings) -> MCPClient:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Under `uvicorn app.main:app` (the documented run command and the
+    # Dockerfile's CMD) uvicorn only configures ITS OWN loggers — the root
+    # logger stays at WARNING with no handler attached, so an INFO record from
+    # "app.main" is discarded before it reaches any output (verified: zero
+    # occurrences of "chat backend:" with plain `uvicorn app.main:app`, with or
+    # without `--log-level info`, since that flag only tunes uvicorn's loggers
+    # too). The "chat backend: ..." line below is the operator's only defence
+    # against a misspelled AGENT_BASE_URL being silently dropped
+    # (`extra="ignore"`), so it must actually reach stdout. Guarded so this
+    # never clobbers a root logger some other entry point (a test runner, a
+    # future ASGI server config) already configured.
+    if not logging.getLogger().handlers:
+        logging.basicConfig(level=logging.INFO)
     settings = get_settings()
     app.state.settings = settings
     # One shared chat client (connection pool) for the whole process. This is
@@ -177,20 +190,65 @@ async def _ollama_error_handler(request: Request, exc: OllamaError) -> JSONRespo
 
 @app.get("/health", tags=["health"])
 async def health(request: Request) -> JSONResponse:
-    """Liveness + CHAT backend reachability. 200 when reachable, 503 when degraded.
+    """Liveness + CHAT and EMBEDDINGS backend reachability.
 
-    The reported url is `chat_base_url`, not `ollama_base_url`: once chat moves
-    to vLLM those differ, and printing the embeddings server here would tell an
-    operator the cutover was fine while showing them the wrong machine. The key
-    is still named `ollama` so existing clients keep parsing it.
+    Before the chat/embeddings split, one URL meant one probe covered both
+    roles. It no longer does: `AGENT_BASE_URL` can point chat at vLLM while
+    embeddings stay on Ollama, and a dead embeddings server (RAG search/ingest
+    broken) behind a healthy vLLM used to be completely invisible here — 200
+    "ok", green Docker healthcheck, silent RAG outage.
+
+    The `ollama` key is UNCHANGED for client compatibility — it is still the
+    CHAT backend's reachability, still named `ollama` on purpose. A second
+    `embeddings` key reports `ollama_base_url`'s own reachability additively.
+
+    HTTP status code and the top-level `status` string stay driven by the CHAT
+    backend alone, exactly as before this field existed: 200/"ok" when chat is
+    reachable, 503/"degraded" when it is not. That is deliberate, not an
+    oversight — restarting the gateway container can plausibly fix a wedged
+    chat client, so that is what Docker's `HEALTHCHECK` (which acts on the
+    status code) should trigger on; restarting the gateway does nothing for a
+    dead EXTERNAL embeddings server, so a dead embeddings backend does not flip
+    the code or bounce the container. It is still not invisible: `status`
+    reports **"embeddings_degraded"** and `embeddings.reachable` is `false`
+    whenever chat is fine but embeddings is not, so any monitor parsing the
+    JSON body — not just the HTTP status — has a signal to alert on.
+
+    When `ollama_base_url == chat_base_url` (the default, unset
+    `AGENT_BASE_URL`), there is exactly one server to ask, so only one probe
+    runs and both fields report its result.
     """
     settings = request.app.state.settings
-    reachable = await request.app.state.ollama.is_healthy()
+    chat_reachable = await request.app.state.ollama.is_healthy()
+
+    if settings.ollama_base_url == settings.chat_base_url:
+        embeddings_reachable = chat_reachable
+    else:
+        embed_client = OllamaClient(settings.ollama_base_url, settings.ollama_timeout)
+        try:
+            embeddings_reachable = await embed_client.is_healthy()
+        finally:
+            await embed_client.aclose()
+
+    if not chat_reachable:
+        status = "degraded"
+    elif not embeddings_reachable:
+        status = "embeddings_degraded"
+    else:
+        status = "ok"
+
     return JSONResponse(
-        status_code=200 if reachable else 503,
+        status_code=200 if chat_reachable else 503,
         content={
-            "status": "ok" if reachable else "degraded",
-            "ollama": {"base_url": settings.chat_base_url, "reachable": reachable},
+            "status": status,
+            "ollama": {
+                "base_url": settings.chat_base_url,
+                "reachable": chat_reachable,
+            },
+            "embeddings": {
+                "base_url": settings.ollama_base_url,
+                "reachable": embeddings_reachable,
+            },
         },
     )
 

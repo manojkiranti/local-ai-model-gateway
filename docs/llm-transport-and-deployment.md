@@ -141,9 +141,11 @@ now; it's documented so the switch is a config change when/if you want it.
    - Launch with the OpenAI server enabled and context as a flag:
      `--max-model-len 32768`. With 2× A40 you can also use `--tensor-parallel-size 2`.
    - For a **chat-only** move (the realistic one — embeddings stay on Ollama),
-     point **`AGENT_BASE_URL`** at vLLM's `/v1` base and leave
-     `OLLAMA_BASE_URL` on Ollama. Only if vLLM serves *every* role does
-     `OLLAMA_BASE_URL` move instead.
+     point **`AGENT_BASE_URL`** at vLLM — e.g. `http://<SERVER_HOST>:8100`,
+     with **no `/v1` suffix**: `OllamaClient` appends `/v1/chat/completions`
+     itself, so a value ending in `/v1` produces `/v1/v1/...` → 404 on every
+     turn. Leave `OLLAMA_BASE_URL` on Ollama. Only if vLLM serves *every* role
+     does `OLLAMA_BASE_URL` move instead.
    - `AGENT_MODEL` = whatever name vLLM serves the model under
      (`--served-model-name`).
    - Tool calling needs `--enable-auto-tool-choice` and a `--tool-call-parser`,
