@@ -143,10 +143,18 @@ class OllamaClient:
         await self._client.aclose()
 
     # ---- health / discovery ----
-    async def is_healthy(self) -> bool:
-        """True if the model server answers /v1/models within a short timeout."""
+    async def is_healthy(self, timeout: float = 5.0) -> bool:
+        """True if the model server answers /v1/models within `timeout` seconds.
+
+        `timeout` is a param, not always 5.0, because `/health` needs a much
+        shorter budget: Docker's HEALTHCHECK kills the whole check at 3s
+        (see Dockerfile), so probing at the 5.0 default there can make a
+        HANGING (not refusing) backend bounce the container instead of just
+        reporting itself unreachable. Existing callers that omit `timeout`
+        keep the original 5.0 behaviour.
+        """
         try:
-            resp = await self._client.get("/v1/models", timeout=5.0)
+            resp = await self._client.get("/v1/models", timeout=timeout)
             return resp.status_code == 200
         except httpx.HTTPError:
             return False

@@ -31,6 +31,15 @@ from .users.router import router as users_router
 
 logger = logging.getLogger("app.main")
 
+# `/health` must not let Docker's HEALTHCHECK (--timeout=3s, Dockerfile:109)
+# kill the check and bounce the container just because an external backend is
+# HANGING (firewall DROP, powered-off box) rather than refusing. Two probes at
+# the client's normal 5.0s default, run sequentially, could take ~10s — well
+# past 3s, three retries in a row and the orchestrator restarts a container
+# that was never actually unhealthy. This budget is short enough that even two
+# hung backends probed CONCURRENTLY finish well under 3s.
+HEALTH_PROBE_TIMEOUT = 1.5
+
 
 def _build_mcp_client(settings: Settings) -> MCPClient:
     return MCPClient(
@@ -70,6 +79,19 @@ async def lifespan(app: FastAPI):
     logger.info(
         "chat backend: %s (model %s)", settings.chat_base_url, settings.agent_model
     )
+    # One shared EMBEDDINGS client too (finding #2) — built once here rather
+    # than fresh per `/health` request, which used to open (and tear down) a
+    # new httpx.AsyncClient/TCP connection on every unauthenticated poll of a
+    # public endpoint. Compare the NORMALISED URLs (`OllamaClient.__init__`
+    # itself does `.rstrip("/")`) so `AGENT_BASE_URL` with a trailing slash
+    # still takes the one-server path (finding #3) instead of aliasing a
+    # client whose `.base_url` won't string-match the other's raw setting.
+    if settings.chat_base_url.rstrip("/") == settings.ollama_base_url.rstrip("/"):
+        app.state.embeddings = app.state.ollama
+    else:
+        app.state.embeddings = OllamaClient(
+            settings.ollama_base_url, settings.ollama_timeout
+        )
     # MCP client (the gateway is the MCP client) + file store for generated files.
     app.state.mcp = _build_mcp_client(settings)
     file_store.configure(settings.files_dir)
@@ -98,6 +120,12 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         await app.state.ollama.aclose()
+        # Only close the embeddings client separately when it is actually a
+        # DIFFERENT object — when the URLs match it IS app.state.ollama
+        # (aliased above), and closing the same httpx.AsyncClient twice is at
+        # best redundant and at worst an error depending on httpx's version.
+        if app.state.embeddings is not app.state.ollama:
+            await app.state.embeddings.aclose()
         # Dispose the DB engine so pooled connections don't outlive the loop
         # (correct on real shutdown; also keeps test event loops isolated).
         await engine.dispose()
@@ -215,20 +243,32 @@ async def health(request: Request) -> JSONResponse:
     JSON body — not just the HTTP status — has a signal to alert on.
 
     When `ollama_base_url == chat_base_url` (the default, unset
-    `AGENT_BASE_URL`), there is exactly one server to ask, so only one probe
-    runs and both fields report its result.
+    `AGENT_BASE_URL`, compared normalised — a trailing slash on either setting
+    still counts as the same server), there is exactly one server to ask, so
+    only one probe runs and both fields report its result.
+
+    Both probes run CONCURRENTLY, each bounded by `HEALTH_PROBE_TIMEOUT`
+    (well under Docker's own 3s HEALTHCHECK timeout), and both clients are
+    long-lived (built once in `lifespan`, not per request) — see the module
+    comment on `HEALTH_PROBE_TIMEOUT` and findings #1/#2 in the vLLM
+    migration review for why either regression bounces the container or
+    leaks a connection on every poll.
     """
     settings = request.app.state.settings
-    chat_reachable = await request.app.state.ollama.is_healthy()
+    same_server = (
+        settings.ollama_base_url.rstrip("/") == settings.chat_base_url.rstrip("/")
+    )
 
-    if settings.ollama_base_url == settings.chat_base_url:
+    if same_server:
+        chat_reachable = await request.app.state.ollama.is_healthy(
+            timeout=HEALTH_PROBE_TIMEOUT
+        )
         embeddings_reachable = chat_reachable
     else:
-        embed_client = OllamaClient(settings.ollama_base_url, settings.ollama_timeout)
-        try:
-            embeddings_reachable = await embed_client.is_healthy()
-        finally:
-            await embed_client.aclose()
+        chat_reachable, embeddings_reachable = await asyncio.gather(
+            request.app.state.ollama.is_healthy(timeout=HEALTH_PROBE_TIMEOUT),
+            request.app.state.embeddings.is_healthy(timeout=HEALTH_PROBE_TIMEOUT),
+        )
 
     if not chat_reachable:
         status = "degraded"
