@@ -231,7 +231,9 @@ path, and `fetch_url` is the only tool that accepts a URL at all.
 | Variable | Read by | Lives in |
 |---|---|---|
 | `DATABASE_URL`, `JWT_SECRET`, `AGENT_MODEL`, `OLLAMA_BASE_URL`, `RAG_*`, … | the gateway (and the worker, for `RAG_*` + `DATABASE_URL`) | gateway `.env` / `.env.docker` |
+| `AGENT_BASE_URL` | the gateway's **chat** client only (`Settings.chat_base_url`); the worker and the query-embed path keep reading `OLLAMA_BASE_URL` | gateway `.env`; **blank = same server as embeddings**, which is what the laptop wants |
 | `OLLAMA_CONTEXT_LENGTH` | **Ollama** | the Ollama service's own env (compose `environment:` or systemd unit) |
+| `--max-model-len` | **vLLM** (the launch flag replacing `OLLAMA_CONTEXT_LENGTH`) | the vLLM service's own launch args — must equal `CONTEXT_WINDOW_TOKENS` |
 | `NRB_API_BASE_URL` | the gateway (`get_nrb_forex`) | gateway `.env`; default `https://www.nrb.org.np/api/forex/v1` |
 
 There is **no timezone variable**. "Today" comes from `app/localtime.py`, which
@@ -253,7 +255,8 @@ persisted to `chat_messages.trace` either way.
 
 ## 8. Backend swap checklist
 
-Moving local Ollama → server Ollama → vLLM is config only:
+**Moving the WHOLE backend** (every model role together — local Ollama → server
+Ollama → a vLLM serving all of them) is config only:
 
 1. `OLLAMA_BASE_URL` → the new server's OpenAI base URL.
 2. `AGENT_MODEL` → whatever name that server serves the model under.
@@ -261,6 +264,22 @@ Moving local Ollama → server Ollama → vLLM is config only:
    `--tensor-parallel-size 2` for the two A40s).
 4. Restart the gateway. No code edits — the wire format lives only in
    `app/ollama/client.py`.
+
+**Moving ONE role is not**, and that is the realistic vLLM case. vLLM serves one
+model per process, so putting the chat model on vLLM for concurrency leaves
+embeddings and the reranker on Ollama — two servers, and the gateway needs two
+base URLs. `OLLAMA_BASE_URL` alone cannot express that. Hence:
+
+- `OLLAMA_BASE_URL` = the **embeddings/reranker** backend (it keeps its name).
+- `AGENT_BASE_URL` = the **chat/agent** backend. **Blank falls back to
+  `OLLAMA_BASE_URL`**, so a dev laptop sets nothing and behaves exactly as
+  before; only the server sets it. `Settings.chat_base_url` resolves the two.
+
+That split is a real (small) code change, already landed on `feat/vllm`. Do not
+repeat step 1 above for a chat-only move — repointing `OLLAMA_BASE_URL` at vLLM
+would send **embeddings** to a chat model, which answers, so the failure is
+silent. Full plan, VRAM math and cutover runbook:
+`docs/ollama-to-vllm-migration.md`.
 
 ---
 

@@ -140,9 +140,16 @@ now; it's documented so the switch is a config change when/if you want it.
 2. **vLLM on the server** — FUTURE OPTION, not running yet
    - Launch with the OpenAI server enabled and context as a flag:
      `--max-model-len 32768`. With 2× A40 you can also use `--tensor-parallel-size 2`.
-   - Point `OLLAMA_BASE_URL` at vLLM's `/v1` base. **No gateway code change** —
-     that's the whole payoff of the transport port.
-   - `AGENT_MODEL` = whatever name vLLM serves the model under.
+   - For a **chat-only** move (the realistic one — embeddings stay on Ollama),
+     point **`AGENT_BASE_URL`** at vLLM's `/v1` base and leave
+     `OLLAMA_BASE_URL` on Ollama. Only if vLLM serves *every* role does
+     `OLLAMA_BASE_URL` move instead.
+   - `AGENT_MODEL` = whatever name vLLM serves the model under
+     (`--served-model-name`).
+   - Tool calling needs `--enable-auto-tool-choice` and a `--tool-call-parser`,
+     or vLLM returns tool syntax as plain text and every tool turn breaks.
+   - The transport itself still needs no edits — the wire format lives only in
+     `app/ollama/client.py`. Full plan: `docs/ollama-to-vllm-migration.md`.
 
 **VRAM note:** a 32k-token KV cache is a real allocation on top of the weights.
 92 GB across two A40s is comfortable for a 35B MoE at 32k, but if you later push
@@ -155,12 +162,25 @@ it isn't forgotten.
 
 ## Backend swap checklist
 
-To move from local Ollama → server Ollama → vLLM, you only ever touch config:
+Moving the **whole** backend — every model role together — is config only:
 
 1. `OLLAMA_BASE_URL` → the new server's OpenAI base URL.
 2. `AGENT_MODEL` → the model name the new server serves.
 3. Context: `OLLAMA_CONTEXT_LENGTH` (Ollama) or `--max-model-len` (vLLM).
 4. Restart the gateway. No code edits if the backend is OpenAI-compatible.
+
+Moving **one role** is not. vLLM serves one model per process, so the realistic
+case — chat on vLLM for concurrency, embeddings and the reranker left on Ollama
+— is two servers and therefore two base URLs:
+
+- `OLLAMA_BASE_URL` = the **embeddings/reranker** backend (keeps its name).
+- `AGENT_BASE_URL` = the **chat/agent** backend; **blank falls back to
+  `OLLAMA_BASE_URL`**, so the laptop sets nothing and only the server sets it.
+  `Settings.chat_base_url` owns that fallback.
+
+Do not use step 1 for a chat-only move: repointing `OLLAMA_BASE_URL` at vLLM
+sends **embeddings** to a chat model, which answers — a silent failure. See
+`docs/ollama-to-vllm-migration.md`.
 
 ## Still to verify live
 
