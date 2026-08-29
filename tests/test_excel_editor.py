@@ -274,3 +274,72 @@ def test_the_formula_refusal_does_not_send_the_model_to_create_excel():
         editor.apply(wb, operation="delete_rows", rows=[1])
     assert "set_cells" in str(exc.value)
     assert "Do NOT rebuild the file with create_excel" in str(exc.value)
+
+
+# --------------------------------------------------------------------------- #
+# Second code review (2026-08-29)
+# --------------------------------------------------------------------------- #
+def _array_formula(text: str, ref: str):
+    from openpyxl.worksheet.formula import ArrayFormula
+
+    return ArrayFormula(ref, text)
+
+
+def test_an_array_formula_on_the_sheet_blocks_a_delete():
+    """openpyxl returns array/CSE formulas as ArrayFormula OBJECTS, not strings,
+    so an isinstance(str) test walks straight past them and the guard lets the
+    exact corruption it exists to prevent through."""
+    wb = _book(GRID)
+    wb["Data"]["D1"] = _array_formula("=SUM(A2:A3*B2:B3)", "D1:D2")
+    with pytest.raises(editor.EditError, match="formula"):
+        editor.apply(wb, operation="delete_rows", rows=[1])
+
+
+def test_an_array_formula_on_another_sheet_pointing_here_blocks_a_delete():
+    wb = _book(GRID)
+    wb.create_sheet("Summary")["A1"] = _array_formula("=SUM(Data!B2:B4)", "A1:A2")
+    with pytest.raises(editor.EditError, match="formula"):
+        editor.apply(wb, operation="delete_rows", sheet="Data", rows=[1])
+
+
+def test_delete_columns_refuses_a_letter_beyond_the_sheet():
+    """delete_cols(26) on a 3-column sheet is a silent no-op, and the tool
+    reported it as a successful delete — the model then tells the user the
+    column is gone."""
+    wb = _book([["name", "qty", "price"], ["a", 1, 10]])
+    with pytest.raises(editor.EditError, match="no column"):
+        editor.apply(wb, operation="delete_columns", columns=["Z"])
+    assert [c.value for c in wb["Data"][1]] == ["name", "qty", "price"]
+
+
+def _with_trailing_style(rows):
+    """A sheet whose last STYLED row is far below its last DATA row — ordinary
+    in real uploads, and it inflates ws.max_row."""
+    from openpyxl.styles import Font
+
+    wb = _book(rows)
+    wb["Data"]["A10"].font = Font(bold=True)
+    return wb
+
+
+def test_the_data_row_count_ignores_rows_that_only_carry_FORMATTING():
+    """`readers.py` trims trailing empty rows, so read_excel says 3 while
+    ws.max_row said 9. add_column then demanded 9 values for a 3-row sheet, and
+    the only way past it was padding values into blank rows."""
+    wb = _with_trailing_style(GRID)
+    editor.apply(wb, operation="add_column", header="note", values=["x", "y", "z"])
+    assert [c.value for c in wb["Data"]["C"]][:4] == ["note", "x", "y", "z"]
+
+
+def test_delete_rows_refuses_a_row_the_read_tools_never_displayed():
+    wb = _with_trailing_style(GRID)
+    with pytest.raises(editor.EditError, match="3 data row"):
+        editor.apply(wb, operation="delete_rows", rows=[4])
+
+
+def test_append_rows_lands_after_the_last_POPULATED_row():
+    """ws.append() starts from ws.max_row, so a styled empty row at A10 pushed
+    the new record to row 11 and left rows 5-9 blank inside the data."""
+    wb = _with_trailing_style(GRID)
+    editor.apply(wb, operation="append_rows", rows=[["d", 4]])
+    assert [c.value for c in wb["Data"][5]][:2] == ["d", 4]

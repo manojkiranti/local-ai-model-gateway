@@ -18,6 +18,10 @@ from typing import Any
 from ... import nepali_date as bs
 from .base import LocalToolSpec
 
+# The last Gregorian year the table reaches; a "date" past it on the AD path
+# is a BS year that was sent without to='ad'.
+_LAST_AD_YEAR = bs.to_ad(bs.BsDate(max(bs.supported_years()), 1, 1)).year
+
 _WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 
 
@@ -61,6 +65,15 @@ async def _nepali_date(args: dict[str, Any]) -> str:
         if target == "bs":
             # The input is Gregorian; hand back the Nepali date.
             ad_date = date.fromisoformat(_ascii(text))
+            if ad_date.year > _LAST_AD_YEAR:
+                # Almost certainly a BS year sent on the default path. An AD
+                # range error gives the model nothing to correct, so name the
+                # fix instead of letting it retry or give up.
+                return (
+                    f"ERROR: {text!r} looks like a Bikram Sambat date, not a "
+                    "Gregorian one. To convert it to Gregorian, call again with "
+                    "to='ad'."
+                )
             bs_date = bs.from_ad(ad_date)
         else:
             bs_date = bs.parse(text)

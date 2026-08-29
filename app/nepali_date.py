@@ -150,7 +150,13 @@ def today() -> BsDate:
 def fiscal_year(bs: BsDate) -> str:
     """Nepal's fiscal year for a BS date, as NRB writes it ('2082/83')."""
     start = bs.year if bs.month >= FISCAL_START_MONTH else bs.year - 1
-    return f"{start}/{(start + 1) % 100:02d}"
+    end = start + 1
+    # Two digits is NRB's own spelling, but at a century roll '%02d' of 2100 is
+    # '00', which reads back as the year 2000 and fails the consecutive check.
+    # BS 2099 is AD 2042, inside the table, so this is reachable — spell the
+    # year in full there rather than emit a label we would reject.
+    tail = f"{end % 100:02d}" if end % 100 else str(end)
+    return f"{start}/{tail}"
 
 
 _FY = re.compile(r"^(\d{4})\s*[/-]\s*(\d{2}|\d{4})$")

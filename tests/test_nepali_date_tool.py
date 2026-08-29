@@ -100,3 +100,13 @@ def test_date_math_routes_nepali_dates_to_this_tool():
     from app.tools.local import date_math
 
     assert "nepali_date" in date_math.SPEC.description
+
+
+def test_a_bs_date_sent_without_to_is_told_how_to_fix_the_call():
+    """to defaults to 'bs' (input is Gregorian), so the obvious call for
+    'convert 2082-01-31' answered with an AD range — nothing the model can act
+    on, so it retries or gives up instead of resending with to='ad'."""
+    out = _call({"date": "2082-01-31"})
+    assert out.startswith("ERROR:")
+    assert "to='ad'" in out
+    assert "Bikram Sambat" in out

@@ -132,8 +132,13 @@ def _append_rows(ws, rows: Any) -> EditResult:
             raise EditError("each entry of 'rows' must be an array of cell values")
         checked.append([_check_value(v) for v in row])
 
-    for row in checked:
-        ws.append(row)
+    # Not ws.append(): it starts from ws.max_row, so a styled empty row far
+    # below the data pushes the new record past the gap instead of onto the
+    # first free line.
+    next_row = _last_populated_row(ws) + 1
+    for offset, row in enumerate(checked):
+        for column, value in enumerate(row, start=1):
+            ws.cell(row=next_row + offset, column=column, value=value)
     return EditResult(
         operation="append_rows",
         sheet_name=ws.title,
@@ -176,10 +181,28 @@ def _is_blank(ws) -> bool:
     return ws.max_row == 1 and ws.max_column == 1 and ws["A1"].value is None
 
 
+def _formula_text(cell) -> str | None:
+    """The formula in a cell, however openpyxl chose to represent it.
+
+    A plain formula comes back as a `str`, but an ARRAY/CSE formula (and a data
+    table) comes back as an `ArrayFormula`/`DataTableFormula` OBJECT. An
+    isinstance(str) test walks straight past those, which let the guard below
+    approve exactly the corruption it exists to prevent. `data_type == "f"` is
+    the one check that covers every representation.
+    """
+    if cell.data_type != "f":
+        return None
+    value = cell.value
+    if isinstance(value, str):
+        return value
+    # ArrayFormula/DataTableFormula carry the source in `.text`.
+    return getattr(value, "text", None) or ""
+
+
 def _first_formula(ws) -> str | None:
     for row in ws.iter_rows():
         for cell in row:
-            if isinstance(cell.value, str) and cell.value.startswith("="):
+            if _formula_text(cell) is not None:
                 return cell.coordinate
     return None
 
@@ -212,8 +235,8 @@ def _guard_shifting_formulas(wb, ws) -> None:
             continue
         for row in other.iter_rows():
             for cell in row:
-                value = cell.value
-                if isinstance(value, str) and value.startswith("=") and ws.title in value:
+                text = _formula_text(cell)
+                if text is not None and ws.title in text:
                     raise EditError(
                         f"refusing to delete from sheet '{ws.title}': sheet "
                         f"'{other.title}' has a formula ({cell.coordinate}) that "
@@ -222,9 +245,26 @@ def _guard_shifting_formulas(wb, ws) -> None:
                     )
 
 
+def _last_populated_row(ws) -> int:
+    """The last row holding a VALUE, ignoring rows that carry only formatting.
+
+    `ws.max_row` counts a row styled but never filled — ordinary in real
+    uploads — while `readers._xlsx_sheet_grid` trims trailing empty rows. The
+    two disagreeing meant `read_excel` showed 3 data rows while the editor
+    believed 9: `add_column` then demanded nine values for a three-row sheet,
+    `delete_rows` accepted numbers the read tools never displayed, and
+    `append_rows` landed past the gap. The read tools are what the model saw,
+    so this side is the one that has to move.
+    """
+    for row in range(ws.max_row, 0, -1):
+        if any(cell.value is not None for cell in ws[row]):
+            return row
+    return 0
+
+
 def _data_row_count(ws) -> int:
     """Rows below the header row. An empty sheet has none."""
-    return max(0, ws.max_row - 1) if ws.max_row else 0
+    return max(0, _last_populated_row(ws) - 1)
 
 
 def _delete_rows(ws, rows: Any) -> EditResult:
@@ -289,9 +329,13 @@ def _column_index(headers: list[Any], name: Any) -> int:
             return i
     if target.isalpha() and len(target) <= 3:
         try:
-            return column_index_from_string(target.upper())
+            index = column_index_from_string(target.upper())
         except ValueError:
-            pass
+            index = None
+        # Bound it to the sheet: delete_cols(26) on a 3-column sheet is a
+        # silent no-op that used to be reported as a successful delete.
+        if index is not None and 1 <= index <= len(headers):
+            return index
     known = ", ".join(str(h) for h in headers if h is not None) or "(none)"
     raise EditError(f"no column named '{name}' (headers are: {known})")
 

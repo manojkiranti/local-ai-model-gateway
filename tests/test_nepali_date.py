@@ -169,3 +169,35 @@ def test_the_month_carries_both_names():
     assert bs.month_name == "Shrawan"
     assert bs.month_name_nepali == "श्रावण"
     assert bs.isoformat() == "2082-04-01"
+
+
+def test_a_fiscal_year_label_at_the_century_boundary_can_be_read_back():
+    """'%02d' of 2100 is '00', which the parser then reads as the year 2000 and
+    rejects. BS 2099 is AD 2042 — inside the table, so this is reachable."""
+    label = nd.fiscal_year(nd.BsDate(2099, 4, 1))
+    start, _ = nd.fiscal_year_span(label)
+    assert start == nd.BsDate(2099, 4, 1)
+
+
+def test_every_fiscal_year_label_the_table_can_produce_reads_back():
+    """Exhaustive, because the century-boundary bug above was only reachable in
+    one year out of 126 and no hand-picked case would have found it."""
+    checked = 0
+    for year in nd.supported_years():
+        label = nd.fiscal_year(nd.BsDate(year, 4, 1))
+        if year == max(nd.supported_years()):
+            continue  # its END year is past the table; asserted separately below
+        start, _ = nd.fiscal_year_span(label)
+        assert start.year == year, label
+        checked += 1
+    assert checked == 125
+
+
+def test_the_last_fiscal_year_refuses_rather_than_extrapolating_past_the_table():
+    """FY 2100/01 ends in BS 2101, which the table does not cover. Its END DATE
+    is genuinely unknown, so refusing is the correct answer — not a gap to
+    paper over by assuming a month length."""
+    label = nd.fiscal_year(nd.BsDate(2100, 4, 1))
+    assert label == "2100/01"
+    with pytest.raises(nd.OutOfRange):
+        nd.fiscal_year_span(label)
