@@ -110,3 +110,17 @@ def test_a_bs_date_sent_without_to_is_told_how_to_fix_the_call():
     assert out.startswith("ERROR:")
     assert "to='ad'" in out
     assert "Bikram Sambat" in out
+
+
+def test_the_description_routes_document_questions_to_the_rag_tool():
+    """NRB files its documents BY fiscal year ('2082-83' is a category slug), so
+    'what circulars came out in 2082/83' is the question most likely to be
+    captured by this tool instead of reaching the corpus. Same negative-routing
+    clause get_nrb_forex carries, for the same reason: descriptions ARE the
+    routing prompt, and a date tool answering a document question means RAG was
+    never consulted."""
+    desc = tool.SPEC.description
+    assert "search_department_docs" in desc
+    lowered = desc.lower()
+    for negative in ("circular", "polic", "directive"):
+        assert negative in lowered, negative

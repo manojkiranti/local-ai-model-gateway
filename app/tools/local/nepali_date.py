@@ -108,7 +108,10 @@ SPEC = LocalToolSpec(
         "'date' with to='bs' to turn a Gregorian date into a Nepali one, or "
         "to='ad' for the reverse; omit 'date' for today in Nepal. Pass "
         "'fiscal_year' (e.g. '2082/83') for that year's start and end dates. "
-        "The fiscal year runs Shrawan 1 to Ashar end, NOT the Nepali new year."
+        "The fiscal year runs Shrawan 1 to Ashar end, NOT the Nepali new year. "
+        "This tool converts DATES only — for what a circular, policy, directive "
+        "or report from a Nepali year actually SAYS, search the documents with "
+        "search_department_docs."
     ),
     parameters={
         "type": "object",

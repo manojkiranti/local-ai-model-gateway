@@ -62,8 +62,14 @@ def test_missing_file_id_errors():
 
 
 def test_unknown_id_errors_without_distinguishing_foreign_from_missing():
+    """ONE message for both causes: which file ids exist is not the caller's to
+    learn. The routing guidance appended to it is identical in both cases, so it
+    leaks nothing — it is there because the model otherwise invents a file_id
+    and then asks the user to upload a document the corpus may already hold."""
     assert _read({"file_id": "nope"}) == (
-        "ERROR: no such file (unknown id, or you don't own it)."
+        "ERROR: no such file (unknown id, or you don't own it). If the user did "
+        "not attach this document to the chat, do NOT guess a file_id — search "
+        "the department's official corpus with search_department_docs instead."
     )
 
 
@@ -321,3 +327,16 @@ def test_header_carries_all_four_lines_at_once_and_stays_under_the_cap(tmp_path,
     assert lines[1] == "TRUNCATED: call read_document again with start_line=81 to continue."
     assert lines[2] == "PARTIAL: pages 3–4 were not read (limit 2 pages)."
     assert lines[3] == "1 of 2 pages have no extractable text (likely scanned images)."
+
+
+def test_an_unknown_file_id_points_the_model_at_the_corpus():
+    """Measured against qwen2.5 with the full registry: asked to summarise a
+    document it was never given, the model INVENTS a file_id, gets this error,
+    and then tells the user to upload the file — the corpus is never searched,
+    which is a RAG false negative on a question the corpus may well answer.
+    Editing the description did not move it (tried twice); the error arrives
+    mid-loop, where the model can still act on it."""
+    out = asyncio.run(read_document.SPEC.func({"file_id": "att_1234567890"}))
+    assert out.startswith("ERROR:")
+    assert "search_department_docs" in out
+    assert "do NOT guess" in out
