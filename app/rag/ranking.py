@@ -32,7 +32,6 @@ from .retrieval import RetrievedChunk
 # in the top logprobs — deliberately uninformative rather than confidently
 # wrong. Named here because it disqualifies itself as a threshold: at 0.5 the
 # least informative case sits exactly on the boundary.
-NO_SIGNAL_SCORE = 0.5
 
 # A floor of 1, and it is a fail-safe rather than a nicety. With top_k=0 and no
 # floor, `kept` is empty, so `abstained` becomes True and a single misconfigured
@@ -59,6 +58,10 @@ class Ranking:
     # and `kept` is therefore RRF order. Recorded so a silently un-reranked
     # deployment is detectable rather than looking like a working one.
     degraded: bool
+    # How many candidates the reranker returned NO signal for. Reported so that
+    # partial breakage is visible: these are kept (fail open) and excluded from
+    # `scores`, so without this they would leave no trace at all.
+    unscored: int = 0
 
 
 logger = logging.getLogger(__name__)
@@ -66,7 +69,7 @@ logger = logging.getLogger(__name__)
 
 def decide(
     chunks: Sequence[RetrievedChunk],
-    scores: Sequence[float],
+    scores: Sequence[float | None],
     *,
     threshold: float,
     top_k: int,
@@ -75,6 +78,17 @@ def decide(
 
     `>=` rather than `>` so the swept threshold means the same number in the
     table as it does here.
+
+    A score of **None means the reranker gave no signal** for that passage, and
+    it is NOT a number to compare — it is kept, because this module fails open:
+    withholding an answer asserts something false about the bank's own policies,
+    and silence from the reranker is not evidence of irrelevance. It is also
+    excluded from `scores`, so it cannot masquerade as a measurement in the
+    distribution a threshold refit reads.
+
+    If NOTHING scored, the reranker itself is broken and the result is
+    `degraded` — the case that previously looked like a working reranker
+    reporting uniform 0.5s.
     """
     if len(chunks) != len(scores):
         raise ValueError(
@@ -84,27 +98,46 @@ def decide(
     if not chunks:
         return Ranking(kept=[], scores={}, abstained=False, degraded=False)
 
-    by_id = {c.chunk_id: float(s) for c, s in zip(chunks, scores)}
+    by_id = {
+        c.chunk_id: float(s) for c, s in zip(chunks, scores) if s is not None
+    }
+    unscored = [c for c in chunks if c.chunk_id not in by_id]
+
+    # Nothing scored at all: the reranker produced no usable signal, so there is
+    # nothing to rank BY. Fall back rather than present a confident-looking
+    # ordering built out of silence.
+    if not by_id:
+        return _degraded(chunks, top_k, unscored=len(unscored))
+
     # Stable sort: equal scores keep the order fusion gave them, so a tie is
     # broken by RRF rather than arbitrarily.
-    ordered = sorted(chunks, key=lambda c: by_id[c.chunk_id], reverse=True)
-    kept = [c for c in ordered if by_id[c.chunk_id] >= threshold][: max(MIN_KEPT, top_k)]
+    scored = [c for c in chunks if c.chunk_id in by_id]
+    ordered = sorted(scored, key=lambda c: by_id[c.chunk_id], reverse=True)
+    # Scored survivors first (we have evidence for them), then the unscored in
+    # the order fusion gave them.
+    kept = ([c for c in ordered if by_id[c.chunk_id] >= threshold] + unscored)[
+        : max(MIN_KEPT, top_k)
+    ]
 
     return Ranking(
         kept=kept,
         scores=by_id,
         abstained=not kept,
         degraded=False,
+        unscored=len(unscored),
     )
 
 
-def _degraded(chunks: Sequence[RetrievedChunk], top_k: int) -> Ranking:
+def _degraded(
+    chunks: Sequence[RetrievedChunk], top_k: int, *, unscored: int = 0
+) -> Ranking:
     """RRF order, no abstention, flagged. The fail-open outcome."""
     return Ranking(
         kept=list(chunks[: max(MIN_KEPT, top_k)]),
         scores={},
         abstained=False,
         degraded=True,
+        unscored=unscored,
     )
 
 
@@ -180,11 +213,15 @@ async def apply(
     else:
         spread = "min=n/a median=n/a max=n/a"
     logger.info(
-        "ranked %d candidates (query_chars=%d threshold=%.2f %s) -> kept %d%s",
+        "ranked %d candidates (query_chars=%d threshold=%.2f %s%s) -> kept %d%s",
         len(chunks),
         len(query),
         settings.rag_relevance_threshold,
         spread,
+        # Partial silence leaves no other trace: unscored candidates are kept
+        # but excluded from the distribution, so without this an operator cannot
+        # tell a confident reranker from one answering half the time.
+        f" unscored={result.unscored}" if result.unscored else "",
         len(result.kept),
         ", abstained" if result.abstained else "",
     )

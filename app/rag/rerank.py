@@ -37,13 +37,22 @@ class ChatClient(Protocol):
     async def chat(self, payload: dict[str, Any]) -> dict[str, Any]: ...
 
 
-def score_from_logprobs(top_logprobs: Sequence[dict[str, Any]]) -> float:
-    """P(relevant) from the first token's alternatives.
+def score_from_logprobs(top_logprobs: Sequence[dict[str, Any]]) -> float | None:
+    """P(relevant) from the first token's alternatives, or None for NO SIGNAL.
 
     Softmax over just the yes/no mass, case-insensitively — the model may emit
-    'Yes', 'yes' or ' yes' depending on tokenizer and prompt. Returns 0.5 when
-    neither appears, which is deliberately uninformative rather than confidently
-    wrong: a missing signal must not read as "definitely irrelevant".
+    'Yes', 'yes' or ' yes' depending on tokenizer and prompt.
+
+    **None, not 0.5, when neither token appears.** An earlier version returned
+    0.5, which made silence indistinguishable from a genuine 50/50 and, worse,
+    let it enter `decide`'s `>=` comparison — so the least informative case was
+    settled by the comparison operator rather than by evidence. It also hid the
+    failure that matters: a reranker producing nothing usable (wrong model,
+    changed prompt format, unexpected tokenizer) scored EVERY passage 0.5, kept
+    them all, and logged `min=0.500 median=0.500 max=0.500` — identical to a
+    working reranker that was uncertain, while quietly poisoning the score
+    distribution that a threshold refit depends on. A real tie still returns
+    0.5: that is a measurement and stays one.
     """
     yes = no = None
     for item in top_logprobs:
@@ -57,7 +66,7 @@ def score_from_logprobs(top_logprobs: Sequence[dict[str, Any]]) -> float:
             no = float(logprob)
 
     if yes is None and no is None:
-        return 0.5
+        return None
     if yes is None:
         return 1.0 - math.exp(float(no))
     if no is None:
@@ -65,7 +74,9 @@ def score_from_logprobs(top_logprobs: Sequence[dict[str, Any]]) -> float:
 
     ey, en = math.exp(yes), math.exp(no)
     total = ey + en
-    return 0.5 if total == 0 else ey / total
+    # Both masses underflowed to zero: arithmetically undefined, so it is
+    # silence, not a tie.
+    return None if total == 0 else ey / total
 
 
 async def rerank(
@@ -74,7 +85,7 @@ async def rerank(
     passages: Sequence[str],
     *,
     model: str,
-) -> list[float]:
+) -> list[float | None]:
     """Score each passage against the query. One forward pass per passage, all
     issued CONCURRENTLY.
 
@@ -84,7 +95,7 @@ async def rerank(
     `ranking.decide` relies on to pair a score with its chunk.
     """
 
-    async def one(passage: str) -> float:
+    async def one(passage: str) -> float | None:
         response = await client.chat(
             {
                 "model": model,

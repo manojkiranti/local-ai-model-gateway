@@ -1749,12 +1749,26 @@ silently hides every RAG admin control.
 `RAG_RERANK_POOL` and routes candidates through `app/rag/ranking.py`, which can
 abstain — but `RAG_RERANK_ENABLED=false` and `RAG_RELEVANCE_THRESHOLD` is an
 unfitted placeholder, so the serving path is byte-identical to before: RRF order,
-no abstention. **0.5 is disqualified as a threshold** — it is exactly what
-`rerank.score_from_logprobs` returns for "no signal", and the decision boundary would sit exactly on the sentinel, and since the
-comparison is `>=`, a passage the reranker had NO opinion about would be kept
-and treated as relevant (verified: at 0.5 a no-signal passage is kept; at 0.6 it
-is dropped). Either way the least informative case is decided by the comparison
-operator rather than by evidence, which is why the value is disqualified. Fitting it needs three things in order: a human authors the 50
+no abstention. **0.5 was disqualified as a threshold, and is not any more
+(2026-08-29).** It used to be exactly what `rerank.score_from_logprobs` returned
+for "no signal", so the decision boundary sat on that sentinel: with `>=`, a
+passage the reranker had NO opinion about was kept and treated as relevant, and
+one notch higher it was discarded — the least informative case settled by the
+comparison operator rather than by evidence. **Silence is now `None`**, which
+never reaches the comparison: an unscored passage is KEPT (this module fails
+open — see `app/rag/ranking.py`) and excluded from `scores`, so it cannot
+masquerade as a measurement in the distribution a refit reads. Two consequences
+a rewrite must not lose: (1) **a reranker that scores NOTHING is now `degraded`**
+— it previously gave every passage 0.5, kept them all, and logged
+`min=0.500 median=0.500 max=0.500`, which is indistinguishable from a working
+reranker being uncertain, so a wrong model or a changed prompt format looked
+like a healthy deployment while poisoning the only fitting data there is (the
+§18 class); (2) **the `NO_SIGNAL_SCORE` constant is deliberately GONE** and a
+test asserts it stays gone — naming 0.5 was the old mitigation, and keeping the
+name after the value stopped being returned only invites someone to compare
+against it. 0.5 is now an ordinary operating point meaning "keep anything judged
+at least even odds" — still one to CHOOSE from the sweep rather than inherit as
+a default. Fitting it needs three things in order: a human authors the 50
 `[REVIEW` questions in `docs/rag/retrieval-eval-cohort.json` and freezes it,
 `ollama pull qwen3-reranker:4b`, then `scripts/rag_eval_sweep.py`. Pick the
 operating point from the false-refusal column FIRST — refusing a question the
