@@ -1,6 +1,10 @@
 # Migrating the chat/agent model from Ollama to vLLM (live GPU server)
 
-**Status:** PLAN — not executed. No code has been changed for this yet.
+**Status:** the gateway-side **code prerequisite is DONE** on branch
+`feat/vllm` (the chat/embeddings base-URL split, §6 Option A) and is
+behaviour-neutral until `AGENT_BASE_URL` is set. **Nothing has been done on
+the server** — vLLM is not running, and no cutover has happened. The runbook
+(§8) and validation (§9) are still ahead.
 **Author aid:** drafted 2026-08-28 against the repo state at that date.
 **Companion docs:** `docs/server-and-models.md` (what runs where),
 `docs/llm-transport-and-deployment.md` (why the transport is OpenAI-compatible),
@@ -209,39 +213,46 @@ servers resident:
 
 Pick **one**. This is the only architecturally interesting decision.
 
-### Option A — split the config into two base URLs (RECOMMENDED)
+### Option A — split the config into two base URLs (IMPLEMENTED)
 
-Introduce a dedicated base URL for the chat/agent client; leave embeddings and
-the reranker on the existing Ollama URL. **This is the entire code footprint of
-the migration** — three edits, with a default that keeps today's behaviour until
-`AGENT_BASE_URL` is set.
+**Status: DONE on branch `feat/vllm`.** Introduce a dedicated base URL for the
+chat/agent client; leave embeddings and the reranker on the existing Ollama URL.
+This is the entire code footprint of the migration, and it is behaviour-neutral
+until `AGENT_BASE_URL` is set.
 
-**Edit 1 — `app/config.py`, after line 70** (the `# --- Ollama ---` block). Add
-the chat backend URL; blank means "fall back to `ollama_base_url`", so an unset
-env var changes nothing:
-
-```python
-# --- Chat/agent backend (vLLM); blank falls back to ollama_base_url ---
-agent_base_url: str = ""      # env AGENT_BASE_URL
-```
-
-**Edit 2 — `app/main.py:51`** (lifespan, where the one shared chat client is
-built). Resolve the chat URL, then construct from it, and **log the resolved
-value** so a typo'd `AGENT_BASE_URL` — silently dropped by `extra="ignore"` and
-falling back to Ollama — is visible at startup rather than mistaken for a
-successful cutover:
+**`app/config.py`** — a new field plus one property that owns the fallback rule.
+A property rather than resolving inline at the call site, so the chat client and
+the health badge cannot drift apart about which server they mean, and so the
+rule is testable without booting the app:
 
 ```python
-chat_url = settings.agent_base_url or settings.ollama_base_url
-app.state.ollama = OllamaClient(chat_url, settings.ollama_timeout)
-log.info("chat backend: %s (model %s)", chat_url, settings.agent_model)
+ollama_base_url: str = "http://localhost:11434"   # EMBEDDINGS/reranker
+agent_base_url: str = ""                          # CHAT; blank = same server
+
+@property
+def chat_base_url(self) -> str:
+    return self.agent_base_url or self.ollama_base_url
 ```
 
-**Edit 3 — `app/main.py:179`** (the `/health` body). It currently reports
-`settings.ollama_base_url` under the `"ollama"` key as *the* model server. Once
-split, that URL is the **embeddings** backend; the chat badge would point at the
-wrong server. Report the resolved chat URL there (or add a second field for the
-embeddings URL). Cosmetic to health, but it's the operator's first diagnostic.
+**`app/main.py` (lifespan)** — the one shared chat client is built from
+`chat_base_url`, and the resolved value is **logged at startup**, because a
+misspelled `AGENT_BASE_URL` is silently dropped (`extra="ignore"`) and the
+fallback to Ollama otherwise looks exactly like a successful cutover:
+
+```python
+app.state.ollama = OllamaClient(settings.chat_base_url, settings.ollama_timeout)
+logger.info("chat backend: %s (model %s)", settings.chat_base_url, settings.agent_model)
+```
+
+**`app/main.py` (`/health`)** — reports `chat_base_url`. It previously printed
+`ollama_base_url`, which after the split is the *embeddings* server: an operator
+checking the cutover would have been shown the wrong machine and told it was
+healthy. The JSON key is still `"ollama"` so existing clients keep parsing it —
+renaming it would break the frontend health badge for no operational gain.
+
+**`.env.example`** — `AGENT_BASE_URL=` documented (blank), with both traps
+written down. The repo's `tests/test_env_templates.py` guard enforces this: a
+setting that exists in `config.py` but not in the template fails the suite.
 
 **Everything else stays on `ollama_base_url`, unchanged:**
 `app/rag/worker.py:430` (document embeddings), `app/tools/local/
@@ -249,11 +260,21 @@ search_department_docs.py:233` (query embeddings), and the scripts. The existing
 `agent_model` / `agent_temperature` / `agent_max_iterations` settings are
 untouched — only the *URL* was fused, and only the URL is being un-fused.
 
-- **Cost:** 1 new setting + 2 edited lines + a log line + a one-line test that
-  `agent_base_url` overrides the chat client while the worker still reads
-  `ollama_base_url`. No new moving part on the server.
+**Tests** (`tests/test_config_chat_backend.py`,
+`tests/test_chat_backend_wiring.py`), each written failing first:
+
+- blank `agent_base_url` falls back to Ollama — **the laptop path**;
+- a set `agent_base_url` becomes the chat backend — the server path;
+- splitting chat does **not** move `ollama_base_url` — guards the silent failure
+  where embeddings would be sent to a vLLM serving a chat model, which answers;
+- `/health` reports the chat backend and not the embeddings one;
+- the shared client the agent loop streams through is built from the chat URL.
+
+Full suite after the change: **2509 passed, 115 skipped, 0 failed** (skip count
+unchanged, per the repo's own "compare the skip count" rule).
+
 - **Payoff:** the gateway genuinely talks to two backends; each can be sized and
-  restarted independently.
+  restarted independently, and the laptop keeps a single local Ollama.
 
 > These are **code changes**, so they contradict the "config only" line in
 > `docs/server-and-models.md` §8 and `docs/llm-transport-and-deployment.md`.

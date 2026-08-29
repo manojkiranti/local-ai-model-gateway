@@ -65,11 +65,45 @@ class Settings(BaseSettings):
     login_attempt_window_seconds: int = 300
     login_lockout_seconds: int = 900
 
-    # --- Ollama ---
+    # --- Model servers ---
+    # `ollama_base_url` is the EMBEDDINGS/reranker backend and keeps its name.
+    # `agent_base_url` is the chat/agent backend, which may be a different
+    # server (vLLM on the GPU box, for throughput). Blank means "same server as
+    # embeddings", so a dev laptop — where vLLM is impractical — sets nothing
+    # and keeps talking to one local Ollama exactly as before the split.
+    # Read `chat_base_url`, never `agent_base_url`, when opening a chat client.
     ollama_base_url: str = "http://localhost:11434"
+    agent_base_url: str = ""
     ollama_timeout: float = 120.0
     default_chat_model: str = "qwen2.5:latest"
     default_embed_model: str = "nomic-embed-text:latest"
+
+    @property
+    def chat_base_url(self) -> str:
+        """Where the chat/agent model lives — `agent_base_url` or, blank, Ollama.
+
+        One place owns the fallback so the chat client and the health badge
+        cannot disagree about which server they mean. `.strip()` so a
+        whitespace-only `AGENT_BASE_URL` (e.g. `"   "` from a stray env-file
+        value) falls back to Ollama instead of being treated as a set,
+        truthy, unusable URL.
+        """
+        return self.agent_base_url.strip() or self.ollama_base_url
+
+    @property
+    def single_backend(self) -> bool:
+        """True when chat and embeddings resolve to the SAME server.
+
+        The ONE definition of "same backend". `app/main.py` uses it in two
+        places — to alias the chat and embeddings clients in `lifespan`, and to
+        decide whether `/health` probes once or twice — and they must never
+        disagree: if the wiring aliased the two while `/health` treated them as
+        distinct (or vice versa), the health badge would report a backend state
+        that does not match how requests are actually routed, with no error.
+        Compared NORMALISED because `OllamaClient.__init__` does `.rstrip("/")`,
+        so a trailing slash on `AGENT_BASE_URL` still counts as one server.
+        """
+        return self.chat_base_url.rstrip("/") == self.ollama_base_url.rstrip("/")
 
     # --- Assistant identity (deployment branding) ---
     # What the assistant calls itself. Defaults stay generic so the same build

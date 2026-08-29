@@ -31,6 +31,15 @@ from .users.router import router as users_router
 
 logger = logging.getLogger("app.main")
 
+# `/health` must not let Docker's HEALTHCHECK (--timeout=3s, Dockerfile:109)
+# kill the check and bounce the container just because an external backend is
+# HANGING (firewall DROP, powered-off box) rather than refusing. Two probes at
+# the client's normal 5.0s default, run sequentially, could take ~10s — well
+# past 3s, three retries in a row and the orchestrator restarts a container
+# that was never actually unhealthy. This budget is short enough that even two
+# hung backends probed CONCURRENTLY finish well under 3s.
+HEALTH_PROBE_TIMEOUT = 1.5
+
 
 def _build_mcp_client(settings: Settings) -> MCPClient:
     return MCPClient(
@@ -45,10 +54,54 @@ def _build_mcp_client(settings: Settings) -> MCPClient:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Under `uvicorn app.main:app` (the documented run command and the
+    # Dockerfile's CMD) uvicorn only configures ITS OWN loggers — the root
+    # logger stays at WARNING with no handler attached, so an INFO record from
+    # "app.main" is discarded before it reaches any output (verified: zero
+    # occurrences of "chat backend:" with plain `uvicorn app.main:app`, with or
+    # without `--log-level info`, since that flag only tunes uvicorn's loggers
+    # too). The "chat backend: ..." line below is the operator's only defence
+    # against a misspelled AGENT_BASE_URL being silently dropped
+    # (`extra="ignore"`), so it must actually reach stdout. Guarded so this
+    # never clobbers a root logger some other entry point (a test runner, a
+    # future ASGI server config) already configured.
+    if not logging.getLogger().handlers:
+        logging.basicConfig(level=logging.INFO)
+        # basicConfig raises the ROOT logger to INFO, and httpx logs each
+        # request line — INCLUDING the full URL — at logger.info() (verified:
+        # httpx.Client._send_single_request). The AD directory shim sends
+        # credentials in the QUERY STRING over plain HTTP (app/auth/directory.py),
+        # so an httpx INFO line here would print the AD password to stdout.
+        # directory.py already pins these at WARNING on import, but relying on
+        # that is relying on import order; re-pin at the point that raises the
+        # level, so THIS basicConfig cannot leak regardless of what imported what.
+        for _noisy in ("httpx", "httpcore"):
+            logging.getLogger(_noisy).setLevel(logging.WARNING)
     settings = get_settings()
     app.state.settings = settings
-    # One shared Ollama client (connection pool) for the whole process.
-    app.state.ollama = OllamaClient(settings.ollama_base_url, settings.ollama_timeout)
+    # One shared chat client (connection pool) for the whole process. This is
+    # the CHAT backend, which may be a different server than the embeddings one
+    # (vLLM for chat, Ollama for embeddings) — see Settings.chat_base_url.
+    # Logged because AGENT_BASE_URL is silently dropped when misspelled
+    # (`extra="ignore"`), and the fallback to Ollama would otherwise look
+    # exactly like a successful cutover.
+    app.state.ollama = OllamaClient(settings.chat_base_url, settings.ollama_timeout)
+    logger.info(
+        "chat backend: %s (model %s)", settings.chat_base_url, settings.agent_model
+    )
+    # One shared EMBEDDINGS client too — built once here rather than fresh per
+    # `/health` request, which used to open (and tear down) a new
+    # httpx.AsyncClient/TCP connection on every unauthenticated poll of a
+    # public endpoint. `settings.single_backend` is the ONE definition of
+    # "same server" (normalised, so a trailing slash on `AGENT_BASE_URL` still
+    # counts) — shared with `/health` so the aliasing here and the probe there
+    # cannot disagree about whether there are one or two backends.
+    if settings.single_backend:
+        app.state.embeddings = app.state.ollama
+    else:
+        app.state.embeddings = OllamaClient(
+            settings.ollama_base_url, settings.ollama_timeout
+        )
     # MCP client (the gateway is the MCP client) + file store for generated files.
     app.state.mcp = _build_mcp_client(settings)
     file_store.configure(settings.files_dir)
@@ -77,6 +130,12 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         await app.state.ollama.aclose()
+        # Only close the embeddings client separately when it is actually a
+        # DIFFERENT object — when the URLs match it IS app.state.ollama
+        # (aliased above), and closing the same httpx.AsyncClient twice is at
+        # best redundant and at worst an error depending on httpx's version.
+        if app.state.embeddings is not app.state.ollama:
+            await app.state.embeddings.aclose()
         # Dispose the DB engine so pooled connections don't outlive the loop
         # (correct on real shutdown; also keeps test event loops isolated).
         await engine.dispose()
@@ -169,14 +228,74 @@ async def _ollama_error_handler(request: Request, exc: OllamaError) -> JSONRespo
 
 @app.get("/health", tags=["health"])
 async def health(request: Request) -> JSONResponse:
-    """Liveness + Ollama reachability. 200 when reachable, 503 when degraded."""
+    """Liveness + CHAT and EMBEDDINGS backend reachability.
+
+    Before the chat/embeddings split, one URL meant one probe covered both
+    roles. It no longer does: `AGENT_BASE_URL` can point chat at vLLM while
+    embeddings stay on Ollama, and a dead embeddings server (RAG search/ingest
+    broken) behind a healthy vLLM used to be completely invisible here — 200
+    "ok", green Docker healthcheck, silent RAG outage.
+
+    The `ollama` key is UNCHANGED for client compatibility — it is still the
+    CHAT backend's reachability, still named `ollama` on purpose. A second
+    `embeddings` key reports `ollama_base_url`'s own reachability additively.
+
+    HTTP status code and the top-level `status` string stay driven by the CHAT
+    backend alone, exactly as before this field existed: 200/"ok" when chat is
+    reachable, 503/"degraded" when it is not. That is deliberate, not an
+    oversight — restarting the gateway container can plausibly fix a wedged
+    chat client, so that is what Docker's `HEALTHCHECK` (which acts on the
+    status code) should trigger on; restarting the gateway does nothing for a
+    dead EXTERNAL embeddings server, so a dead embeddings backend does not flip
+    the code or bounce the container. It is still not invisible: `status`
+    reports **"embeddings_degraded"** and `embeddings.reachable` is `false`
+    whenever chat is fine but embeddings is not, so any monitor parsing the
+    JSON body — not just the HTTP status — has a signal to alert on.
+
+    When `ollama_base_url == chat_base_url` (the default, unset
+    `AGENT_BASE_URL`, compared normalised — a trailing slash on either setting
+    still counts as the same server), there is exactly one server to ask, so
+    only one probe runs and both fields report its result.
+
+    Both probes run CONCURRENTLY, each bounded by `HEALTH_PROBE_TIMEOUT`
+    (well under Docker's own 3s HEALTHCHECK timeout), and both clients are
+    long-lived (built once in `lifespan`, not per request) — see the module
+    comment on `HEALTH_PROBE_TIMEOUT` and findings #1/#2 in the vLLM
+    migration review for why either regression bounces the container or
+    leaks a connection on every poll.
+    """
     settings = request.app.state.settings
-    reachable = await request.app.state.ollama.is_healthy()
+
+    if settings.single_backend:
+        chat_reachable = await request.app.state.ollama.is_healthy(
+            timeout=HEALTH_PROBE_TIMEOUT
+        )
+        embeddings_reachable = chat_reachable
+    else:
+        chat_reachable, embeddings_reachable = await asyncio.gather(
+            request.app.state.ollama.is_healthy(timeout=HEALTH_PROBE_TIMEOUT),
+            request.app.state.embeddings.is_healthy(timeout=HEALTH_PROBE_TIMEOUT),
+        )
+
+    if not chat_reachable:
+        status = "degraded"
+    elif not embeddings_reachable:
+        status = "embeddings_degraded"
+    else:
+        status = "ok"
+
     return JSONResponse(
-        status_code=200 if reachable else 503,
+        status_code=200 if chat_reachable else 503,
         content={
-            "status": "ok" if reachable else "degraded",
-            "ollama": {"base_url": settings.ollama_base_url, "reachable": reachable},
+            "status": status,
+            "ollama": {
+                "base_url": settings.chat_base_url,
+                "reachable": chat_reachable,
+            },
+            "embeddings": {
+                "base_url": settings.ollama_base_url,
+                "reachable": embeddings_reachable,
+            },
         },
     )
 

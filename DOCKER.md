@@ -17,7 +17,8 @@ Override these (via `--env-file`, a prod `.env`, or compose) to reachable hosts:
 | Var | `.env` now (host-only) | In Docker use |
 |---|---|---|
 | `DATABASE_URL` | `...@127.0.0.1:5432/...` | `...@host.docker.internal:5432/...` |
-| `OLLAMA_BASE_URL` | `http://localhost:11434` | `http://host.docker.internal:11434` |
+| `OLLAMA_BASE_URL` (embeddings/reranker backend) | `http://localhost:11434` | `http://host.docker.internal:11434` |
+| `AGENT_BASE_URL` (chat/agent backend — blank = same server as embeddings) | blank, or `http://localhost:8100` | blank, or `http://host.docker.internal:8100` (no trailing `/v1`) |
 | `MCP_SERVER_URL` | `http://localhost:3333/mcp` | `http://host.docker.internal:3333/mcp` |
 
 On **Linux**, `host.docker.internal` needs:
