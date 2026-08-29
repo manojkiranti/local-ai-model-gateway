@@ -67,6 +67,16 @@ async def lifespan(app: FastAPI):
     # future ASGI server config) already configured.
     if not logging.getLogger().handlers:
         logging.basicConfig(level=logging.INFO)
+        # basicConfig raises the ROOT logger to INFO, and httpx logs each
+        # request line — INCLUDING the full URL — at logger.info() (verified:
+        # httpx.Client._send_single_request). The AD directory shim sends
+        # credentials in the QUERY STRING over plain HTTP (app/auth/directory.py),
+        # so an httpx INFO line here would print the AD password to stdout.
+        # directory.py already pins these at WARNING on import, but relying on
+        # that is relying on import order; re-pin at the point that raises the
+        # level, so THIS basicConfig cannot leak regardless of what imported what.
+        for _noisy in ("httpx", "httpcore"):
+            logging.getLogger(_noisy).setLevel(logging.WARNING)
     settings = get_settings()
     app.state.settings = settings
     # One shared chat client (connection pool) for the whole process. This is
@@ -79,14 +89,14 @@ async def lifespan(app: FastAPI):
     logger.info(
         "chat backend: %s (model %s)", settings.chat_base_url, settings.agent_model
     )
-    # One shared EMBEDDINGS client too (finding #2) — built once here rather
-    # than fresh per `/health` request, which used to open (and tear down) a
-    # new httpx.AsyncClient/TCP connection on every unauthenticated poll of a
-    # public endpoint. Compare the NORMALISED URLs (`OllamaClient.__init__`
-    # itself does `.rstrip("/")`) so `AGENT_BASE_URL` with a trailing slash
-    # still takes the one-server path (finding #3) instead of aliasing a
-    # client whose `.base_url` won't string-match the other's raw setting.
-    if settings.chat_base_url.rstrip("/") == settings.ollama_base_url.rstrip("/"):
+    # One shared EMBEDDINGS client too — built once here rather than fresh per
+    # `/health` request, which used to open (and tear down) a new
+    # httpx.AsyncClient/TCP connection on every unauthenticated poll of a
+    # public endpoint. `settings.single_backend` is the ONE definition of
+    # "same server" (normalised, so a trailing slash on `AGENT_BASE_URL` still
+    # counts) — shared with `/health` so the aliasing here and the probe there
+    # cannot disagree about whether there are one or two backends.
+    if settings.single_backend:
         app.state.embeddings = app.state.ollama
     else:
         app.state.embeddings = OllamaClient(
@@ -255,11 +265,8 @@ async def health(request: Request) -> JSONResponse:
     leaks a connection on every poll.
     """
     settings = request.app.state.settings
-    same_server = (
-        settings.ollama_base_url.rstrip("/") == settings.chat_base_url.rstrip("/")
-    )
 
-    if same_server:
+    if settings.single_backend:
         chat_reachable = await request.app.state.ollama.is_healthy(
             timeout=HEALTH_PROBE_TIMEOUT
         )

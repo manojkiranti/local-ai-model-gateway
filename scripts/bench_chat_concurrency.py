@@ -27,7 +27,6 @@ Usage:
 import argparse
 import asyncio
 import json
-import statistics
 import sys
 import time
 from pathlib import Path
@@ -52,6 +51,15 @@ MAX_TOKENS = 200
 
 def _prompt_for(index: int) -> str:
     return PROMPTS[index % len(PROMPTS)]
+
+
+def _nearest_rank_index(percentile: int, n: int) -> int:
+    """Zero-based nearest-rank index: ceil(percentile/100 * n) - 1, clamped.
+
+    `-(-a // b)` is ceil-division on ints. Stays in `[0, n-1]` for every n>=1
+    (n=1 -> 0, n=2 p50 -> 0, n=20 p50 -> 9 i.e. value 10.0, n=20 p95 -> 18).
+    """
+    return max(0, -(-percentile * n // 100) - 1)
 
 
 def summarize(
@@ -84,15 +92,19 @@ def summarize(
             "p95_ms": 0.0,
         }
     ordered = sorted(latencies_ms)
-    # Nearest-rank percentile: index = ceil(p * n) - 1.
-    p95_index = max(0, -(-95 * len(ordered) // 100) - 1)
+    # Nearest-rank for BOTH percentiles (index = ceil(p * n) - 1), so p50 and
+    # p95 are the same kind of number — each an actually-observed latency. An
+    # earlier version took p50 from statistics.median, which interpolates the
+    # two middle values for even n and reports a latency that never occurred;
+    # mixing that with a nearest-rank p95 makes the two incomparable when a
+    # reader diffs them across an Ollama-vs-vLLM run, which is the whole job.
     return {
         "n": n,
         "attempted": attempted,
         "wall_seconds": round(wall_seconds, 3),
         "throughput_rps": round(n / wall_seconds, 3) if wall_seconds else 0.0,
-        "p50_ms": round(statistics.median(ordered), 1),
-        "p95_ms": round(ordered[p95_index], 1),
+        "p50_ms": round(ordered[_nearest_rank_index(50, len(ordered))], 1),
+        "p95_ms": round(ordered[_nearest_rank_index(95, len(ordered))], 1),
     }
 
 

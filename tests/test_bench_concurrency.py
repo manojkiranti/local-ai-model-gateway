@@ -3,12 +3,24 @@
 from scripts.bench_chat_concurrency import PROMPTS, _prompt_for, summarize
 
 
-def test_p95_picks_the_nearest_rank_not_the_max():
-    # 20 samples: p95 is the 19th value (nearest-rank), not the 20th.
+def test_both_percentiles_are_nearest_rank_observed_values():
+    # 20 samples: nearest-rank p95 is the 19th value (19.0), p50 the 10th
+    # (10.0) — both actually-observed latencies. p50 is NOT statistics.median
+    # (which would interpolate the 10th and 11th to 10.5, a value that never
+    # occurred); the two percentiles must be the same kind of number so a
+    # reader can diff them across an Ollama-vs-vLLM run.
     latencies = [float(i) for i in range(1, 21)]
     out = summarize(latencies, wall_seconds=2.0)
     assert out["p95_ms"] == 19.0
-    assert out["p50_ms"] == 10.5
+    assert out["p50_ms"] == 10.0
+
+
+def test_p50_nearest_rank_on_even_n_takes_the_lower_middle_not_an_average():
+    # n=2: nearest-rank p50 index = ceil(0.5*2)-1 = 0 -> the LOWER value.
+    # statistics.median would have returned 15.0 (the average); nearest-rank
+    # returns 10.0, an observed sample.
+    out = summarize([10.0, 20.0], wall_seconds=1.0)
+    assert out["p50_ms"] == 10.0
 
 
 def test_throughput_is_requests_over_wall_clock_not_sum_of_latencies():

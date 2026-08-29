@@ -90,6 +90,21 @@ class Settings(BaseSettings):
         """
         return self.agent_base_url.strip() or self.ollama_base_url
 
+    @property
+    def single_backend(self) -> bool:
+        """True when chat and embeddings resolve to the SAME server.
+
+        The ONE definition of "same backend". `app/main.py` uses it in two
+        places — to alias the chat and embeddings clients in `lifespan`, and to
+        decide whether `/health` probes once or twice — and they must never
+        disagree: if the wiring aliased the two while `/health` treated them as
+        distinct (or vice versa), the health badge would report a backend state
+        that does not match how requests are actually routed, with no error.
+        Compared NORMALISED because `OllamaClient.__init__` does `.rstrip("/")`,
+        so a trailing slash on `AGENT_BASE_URL` still counts as one server.
+        """
+        return self.chat_base_url.rstrip("/") == self.ollama_base_url.rstrip("/")
+
     # --- Assistant identity (deployment branding) ---
     # What the assistant calls itself. Defaults stay generic so the same build
     # serves any deployment; a bank sets ASSISTANT_NAME/ASSISTANT_ORG in .env.
