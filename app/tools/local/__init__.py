@@ -20,6 +20,7 @@ from . import (
     get_nrb_forex,
     html,
     inspect_excel,
+    nepali_date,
     pdf,
     read_document,
     read_excel,
@@ -46,6 +47,7 @@ LOCAL_TOOLS: list[LocalToolSpec] = [
     read_image.SPEC,
     aggregate_excel.SPEC,
     edit_excel.SPEC,
+    nepali_date.SPEC,
     search_department_docs.SPEC,
     get_nrb_forex.SPEC,
 ]

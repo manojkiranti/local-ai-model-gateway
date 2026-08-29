@@ -976,6 +976,39 @@ retained). Runbook: `docs/external-api.md`.
   the key silently and leaves the column unchanged** (measured, no error). Core
   everywhere means one vocabulary; updates are
   `Table.update().where(id == bindparam("_id"))` executemany.
+- **Bikram Sambat has NO formula, and the published tables DISAGREE about the
+  current fiscal year.** `app/nepali_calendar_data.py` (data + provenance) and
+  `app/nepali_date.py` (pure conversion) exist because BS is a sidereal solar
+  calendar: months run 29-32 days with no cycle, so every implementation is an
+  anchor plus a month-length table plus day counting. The table is 126 years
+  (BS 1975-2100, anchored BS 1975-01-01 = AD 1918-04-13, 46,022 days),
+  transcribed from `nepali-datetime` 1.0.8.5 and verified against it for **all
+  46,022 dates, 0 mismatches** — a check run ONCE out-of-repo, so no calendar
+  library is a dependency here. Four things a rewrite must not lose:
+  (1) **the disagreement is live, not a far-edge curiosity** — a second library
+  (`bikram`) agrees exactly from 1944 to May 2025 and then diverges by one day
+  from **AD 2025-05-14 for the entire rest of the range**, because it gives
+  Baisakh 2082 thirty days instead of thirty-one. That was settled on PRIMARY
+  sources, not by preferring a library: hamropatro renders BS 2082 Baisakh 31 as
+  Wed 14 May 2025 (the date could not exist at 30 days), and ADBL Bank published
+  "Jestha 01, 2082 (15 May, 2025)". **A second library agreeing is not evidence**
+  — the whole problem is two libraries disagreeing — so revising any year needs a
+  primary source; a wrong month length never fails loudly, it shifts every later
+  date by a day forever; (2) **the fiscal year starts SHRAWAN 1 (month 4), not
+  Baisakh 1** — FY 2082/83 is AD 2025-07-17 to 2026-07-16, and anchoring it to
+  the BS new year is off by three and a half months, mislabelling every circular
+  in a catalog that files them under exactly that string (`2082-83` slugs,
+  `metadata.fiscal_year`, circular numbers like `12/2082-83`); (3) **out of range
+  REFUSES** (`OutOfRange`), never extrapolates — the `app/nrb/` fail-closed rule,
+  because a plausible wrong date is indistinguishable from an answer; (4) **an
+  unknown month romanisation is refused, not guessed** — Ashar/Asar/Ashadh and
+  Ashoj/Asoj/Ashwin are all real, so there is an alias table, and a wrong guess
+  is a 30-day error that reads as correct. `parse` folds Devanagari digits
+  (NRB writes २०८२). The tool is `nepali_date` (~208 tokens, the cheapest
+  meaningful tool in the set) and `date_math`'s description now routes BS dates
+  to it — `date_math` is Gregorian-only and would silently treat 2082 as a
+  Gregorian year. `today()` goes through `app/localtime.py`, never
+  `date.today()`, for the reason in the next bullet.
 - **Dates come from the server clock, never from the model.** `app/localtime.py`
   is the one source of "today" (Nepal time as a literal **UTC+05:45** offset —
   `ZoneInfo` needs system tzdata the slim images don't install, and Nepal has no
