@@ -155,9 +155,19 @@ class Settings(BaseSettings):
     # all of them. 9059 (one RAG result) + ~2941 (the current user message plus
     # the model's own answer) = 12000, rounded for headroom.
     context_reserve_tokens: int = 12000
-    # Measured floor for the local tool schemas. CLAUDE.md's 3475 figure was
-    # taken at 15 tools and LOCAL_TOOLS is now 17 — re-measure when it grows.
-    context_tool_schema_tokens: int = 4000
+    # Floor for the local tool schemas. The only LIVE measurement is CLAUDE.md's
+    # 3475 tokens at 15 tools (usage.prompt_tokens, qwen2.5, 2026-08-11).
+    # LOCAL_TOOLS is now 18 (read_document, read_image, then edit_excel landed
+    # after that measurement). Serialising those same 15 schemas today gives
+    # 15,498 chars, so that measurement calibrates to ~4.46 chars/token; all 18
+    # serialise to 20,267 chars, i.e. **~4550 tokens estimated**. Raised 4000 ->
+    # 4600 on that basis (2026-08-29): the value was ALREADY below the estimate
+    # at 17 tools, and under-reserving is the dangerous direction — we budget
+    # history confidently into an overflow and Ollama drops the FRONT of the
+    # prompt, where the identity and date system prompt lives. This is an
+    # ESTIMATE, not a measurement: re-measure with usage.prompt_tokens against
+    # the deployed model (qwen3.5:35b-a3b tokenizes differently from qwen2.5).
+    context_tool_schema_tokens: int = 4600
     # DB-side bound on the context read, applied BEFORE the token budget so a
     # 500-turn thread never materializes. Deliberately far more messages than
     # any budget can hold, so it never decides selection; if it is ever the

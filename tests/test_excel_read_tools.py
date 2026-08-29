@@ -164,3 +164,16 @@ def test_attachment_note_routes_documents_to_read_document_not_read_excel():
         {"id": "f2", "filename": "book.xlsx", "summary": "Excel, 1 sheet, 10 rows"},
     ])
     assert "read_document" in note
+
+
+def test_descriptions_route_modifying_a_workbook_to_edit_excel():
+    """Without this cross-reference the model's obvious path to "add a column to
+    my sheet" is read_excel -> create_excel, which silently rebuilds the file
+    from a CAPPED read and drops every row past the cap. Same failure the
+    aggregate_excel cross-reference exists to prevent."""
+    from app.tools.local import edit_excel
+
+    assert "edit_excel" in read_excel.SPEC.description
+    assert "edit_excel" in inspect_excel.SPEC.description
+    # and edit_excel must point back at the read tools for row numbers
+    assert "read_excel" in edit_excel.SPEC.description

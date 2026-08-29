@@ -1051,6 +1051,61 @@ retained). Runbook: `docs/external-api.md`.
   ownership (404 on foreign id), persists `{id,filename,summary}` on the user
   message (`chat_messages.attachments` JSONB), and `build_context_messages`
   re-emits the attachment note on later turns so ids survive without resending.
+- **`edit_excel` loads `data_only=False`, and that single flag is the whole
+  reason the tool is safe.** `readers.py` opens `data_only=True` deliberately —
+  it must never evaluate a formula — but reusing that setting on the WRITE path
+  DESTROYS formulas: measured on openpyxl 3.1.5, loading `data_only=True` and
+  saving replaces every formula cell with its last cached value, so a workbook a
+  human saved from Excel comes back carrying the right NUMBERS with no live model
+  behind them. Nothing errors, the file opens fine, and the damage is invisible —
+  the §18 failure class, applied to a user's own spreadsheet. Never "unify" the
+  two load paths; `test_a_formula_elsewhere_in_the_workbook_survives_the_edit`
+  is the guard. **But `data_only=False` only stops a formula being OVERWRITTEN —
+  it cannot make a SHIFT correct, and `delete_rows`/`delete_columns` therefore
+  REFUSE on any workbook containing formulas.** openpyxl's `delete_rows`/
+  `delete_cols` are not formula-aware: measured, deleting a row above
+  `=SUM(B2:B4)` leaves it spelled `=SUM(B2:B4)` while the rows it names have
+  moved, so it silently sums the wrong records — Excel rewrites those references,
+  openpyxl does not. `_guard_shifting_formulas` checks the target sheet AND any
+  other sheet holding a formula that mentions it by name (a cross-sheet reference
+  breaks identically and is invisible from the target sheet). The refusal
+  deliberately does NOT recommend `create_excel`: rebuilding from a `read_excel`
+  dump is capped and drops rows. Six more things a rewrite must not lose: (1) **the edit always
+  produces a NEW file** and the upload is never touched, so a wrong edit costs
+  nothing (`test_the_edit_lands_in_a_new_file_and_the_original_is_untouched`) —
+  same instinct as NRB supersession archiving rather than overwriting; (2) **ONE
+  operation per call**, because an ordered list of edits is a correctness trap:
+  deleting a row shifts every A1 reference after it and the model cannot predict
+  the shift — each operation is batched INTERNALLY instead, so one call still
+  does one whole job; (3) `delete_rows` numbers are **1-based DATA rows as
+  `read_excel` displays them**, resolved against the numbering the model SAW and
+  applied in descending sheet order — applying them top-down silently deletes the
+  wrong records; (4) **a batch is all-or-nothing** — the whole list is validated
+  before a single cell is written, or a bad entry late in the list leaves a
+  half-edited sheet nobody can reason about; (5) **a value starting with `=` is
+  REFUSED, not escaped** — it would become a live Excel formula, and our own read
+  path (`data_only=True`) would then show it as blank. The cell cap is a module
+  constant checked by a cheap read-only pass BEFORE the editable load
+  (`MAX_IMAGE_PIXELS`'s rule: refuse from declared dimensions, don't find out by
+  exhausting RAM) and is deliberately **not** a tool argument, so the model
+  cannot raise the limit protecting the process. `.xlsx` only: a `.csv` is
+  refused with a reason **naming its own extension** — reporting every non-.xlsx
+  file as a `.csv` routed the model to `read_excel`, which then fails on a PDF
+  and loops. `.xlsx`-only is the one place `readers.py`'s "xlsx and csv behave
+  identically" principle is knowingly broken, because writing them is not the
+  same job as reading them. (6) **`delete_columns` dedupes on the RESOLVED index,
+  never the caller's spelling** — `['qty','B']` and `['qty','QTY ']` each name one
+  column, and deleting it twice destroys the column that shifted into its place
+  while reporting two successful deletes. Two smaller ones with the same shape:
+  an A1 reference is bounded to Excel's real grid (`XFD`/1048576 — the regex
+  alone allows `ZZZ` = 18278, which openpyxl writes without complaint and whose
+  inflated dimension then trips this tool's own cell cap forever after), and an
+  **absent** `value` key is refused while an **explicit null** still clears the
+  cell (nothing enforces the JSON schema's `required`, so the omission used to
+  blank a cell and report success). `read_excel`/`inspect_excel` both name `edit_excel`
+  for the `aggregate_excel` reason — without the cross-reference the model's
+  obvious path to "add a column" is read_excel → create_excel, which rebuilds the
+  file from a CAPPED read and silently drops every row past the cap.
 - **Image OCR is `read_image`, it is OPTIONAL, and it does NOT go through
   docling.** Full write-up in `docs/image-ocr.md`. `app/files/image_ocr.py` calls
   `rapidocr` directly — `RapidOCR.__call__` takes an image, so the docling path

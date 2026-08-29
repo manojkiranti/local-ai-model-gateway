@@ -14,6 +14,7 @@ from . import (
     csv,
     date_math,
     docx,
+    edit_excel,
     excel,
     fetch_url,
     get_nrb_forex,
@@ -44,6 +45,7 @@ LOCAL_TOOLS: list[LocalToolSpec] = [
     read_document.SPEC,
     read_image.SPEC,
     aggregate_excel.SPEC,
+    edit_excel.SPEC,
     search_department_docs.SPEC,
     get_nrb_forex.SPEC,
 ]
