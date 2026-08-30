@@ -1185,6 +1185,44 @@ retained). Runbook: `docs/external-api.md`.
   the engine reads frame 1 only (measured: page 2's text just vanished) — so
   `ImageSummary.frames` is a reported fact and `read_image` emits a `PARTIAL:`
   line, exactly as `read_document` reports `pages_skipped`.
+- **`read_department_doc` reads a corpus document from its CHUNKS, never from
+  its bytes, and that is the whole design.** `search_department_docs` returns
+  PASSAGES under a character budget, so "summarise this circular" had no answer
+  and the model's fallbacks were another search or `read_document` with an
+  INVENTED file_id (measured: it asks the user to upload a document the corpus
+  already holds). Re-parsing the original file would be actively wrong for NRB:
+  a legacy-font PDF's own text layer is Preeti glyph soup and a scanned page's is
+  empty — the entire reason `app/nrb/recovery.py` exists — so reading bytes would
+  hand the model exactly the junk §16's `_withhold` rule keeps out, while the
+  RECOVERED text sits in `document_chunks`. Reading chunks also guarantees what
+  no re-parse can: **what the reader sees is what search searched.**
+  `app/rag/reassemble.py` is pure and undoes the two indexing artifacts — the
+  heading path `parsing._attach_headings` prepends to every chunk's CONTENT (the
+  `section` column says exactly what to strip) and the `RAG_CHUNK_OVERLAP_CHARS`
+  overlap between consecutive chunks — and de-overlap errs toward KEEPING text,
+  bounded by the configured overlap, because printing a sentence twice is untidy
+  while deleting one is not. Four more things a rewrite must not lose: (1) **no
+  `department` parameter** — scope is `rag_context`, the `search_department_docs`
+  rule, so an injection has nothing to target; (2) unknown id / another
+  department's / not-`ready` are **ONE message**, because at document granularity
+  existence is the secret (the download route's blanket 404); (3) recovered text
+  carries `sources.VERIFY_NOTE` — the SAME constant, now three readers — and
+  native text carries none (§29.2: over-warning trains the reader to ignore it);
+  (4) it reuses `_paging.window`, so metadata leads and truncation is on whole
+  lines.
+- **A routing hint's POSITION inside a tool description is load-bearing, and
+  `scripts/eval_rag_routing.py` is how you find out.** Measured 2026-08-29 while
+  adding `read_department_doc`: appending its clause AFTER
+  `search_department_docs`'s spreadsheet clause took the `spreadsheet-doc` case
+  from 2/3 to **0/3** — the buried hint stopped being read — and moving it BEFORE
+  that clause took both to 3/3. The same edit FIXED `bs-dated-doc`, which two
+  earlier description rewrites and a stronger imperative had failed to move:
+  what worked was giving the model somewhere to GO, and it worked with the tool
+  dropped from the registry too, so the DESCRIPTION did it, not the tool. Run
+  that eval after any description edit, not just after adding a tool; its
+  `DROP_TOOLS=` flag is the A/B that separates "my tool did this" from "this was
+  already flaky", and `KNOWN_MISSES`/`BORDERLINE` keep it from either rotting or
+  crying wolf.
 - **`read_document` reads ONE attached .pdf/.docx/.txt/.md/.json** by `file_id`
   (spreadsheets 400 with a pointer to `inspect_excel`/`read_excel`).
   `app/files/documents.py` normalizes every format to flat lines (`documents.py`

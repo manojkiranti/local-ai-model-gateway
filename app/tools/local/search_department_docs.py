@@ -302,9 +302,11 @@ SPEC = LocalToolSpec(
         "company policy, process, entitlements, products or internal rules — the "
         "answer must come from these documents, not from general knowledge. The "
         "department is fixed by the conversation; you cannot and need not choose "
-        "it. For totals over a spreadsheet the USER attached to this chat, use "
-        "aggregate_excel instead — corpus spreadsheets are searchable as text "
-        "here but not aggregatable."
+        "it. To read one of these documents IN FULL (to summarise it, or to see "
+        "what else it says beyond the passage returned here), call "
+        "read_department_doc with the 'doc=' id from a result. For totals over a "
+        "spreadsheet the USER attached to this chat, use aggregate_excel instead "
+        "— corpus spreadsheets are searchable as text here but not aggregatable."
     ),
     parameters={
         "type": "object",

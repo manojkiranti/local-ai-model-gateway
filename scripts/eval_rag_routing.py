@@ -16,9 +16,10 @@ WHY THIS EXISTS
 
     Measured 2026-08-29 (qwen2.5:latest, local, MCP off), A/B against the same
     cases with `edit_excel` and `nepali_date` removed: routing was IDENTICAL on
-    every document case, so those two tools cost RAG nothing. `bs-dated-doc`
-    missed on BOTH registries — a pre-existing weakness, recorded below, not a
-    regression.
+    every document case, so those two tools cost RAG nothing. Re-measured after
+    `read_department_doc`: 7/7, including the `bs-dated-doc` case that had missed
+    on every registry until then. The A/B flag below is how both of those were
+    established, and it caught a real regression in between — see KNOWN_MISSES.
 
 USAGE
     .venv/bin/python scripts/eval_rag_routing.py
@@ -70,15 +71,35 @@ CASES = [
 # Documented weaknesses, excluded from the exit code. A case here that starts
 # passing FAILS the run, so a fix cannot go unnoticed and the list cannot rot.
 #
-# bs-dated-doc: asked to summarise a document it was never given, the model
-# invents a file_id, calls read_document, and then asks the user to upload the
-# file. Measured identical with and without this branch's tools, so it is not a
-# tool-count effect. Two description edits and a stronger imperative did not move
-# it (matching the attachment-note finding in CLAUDE.md: wording barely helps this
-# model, structure does). read_document's unknown-id error now names the corpus,
-# which measurably changes the ANSWER — the model offers to search — but still
-# does not produce the call.
-KNOWN_MISSES = {"bs-dated-doc"}
+# EMPTY as of 2026-08-29. `bs-dated-doc` used to live here: asked to summarise a
+# document it was never given, the model invented a file_id, called
+# read_document, and asked the user to upload a file the corpus already held.
+# Two description edits and a stronger imperative had failed to move it. What
+# fixed it was giving the model somewhere to GO — `read_department_doc` plus the
+# clause in `search_department_docs`'s description naming it. Measured 3/3 both
+# with the tool registered and with it dropped, so the DESCRIPTION did the work:
+# once "read one of these documents in full" existed as a sentence, the corpus
+# became the obvious route for "summarise the directive published on <date>".
+#
+# The same edit taught a second lesson, the hard way. Appended AFTER the
+# spreadsheet clause it took `spreadsheet-doc` from 2/3 to 0/3; moved BEFORE it,
+# both went 3/3. Position inside a description is load-bearing — a routing hint
+# pushed to the end stops being read. Re-run this eval after ANY description
+# edit, not just after adding a tool.
+KNOWN_MISSES: set[str] = set()
+
+# Cases whose QUESTION is genuinely ambiguous, so unanimity is the wrong bar.
+# They must still reach the corpus a MAJORITY of the time — a collapse to 0 is
+# a real regression and still fails — but demanding 3/3 from a borderline
+# question turns this eval into an alarm nobody trusts.
+#
+# spreadsheet-doc ("what are the loan limits in the product sheet?"): "product
+# sheet" reads as a spreadsheet, and the model sometimes reaches for
+# inspect_excel. Measured at 2/3 BEFORE `read_department_doc` existed, so the
+# flakiness is the question's, not any tool's. It is kept because it is a real
+# user phrasing, and because its 0/3 collapse is what caught the description
+# ordering bug above.
+BORDERLINE = {"spreadsheet-doc"}
 
 
 async def _run_case(prompt: str, settings, mcp) -> tuple[list[str], float]:
@@ -136,6 +157,12 @@ async def main() -> int:
             # A known miss that starts passing is news, and must not stay hidden.
             mark = "FIXED!" if hits else "known"
             if hits:
+                failed = True
+        elif case_id in BORDERLINE:
+            # Majority, not unanimity. Zero is still a failure.
+            ok = hits * 2 > repeat
+            mark = "PASS" if passed else ("ok~" if ok else "FAIL")
+            if not ok:
                 failed = True
         else:
             mark = "PASS" if passed else ("FLAKY" if hits else "FAIL")
