@@ -60,7 +60,8 @@ SPEC = LocalToolSpec(
         "and a few sample rows. Call this first to see what a file contains, then "
         "pick by question: for a total, average, min/max, count or a breakdown by "
         "category use aggregate_excel (it reads every row); to look at or quote "
-        "actual rows use read_excel (capped, so never add up its output). The "
+        "actual rows use read_excel (capped, so never add up its output); to "
+        "MODIFY the workbook and get an edited copy back use edit_excel. The "
         "sample rows here are a preview only — never answer from them."
     ),
     parameters={

@@ -161,7 +161,9 @@ SPEC = LocalToolSpec(
         "(2026-01-31 + 1 month = 2026-02-28).\n"
         "- 'diff': give 'from' and 'to' (ISO); returns the gap in whole days "
         "(plus H:MM:SS when times are involved).\n"
-        "Times promote the result to a datetime; date-only inputs stay dates."
+        "Times promote the result to a datetime; date-only inputs stay dates.\n"
+        "GREGORIAN ONLY — for a Nepali (Bikram Sambat) date such as 2082-01-31, "
+        "or a Nepali fiscal year, use nepali_date instead."
     ),
     parameters={
         "type": "object",

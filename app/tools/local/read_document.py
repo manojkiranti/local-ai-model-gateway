@@ -82,7 +82,12 @@ async def _read_document(args: dict[str, Any]) -> str:
         return "ERROR: 'file_id' is required (the id of an uploaded document)."
     record = await resolve_file(file_id.strip())
     if record is None:
-        return "ERROR: no such file (unknown id, or you don't own it)."
+        return (
+            "ERROR: no such file (unknown id, or you don't own it). If the user "
+            "did not attach this document to the chat, do NOT guess a file_id — "
+            "search the department's official corpus with search_department_docs "
+            "instead."
+        )
 
     ext = Path(record.path).suffix.lower()
     if ext in ingest.SPREADSHEET_EXTS:

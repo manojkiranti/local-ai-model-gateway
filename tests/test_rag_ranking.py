@@ -6,7 +6,7 @@ about the boundary rather than representative.
 
 import pytest
 
-from app.rag.ranking import NO_SIGNAL_SCORE, Ranking, decide
+from app.rag.ranking import Ranking, decide
 from app.rag.retrieval import RetrievedChunk
 
 
@@ -88,29 +88,37 @@ def test_mismatched_score_count_is_a_programming_error():
         decide([chunk(1), chunk(2)], [0.9], threshold=0.7, top_k=10)
 
 
-def test_the_no_signal_score_is_named_so_a_threshold_cannot_land_on_it():
-    assert NO_SIGNAL_SCORE == 0.5
+def test_a_threshold_of_one_half_is_now_an_ORDINARY_operating_point():
+    """0.5 used to be disqualified, and the reason is gone.
 
+    `score_from_logprobs` returned 0.5 for "the reranker said nothing", so a
+    threshold of 0.5 put the decision boundary exactly on that sentinel: with
+    `>=`, a passage the reranker had NO opinion about was kept and treated as
+    relevant, and one notch higher it was discarded. Either way the least
+    informative case was settled by the comparison operator rather than by
+    evidence — which is why four files called 0.5 disqualified.
 
-def test_a_threshold_equal_to_the_no_signal_score_ADMITS_the_no_opinion_passage():
-    """The trap, pinned: at threshold == NO_SIGNAL_SCORE the boundary sits exactly
-    on the sentinel `score_from_logprobs` returns when the reranker answered
-    neither "yes" nor "no". Because `decide` compares with `>=`, that passage is
-    KEPT and presented to the model as relevant — it is NOT refused.
-
-    Documentation got this backwards once, in four files. The direction matters to
-    whoever picks the operating point: at 0.5 you silently trust passages the
-    reranker had no opinion about, and one notch higher you discard them. Either
-    way the least informative case is decided by the comparison operator rather
-    than by evidence, which is why 0.5 is disqualified as a threshold.
+    Silence is now None and never reaches the comparison, so 0.5 means what it
+    reads as: keep anything judged at least even odds. It is a legitimate
+    operating point again — still one to CHOOSE from the sweep rather than
+    inherit as a default, but no longer a trap.
     """
-    at = decide([chunk(1)], [NO_SIGNAL_SCORE], threshold=NO_SIGNAL_SCORE, top_k=10)
-    assert [c.chunk_id for c in at.kept] == [1], "at the sentinel: admitted"
-    assert at.abstained is False
+    kept = decide([chunk(1)], [0.5], threshold=0.5, top_k=10)
+    assert [c.chunk_id for c in kept.kept] == [1]
+    assert kept.scores == {1: 0.5}, "a real tie is a measurement and is recorded"
 
-    above = decide([chunk(1)], [NO_SIGNAL_SCORE], threshold=NO_SIGNAL_SCORE + 0.1, top_k=10)
-    assert above.kept == [], "one notch above the sentinel: dropped"
-    assert above.abstained is True
+    dropped = decide([chunk(1)], [0.5], threshold=0.6, top_k=10)
+    assert dropped.kept == [] and dropped.abstained is True
+
+
+def test_the_sentinel_constant_is_gone_so_nothing_can_reintroduce_it():
+    """Naming 0.5 was the previous mitigation. Keeping the name around after the
+    value stopped being returned would invite someone to compare against it."""
+    import app.rag.ranking as ranking_module
+    import app.rag.rerank as rerank_module
+
+    assert not hasattr(ranking_module, "NO_SIGNAL_SCORE")
+    assert not hasattr(rerank_module, "NO_SIGNAL_SCORE")
 
 
 def test_a_zero_top_k_still_returns_one_passage_rather_than_abstaining():
@@ -306,3 +314,68 @@ def test_the_score_distribution_is_logged_not_only_the_best(caplog):
     text = caplog.text
     assert "min=" in text and "median=" in text and "max=" in text
     assert "query_chars=1" in text  # length only, never the query itself
+
+
+# --------------------------------------------------------------------------- #
+# No signal is not a SCORE (2026-08-29)
+# --------------------------------------------------------------------------- #
+def test_no_signal_is_none_not_a_number():
+    """`0.5` was two things at once: a genuine tie, and "the reranker said
+    nothing". As a float it entered the `>=` comparison, so the least informative
+    case was settled by the operator. As None it cannot."""
+    from app.rag.rerank import score_from_logprobs
+
+    assert score_from_logprobs([{"token": "banana", "logprob": -0.1}]) is None
+    assert score_from_logprobs([]) is None
+
+
+def test_a_real_tie_is_still_a_number():
+    """A genuine 50/50 is a MEASUREMENT and must stay one — the point is to stop
+    conflating it with silence, not to discard it."""
+    from app.rag.rerank import score_from_logprobs
+
+    score = score_from_logprobs(
+        [{"token": "yes", "logprob": -0.6931}, {"token": "no", "logprob": -0.6931}]
+    )
+    assert score is not None and abs(score - 0.5) < 1e-6
+
+
+def test_an_unscored_passage_is_KEPT_because_this_module_fails_open():
+    """Withholding an answer asserts something false about the bank's own
+    policies, so a passage the reranker had no opinion about is presented, not
+    dropped — at ANY threshold, rather than at the mercy of where it sits."""
+    result = decide([chunk(1), chunk(2)], [0.95, None], threshold=0.9, top_k=10)
+    assert set(c.chunk_id for c in result.kept) == {1, 2}
+    assert result.abstained is False
+
+
+def test_an_unscored_passage_is_kept_even_when_the_threshold_is_high():
+    result = decide([chunk(1)], [None], threshold=0.99, top_k=10)
+    assert [c.chunk_id for c in result.kept] == [1]
+
+
+def test_an_unscored_passage_does_not_pollute_the_score_distribution():
+    """The `ranked ...` INFO line is the ONLY dataset a threshold refit has. A
+    dead reranker used to fill it with 0.500s that read as real measurements."""
+    result = decide([chunk(1), chunk(2)], [0.8, None], threshold=0.5, top_k=10)
+    assert list(result.scores.values()) == [0.8]
+    assert result.unscored == 1
+
+
+def test_a_reranker_that_scores_NOTHING_is_reported_as_degraded():
+    """The failure this whole change exists for: a reranker returning no usable
+    signal used to give every passage 0.5, keep them all, and log
+    'min=0.500 median=0.500 max=0.500' — indistinguishable from a working
+    reranker that was uncertain. Now it is visibly degraded."""
+    result = decide([chunk(1), chunk(2)], [None, None], threshold=0.5, top_k=10)
+    assert result.degraded is True
+    assert result.abstained is False
+    assert len(result.kept) == 2
+
+
+def test_a_scored_passage_below_the_threshold_is_still_dropped():
+    """Failing open on SILENCE must not become failing open on everything."""
+    result = decide([chunk(1)], [0.2], threshold=0.7, top_k=10)
+    assert result.kept == []
+    assert result.abstained is True
+    assert result.degraded is False

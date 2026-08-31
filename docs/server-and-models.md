@@ -92,19 +92,24 @@ Model facts that bite:
 - **Native embedding output is 2560 dims, MRL-truncated to 1536** because
   pgvector's HNSW index caps at 2000. `RAG_EMBED_DIM=1536` must match the
   schema's `vector(1536)`; the worker's preflight refuses to start on a mismatch.
-- **Reranking is off, but it is now WIRED.** `app/rag/ranking.py` scores the
-  candidate pool with the cross-encoder and can abstain; `RAG_RERANK_ENABLED=false`
-  routes every search down the `degraded` path instead, which is RRF order and
-  never a refusal — byte-identical to the behaviour before abstention existed. So
-  there is still no calibrated relevance score in production, and
-  `RAG_RELEVANCE_THRESHOLD` is still an **unfitted placeholder**. Note that its
-  current value `0.5` is disqualified on principle: it is exactly what
-  `rerank.score_from_logprobs` returns for "no signal", and the decision boundary
-  would sit exactly on that sentinel. Since the comparison is `>=`, a passage the
-  reranker had NO opinion about would be **kept and treated as relevant** (verified:
-  at 0.5 a no-signal passage is kept, at 0.6 it is dropped). Either way the least
-  informative case is settled by the comparison operator rather than by evidence. Fitting it means freezing the eval cohort, pulling the reranker
-  and running `scripts/rag_eval_sweep.py` — see
+- **Reranking is WIRED, and is ENABLED on the live server** (reported by the
+  operator 2026-08-29; `RAG_RERANK_ENABLED` still defaults to false, so local dev
+  and any deployment that does not set it run the `degraded` path — RRF order,
+  never a refusal, byte-identical to the behaviour before abstention existed).
+  **The flag being on does not prove reranking is happening.** `ranking.apply`
+  catches broadly and fails open, so a wrong model, an evicted model or an
+  unreachable Ollama silently degrades to RRF. Verify from the LOG, never the
+  config: a WARNING `rerank unavailable (…)` means it is NOT running, and an INFO
+  `ranked N candidates (… threshold=… min/median/max …) -> kept N` means it is.
+  Those INFO lines are also the only dataset a threshold refit has.
+  `RAG_RELEVANCE_THRESHOLD` remains an **unfitted placeholder**, but its current
+  value `0.5` is **no longer disqualified** (2026-08-29): it used to be exactly
+  what `score_from_logprobs` returned for "no signal", putting the boundary on
+  that sentinel, whereas silence is now `None` — kept (fail open) and excluded
+  from the score distribution — so 0.5 simply means "at least even odds". A
+  reranker that scores nothing at all is now reported as `degraded` rather than
+  looking like uniform 0.5s. Fitting the threshold still needs the frozen cohort
+  and `scripts/rag_eval_sweep.py` — see
   `docs/superpowers/specs/2026-08-22-rag-abstention-and-retrieval-eval-design.md`.
 - **Tool-calling behaviour is model- and shim-dependent.** The 35B MoE has not
   been fully re-verified for multi-tool turns; the local 7B was the reference.
@@ -178,7 +183,7 @@ file.
 | `RAG_CANDIDATE_POOL` | 50 | per channel, before fusion |
 | `RAG_RERANK_POOL` | 20 | what retrieval FETCHES (`search_chunks(limit=)`), and what the reranker scores. **Must stay ≥ `RAG_TOP_K`** — a smaller pool caps presentation invisibly; a `Settings` validator now refuses to start otherwise |
 | `RAG_RERANK_ENABLED` | `false` | off until the sweep fits a threshold |
-| `RAG_RELEVANCE_THRESHOLD` | 0.5 | **placeholder, and disqualified** — 0.5 is `score_from_logprobs`' own "no signal" value |
+| `RAG_RELEVANCE_THRESHOLD` | 0.5 | **placeholder, still unfitted** (no longer disqualified — silence is `None` now) — 0.5 is `score_from_logprobs`' own "no signal" value |
 | `RAG_RRF_K` | 60 | reciprocal-rank fusion constant |
 | `RAG_HNSW_EF_SEARCH` | 100 | must be ≥ per-channel pool |
 | `RAG_TOOL_RESULT_MAX_CHARS` | 7000 | under the loop's 8000 cap, so citations aren't severed |

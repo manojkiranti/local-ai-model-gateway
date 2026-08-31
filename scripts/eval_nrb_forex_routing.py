@@ -141,7 +141,7 @@ async def _run_case(case: dict, settings, mcp) -> dict:
     try:
         out = await run_turn(
             messages=[{"role": "user", "content": case["prompt"]}],
-            ollama=ollama, mcp=mcp, settings=settings, user_email="eval@example.com",
+            ollama=ollama, mcp=mcp, settings=settings, identity=None,
         )
     finally:
         await ollama.aclose()

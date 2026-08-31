@@ -976,6 +976,39 @@ retained). Runbook: `docs/external-api.md`.
   the key silently and leaves the column unchanged** (measured, no error). Core
   everywhere means one vocabulary; updates are
   `Table.update().where(id == bindparam("_id"))` executemany.
+- **Bikram Sambat has NO formula, and the published tables DISAGREE about the
+  current fiscal year.** `app/nepali_calendar_data.py` (data + provenance) and
+  `app/nepali_date.py` (pure conversion) exist because BS is a sidereal solar
+  calendar: months run 29-32 days with no cycle, so every implementation is an
+  anchor plus a month-length table plus day counting. The table is 126 years
+  (BS 1975-2100, anchored BS 1975-01-01 = AD 1918-04-13, 46,022 days),
+  transcribed from `nepali-datetime` 1.0.8.5 and verified against it for **all
+  46,022 dates, 0 mismatches** — a check run ONCE out-of-repo, so no calendar
+  library is a dependency here. Four things a rewrite must not lose:
+  (1) **the disagreement is live, not a far-edge curiosity** — a second library
+  (`bikram`) agrees exactly from 1944 to May 2025 and then diverges by one day
+  from **AD 2025-05-14 for the entire rest of the range**, because it gives
+  Baisakh 2082 thirty days instead of thirty-one. That was settled on PRIMARY
+  sources, not by preferring a library: hamropatro renders BS 2082 Baisakh 31 as
+  Wed 14 May 2025 (the date could not exist at 30 days), and ADBL Bank published
+  "Jestha 01, 2082 (15 May, 2025)". **A second library agreeing is not evidence**
+  — the whole problem is two libraries disagreeing — so revising any year needs a
+  primary source; a wrong month length never fails loudly, it shifts every later
+  date by a day forever; (2) **the fiscal year starts SHRAWAN 1 (month 4), not
+  Baisakh 1** — FY 2082/83 is AD 2025-07-17 to 2026-07-16, and anchoring it to
+  the BS new year is off by three and a half months, mislabelling every circular
+  in a catalog that files them under exactly that string (`2082-83` slugs,
+  `metadata.fiscal_year`, circular numbers like `12/2082-83`); (3) **out of range
+  REFUSES** (`OutOfRange`), never extrapolates — the `app/nrb/` fail-closed rule,
+  because a plausible wrong date is indistinguishable from an answer; (4) **an
+  unknown month romanisation is refused, not guessed** — Ashar/Asar/Ashadh and
+  Ashoj/Asoj/Ashwin are all real, so there is an alias table, and a wrong guess
+  is a 30-day error that reads as correct. `parse` folds Devanagari digits
+  (NRB writes २०८२). The tool is `nepali_date` (~208 tokens, the cheapest
+  meaningful tool in the set) and `date_math`'s description now routes BS dates
+  to it — `date_math` is Gregorian-only and would silently treat 2082 as a
+  Gregorian year. `today()` goes through `app/localtime.py`, never
+  `date.today()`, for the reason in the next bullet.
 - **Dates come from the server clock, never from the model.** `app/localtime.py`
   is the one source of "today" (Nepal time as a literal **UTC+05:45** offset —
   `ZoneInfo` needs system tzdata the slim images don't install, and Nepal has no
@@ -1051,6 +1084,61 @@ retained). Runbook: `docs/external-api.md`.
   ownership (404 on foreign id), persists `{id,filename,summary}` on the user
   message (`chat_messages.attachments` JSONB), and `build_context_messages`
   re-emits the attachment note on later turns so ids survive without resending.
+- **`edit_excel` loads `data_only=False`, and that single flag is the whole
+  reason the tool is safe.** `readers.py` opens `data_only=True` deliberately —
+  it must never evaluate a formula — but reusing that setting on the WRITE path
+  DESTROYS formulas: measured on openpyxl 3.1.5, loading `data_only=True` and
+  saving replaces every formula cell with its last cached value, so a workbook a
+  human saved from Excel comes back carrying the right NUMBERS with no live model
+  behind them. Nothing errors, the file opens fine, and the damage is invisible —
+  the §18 failure class, applied to a user's own spreadsheet. Never "unify" the
+  two load paths; `test_a_formula_elsewhere_in_the_workbook_survives_the_edit`
+  is the guard. **But `data_only=False` only stops a formula being OVERWRITTEN —
+  it cannot make a SHIFT correct, and `delete_rows`/`delete_columns` therefore
+  REFUSE on any workbook containing formulas.** openpyxl's `delete_rows`/
+  `delete_cols` are not formula-aware: measured, deleting a row above
+  `=SUM(B2:B4)` leaves it spelled `=SUM(B2:B4)` while the rows it names have
+  moved, so it silently sums the wrong records — Excel rewrites those references,
+  openpyxl does not. `_guard_shifting_formulas` checks the target sheet AND any
+  other sheet holding a formula that mentions it by name (a cross-sheet reference
+  breaks identically and is invisible from the target sheet). The refusal
+  deliberately does NOT recommend `create_excel`: rebuilding from a `read_excel`
+  dump is capped and drops rows. Six more things a rewrite must not lose: (1) **the edit always
+  produces a NEW file** and the upload is never touched, so a wrong edit costs
+  nothing (`test_the_edit_lands_in_a_new_file_and_the_original_is_untouched`) —
+  same instinct as NRB supersession archiving rather than overwriting; (2) **ONE
+  operation per call**, because an ordered list of edits is a correctness trap:
+  deleting a row shifts every A1 reference after it and the model cannot predict
+  the shift — each operation is batched INTERNALLY instead, so one call still
+  does one whole job; (3) `delete_rows` numbers are **1-based DATA rows as
+  `read_excel` displays them**, resolved against the numbering the model SAW and
+  applied in descending sheet order — applying them top-down silently deletes the
+  wrong records; (4) **a batch is all-or-nothing** — the whole list is validated
+  before a single cell is written, or a bad entry late in the list leaves a
+  half-edited sheet nobody can reason about; (5) **a value starting with `=` is
+  REFUSED, not escaped** — it would become a live Excel formula, and our own read
+  path (`data_only=True`) would then show it as blank. The cell cap is a module
+  constant checked by a cheap read-only pass BEFORE the editable load
+  (`MAX_IMAGE_PIXELS`'s rule: refuse from declared dimensions, don't find out by
+  exhausting RAM) and is deliberately **not** a tool argument, so the model
+  cannot raise the limit protecting the process. `.xlsx` only: a `.csv` is
+  refused with a reason **naming its own extension** — reporting every non-.xlsx
+  file as a `.csv` routed the model to `read_excel`, which then fails on a PDF
+  and loops. `.xlsx`-only is the one place `readers.py`'s "xlsx and csv behave
+  identically" principle is knowingly broken, because writing them is not the
+  same job as reading them. (6) **`delete_columns` dedupes on the RESOLVED index,
+  never the caller's spelling** — `['qty','B']` and `['qty','QTY ']` each name one
+  column, and deleting it twice destroys the column that shifted into its place
+  while reporting two successful deletes. Two smaller ones with the same shape:
+  an A1 reference is bounded to Excel's real grid (`XFD`/1048576 — the regex
+  alone allows `ZZZ` = 18278, which openpyxl writes without complaint and whose
+  inflated dimension then trips this tool's own cell cap forever after), and an
+  **absent** `value` key is refused while an **explicit null** still clears the
+  cell (nothing enforces the JSON schema's `required`, so the omission used to
+  blank a cell and report success). `read_excel`/`inspect_excel` both name `edit_excel`
+  for the `aggregate_excel` reason — without the cross-reference the model's
+  obvious path to "add a column" is read_excel → create_excel, which rebuilds the
+  file from a CAPPED read and silently drops every row past the cap.
 - **Image OCR is `read_image`, it is OPTIONAL, and it does NOT go through
   docling.** Full write-up in `docs/image-ocr.md`. `app/files/image_ocr.py` calls
   `rapidocr` directly — `RapidOCR.__call__` takes an image, so the docling path
@@ -1097,6 +1185,44 @@ retained). Runbook: `docs/external-api.md`.
   the engine reads frame 1 only (measured: page 2's text just vanished) — so
   `ImageSummary.frames` is a reported fact and `read_image` emits a `PARTIAL:`
   line, exactly as `read_document` reports `pages_skipped`.
+- **`read_department_doc` reads a corpus document from its CHUNKS, never from
+  its bytes, and that is the whole design.** `search_department_docs` returns
+  PASSAGES under a character budget, so "summarise this circular" had no answer
+  and the model's fallbacks were another search or `read_document` with an
+  INVENTED file_id (measured: it asks the user to upload a document the corpus
+  already holds). Re-parsing the original file would be actively wrong for NRB:
+  a legacy-font PDF's own text layer is Preeti glyph soup and a scanned page's is
+  empty — the entire reason `app/nrb/recovery.py` exists — so reading bytes would
+  hand the model exactly the junk §16's `_withhold` rule keeps out, while the
+  RECOVERED text sits in `document_chunks`. Reading chunks also guarantees what
+  no re-parse can: **what the reader sees is what search searched.**
+  `app/rag/reassemble.py` is pure and undoes the two indexing artifacts — the
+  heading path `parsing._attach_headings` prepends to every chunk's CONTENT (the
+  `section` column says exactly what to strip) and the `RAG_CHUNK_OVERLAP_CHARS`
+  overlap between consecutive chunks — and de-overlap errs toward KEEPING text,
+  bounded by the configured overlap, because printing a sentence twice is untidy
+  while deleting one is not. Four more things a rewrite must not lose: (1) **no
+  `department` parameter** — scope is `rag_context`, the `search_department_docs`
+  rule, so an injection has nothing to target; (2) unknown id / another
+  department's / not-`ready` are **ONE message**, because at document granularity
+  existence is the secret (the download route's blanket 404); (3) recovered text
+  carries `sources.VERIFY_NOTE` — the SAME constant, now three readers — and
+  native text carries none (§29.2: over-warning trains the reader to ignore it);
+  (4) it reuses `_paging.window`, so metadata leads and truncation is on whole
+  lines.
+- **A routing hint's POSITION inside a tool description is load-bearing, and
+  `scripts/eval_rag_routing.py` is how you find out.** Measured 2026-08-29 while
+  adding `read_department_doc`: appending its clause AFTER
+  `search_department_docs`'s spreadsheet clause took the `spreadsheet-doc` case
+  from 2/3 to **0/3** — the buried hint stopped being read — and moving it BEFORE
+  that clause took both to 3/3. The same edit FIXED `bs-dated-doc`, which two
+  earlier description rewrites and a stronger imperative had failed to move:
+  what worked was giving the model somewhere to GO, and it worked with the tool
+  dropped from the registry too, so the DESCRIPTION did it, not the tool. Run
+  that eval after any description edit, not just after adding a tool; its
+  `DROP_TOOLS=` flag is the A/B that separates "my tool did this" from "this was
+  already flaky", and `KNOWN_MISSES`/`BORDERLINE` keep it from either rotting or
+  crying wolf.
 - **`read_document` reads ONE attached .pdf/.docx/.txt/.md/.json** by `file_id`
   (spreadsheets 400 with a pointer to `inspect_excel`/`read_excel`).
   `app/files/documents.py` normalizes every format to flat lines (`documents.py`
@@ -1661,12 +1787,26 @@ silently hides every RAG admin control.
 `RAG_RERANK_POOL` and routes candidates through `app/rag/ranking.py`, which can
 abstain — but `RAG_RERANK_ENABLED=false` and `RAG_RELEVANCE_THRESHOLD` is an
 unfitted placeholder, so the serving path is byte-identical to before: RRF order,
-no abstention. **0.5 is disqualified as a threshold** — it is exactly what
-`rerank.score_from_logprobs` returns for "no signal", and the decision boundary would sit exactly on the sentinel, and since the
-comparison is `>=`, a passage the reranker had NO opinion about would be kept
-and treated as relevant (verified: at 0.5 a no-signal passage is kept; at 0.6 it
-is dropped). Either way the least informative case is decided by the comparison
-operator rather than by evidence, which is why the value is disqualified. Fitting it needs three things in order: a human authors the 50
+no abstention. **0.5 was disqualified as a threshold, and is not any more
+(2026-08-29).** It used to be exactly what `rerank.score_from_logprobs` returned
+for "no signal", so the decision boundary sat on that sentinel: with `>=`, a
+passage the reranker had NO opinion about was kept and treated as relevant, and
+one notch higher it was discarded — the least informative case settled by the
+comparison operator rather than by evidence. **Silence is now `None`**, which
+never reaches the comparison: an unscored passage is KEPT (this module fails
+open — see `app/rag/ranking.py`) and excluded from `scores`, so it cannot
+masquerade as a measurement in the distribution a refit reads. Two consequences
+a rewrite must not lose: (1) **a reranker that scores NOTHING is now `degraded`**
+— it previously gave every passage 0.5, kept them all, and logged
+`min=0.500 median=0.500 max=0.500`, which is indistinguishable from a working
+reranker being uncertain, so a wrong model or a changed prompt format looked
+like a healthy deployment while poisoning the only fitting data there is (the
+§18 class); (2) **the `NO_SIGNAL_SCORE` constant is deliberately GONE** and a
+test asserts it stays gone — naming 0.5 was the old mitigation, and keeping the
+name after the value stopped being returned only invites someone to compare
+against it. 0.5 is now an ordinary operating point meaning "keep anything judged
+at least even odds" — still one to CHOOSE from the sweep rather than inherit as
+a default. Fitting it needs three things in order: a human authors the 50
 `[REVIEW` questions in `docs/rag/retrieval-eval-cohort.json` and freezes it,
 `ollama pull qwen3-reranker:4b`, then `scripts/rag_eval_sweep.py`. Pick the
 operating point from the false-refusal column FIRST — refusing a question the

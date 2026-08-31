@@ -100,7 +100,9 @@ SPEC = LocalToolSpec(
         "you how to page. Because of that cap, do NOT sum, average or count from "
         "this output — use aggregate_excel for any total or breakdown, which reads "
         "every row. For a multi-sheet file, call once per sheet. Use inspect_excel "
-        "first to see the sheets and headers."
+        "first to see the sheets and headers. To CHANGE the file, use edit_excel — "
+        "do NOT rebuild it with create_excel from this capped output, which would "
+        "silently drop every row past the cap."
     ),
     parameters={
         "type": "object",
