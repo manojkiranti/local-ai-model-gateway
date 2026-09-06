@@ -120,7 +120,7 @@ SPEC = LocalToolSpec(
         "and 'filename'. Each section may have a 'heading', a 'body' (paragraph "
         "text), and/or a 'table' ({headers?, rows[][]}). Full Unicode is "
         "supported. Use this when the user wants an editable Word document (use "
-        "create_pdf for a fixed-layout PDF instead)."
+        "create_pdf for a fixed-layout PDF, or create_pptx for a slide deck, instead)."
     ),
     parameters={
         "type": "object",

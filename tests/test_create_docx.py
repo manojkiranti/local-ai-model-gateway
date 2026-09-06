@@ -122,3 +122,9 @@ def test_registered_in_local_tools():
     from app.tools.local import LOCAL_TOOLS
 
     assert any(spec.name == "create_docx" for spec in LOCAL_TOOLS)
+
+
+def test_description_routes_slide_decks_to_create_pptx():
+    from app.tools.local import docx as docx_tool
+
+    assert "create_pptx" in docx_tool.SPEC.description

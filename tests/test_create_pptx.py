@@ -234,3 +234,6 @@ def test_tool_is_registered_once():
     assert names.count("create_pptx") == 1
     assert names.index("create_pptx") == names.index("create_docx") + 1
 
+
+def test_description_routes_documents_to_create_docx():
+    assert "create_docx" in pptx_tool.SPEC.description
