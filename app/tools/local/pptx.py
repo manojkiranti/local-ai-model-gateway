@@ -22,6 +22,14 @@ from .base import LocalToolSpec
 
 MAX_SLIDES = 50
 MAX_BULLETS_PER_SLIDE = 20
+# A table does not paginate on a slide the way it does in a Word document — it
+# just overflows past the slide's edge with no error. Measured on the default
+# template: 13 rows fit from the bullets-free table position, 8 when bullets
+# share the slide (the table starts lower). Caps are row count = data rows +
+# 1 if headers, enforced in _validate (never a tool argument), same rule as
+# MAX_SLIDES/MAX_BULLETS_PER_SLIDE.
+MAX_TABLE_ROWS_PER_SLIDE = 12
+MAX_TABLE_ROWS_WITH_BULLETS = 8
 
 _DEFAULT_FILENAME = "presentation.pptx"
 
@@ -61,6 +69,15 @@ def _validate(args: dict[str, Any]) -> tuple[str, str, list[dict], str] | str:
             headers = table.get("headers")
             if headers is not None and not isinstance(headers, list):
                 return f"ERROR: slides[{idx}].table.headers must be an array of column names."
+            nrows = len(rows) + (1 if headers else 0)
+            has_bullets = bool(bullets)
+            cap = MAX_TABLE_ROWS_WITH_BULLETS if has_bullets else MAX_TABLE_ROWS_PER_SLIDE
+            if nrows > cap:
+                return (
+                    f"ERROR: slides[{idx}].table has {nrows} rows (incl. header); the limit is "
+                    f"{cap} on a slide {'with bullets' if has_bullets else 'without bullets'}. "
+                    "Split the table across slides."
+                )
 
     title = str(args.get("title") or "")
     subtitle = str(args.get("subtitle") or "")
@@ -85,7 +102,7 @@ def _add_bullets(slide, bullets: list[str]) -> None:
         paragraph.level = 0
 
 
-def _add_table(slide, table: dict, top_emu: int) -> None:
+def _add_table(slide, table: dict, top_emu: int, slide_width: int) -> None:
     from pptx.util import Emu
 
     headers = table.get("headers")
@@ -93,9 +110,8 @@ def _add_table(slide, table: dict, top_emu: int) -> None:
     ncols = max([len(headers or [])] + [len(r) for r in rows]) or 1
     nrows = len(rows) + (1 if headers else 0)
 
-    prs_width = slide.part.package.presentation_part.presentation.slide_width
-    margin = Emu(int(prs_width * 0.05))
-    width = Emu(prs_width - 2 * margin)
+    margin = Emu(int(slide_width * 0.05))
+    width = Emu(slide_width - 2 * margin)
     row_h = Emu(370_000)  # ~1 cm; python-pptx sizes rows to content anyway
     shape = slide.shapes.add_table(nrows, ncols, margin, Emu(top_emu), width, Emu(row_h * nrows))
     grid = shape.table
@@ -130,7 +146,6 @@ def _build_pptx_bytes(title: str, subtitle: str, slides: list[dict]) -> bytes:
         slide = prs.slides.add_slide(prs.slide_layouts[layout])
         slide.shapes.title.text = str(spec.get("title") or "")
 
-        table_top = int(prs.slide_height * 0.25)
         if bullets:
             _add_bullets(slide, bullets)
             if table is not None:
@@ -144,9 +159,9 @@ def _build_pptx_bytes(title: str, subtitle: str, slides: list[dict]) -> bytes:
                 body.height = Emu(int(prs.slide_height * 0.30))
                 body.left = left
                 body.width = width
-                table_top = int(prs.slide_height * 0.55)
         if table is not None:
-            _add_table(slide, table, table_top)
+            table_top = int(prs.slide_height * (0.55 if bullets else 0.25))
+            _add_table(slide, table, table_top, prs.slide_width)
 
     buffer = BytesIO()
     prs.save(buffer)
@@ -182,7 +197,10 @@ SPEC = LocalToolSpec(
         "'subtitle' (rendered as a title slide) and a 'filename'. Each slide may have "
         "a 'title', 'bullets' (array of short strings, one level) and/or a 'table' "
         "({headers?, rows[][]}). Full Unicode is supported. Keep decks under "
-        f"{MAX_SLIDES} slides and {MAX_BULLETS_PER_SLIDE} bullets per slide. For a "
+        f"{MAX_SLIDES} slides and {MAX_BULLETS_PER_SLIDE} bullets per slide, and a "
+        f"table to {MAX_TABLE_ROWS_PER_SLIDE} rows (incl. header) on a slide without "
+        f"bullets or {MAX_TABLE_ROWS_WITH_BULLETS} on one with bullets — a table does "
+        "not paginate on a slide, unlike a document. For a "
         "document rather than slides use create_docx or create_pdf."
     ),
     parameters={

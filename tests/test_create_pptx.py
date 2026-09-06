@@ -94,6 +94,33 @@ def test_too_many_bullets_is_refused():
     assert result.startswith("ERROR: slides[0].bullets") and str(pptx_tool.MAX_BULLETS_PER_SLIDE) in result
 
 
+def test_table_over_cap_without_bullets_is_refused():
+    rows = [[str(i)] for i in range(pptx_tool.MAX_TABLE_ROWS_PER_SLIDE + 1)]  # no header, so 13 rows total
+    result = _run({"slides": [{"title": "x", "table": {"rows": rows}}]})
+    assert result.startswith("ERROR: slides[0].table has")
+    assert str(pptx_tool.MAX_TABLE_ROWS_PER_SLIDE) in result
+
+
+def test_table_at_cap_without_bullets_is_created():
+    rows = [[str(i)] for i in range(pptx_tool.MAX_TABLE_ROWS_PER_SLIDE)]  # no header, exactly at the cap
+    result = _run({"slides": [{"title": "x", "table": {"rows": rows}}]})
+    assert result.startswith("Created"), result
+
+
+def test_table_over_cap_with_bullets_is_refused():
+    rows = [[str(i)] for i in range(pptx_tool.MAX_TABLE_ROWS_WITH_BULLETS + 1)]  # over the bullets cap
+    result = _run({"slides": [{"title": "x", "bullets": ["b"], "table": {"rows": rows}}]})
+    assert result.startswith("ERROR: slides[0].table has")
+    assert str(pptx_tool.MAX_TABLE_ROWS_WITH_BULLETS) in result
+    assert "with bullets" in result
+
+
+def test_table_at_cap_with_bullets_is_created():
+    rows = [[str(i)] for i in range(pptx_tool.MAX_TABLE_ROWS_WITH_BULLETS)]  # at the bullets cap
+    result = _run({"slides": [{"title": "x", "bullets": ["b"], "table": {"rows": rows}}]})
+    assert result.startswith("Created"), result
+
+
 # ---- rendering --------------------------------------------------------------
 
 
@@ -206,3 +233,4 @@ def test_tool_is_registered_once():
     names = [t.name for t in LOCAL_TOOLS]
     assert names.count("create_pptx") == 1
     assert names.index("create_pptx") == names.index("create_docx") + 1
+

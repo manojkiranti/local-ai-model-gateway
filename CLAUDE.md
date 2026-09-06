@@ -1147,6 +1147,9 @@ retained). Runbook: `docs/external-api.md`.
   are module constants — the `edit_excel` cell-cap rule — so the model cannot raise
   the bound on the file it asks the process to build. Layout indexes 0/1/5 are the
   default python-pptx template's; a custom template would renumber them.
+  `MAX_TABLE_ROWS_PER_SLIDE`/`MAX_TABLE_ROWS_WITH_BULLETS` cap a slide's table rows
+  (incl. header) for the same reason: a table does not paginate on a slide the way
+  it does in a Word document, it just overflows past the edge with no error.
 - **Image OCR is `read_image`, it is OPTIONAL, and it does NOT go through
   docling.** Full write-up in `docs/image-ocr.md`. `app/files/image_ocr.py` calls
   `rapidocr` directly — `RapidOCR.__call__` takes an image, so the docling path
