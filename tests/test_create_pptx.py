@@ -157,6 +157,25 @@ def test_bullets_and_table_on_one_slide():
     assert "point one" in texts and "a" in texts and "b" in texts
 
 
+def test_bullets_and_table_shrink_keeps_body_left_and_width():
+    """Regression: shrinking the bullet box for a table must not zero its
+    left/width. python-pptx placeholder position setters write a bare xfrm,
+    so writing only top/height (without re-asserting left/width) defaults the
+    other two to 0 — invisible bullets, even though the text is still in the
+    XML. Compare against the layout's own placeholder, the value the shrink
+    must preserve."""
+    from pptx import Presentation
+
+    result = _run({"slides": [{"title": "Both", "bullets": ["point one"], "table": {"rows": [["a", "b"]]}}]})
+    record = file_store.get(_link_id(result))
+    prs = Presentation(record.path)
+    slide = prs.slides[0]
+    body = slide.placeholders[1]
+    layout_body = slide.slide_layout.placeholders[1]
+    assert body.left == layout_body.left
+    assert body.width == layout_body.width
+
+
 def test_ragged_table_rows_are_padded():
     result = _run({"slides": [{"table": {"headers": ["x", "y", "z"], "rows": [["1"], ["1", "2", "3", "4"]]}}]})
     assert result.startswith("Created"), result
