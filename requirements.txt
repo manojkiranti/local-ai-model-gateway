@@ -13,6 +13,7 @@ mcp>=2.0
 openpyxl>=3.1
 fpdf2>=2.7
 python-docx>=1.1
+python-pptx>=1.0
 pypdf>=6.0
 # Image uploads: dimensions for the attachment summary, the format allowlist,
 # and the decoded-PIXEL cap. That cap is a security control on the upload path

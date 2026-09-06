@@ -30,6 +30,7 @@ SVG_MEDIA_TYPE = "image/svg+xml"
 PDF_MEDIA_TYPE = "application/pdf"
 CSV_MEDIA_TYPE = "text/csv; charset=utf-8"
 DOCX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+PPTX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 
 # Uploaded images (read via the read_image tool). SVG is deliberately absent
 # from the UPLOAD allowlist — SVG_MEDIA_TYPE above is create_chart's OUTPUT
