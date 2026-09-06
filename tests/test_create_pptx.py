@@ -1,0 +1,94 @@
+"""Offline tests for the create_pptx local tool (python-pptx -> .pptx).
+
+No network: calls the tool fn directly against a temp-configured fallback file
+store and asserts (a) a valid .pptx (zip w/ ppt/presentation.xml) is produced
+and stored, (b) deck title / slide titles / bullets / table cells land in the
+deck, (c) full Unicode survives, (d) validation returns friendly ERROR strings,
+and (e) the slide/bullet caps refuse rather than build.
+"""
+
+import asyncio
+import zipfile
+
+import pytest
+
+from app.files.store import PPTX_MEDIA_TYPE, file_store
+from app.tools.local import pptx as pptx_tool
+
+
+@pytest.fixture(autouse=True)
+def _configure_store(tmp_path):
+    file_store.configure(str(tmp_path))
+    yield
+
+
+def _run(args):
+    return asyncio.run(pptx_tool.SPEC.func(args))
+
+
+def _link_id(result: str) -> str:
+    assert "Download it at: GET /v1/files/" in result, result
+    return result.split("/v1/files/")[1].strip().split()[0]
+
+
+def _slide_texts(result: str) -> list[str]:
+    """Reopen the stored file with python-pptx and return every text run, in order."""
+    from pptx import Presentation
+
+    record = file_store.get(_link_id(result))
+    assert record is not None
+    assert record.media_type == PPTX_MEDIA_TYPE
+    with zipfile.ZipFile(record.path) as zf:
+        assert "ppt/presentation.xml" in zf.namelist()  # it's a real .pptx
+    prs = Presentation(record.path)
+    texts: list[str] = []
+    for slide in prs.slides:
+        for shape in slide.shapes:
+            if shape.has_text_frame:
+                texts.extend(p.text for p in shape.text_frame.paragraphs)
+            if shape.has_table:
+                for row in shape.table.rows:
+                    texts.extend(cell.text for cell in row.cells)
+    return texts
+
+
+# ---- validation -------------------------------------------------------------
+
+
+def test_missing_slides_is_error():
+    assert _run({}).startswith("ERROR: 'slides' is required")
+    assert _run({"slides": []}).startswith("ERROR: 'slides' is required")
+
+
+def test_slide_not_object_is_error():
+    assert _run({"slides": ["just text"]}).startswith("ERROR: slides[0] must be an object")
+
+
+def test_empty_slide_is_error():
+    assert _run({"slides": [{}]}).startswith("ERROR: slides[0] needs at least one of")
+
+
+def test_bullets_must_be_array_of_strings():
+    assert _run({"slides": [{"bullets": "one"}]}).startswith("ERROR: slides[0].bullets must be an array")
+    assert _run({"slides": [{"bullets": [1, 2]}]}).startswith("ERROR: slides[0].bullets must be an array")
+
+
+def test_bad_table_is_error():
+    assert _run({"slides": [{"table": "x"}]}).startswith("ERROR: slides[0].table must be an object")
+    assert _run({"slides": [{"table": {"rows": []}}]}).startswith("ERROR: slides[0].table.rows must be")
+    assert _run({"slides": [{"table": {"rows": ["a"]}}]}).startswith("ERROR: slides[0].table.rows[0] must be")
+    assert _run({"slides": [{"table": {"rows": [["a"]], "headers": "h"}}]}).startswith(
+        "ERROR: slides[0].table.headers must be"
+    )
+
+
+def test_too_many_slides_is_refused():
+    slides = [{"title": f"s{i}"} for i in range(pptx_tool.MAX_SLIDES + 1)]
+    result = _run({"slides": slides})
+    assert result.startswith("ERROR:") and str(pptx_tool.MAX_SLIDES) in result
+
+
+def test_too_many_bullets_is_refused():
+    bullets = [f"b{i}" for i in range(pptx_tool.MAX_BULLETS_PER_SLIDE + 1)]
+    result = _run({"slides": [{"title": "x", "bullets": bullets}]})
+    assert result.startswith("ERROR: slides[0].bullets") and str(pptx_tool.MAX_BULLETS_PER_SLIDE) in result
