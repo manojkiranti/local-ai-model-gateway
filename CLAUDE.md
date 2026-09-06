@@ -367,7 +367,7 @@ idempotent and does NOT rewrite `granted_at`, 422 unknown grant key or an
 extra field, 404 unknown user), `DELETE /v1/users/{id}/mcp-grants/{grant_key}`
 (admin; 204 whether or not the row existed, 404 unknown user),
 `POST /v1/files` (upload .xlsx/.csv/
-.pdf/.docx/.txt/.md/.json/.png/.jpg/.jpeg/.webp/.tif/.tiff/.bmp →
+.pdf/.docx/.pptx/.txt/.md/.json/.png/.jpg/.jpeg/.webp/.tif/.tiff/.bmp →
 `generated_files` row `source=uploaded`; 400 bad
 ext/corrupt/zip-bomb/pixel-bomb/non-allowlisted image format, 413 over size
 cap), `GET /v1/files` (caller's files,
@@ -431,7 +431,7 @@ the caller, and still writes a usage row**).
 `lang` (image uploads only) → `{kind, text, lines[{text,confidence}],
 sheets[{name,headers,rows,total_rows,truncated}], source{route,authoritative,
 caveat?,pages,text_pages,pages_skipped,partial}, request_id}`; accepts
-`.pdf .docx .txt .md .json` (native text layer), `.xlsx .csv` (native, as
+`.pdf .docx .pptx .txt .md .json` (native text layer; a deck's text per slide), `.xlsx .csv` (native, as
 `sheets` — `text` stays `""`), `.png .jpg .jpeg .webp .tif .tiff .bmp` (OCR,
 same engine as `/v1/ocr`); 400 unsupported ext/empty/corrupt/bad-lang, 401 any
 credential fault, 403 missing scope, 413 over `EXTRACT_MAX_UPLOAD_BYTES`
@@ -1234,7 +1234,7 @@ retained). Runbook: `docs/external-api.md`.
   `DROP_TOOLS=` flag is the A/B that separates "my tool did this" from "this was
   already flaky", and `KNOWN_MISSES`/`BORDERLINE` keep it from either rotting or
   crying wolf.
-- **`read_document` reads ONE attached .pdf/.docx/.txt/.md/.json** by `file_id`
+- **`read_document` reads ONE attached .pdf/.docx/.pptx/.txt/.md/.json** by `file_id`
   (spreadsheets 400 with a pointer to `inspect_excel`/`read_excel`).
   `app/files/documents.py` normalizes every format to flat lines (`documents.py`
   is pure — no DB/HTTP — shared by this tool AND the upload route's summary via
@@ -1257,6 +1257,16 @@ retained). Runbook: `docs/external-api.md`.
   scanned pages read differently to the model. Locked by
   `tests/test_document_eval.py` (8 deterministic cases, target 8/8) and the
   routing-description cross-reference test in `tests/test_excel_read_tools.py`.
+  **A `.pptx` pages by SLIDE** (`[slide N]` markers, `DocumentText.page_unit ==
+  "slide"`, read with python-pptx — the library `create_pptx` renders with): the
+  title placeholder becomes a `# ` heading, tables render `a | b` per row like
+  `.docx`, group shapes are descended into (a grouped text box would otherwise
+  vanish with no marker), and speaker notes are NOT read. A picture-only slide
+  gets an explicit "(no text on this slide)" marker and is **not** a scan — the
+  all-pages-textless → "OCR is not available" refusal is PDF-only, because a deck
+  of pictures is a normal deck. Adding `.pptx` to `documents.DOCUMENT_EXTS` also
+  put it on `POST /v1/extract`'s allowlist (`EXTRACT_EXTS` is the union of the
+  three families) and under the upload zip-bomb guard — both by construction.
 - **Exactly ONE attachment set is active** — the newest. `build_context_messages`
   replays older sets with superseded wording and no summary; a turn that carries
   its own upload passes `pending_attachments=True` so every replayed set is

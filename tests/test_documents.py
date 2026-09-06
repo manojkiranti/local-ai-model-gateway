@@ -392,3 +392,83 @@ def test_ingest_rejects_an_unknown_extension(tmp_path):
     p = _write(tmp_path, "a.rtf", "hi")
     with pytest.raises(ReadError):
         ingest.summarize(p)
+
+
+# --------------------------------------------------------------------------- #
+# PowerPoint (.pptx) — slides are the paging unit, marked like PDF pages
+# --------------------------------------------------------------------------- #
+def _make_pptx(tmp_path, name="d.pptx", *, image_only=False):
+    from pptx import Presentation
+    from pptx.util import Inches
+
+    prs = Presentation()
+    if image_only:
+        from PIL import Image
+
+        img = tmp_path / "blk.png"
+        Image.new("RGB", (32, 32), (120, 120, 120)).save(img)
+        for _ in range(2):
+            s = prs.slides.add_slide(prs.slide_layouts[6])  # blank
+            s.shapes.add_picture(str(img), Inches(1), Inches(1))
+    else:
+        title = prs.slides.add_slide(prs.slide_layouts[0])
+        title.shapes.title.text = "Quarterly Review"
+        title.placeholders[1].text = "Finance"
+        body = prs.slides.add_slide(prs.slide_layouts[1])
+        body.shapes.title.text = "Highlights"
+        tf = body.placeholders[1].text_frame
+        tf.text = "Revenue up"
+        tf.add_paragraph().text = "Costs flat"
+        tbl_slide = prs.slides.add_slide(prs.slide_layouts[5])
+        tbl_slide.shapes.title.text = "Numbers"
+        shape = tbl_slide.shapes.add_table(2, 2, Inches(1), Inches(2), Inches(6), Inches(1))
+        shape.table.cell(0, 0).text = "Month"
+        shape.table.cell(0, 1).text = "Sales"
+        shape.table.cell(1, 0).text = "Jan"
+        shape.table.cell(1, 1).text = "10"
+        prs.slides.add_slide(prs.slide_layouts[6])  # blank slide, no text
+    p = tmp_path / name
+    prs.save(str(p))
+    return p
+
+
+def test_pptx_marks_each_slide_in_order_with_titles_bullets_and_tables(tmp_path):
+    doc = documents.read_lines(_make_pptx(tmp_path))
+    assert doc.kind == "PowerPoint presentation"
+    assert doc.pages == 4 and doc.text_pages == 3 and doc.page_unit == "slide"
+    markers = [ln for ln in doc.lines if ln.startswith("[slide ")]
+    assert markers[:3] == ["[slide 1]", "[slide 2]", "[slide 3]"]
+    assert markers[3].startswith("[slide 4] (no text")
+    joined = "\n".join(doc.lines)
+    assert "# Quarterly Review" in joined and "Finance" in joined
+    assert joined.index("# Highlights") < joined.index("Revenue up") < joined.index("Costs flat")
+    assert "Month | Sales" in joined and "Jan | 10" in joined
+    assert joined.index("Revenue up") < joined.index("# Numbers") < joined.index("Jan | 10")
+
+
+def test_image_only_pptx_returns_normally_with_zero_text_slides(tmp_path):
+    doc = documents.read_lines(_make_pptx(tmp_path, "img.pptx", image_only=True))
+    assert doc.pages == 2 and doc.text_pages == 0
+    assert all(ln.startswith("[slide ") for ln in doc.lines)
+
+
+def test_pptx_summary_counts_slides_not_pages(tmp_path):
+    s = documents.summarize_document(_make_pptx(tmp_path))
+    assert s.text().startswith("PowerPoint presentation, 4 slides, ")
+    assert s.as_dict()["pages"] == 4
+
+
+def test_corrupt_pptx_raises_read_error_without_leaking_the_path(tmp_path):
+    p = _write_bytes(tmp_path, "bad.pptx", b"PK\x03\x04 not really")
+    with pytest.raises(ReadError) as exc:
+        documents.read_lines(p)
+    assert str(tmp_path) not in str(exc.value)
+
+
+def test_pptx_is_a_document_family_upload(tmp_path):
+    from app.files import ingest
+    from app.files.store import PPTX_MEDIA_TYPE
+
+    assert ".pptx" in ingest.DOCUMENT_EXTS
+    assert ingest.UPLOAD_TYPES[".pptx"] == PPTX_MEDIA_TYPE
+    assert ingest.summarize(_make_pptx(tmp_path)).text().startswith("PowerPoint presentation, ")

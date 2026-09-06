@@ -348,7 +348,7 @@ Accepted extensions, and which route each family takes:
 
 | Extension | Route | Notes |
 |---|---|---|
-| `.pdf` `.docx` `.txt` `.md` `.json` | `native` | Read from the document's own text layer. A PDF with no text layer is a **422**, not empty text — see below. |
+| `.pdf` `.docx` `.pptx` `.txt` `.md` `.json` | `native` | Read from the document's own text layer. A PDF with no text layer is a **422**, not empty text — see below. |
 | `.xlsx` `.csv` | `native` | Returned as `sheets`, never flattened into `text` (`text` is `""` for these two). |
 | `.png` `.jpg` `.jpeg` `.webp` `.tif` `.tiff` `.bmp` | `ocr` | The same engine `/v1/ocr` uses. `lang` (`devanagari` default, or `en`) applies to these only. |
 
@@ -504,7 +504,7 @@ on Devanagari. The image case is deliberately excluded rather than re-scored
 under looser assertions — that engine is already evaluated in
 `test_ocr_api_eval.py`, and re-scoring it here would just import its
 nondeterminism into a file whose whole point is exactness. 7 cases (`.txt`,
-`.md`, `.json`, `.docx`, `.xlsx`, `.csv`, and a dedicated
+`.md`, `.json`, `.docx`, `.pptx`, `.xlsx`, `.csv`, and a dedicated
 native-carries-no-caveat check) plus one aggregate pass/fail so a partial
 regression cannot hide inside an otherwise-green module.
 

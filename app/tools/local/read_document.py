@@ -1,7 +1,8 @@
 """Local tool: read_document — the text of ONE uploaded document.
 
-Owner-scoped by file_id (see files/source.py). Handles .pdf/.docx/.txt/.md/
-.json; a PDF's page boundaries appear as '[page N]' marker lines inside the
+Owner-scoped by file_id (see files/source.py). Handles .pdf/.docx/.pptx/.txt/
+.md/.json; a PDF's page boundaries appear as '[page N]' marker lines (a deck's
+slides as '[slide N]') inside the
 line stream, so there is only ever ONE paging unit.
 
 Paging is `_paging.window` — shared with read_image, and the two rules it
@@ -33,7 +34,7 @@ def _header(
     total = len(doc.lines)
     line_word = "line" if total == 1 else "lines"
     if doc.pages is not None:
-        page_word = "page" if doc.pages == 1 else "pages"
+        page_word = doc.page_unit if doc.pages == 1 else f"{doc.page_unit}s"
         head = (
             f"{doc.kind}, {doc.pages} {page_word}, {total} {line_word} — "
             f"showing lines {start}–{last} of {total}."
@@ -69,10 +70,13 @@ def _header(
         read_count = doc.pages - (doc.pages_skipped or 0)
         empty = read_count - doc.text_pages
         if empty > 0:
-            out.append(
-                f"{empty} of {read_count} pages have no extractable text "
-                f"(likely scanned images)."
-            )
+            if doc.page_unit == "slide":
+                out.append(f"{empty} of {read_count} slides have no text (pictures only, or empty).")
+            else:
+                out.append(
+                    f"{empty} of {read_count} pages have no extractable text "
+                    f"(likely scanned images)."
+                )
     return out
 
 
@@ -115,7 +119,8 @@ async def _read_document(args: dict[str, Any]) -> str:
 
     # Policy: a PDF with pages but no text anywhere is a scan. Said explicitly,
     # because an empty body would read to the model as "the document is blank".
-    if doc.pages and not doc.text_pages:
+    # A deck is NOT a scan: its slide markers already say "pictures only".
+    if doc.kind == "PDF" and doc.pages and not doc.text_pages:
         return (
             "ERROR: this PDF appears to contain scanned images with no text layer "
             "— OCR is not available yet."
@@ -140,11 +145,12 @@ SPEC = LocalToolSpec(
     name="read_document",
     description=(
         "Read the text of a document the USER attached to THIS chat (.pdf, .docx, "
-        ".txt, .md, .json) by its file_id. Page through it with 'start_line' "
+        ".pptx, .txt, .md, .json) by its file_id. Page through it with 'start_line' "
         "(1-based) and 'max_lines'; the FIRST line of the result gives the total "
         "line count, and if the output was truncated the second line gives the "
         "exact start_line to continue from. In a PDF, page boundaries appear as "
-        "'[page N]' marker lines, so you can cite the page a passage came from. "
+        "'[page N]' marker lines (in a PowerPoint deck, '[slide N]'), so you can cite "
+        "the page or slide a passage came from. "
         "For a spreadsheet (.xlsx/.csv) use inspect_excel / read_excel instead, "
         "and for any total or breakdown use aggregate_excel. For an IMAGE "
         "(.png/.jpg/.webp/.tif/.bmp) use read_image, which OCRs it. For questions about "

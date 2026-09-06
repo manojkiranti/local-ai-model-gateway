@@ -212,3 +212,32 @@ def test_rtf_is_refused():
     with TestClient(app) as client:
         owner = _auth(client, OWNER)
         assert _upload(client, owner, "a.rtf", b"{\\rtf1}", "application/rtf").status_code == 400
+
+
+PPTX_CT = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+
+
+def test_pptx_upload_is_accepted(tmp_path):
+    from pptx import Presentation
+
+    prs = Presentation()
+    prs.slides.add_slide(prs.slide_layouts[0]).shapes.title.text = "Hi"
+    p = tmp_path / "a.pptx"
+    prs.save(str(p))
+    with TestClient(app) as client:
+        owner = _auth(client, OWNER)
+        up = _upload(client, owner, "a.pptx", p.read_bytes(), PPTX_CT)
+        assert up.status_code == 201, up.text
+        assert up.json()["summary"]["kind"] == "PowerPoint presentation"
+
+
+def test_pptx_zip_bomb_is_refused():
+    """The OOXML zip guard covers .pptx too."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("ppt/presentation.xml", b"\0" * (200 * 1024 * 1024 + 1))
+    with TestClient(app) as client:
+        owner = _auth(client, OWNER)
+        up = _upload(client, owner, "bomb.pptx", buf.getvalue(), PPTX_CT)
+        assert up.status_code == 400, up.text
+        assert "too large" in up.json()["detail"]

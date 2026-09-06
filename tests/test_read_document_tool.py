@@ -340,3 +340,37 @@ def test_an_unknown_file_id_points_the_model_at_the_corpus():
     assert out.startswith("ERROR:")
     assert "search_department_docs" in out
     assert "do NOT guess" in out
+
+
+# --------------------------------------------------------------------------- #
+# PowerPoint decks page by SLIDE
+# --------------------------------------------------------------------------- #
+def _pptx_bytes(tmp_path) -> bytes:
+    from pptx import Presentation
+
+    prs = Presentation()
+    s = prs.slides.add_slide(prs.slide_layouts[1])
+    s.shapes.title.text = "Agenda"
+    s.placeholders[1].text_frame.text = "Item one"
+    prs.slides.add_slide(prs.slide_layouts[6])
+    p = tmp_path / "deck.pptx"
+    prs.save(str(p))
+    return p.read_bytes()
+
+
+def test_pptx_header_counts_slides_and_body_has_slide_markers(tmp_path):
+    from app.files.store import PPTX_MEDIA_TYPE
+
+    fid = _save(_pptx_bytes(tmp_path), "deck.pptx", PPTX_MEDIA_TYPE)
+    out = _read({"file_id": fid})
+    first = out.splitlines()[0]
+    assert first.startswith("PowerPoint presentation, 2 slides, ")
+    assert "[slide 1]" in out and "# Agenda" in out and "Item one" in out
+    assert "[slide 2] (no text" in out
+    assert "1 of 2 slides have no text" in out
+    assert "scanned" not in out.lower()  # a blank slide is not a scan
+
+
+def test_description_names_pptx_and_slide_markers():
+    d = read_document.SPEC.description
+    assert ".pptx" in d and "[slide N]" in d

@@ -22,7 +22,7 @@ from .readers import ReadError
 
 logger = logging.getLogger("app.files")
 
-DOCUMENT_EXTS = {".pdf", ".docx", ".txt", ".md", ".json"}
+DOCUMENT_EXTS = {".pdf", ".docx", ".pptx", ".txt", ".md", ".json"}
 
 # A hard bound on extraction work for one PDF. Beyond this we stop and SAY so
 # (see DocumentText.pages_skipped) rather than refusing the file.
@@ -41,6 +41,9 @@ class DocumentText:
     pages: Optional[int] = None
     text_pages: Optional[int] = None       # pages READ that produced text
     pages_skipped: Optional[int] = None    # pages beyond MAX_PDF_PAGES
+    # What one "page" IS for this kind: "page" (PDF) or "slide" (.pptx). Only
+    # wording — a deck pages by slide exactly as a PDF pages by page.
+    page_unit: str = "page"
 
 
 def _decode(path: Path) -> str:
@@ -139,6 +142,79 @@ def _read_docx(path: Path) -> DocumentText:
             msg = type(exc).__name__
         raise ReadError(f"could not read the Word document: {msg}") from exc
     return DocumentText(kind="Word document", lines=lines)
+
+
+def _iter_pptx_shapes(shapes):
+    """Yield leaf shapes in slide order, descending into groups.
+
+    python-pptx exposes a GroupShape's children only via `.shapes`; without the
+    recursion a grouped text box would vanish from the output with no marker.
+    """
+    for shape in shapes:
+        if shape.shape_type == 6:  # MSO_SHAPE_TYPE.GROUP — literal avoids the enum import
+            yield from _iter_pptx_shapes(shape.shapes)
+        else:
+            yield shape
+
+
+def _read_pptx(path: Path) -> DocumentText:
+    """PowerPoint -> lines, one '[slide N]' marker per slide.
+
+    Mirrors _read_pdf: a slide with no text still gets an explicit marker, so a
+    picture-only slide reads as "nothing to extract here", not as a gap in the
+    numbering. The slide TITLE placeholder becomes a '# ' heading (the .docx
+    convention), text frames one line per paragraph, tables one row per line
+    with ' | ' between cells (the .docx/.xlsx convention). Speaker notes are not
+    read. python-pptx is the same library create_pptx renders with.
+    """
+    from pptx import Presentation
+
+    try:
+        prs = Presentation(str(path))
+        lines: list[str] = []
+        text_slides = 0
+        total = 0
+        for index, slide in enumerate(prs.slides, start=1):
+            total = index
+            slide_lines: list[str] = []
+            # `.title` returns a NEW proxy per access, so compare ids, not identity.
+            title_shape = slide.shapes.title
+            title_id = title_shape.shape_id if title_shape is not None else None
+            for shape in _iter_pptx_shapes(slide.shapes):
+                if shape.has_text_frame:
+                    paras = [pg.text.strip() for pg in shape.text_frame.paragraphs]
+                    paras = [t for t in paras if t]
+                    if shape.shape_id == title_id and paras:
+                        slide_lines.append(f"# {' '.join(paras)}")
+                    else:
+                        slide_lines.extend(paras)
+                elif getattr(shape, "has_table", False) and shape.has_table:
+                    slide_lines.append("")
+                    for row in shape.table.rows:
+                        slide_lines.append(" | ".join(c.text.strip() for c in row.cells))
+                    slide_lines.append("")
+            # trim blank padding at either end of the slide
+            while slide_lines and not slide_lines[0]:
+                slide_lines.pop(0)
+            while slide_lines and not slide_lines[-1]:
+                slide_lines.pop()
+            if slide_lines:
+                text_slides += 1
+                lines.append(f"[slide {index}]")
+                lines.extend(slide_lines)
+            else:
+                lines.append(f"[slide {index}] (no text on this slide — pictures only, or empty)")
+    except Exception as exc:  # noqa: BLE001 - any pptx/zip/XML failure is a ReadError
+        # Same rule as _read_docx: never str(exc), which may embed the path.
+        msg = (exc.strerror or "I/O error") if isinstance(exc, OSError) else type(exc).__name__
+        raise ReadError(f"could not read the PowerPoint presentation: {msg}") from exc
+    return DocumentText(
+        kind="PowerPoint presentation",
+        lines=lines,
+        pages=total,
+        text_pages=text_slides,
+        page_unit="slide",
+    )
 
 
 @dataclass(frozen=True)
@@ -250,6 +326,8 @@ def read_lines(path: Path) -> DocumentText:
         return _read_text(path, ext)
     if ext == ".docx":
         return _read_docx(path)
+    if ext == ".pptx":
+        return _read_pptx(path)
     if ext == ".pdf":
         return _read_pdf(path)
     raise ReadError(f"unsupported document type '{ext}'")
@@ -265,6 +343,7 @@ class DocumentSummary:
     chars: int
     pages: Optional[int] = None
     text_pages: Optional[int] = None
+    page_unit: str = "page"
 
     def as_dict(self) -> dict:
         return {
@@ -279,8 +358,10 @@ class DocumentSummary:
         """One-line human/model summary, e.g. 'PDF, 12 pages, 340 lines'."""
         line_word = "line" if self.lines == 1 else "lines"
         if self.pages is not None:
-            page_word = "page" if self.pages == 1 else "pages"
+            page_word = self.page_unit if self.pages == 1 else f"{self.page_unit}s"
             if not self.text_pages:
+                if self.page_unit == "slide":
+                    return f"{self.kind}, {self.pages} {page_word}, no text (pictures only)"
                 return f"{self.kind}, {self.pages} {page_word}, no extractable text (scanned)"
             return f"{self.kind}, {self.pages} {page_word}, {self.lines} {line_word}"
         return f"{self.kind}, {self.lines} {line_word}"
@@ -299,4 +380,5 @@ def summarize_document(path: Path) -> DocumentSummary:
         chars=sum(len(line) for line in doc.lines),
         pages=doc.pages,
         text_pages=doc.text_pages,
+        page_unit=doc.page_unit,
     )

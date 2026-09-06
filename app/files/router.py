@@ -102,7 +102,7 @@ async def upload_file(
         raise _reject(
             None,
             400,
-            "only .xlsx, .csv, .pdf, .docx, .txt, .md, .json, .png, .jpg, "
+            "only .xlsx, .csv, .pdf, .docx, .pptx, .txt, .md, .json, .png, .jpg, "
             ".jpeg, .webp, .tif, .tiff and .bmp files are accepted",
         )
 
@@ -131,7 +131,7 @@ async def upload_file(
         raise _reject(dest, 400, "uploaded file is empty")
 
     # 3) zip-bomb guard for the OOXML formats: refuse absurd expansion
-    if ext in (".xlsx", ".docx"):
+    if ext in (".xlsx", ".docx", ".pptx"):
         try:
             with zipfile.ZipFile(dest) as zf:
                 uncompressed = sum(i.file_size for i in zf.infolist())
