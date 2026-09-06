@@ -4,30 +4,82 @@
 
 **Goal:** Move the chat/agent model from Ollama to vLLM on the live GPU box for concurrency, side-by-side and reversible, without disturbing the other team's production stack.
 
-**Architecture:** vLLM runs as a second model server on a *new* port beside the existing `nic_ollama`. The gateway's chat client is repointed with `AGENT_BASE_URL` (already implemented, commit `9bfc190`); embeddings and the reranker keep talking to Ollama on `:11434`. Ollama stays up throughout, so rollback is a one-line config revert rather than a re-pull.
+**Architecture:** vLLM runs as a second model server on a *new* port beside the existing `nic_ollama`. The gateway's chat client is repointed with `AGENT_BASE_URL` (already implemented, merged at `9c07e3b`); embeddings and the reranker keep talking to Ollama on `:11434`. Ollama stays up throughout, so rollback is a one-line config revert rather than a re-pull.
 
 **Tech Stack:** vLLM OpenAI-compatible server (Docker, NVIDIA runtime), 2× A40 (Ampere sm_86) with `--tensor-parallel-size 2`, Qwen3.5 35B MoE in HF safetensors; gateway is FastAPI + httpx on Python 3.10.
 
 **Spec:** `docs/ollama-to-vllm-migration.md` — read it before executing. This plan implements its §8 runbook and §9 validation; the spec carries the *why*, the VRAM math (§5), and the silent-failure watch list (§11).
 
+## Status & day-of prep (updated 2026-09-05, before SSH access)
+
+**Done, do not redo:** Task 1 (`scripts/bench_chat_concurrency.py` + tests) is
+merged; `feat/vllm` (the `AGENT_BASE_URL` split) is merged to `main` at `9c07e3b`.
+The server has still never been reached from this environment.
+
+**Resolved from public sources on 2026-09-05 (verify on the day, but do not
+re-research):**
+
+| Placeholder | Value | Source / caveat |
+|---|---|---|
+| `<HF_REPO>` (overlap) | `Qwen/Qwen3.5-35B-A3B-GPTQ-Int4` | Official Qwen quant: experts INT4, non-expert layers BF16, `--quantization moe_wna16`. ~20 GB weights → fits beside Ollama's 24 GB Q4_K_M GGUF. Apache-2.0. |
+| `<HF_REPO>` (later, optional) | `Qwen/Qwen3.5-35B-A3B` (BF16, ~70 GB) | Only after Ollama's chat load is gone; does NOT fit during the overlap (§5 math below). |
+| `<PARSER>` | `--tool-call-parser qwen3_coder` | Qwen3.5 model card + vLLM recipe. NOT `hermes` — the spec's guess was wrong. |
+| reasoning | `--reasoning-parser qwen3` **and** `--default-chat-template-kwargs '{"enable_thinking": false}'` | See "Thinking" below. |
+| vision | `--language-model-only` | Qwen3.5 is natively multimodal; the gateway never sends images to the model (OCR is a separate path), so skip the vision encoder and its VRAM. |
+| `<VLLM_IMAGE>` | `vllm/vllm-openai:<pinned>` — pick the newest stable at execution; **known-good 0.17.1**, **0.18.0 broke Qwen3.5 startup** (vllm#37749), **0.19 mis-parses a tool call emitted inside `<think>`** (vllm#39056, non-streaming only, moot with thinking off). | Host driver 580 / CUDA 13.0 runs any cu12x/cu13 image. Check the pinned tag's release notes for Qwen3.5 before pulling. |
+| `<VLLM_PORT>` | `8100` | Confirm free in Task 2 Step 6. |
+| `<SERVED_NAME>` | `qwen35-chat` | Becomes `AGENT_MODEL`. |
+
+**Thinking — the gap the spec's §13 waved away.** Qwen3.5 thinks by default.
+Ollama's `/v1` shim puts that into a separate `reasoning` field, which
+`app/ollama/client.py` ignores, so today users never see it. vLLM WITHOUT a
+reasoning parser puts `<think>…</think>` into `content`, and the client would
+stream the model's private reasoning to users as the answer. So `--reasoning-
+parser qwen3` is REQUIRED, not optional. Beyond that we turn thinking OFF for
+this deployment via `--default-chat-template-kwargs`: (a) the gateway sends no
+`chat_template_kwargs`, so the server default is the only lever; (b) a tool call
+emitted inside the think block is exactly vllm#39056; (c) thinking tokens cost
+latency and context on a 32k window budgeted by `CONTEXT_WINDOW_TOKENS`. The
+cost is a quality variable versus the Ollama baseline — that is what the
+routing evals and the frozen 10-prompt set in Task 3 exist to catch. **A
+plain-text `<think>` in any `/v1/chat` answer is a STOP condition** (added to
+Task 5 Step 1 and Task 7 Step 1).
+
+**VRAM math with real model sizes** (Ollama's `qwen3.5:35b-a3b` is Q4_K_M,
+24 GB on disk, plus its 32k KV cache — measure with `ollama ps` on the day):
+if Ollama sits on ONE card it leaves ~20 GB there and ~46 GB on the other; if it
+spans both, ~34 GB each. GPTQ-Int4 at TP=2 wants ~10 GB/card of weights plus KV,
+so `--gpu-memory-utilization 0.40` fits either layout. BF16 wants ~35 GB/card of
+weights before KV and does not fit either layout while Ollama is resident.
+
+**Reachability:** the gateway runs on the laptop, so the server must expose
+`:8100` to the laptop's IP the same way `:11434` is exposed today. Check the
+firewall/`ufw`/cloud rules in Task 2, not after the flip.
+
+**Day-of order (what to type, in sequence):** Task 2 (read-only survey, ~15 min,
+start the ~20 GB download in the background at its end) → Task 3 (Ollama
+baseline while the download runs) → GATE → Task 4 → Task 5 → GATE → Task 6 →
+Task 7 → Task 8 → GATE. Rollback (Task 9) is one `.env` revert at any point.
+
 ## Global Constraints
 
-- **The gateway-side code change is already DONE** (`feat/vllm`, commit `9bfc190`). `AGENT_BASE_URL` blank ⇒ falls back to `OLLAMA_BASE_URL`. Do not re-implement it.
+- **The gateway-side code change is already DONE** (`feat/vllm`, merged to main at `9c07e3b`). `AGENT_BASE_URL` blank ⇒ falls back to `OLLAMA_BASE_URL`. Do not re-implement it.
 - **`nic_ollama`, `nic_postgres`, `nic_qdrant` belong to another team.** Never stop, restart, recreate, or edit `/home/localllm/backend-local/docker-compose.yml`. Read-only inspection is fine.
 - **vLLM binds a NEW port. Never `:11434`.** This plan uses `8100`; if taken, pick another and use it consistently.
 - **`--max-model-len` MUST equal the gateway's `CONTEXT_WINDOW_TOKENS`** (currently `32768`). A mismatch is silent (spec §11).
 - **A40 is Ampere sm_86 — no FP8.** Never pass `--kv-cache-dtype fp8` or use an FP8 checkpoint. AWQ/GPTQ INT4 and BF16 are the valid options.
-- **Tool calling requires `--enable-auto-tool-choice` AND a `--tool-call-parser`.** Without both, vLLM returns tool syntax as plain text and every tool turn breaks silently.
+- **Tool calling requires `--enable-auto-tool-choice` AND `--tool-call-parser qwen3_coder`.** Without both, vLLM returns tool syntax as plain text and every tool turn breaks silently.
+- **Thinking requires `--reasoning-parser qwen3`**, or `<think>` text streams to users as the answer. This deployment also disables thinking by default (see prep section).
 - **Never paste a private key, `HF_TOKEN`, or any credential into chat.** SSH via a `~/.ssh/config` host alias; secrets live on the server or in env files.
 - **Stop at every GATE.** Gates are human decision points, not checkpoints to narrate past.
 - **Rollback is always:** unset `AGENT_BASE_URL`, restore `AGENT_MODEL=qwen3.5:35b-a3b`, restart the gateway.
 
 **Placeholders you must substitute:**
-`<SSH_HOST>` = the ssh config alias · `<VLLM_PORT>` = `8100` unless taken · `<HF_REPO>` = resolved in Task 2 · `<PARSER>` = resolved in Task 2 · `<VLLM_IMAGE>` = resolved in Task 2 · `<SERVED_NAME>` = `qwen35-chat`
+`<SSH_HOST>` = the ssh config alias · `<VLLM_PORT>` = `8100` unless taken · `<HF_REPO>` = `Qwen/Qwen3.5-35B-A3B-GPTQ-Int4` (confirm in Task 2) · `<PARSER>` = `qwen3_coder` · `<VLLM_IMAGE>` = pinned in Task 2 · `<SERVED_NAME>` = `qwen35-chat`
 
 ---
 
-## Task 1: Concurrency benchmark (the only code task)
+## Task 1: Concurrency benchmark (the only code task) — DONE, merged
 
 Concurrency is the entire justification for this migration. Without a baseline captured *before* vLLM competes for VRAM, there is no way to prove the cutover helped. Same script measures both sides, so the comparison is honest.
 
@@ -242,13 +294,13 @@ Pin `<VLLM_IMAGE>` to a specific tag (never `latest`) and confirm its CUDA/drive
 
 - [ ] **Step 5: Determine the tool-call parser**
 
-Check the pinned vLLM version's docs for the parser matching this model family. `hermes` is the usual answer for Qwen3-family; newer vLLM may ship a model-specific parser. Also check whether a `--chat-template` file must be passed explicitly.
-Record as `<PARSER>`. **This is verified empirically in Task 5, not trusted here.**
+Resolved 2026-09-05: `--tool-call-parser qwen3_coder` plus `--reasoning-parser qwen3` (Qwen3.5 model card and vLLM recipe). On the day only confirm both parser names exist in the pinned image: `docker run --rm <VLLM_IMAGE> vllm serve --help | grep -A3 -E "tool-call-parser|reasoning-parser"`. The bundled chat template is used; several HF discussions report template fixes (multiple system messages, empty history blocks), so note the repo revision you download. **Verified empirically in Task 5, not trusted here.**
 
 - [ ] **Step 6: Confirm the chosen port is free**
 
 Run: `ssh <SSH_HOST> 'ss -lntp | grep -E ":(8100|11434) " || echo "8100 free"'`
 Expected: `11434` in use (Ollama), `8100` free. If taken, choose another port and use it consistently from here on.
+Then confirm the laptop will be able to reach it: `ssh <SSH_HOST> 'sudo ufw status 2>/dev/null; sudo iptables -S INPUT 2>/dev/null | grep -E "11434|8100"'`. Whatever rule admits the laptop to `:11434` must be duplicated for `<VLLM_PORT>` before Task 6, or the flip fails with a connection error that looks like vLLM being down.
 
 - [ ] **Step 7: Record findings**
 
@@ -290,10 +342,14 @@ Expected log line: `chat backend: http://<SERVER_HOST>:11434 (model qwen3.5:35b-
 ```
 Expected: `"failed": 0` on all three. A nonzero `failed` means the baseline is unreliable — investigate before continuing.
 
-- [ ] **Step 4: Capture the tool-routing baseline**
+- [ ] **Step 4: Capture the tool-routing baselines**
 
-Run: `.venv/bin/python scripts/eval_nrb_forex_routing.py`
-Record the pass rate. This is the guardrail for tool-calling correctness (spec §10.2).
+Run: `.venv/bin/python scripts/eval_nrb_forex_routing.py` and `.venv/bin/python scripts/eval_rag_routing.py`
+Record both pass rates. These are the guardrails for tool-calling correctness (spec §10.2).
+
+- [ ] **Step 4b: Capture the quality set (thinking is OFF on vLLM — this is what detects the cost)**
+
+Send the same 10 prompts through `/v1/chat` and save the answers: 3 plain chat, 2 single-tool (calculator, `nepali_date`), 2 multi-tool (calculator + forex), 2 department-RAG, 1 file-producing (`create_pdf`). Keep them in `/tmp/quality-ollama/`; Task 8 repeats them against vLLM for a side-by-side human read.
 
 - [ ] **Step 5: Commit the baseline**
 
@@ -344,19 +400,23 @@ services:
     command: >
       --model <HF_REPO>
       --served-model-name <SERVED_NAME>
+      --quantization moe_wna16
       --tensor-parallel-size 2
       --max-model-len 32768
-      --gpu-memory-utilization 0.45
+      --gpu-memory-utilization 0.40
+      --language-model-only
+      --reasoning-parser qwen3
+      --default-chat-template-kwargs '{"enable_thinking": false}'
       --enable-auto-tool-choice
       --tool-call-parser <PARSER>
     restart: unless-stopped
 ```
 
-`--gpu-memory-utilization 0.45` is the **conservative overlap value** from spec §5. Raise it only after Ollama's chat load is gone.
+`--gpu-memory-utilization 0.40` is the **conservative overlap value** for the INT4 build (prep section). Raise it only after Ollama's chat load is gone. `--quantization moe_wna16` is what the official GPTQ-Int4 card specifies; drop it (and use the BF16 repo) only in the post-soak BF16 step. If the pinned image rejects `--default-chat-template-kwargs`, the fallback is a copied chat template with `enable_thinking` defaulted to false passed via `--chat-template` — do not run with thinking on and no parser.
 
 - [ ] **Step 2b: Sanity-check the flags before launching**
 
-Confirm against the pinned image: every flag exists, `--max-model-len` is `32768` (matching `CONTEXT_WINDOW_TOKENS`), no FP8 anywhere, and the port is not `11434`.
+Confirm against the pinned image (`vllm serve --help`): every flag exists (including `--default-chat-template-kwargs` and `--language-model-only`), `--max-model-len` is `32768` (matching `CONTEXT_WINDOW_TOKENS`), no FP8 anywhere, and the port is not `11434`. A Qwen3.5 hybrid-attention warning about CUDA-graph capture size vs Mamba cache is known; the recipe's workaround is lowering `--max-cudagraph-capture-size`.
 
 - [ ] **Step 3: Launch and watch VRAM as it loads**
 
@@ -397,7 +457,7 @@ ssh <SSH_HOST> 'curl -s http://localhost:<VLLM_PORT>/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d "{\"model\":\"<SERVED_NAME>\",\"messages\":[{\"role\":\"user\",\"content\":\"Say OK\"}]}" | head -40'
 ```
-Expected: JSON with `choices[0].message.content`, `finish_reason: "stop"`.
+Expected: JSON with `choices[0].message.content`, `finish_reason: "stop"`. **`content` must not contain `<think>` and `reasoning_content` should be absent or empty** — either means the thinking flags did not take, and the gateway would stream reasoning to users. Fix before Step 2.
 
 - [ ] **Step 2: Streaming**
 
@@ -418,7 +478,7 @@ ssh <SSH_HOST> 'curl -s http://localhost:<VLLM_PORT>/v1/chat/completions \
 
 Expected: `finish_reason: "tool_calls"` and a structured `tool_calls` array with `function.name = "calculator"`.
 
-**FAILURE MODE — read carefully.** If the tool call appears as *plain text* inside `message.content` instead of a structured `tool_calls` array, `<PARSER>` or the chat template is wrong. **Do not proceed to Task 6** — the agent loop would treat that text as a final answer and print raw tool syntax to users. Fix the parser (try the alternative from Task 2 Step 5, or pass `--chat-template`), recreate the container, and repeat this step.
+**FAILURE MODE — read carefully.** If the tool call appears as *plain text* inside `message.content` (or inside `reasoning_content` — vllm#39056) instead of a structured `tool_calls` array, `<PARSER>`, the thinking default or the chat template is wrong. **Do not proceed to Task 6** — the agent loop would treat that text as a final answer and print raw tool syntax to users. Fix the parser (try the alternative from Task 2 Step 5, or pass `--chat-template`), recreate the container, and repeat this step.
 
 - [ ] **Step 4: Streaming tool call**
 
@@ -462,7 +522,7 @@ Everything here uses the real agent loop. Spec §9.
 - [ ] **Step 1: A plain chat turn, non-streaming then streaming**
 
 `POST /v1/chat` with `{"message":"Hello, who are you?","stream":false}`, then `true`.
-Expected: a coherent answer; streaming yields incremental `token` events.
+Expected: a coherent answer; streaming yields incremental `token` events; **no `<think>` text anywhere in the answer**.
 
 - [ ] **Step 2: A single-tool turn**
 
@@ -491,8 +551,8 @@ Expected: it recalls both. **Forgetting its identity means the system prompt was
 
 - [ ] **Step 7: Tool-routing eval**
 
-Run: `.venv/bin/python scripts/eval_nrb_forex_routing.py`
-Expected: pass rate **≥ the Task 3 Step 4 baseline**. A drop means the 35B MoE emits tool calls differently under vLLM — a real regression, not noise.
+Run both `scripts/eval_nrb_forex_routing.py` and `scripts/eval_rag_routing.py`.
+Expected: pass rates **≥ the Task 3 Step 4 baselines**. A drop means the model emits tool calls differently under vLLM, or thinking-off changed routing — a real regression, not noise. Then repeat the Task 3 Step 4b prompt set into `/tmp/quality-vllm/` for the side-by-side read in Task 8.
 
 ---
 
@@ -560,7 +620,7 @@ Watch error rates and `chat_messages.trace` for `finish_reason` anomalies over ~
 
 - [ ] **Step 2: Consider raising `--gpu-memory-utilization`**
 
-Ollama no longer serves chat (it still serves embeddings, which are small), so vLLM can take more. Edit `~/vllm/docker-compose.yml`, `docker compose up -d vllm-chat`, re-verify with `nvidia-smi` and Task 5 Step 3.
+Ollama no longer serves chat (it still serves embeddings, which are small), so vLLM can take more. Edit `~/vllm/docker-compose.yml`, `docker compose up -d vllm-chat`, re-verify with `nvidia-smi` and Task 5 Step 3. This is also the point to consider the BF16 repo (`Qwen/Qwen3.5-35B-A3B`, ~70 GB, drop `--quantization`) if the quality read in Task 8 showed INT4 costing anything — it is a second download and a second Task 5/7/8 pass, not a flag change.
 **Do not remove Ollama** — embeddings and the reranker need it, and the container belongs to another team.
 
 - [ ] **Step 3: Update the docs that are now stale**

@@ -513,11 +513,15 @@ The switch makes several docs wrong. Update as part of "done":
   `logprobs`"* (its own docstring). vLLM **does** expose a native rerank/score
   endpoint — moving to it is the cleaner path, but it's gated on the abstention
   work being fitted at all (`RAG_RERANK_ENABLED=false` today).
-- **`--reasoning-parser` / thinking mode.** `docs/reasoning-thinking.md` is a
-  parked exploration of a ChatGPT-style reasoning toggle. vLLM's
-  `--reasoning-parser` surfaces `reasoning_content` separately and is the natural
-  enabler — but it interacts with tool calling and is its own project. Not part
-  of this migration.
+- **A user-facing thinking TOGGLE.** `docs/reasoning-thinking.md` is a parked
+  exploration of a ChatGPT-style reasoning selector; that UI is its own project.
+  **But the parser itself is NOT out of scope (corrected 2026-09-05):** Qwen3.5
+  thinks by default, Ollama's shim hides the thinking in a `reasoning` field the
+  client ignores, and vLLM without `--reasoning-parser qwen3` puts `<think>…`
+  into `content` — the gateway would stream it to users. The cutover therefore
+  launches with `--reasoning-parser qwen3` and thinking disabled server-side via
+  `--default-chat-template-kwargs '{"enable_thinking": false}'`. The toggle,
+  when built, flips that per request via `chat_template_kwargs`.
 - **Renaming the `ollama_*` symbols** (§6.4) — cosmetic, do it on its own branch.
 - **Deploy hardening** — firewalling the internal deps (now vLLM + Ollama +
   Postgres + MCP) to the gateway's IP. Already deferred; the vLLM port joins that
@@ -527,12 +531,18 @@ The switch makes several docs wrong. Update as part of "done":
 
 ## 14. Open questions to resolve before execution
 
-1. **Exact HF repo id + revision** for `qwen3.5:35b-a3b`, and whether a supported
-   AWQ/GPTQ build exists for its **MoE** layers (fallback: BF16).
-2. **Correct `--tool-call-parser`** name for this specific model on the pinned
-   vLLM version (`hermes` is the likely answer — verify against the model card).
-3. **Pinned vLLM version** and its CUDA/driver requirement vs the box (driver
-   580.173.02, CUDA 13.0) — confirm the chosen image runs on that host.
+1. **Exact HF repo id + revision** — RESOLVED 2026-09-05: `Qwen/Qwen3.5-35B-A3B`
+   (BF16) and the official `Qwen/Qwen3.5-35B-A3B-GPTQ-Int4` (`--quantization
+   moe_wna16`, experts INT4, everything else BF16). The overlap uses INT4 because
+   BF16 does not fit beside Ollama's 24 GB Q4_K_M; revision to be pinned on
+   download. Ollama's own build is Q4, so INT4 is quality parity, not a step down.
+2. **Correct `--tool-call-parser`** — RESOLVED: `qwen3_coder` (not `hermes`), with
+   `--reasoning-parser qwen3`. Both per the model card and vLLM's Qwen3.5 recipe.
+3. **Pinned vLLM version** — NARROWED: 0.17.1 is known-good for Qwen3.5, 0.18.0
+   broke Qwen3.5 startup (vllm#37749), 0.19 mis-parses a tool call emitted inside
+   `<think>` in non-streaming mode (vllm#39056, moot with thinking off). Pick the
+   newest stable whose notes do not regress Qwen3.5; the host driver (580,
+   CUDA 13.0) runs any current image.
 4. **BF16 vs INT4 for the overlap** — decided by the live `nvidia-smi` headroom
    while Ollama is resident (§5).
 5. **Who executes this** — nobody in the current dev environment has server
