@@ -70,9 +70,87 @@ def _validate(args: dict[str, Any]) -> tuple[str, str, list[dict], str] | str:
     return title, subtitle, raw_slides, filename
 
 
+_LAYOUT_TITLE = 0
+_LAYOUT_TITLE_AND_CONTENT = 1
+_LAYOUT_TITLE_ONLY = 5
+
+
+def _add_bullets(slide, bullets: list[str]) -> None:
+    """Fill the content placeholder (index 1 on the Title-and-Content layout)."""
+    body = slide.placeholders[1].text_frame
+    body.clear()  # leaves one empty paragraph
+    for i, text in enumerate(bullets):
+        paragraph = body.paragraphs[0] if i == 0 else body.add_paragraph()
+        paragraph.text = text
+        paragraph.level = 0
+
+
+def _add_table(slide, table: dict, top_emu: int) -> None:
+    from pptx.util import Emu
+
+    headers = table.get("headers")
+    rows = table["rows"]
+    ncols = max([len(headers or [])] + [len(r) for r in rows]) or 1
+    nrows = len(rows) + (1 if headers else 0)
+
+    prs_width = slide.part.package.presentation_part.presentation.slide_width
+    margin = Emu(int(prs_width * 0.05))
+    width = Emu(prs_width - 2 * margin)
+    row_h = Emu(370_000)  # ~1 cm; python-pptx sizes rows to content anyway
+    shape = slide.shapes.add_table(nrows, ncols, margin, Emu(top_emu), width, Emu(row_h * nrows))
+    grid = shape.table
+
+    r = 0
+    if headers:
+        for c in range(ncols):
+            grid.cell(0, c).text = str(headers[c]) if c < len(headers) else ""
+        r = 1
+    for row in rows:
+        for c in range(ncols):
+            grid.cell(r, c).text = str(row[c]) if c < len(row) else ""
+        r += 1
+
+
 def _build_pptx_bytes(title: str, subtitle: str, slides: list[dict]) -> bytes:
-    """Render the deck with python-pptx. Sync — run in a thread. (Filled in Task 3.)"""
-    raise NotImplementedError
+    """Render the deck with python-pptx. Sync — run in a thread."""
+    from pptx import Presentation
+    from pptx.util import Emu
+
+    prs = Presentation()
+
+    if title:
+        ts = prs.slides.add_slide(prs.slide_layouts[_LAYOUT_TITLE])
+        ts.shapes.title.text = title
+        ts.placeholders[1].text = subtitle  # empty string leaves the placeholder blank
+
+    for spec in slides:
+        bullets = spec.get("bullets") or []
+        table = spec.get("table")
+        layout = _LAYOUT_TITLE_AND_CONTENT if bullets else _LAYOUT_TITLE_ONLY
+        slide = prs.slides.add_slide(prs.slide_layouts[layout])
+        slide.shapes.title.text = str(spec.get("title") or "")
+
+        table_top = int(prs.slide_height * 0.25)
+        if bullets:
+            _add_bullets(slide, bullets)
+            if table is not None:
+                # Shrink the bullet box to the upper part so the table fits below it.
+                # Capture the inherited left/width first: python-pptx placeholder
+                # position setters write a bare xfrm, so setting only top/height
+                # zeroes left/width instead of keeping the layout's values.
+                body = slide.placeholders[1]
+                left, width = body.left, body.width
+                body.top = Emu(int(prs.slide_height * 0.22))
+                body.height = Emu(int(prs.slide_height * 0.30))
+                body.left = left
+                body.width = width
+                table_top = int(prs.slide_height * 0.55)
+        if table is not None:
+            _add_table(slide, table, table_top)
+
+    buffer = BytesIO()
+    prs.save(buffer)
+    return buffer.getvalue()
 
 
 async def _create_pptx(args: dict[str, Any]) -> str:

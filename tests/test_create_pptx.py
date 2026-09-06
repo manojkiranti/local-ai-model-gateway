@@ -92,3 +92,87 @@ def test_too_many_bullets_is_refused():
     bullets = [f"b{i}" for i in range(pptx_tool.MAX_BULLETS_PER_SLIDE + 1)]
     result = _run({"slides": [{"title": "x", "bullets": bullets}]})
     assert result.startswith("ERROR: slides[0].bullets") and str(pptx_tool.MAX_BULLETS_PER_SLIDE) in result
+
+
+# ---- rendering --------------------------------------------------------------
+
+
+def test_title_slide_and_bullets_present():
+    result = _run(
+        {
+            "title": "Quarterly Review",
+            "subtitle": "Finance",
+            "slides": [
+                {"title": "Highlights", "bullets": ["Revenue up", "Costs flat"]},
+                {"bullets": ["A slide with no title"]},
+            ],
+        }
+    )
+    assert "3 slide(s)" not in result  # the count reports CONTENT slides only
+    assert "2 slide(s)" in result
+    texts = _slide_texts(result)
+    assert "Quarterly Review" in texts and "Finance" in texts
+    assert "Highlights" in texts
+    assert "Revenue up" in texts and "Costs flat" in texts
+    assert "A slide with no title" in texts
+
+
+def test_no_deck_title_means_no_title_slide():
+    from pptx import Presentation
+
+    result = _run({"slides": [{"title": "Only"}]})
+    record = file_store.get(_link_id(result))
+    assert len(Presentation(record.path).slides) == 1
+
+
+def test_table_slide_present():
+    result = _run(
+        {
+            "slides": [
+                {
+                    "title": "Numbers",
+                    "table": {"headers": ["Month", "Sales"], "rows": [["Jan", 10], ["Feb", 20]]},
+                }
+            ]
+        }
+    )
+    texts = _slide_texts(result)
+    assert "Numbers" in texts
+    assert "Month" in texts and "Sales" in texts and "Jan" in texts and "20" in texts
+
+
+def test_bullets_and_table_on_one_slide():
+    result = _run(
+        {
+            "slides": [
+                {
+                    "title": "Both",
+                    "bullets": ["point one"],
+                    "table": {"rows": [["a", "b"]]},
+                }
+            ]
+        }
+    )
+    texts = _slide_texts(result)
+    assert "point one" in texts and "a" in texts and "b" in texts
+
+
+def test_ragged_table_rows_are_padded():
+    result = _run({"slides": [{"table": {"headers": ["x", "y", "z"], "rows": [["1"], ["1", "2", "3", "4"]]}}]})
+    assert result.startswith("Created"), result
+    texts = _slide_texts(result)
+    assert "4" in texts  # the widest row sets the column count
+
+
+def test_full_unicode_preserved():
+    result = _run({"title": "Café 🚀 “quotes”", "slides": [{"bullets": ["नेपाल राष्ट्र बैंक", "smile 😀"]}]})
+    texts = _slide_texts(result)
+    assert "Café 🚀 “quotes”" in texts
+    assert "नेपाल राष्ट्र बैंक" in texts and "smile 😀" in texts
+
+
+def test_filename_suffix_is_forced():
+    result = _run({"slides": [{"title": "x"}], "filename": "deck"})
+    assert "'deck.pptx'" in result
+    result = _run({"slides": [{"title": "x"}]})
+    assert "'presentation.pptx'" in result
