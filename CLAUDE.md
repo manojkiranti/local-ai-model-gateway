@@ -283,7 +283,7 @@ knows rapidocr exists (PP-OCRv5/onnxruntime, lazy import,
 dispatch (spreadsheet vs document vs image) shared by the upload route and
 turn-open, `router`=upload
 `POST /v1/files` + `GET /v1/files` list + owner-scoped `/v1/files/{id}`; feeds
-create_excel/html/chart/pdf/csv/docx and inspect_excel/read_excel/
+create_excel/html/chart/pdf/csv/docx/pptx and inspect_excel/read_excel/
 read_document/read_image),
 `apikeys/` (external API-key credentials, off unless `EXTERNAL_API_ENABLED`:
 `keygen`+`policy` are PURE — mint / verify / may-this-key-act — `models`+
@@ -609,9 +609,10 @@ retained). Runbook: `docs/external-api.md`.
   `OLLAMA_CONTEXT_LENGTH=32768`. Without it Ollama defaults to **4096**, which is
   too small — **15** local tool schemas alone measured **3475 tokens** on
   2026-08-11 (via `usage.prompt_tokens`, qwen2.5; a bare turn's prompt floor was
-  3778, leaving ~300 of a 4096 window). `LOCAL_TOOLS` is now **17** (`read_document`
-  then `read_image` landed after that measurement) — the token figure has not
-  been re-measured since, so treat it as a floor, not the current count. Either way
+  3778, leaving ~300 of a 4096 window). `LOCAL_TOOLS` is now **21** (`read_document`, `read_image`, `edit_excel`,
+  `nepali_date`, `read_department_doc`, `get_nrb_forex` and `create_pptx` landed
+  after that measurement) — the token figure has not been re-measured since, so
+  treat it as a floor, not the current count. Either way
   one 8000-char tool result overflows. This matches vLLM's `--max-model-len` (a launch flag),
   so it stays a config value across backends. See
   `docs/llm-transport-and-deployment.md`.
@@ -1139,6 +1140,13 @@ retained). Runbook: `docs/external-api.md`.
   for the `aggregate_excel` reason — without the cross-reference the model's
   obvious path to "add a column" is read_excel → create_excel, which rebuilds the
   file from a CAPPED read and silently drops every row past the cap.
+- **`create_pptx` is slide-based, not section-based, and its caps are constants.**
+  A deck's unit is a slide, so the schema is `slides[] of {title?, bullets?, table?}`
+  (the `table` shape is create_docx's, reused on purpose) with an optional deck
+  `title`/`subtitle` that becomes a title slide. `MAX_SLIDES`/`MAX_BULLETS_PER_SLIDE`
+  are module constants — the `edit_excel` cell-cap rule — so the model cannot raise
+  the bound on the file it asks the process to build. Layout indexes 0/1/5 are the
+  default python-pptx template's; a custom template would renumber them.
 - **Image OCR is `read_image`, it is OPTIONAL, and it does NOT go through
   docling.** Full write-up in `docs/image-ocr.md`. `app/files/image_ocr.py` calls
   `rapidocr` directly — `RapidOCR.__call__` takes an image, so the docling path
