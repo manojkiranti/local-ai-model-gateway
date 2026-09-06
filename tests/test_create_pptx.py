@@ -195,3 +195,14 @@ def test_filename_suffix_is_forced():
     assert "'deck.pptx'" in result
     result = _run({"slides": [{"title": "x"}]})
     assert "'presentation.pptx'" in result
+
+
+# ---- registration -----------------------------------------------------------
+
+
+def test_tool_is_registered_once():
+    from app.tools.local import LOCAL_TOOLS
+
+    names = [t.name for t in LOCAL_TOOLS]
+    assert names.count("create_pptx") == 1
+    assert names.index("create_pptx") == names.index("create_docx") + 1
