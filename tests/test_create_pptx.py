@@ -26,6 +26,27 @@ def _run(args):
     return asyncio.run(pptx_tool.SPEC.func(args))
 
 
+def _save_image(*, width=800, height=400, media_type="image/png", filename="photo.png", content=None):
+    """Save a real (or deliberately non-image) file via the fallback store and
+    return its id, for use as an 'image' field's file_id."""
+    async def _save():
+        if content is not None:
+            data = content
+        else:
+            from io import BytesIO
+
+            from PIL import Image
+
+            img = Image.new("RGB", (width, height), color=(230, 0, 18))
+            buf = BytesIO()
+            img.save(buf, format="PNG")
+            data = buf.getvalue()
+        record = await file_store.save(data, filename=filename, media_type=media_type)
+        return record.id
+
+    return asyncio.run(_save())
+
+
 def _link_id(result: str) -> str:
     assert "Download it at: GET /v1/files/" in result, result
     return result.split("/v1/files/")[1].strip().split()[0]
@@ -330,6 +351,178 @@ def test_filename_suffix_is_forced():
     assert "'deck.pptx'" in result
     result = _run({"slides": [{"title": "x"}]})
     assert "'presentation.pptx'" in result
+
+
+def test_image_and_chart_cannot_combine_with_bullets_table_or_stats():
+    for field, value in [
+        ("bullets", ["a"]),
+        ("table", {"rows": [["a"]]}),
+        ("stats", [{"value": "1", "label": "l"}]),
+    ]:
+        for media_field, media_value in [
+            ("image", {"file_id": "whatever"}),
+            ("chart", {"chart_type": "bar", "labels": ["a"], "series": [{"data": [1]}]}),
+        ]:
+            result = _run({"slides": [{"title": "x", field: value, media_field: media_value}]})
+            assert result.startswith("ERROR:") and "combines" in result, result
+
+
+def test_image_and_chart_together_is_refused():
+    result = _run(
+        {
+            "slides": [
+                {
+                    "title": "x",
+                    "image": {"file_id": "whatever"},
+                    "chart": {"chart_type": "bar", "labels": ["a"], "series": [{"data": [1]}]},
+                }
+            ]
+        }
+    )
+    assert result.startswith("ERROR:") and "both 'image' and 'chart'" in result
+
+
+def test_bad_image_is_error():
+    # An empty dict is falsy, so it hits the generic "needs at least one of"
+    # check first (same as stats: {} / stats: [] already do); a non-empty
+    # value of the wrong shape reaches the image-specific validation.
+    assert _run({"slides": [{"image": "x"}]}).startswith("ERROR: slides[0].image must be")
+    assert _run({"slides": [{"image": {"caption": "no file_id"}}]}).startswith(
+        "ERROR: slides[0].image must be"
+    )
+    assert _run({"slides": [{"image": {"file_id": "abc", "caption": 5}}]}).startswith(
+        "ERROR: slides[0].image.caption must be a string"
+    )
+
+
+def test_bad_chart_reuses_create_chart_validation():
+    """create_pptx's chart field is validated by create_chart's own _validate —
+    same error, just re-scoped to the slide/field path."""
+    result = _run({"slides": [{"chart": {"chart_type": "nope", "labels": ["a"], "series": [{"data": [1]}]}}]})
+    assert result == "ERROR: slides[0].chart: 'chart_type' is required and must be one of: bar, line, pie."
+
+
+def test_unknown_image_file_id_is_error():
+    result = _run({"slides": [{"title": "x", "image": {"file_id": "does-not-exist"}}]})
+    assert result == "ERROR: slides[0].image.file_id: no such file (unknown id, or you don't own it)."
+
+
+def test_non_image_file_id_is_error():
+    file_id = _save_image(content=b"not an image", media_type="text/plain", filename="notes.txt")
+    result = _run({"slides": [{"title": "x", "image": {"file_id": file_id}}]})
+    assert "'.txt' is not an image" in result
+
+
+def test_svg_file_id_names_the_chart_field_as_the_alternative():
+    file_id = _save_image(content=b"<svg></svg>", media_type="image/svg+xml", filename="chart.svg")
+    result = _run({"slides": [{"title": "x", "image": {"file_id": file_id}}]})
+    assert "SVG" in result and "'chart' field" in result
+
+
+def test_image_slide_renders_at_native_aspect_ratio_and_is_centered():
+    from pptx import Presentation
+
+    file_id = _save_image(width=800, height=400)
+    result = _run({"slides": [{"title": "Office", "image": {"file_id": file_id, "caption": "HQ"}}]})
+    assert result.startswith("Created"), result
+
+    record = file_store.get(_link_id(result))
+    prs = Presentation(record.path)
+    slide = prs.slides[0]
+    pictures = [s for s in slide.shapes if s.shape_type == 13]  # MSO_SHAPE_TYPE.PICTURE
+    assert len(pictures) == 1
+    pic = pictures[0]
+    # 800x400 is 2:1 -- the embedded picture must keep that ratio.
+    assert abs(pic.width / pic.height - 2.0) < 0.01
+    # Centered horizontally.
+    assert abs((pic.left + pic.width / 2) - prs.slide_width / 2) < 1000
+    assert "HQ" in _slide_texts(result)
+
+
+def test_image_and_chart_slides_do_not_get_the_bullets_layout():
+    """Regression: an earlier version could pick the Title-and-Content layout
+    for an image/chart slide (since that branch only checked `bullets`),
+    leaving an unused, empty content placeholder behind the picture/chart."""
+    file_id = _save_image()
+    result = _run({"slides": [{"title": "x", "image": {"file_id": file_id}}]})
+    from pptx import Presentation
+
+    record = file_store.get(_link_id(result))
+    slide = Presentation(record.path).slides[0]
+    assert slide.slide_layout.name == "Title Only"
+
+
+def test_chart_slide_renders_native_editable_chart_with_correct_data():
+    result = _run(
+        {
+            "slides": [
+                {
+                    "title": "Revenue",
+                    "chart": {
+                        "chart_type": "bar",
+                        "labels": ["Q1", "Q2", "Q3"],
+                        "series": [{"name": "Revenue", "data": [100, 120, 134]}],
+                    },
+                }
+            ]
+        }
+    )
+    assert result.startswith("Created"), result
+
+    from pptx import Presentation
+    from pptx.enum.chart import XL_CHART_TYPE
+
+    record = file_store.get(_link_id(result))
+    slide = Presentation(record.path).slides[0]
+    charts = [s for s in slide.shapes if s.has_chart]
+    assert len(charts) == 1
+    chart = charts[0].chart
+    assert chart.chart_type == XL_CHART_TYPE.COLUMN_CLUSTERED
+    assert list(chart.plots[0].categories) == ["Q1", "Q2", "Q3"]
+    series = list(chart.series)
+    assert len(series) == 1
+    assert series[0].name == "Revenue"
+    assert list(series[0].values) == [100.0, 120.0, 134.0]
+
+
+def test_pie_chart_uses_only_the_first_series():
+    result = _run(
+        {
+            "slides": [
+                {
+                    "title": "Split",
+                    "chart": {
+                        "chart_type": "pie",
+                        "labels": ["A", "B"],
+                        "series": [{"data": [1, 2]}, {"data": [3, 4]}],
+                    },
+                }
+            ]
+        }
+    )
+    assert result.startswith("Created"), result
+
+    from pptx import Presentation
+
+    record = file_store.get(_link_id(result))
+    slide = Presentation(record.path).slides[0]
+    chart = [s for s in slide.shapes if s.has_chart][0].chart
+    assert len(list(chart.series)) == 1
+
+
+def test_hbar_and_donut_chart_types_map_correctly():
+    from pptx import Presentation
+    from pptx.enum.chart import XL_CHART_TYPE
+
+    for chart_type, expected in [("hbar", XL_CHART_TYPE.BAR_CLUSTERED), ("donut", XL_CHART_TYPE.DOUGHNUT)]:
+        result = _run(
+            {"slides": [{"title": "x", "chart": {"chart_type": chart_type, "labels": ["a"], "series": [{"data": [1]}]}}]}
+        )
+        assert result.startswith("Created"), result
+        record = file_store.get(_link_id(result))
+        slide = Presentation(record.path).slides[0]
+        chart = [s for s in slide.shapes if s.has_chart][0].chart
+        assert chart.chart_type == expected
 
 
 # ---- registration -----------------------------------------------------------

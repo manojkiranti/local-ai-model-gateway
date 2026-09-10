@@ -1,10 +1,18 @@
 """Local tool: create_pptx (structured slide deck -> .pptx download link).
 
 Slide-based content model — a deck's unit is a slide, so the model supplies
-`slides[]` of {title?, bullets?, table?} plus an optional deck `title`/`subtitle`
-that becomes a title slide. The `table` shape is create_docx's exactly, so the
-model reuses what it already knows. A file tool, so it flows through the
-per-user file sink like create_docx/create_pdf.
+`slides[]` of {title?, bullets?, table?, stats?, image?, chart?} plus an
+optional deck `title`/`subtitle` that becomes a title slide. The `table` shape
+is create_docx's exactly, and `chart` is create_chart's exactly (validated by
+reusing that tool's own `_validate`, then rendered as a native, editable
+python-pptx chart — not a picture), so the model reuses what it already
+knows. `image` embeds an already-uploaded/generated raster file by `file_id`
+(owner-scoped via `resolve_file`, resolved up front in `_create_pptx` since
+the actual render is sync and can't do its own async lookups). `image`/`chart`
+are full-slide content — mutually exclusive with `bullets`/`table`/`stats` on
+the same slide, to avoid a combinatorial layout explosion; put them on their
+own slide instead. A file tool, so it flows through the per-user file sink
+like create_docx/create_pdf.
 
 Rendered on the org's branded template (`assets/pptx_template.pptx`) rather
 than python-pptx's generic default, so every deck comes out looking the same
@@ -36,7 +44,10 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any
 
-from ...files.store import PPTX_MEDIA_TYPE, file_store
+from ...files import images, ingest
+from ...files.readers import ReadError
+from ...files.store import PPTX_MEDIA_TYPE, file_store, resolve_file
+from . import chart as chart_tool
 from .base import LocalToolSpec
 
 _TEMPLATE_PATH = Path(__file__).parent / "assets" / "pptx_template.pptx"
@@ -72,8 +83,43 @@ def _validate(args: dict[str, Any]) -> tuple[str, str, list[dict], str] | str:
         bullets = slide.get("bullets")
         table = slide.get("table")
         stats = slide.get("stats")
-        if not (slide.get("title") or bullets or table is not None or stats):
-            return f"ERROR: slides[{idx}] needs at least one of 'title', 'bullets', 'table', or 'stats'."
+        image = slide.get("image")
+        chart = slide.get("chart")
+        if not (slide.get("title") or bullets or table is not None or stats or image or chart):
+            return (
+                f"ERROR: slides[{idx}] needs at least one of 'title', 'bullets', 'table', "
+                "'stats', 'image', or 'chart'."
+            )
+        # image/chart are full-slide content (a picture or a native chart filling
+        # the whole area below the title), not one more thing stacked alongside
+        # bullets/table/stats — combining them would need a layout this tool
+        # doesn't have, so it's refused rather than silently overlapping shapes.
+        if (image or chart) and (bullets or table is not None or stats):
+            return (
+                f"ERROR: slides[{idx}] combines 'image'/'chart' with 'bullets'/'table'/'stats' — "
+                "put the image or chart on its own slide (title + image/chart only), and the "
+                "rest on another slide."
+            )
+        if image and chart:
+            return f"ERROR: slides[{idx}] has both 'image' and 'chart' — use one per slide."
+        if image is not None:
+            if not isinstance(image, dict) or not str(image.get("file_id") or "").strip():
+                return f"ERROR: slides[{idx}].image must be an object with a 'file_id' string."
+            caption = image.get("caption")
+            if caption is not None and not isinstance(caption, str):
+                return f"ERROR: slides[{idx}].image.caption must be a string."
+        if chart is not None:
+            if not isinstance(chart, dict):
+                return (
+                    f"ERROR: slides[{idx}].chart must be an object with 'chart_type', "
+                    "'labels', and 'series' (create_chart's own shape)."
+                )
+            # Reuse create_chart's own validator rather than duplicating its
+            # rules — same shape, so the model doesn't learn a second schema,
+            # and the two tools can't silently drift on what counts as valid.
+            chart_check = chart_tool._validate(chart)
+            if isinstance(chart_check, str):
+                return f"ERROR: slides[{idx}].chart: {chart_check.removeprefix('ERROR: ')}"
         if bullets is not None:
             if not isinstance(bullets, list) or not all(isinstance(b, str) for b in bullets):
                 return f"ERROR: slides[{idx}].bullets must be an array of strings."
@@ -164,6 +210,93 @@ def _add_table(slide, table: dict, top_emu: int, slide_width: int) -> None:
         for c in range(ncols):
             grid.cell(r, c).text = str(row[c]) if c < len(row) else ""
         r += 1
+
+
+def _add_image(
+    slide, image: dict, image_paths: dict[str, str], top_emu: int, zone_height_emu: int, slide_width: int
+) -> None:
+    """Embed an already-uploaded/generated raster image, scaled to fit inside
+    the content zone with its aspect ratio preserved and centered
+    horizontally, with an optional caption below it. `image_paths` is resolved
+    up front in `_create_pptx` (async, owner-scoped `resolve_file`) since this
+    whole render runs sync off the loop — a fresh resolve here would need to
+    be async and couldn't be."""
+    from pptx.enum.text import PP_ALIGN
+    from pptx.util import Emu, Pt
+
+    path = image_paths[image["file_id"]]
+    caption = image.get("caption")
+
+    # Reserve room for the caption so the picture doesn't crowd it out; the
+    # summary read is cheap (declared dimensions, not a full decode) and is
+    # the same pixel-bomb-safe entry point every image path in this app uses.
+    caption_h = int(zone_height_emu * 0.12) if caption else 0
+    pic_zone_h = zone_height_emu - caption_h
+    summary = images.summarize_image(Path(path))
+
+    margin = int(slide_width * 0.05)
+    max_w = slide_width - 2 * margin
+    scale = min(max_w / summary.width, pic_zone_h / summary.height)
+    w = int(summary.width * scale)
+    h = int(summary.height * scale)
+    left = (slide_width - w) // 2
+    slide.shapes.add_picture(path, Emu(left), Emu(top_emu), width=Emu(w), height=Emu(h))
+
+    if caption:
+        box = slide.shapes.add_textbox(
+            Emu(margin), Emu(top_emu + h), Emu(slide_width - 2 * margin), Emu(max(caption_h, 1))
+        )
+        tf = box.text_frame
+        tf.word_wrap = True
+        p = tf.paragraphs[0]
+        p.alignment = PP_ALIGN.CENTER
+        run = p.add_run()
+        run.text = caption
+        run.font.size = Pt(11)
+        run.font.italic = True
+
+
+def _add_chart(slide, chart: dict, top_emu: int, height_emu: int, slide_width: int) -> None:
+    """A native, editable PowerPoint chart (python-pptx's own chart engine —
+    not a picture), from the exact same {chart_type, labels, series} shape
+    create_chart validates, coerced the same way _add_table coerces its cells
+    (str.format/float at render time, not at validation time)."""
+    from pptx.chart.data import CategoryChartData
+    from pptx.enum.chart import XL_CHART_TYPE
+    from pptx.util import Emu
+
+    chart_type = chart["chart_type"]
+    labels = [str(lab) for lab in chart["labels"]]
+    raw_series = chart["series"]
+    series = [
+        (str(s.get("name") or f"Series {i + 1}"), [float(v) for v in s["data"]])
+        for i, s in enumerate(raw_series)
+    ]
+    if chart_type in ("pie", "donut"):
+        # Same restriction create_chart's own description states: a pie/donut
+        # is parts-of-a-whole, so only the first series is meaningful.
+        series = series[:1]
+
+    type_map = {
+        "bar": XL_CHART_TYPE.COLUMN_CLUSTERED,
+        "hbar": XL_CHART_TYPE.BAR_CLUSTERED,
+        "line": XL_CHART_TYPE.LINE_MARKERS,
+        "area": XL_CHART_TYPE.AREA,
+        "pie": XL_CHART_TYPE.PIE,
+        "donut": XL_CHART_TYPE.DOUGHNUT,
+    }
+
+    chart_data = CategoryChartData()
+    chart_data.categories = labels
+    for name, data in series:
+        chart_data.add_series(name, data)
+
+    margin = int(slide_width * 0.05)
+    width = slide_width - 2 * margin
+    graphic_frame = slide.shapes.add_chart(
+        type_map[chart_type], Emu(margin), Emu(top_emu), Emu(width), Emu(height_emu), chart_data
+    )
+    graphic_frame.chart.has_legend = True
 
 
 # Brand red (#E60012, matching the frontend's own --primary token). Hardcoded
@@ -378,7 +511,9 @@ def _add_cover_title_text(slide, title: str, subtitle: str) -> None:
         run2.font.name = "Calibri"
 
 
-def _build_pptx_bytes(title: str, subtitle: str, slides: list[dict]) -> bytes:
+def _build_pptx_bytes(
+    title: str, subtitle: str, slides: list[dict], image_paths: dict[str, str]
+) -> bytes:
     """Render the deck with python-pptx. Sync — run in a thread."""
     from pptx import Presentation
     from pptx.util import Emu
@@ -407,6 +542,8 @@ def _build_pptx_bytes(title: str, subtitle: str, slides: list[dict]) -> bytes:
         bullets = spec.get("bullets") or []
         table = spec.get("table")
         stats = spec.get("stats") or []
+        image = spec.get("image")
+        chart = spec.get("chart")
         layout = _LAYOUT_TITLE_AND_CONTENT if bullets else _LAYOUT_TITLE_ONLY
         slide = prs.slides.add_slide(prs.slide_layouts[layout])
         slide.shapes.title.text = str(spec.get("title") or "")
@@ -416,6 +553,23 @@ def _build_pptx_bytes(title: str, subtitle: str, slides: list[dict]) -> bytes:
         # ~29% to clear the branded header artwork (logo + divider line) --
         # not the stock Office default's ~5%-25%. A template swap would need
         # these recalibrated the same way.
+
+        # image/chart are full-slide content, mutually exclusive with
+        # bullets/table/stats (enforced in _validate) — a simpler layout than
+        # trying to stack a picture or a chart alongside the other zones.
+        if image is not None:
+            _add_image(
+                slide, image, image_paths, int(prs.slide_height * 0.30),
+                int(prs.slide_height * 0.58), prs.slide_width,
+            )
+            continue
+        if chart is not None:
+            _add_chart(
+                slide, chart, int(prs.slide_height * 0.30),
+                int(prs.slide_height * 0.58), prs.slide_width,
+            )
+            continue
+
         if stats:
             _add_stats(
                 slide, stats, int(prs.slide_height * 0.30), int(prs.slide_height * 0.22), prs.slide_width
@@ -463,8 +617,38 @@ async def _create_pptx(args: dict[str, Any]) -> str:
         return validated
     title, subtitle, slides, filename = validated
 
+    # Resolve any embedded image file_ids up front: resolve_file is async
+    # (owner-scoped lookup) but the actual render is sync python-pptx work run
+    # off the loop via asyncio.to_thread below, so it can't resolve anything
+    # itself. Keyed by file_id, not by slide index, so the same image
+    # referenced twice is only resolved once.
+    image_paths: dict[str, str] = {}
+    for idx, spec in enumerate(slides):
+        image = spec.get("image")
+        if image is None or image["file_id"] in image_paths:
+            continue
+        file_id = image["file_id"]
+        record = await resolve_file(file_id)
+        if record is None:
+            return f"ERROR: slides[{idx}].image.file_id: no such file (unknown id, or you don't own it)."
+        ext = Path(record.path).suffix.lower()
+        if ext == ".svg":
+            return (
+                f"ERROR: slides[{idx}].image.file_id is an SVG (e.g. from create_chart) — SVG "
+                "can't be embedded directly. Use this slide's own 'chart' field for a native "
+                "chart, or 'image' only for a raster photo/logo (PNG/JPEG/etc)."
+            )
+        if ext not in ingest.IMAGE_EXTS:
+            return (
+                f"ERROR: slides[{idx}].image.file_id: '{ext or 'unknown'}' is not an image "
+                "this tool can embed (PNG/JPEG/WebP/TIFF/BMP)."
+            )
+        image_paths[file_id] = record.path
+
     try:
-        data = await asyncio.to_thread(_build_pptx_bytes, title, subtitle, slides)
+        data = await asyncio.to_thread(_build_pptx_bytes, title, subtitle, slides, image_paths)
+    except ReadError as exc:
+        return f"ERROR: could not read an embedded image ({exc})."
     except Exception as exc:  # noqa: BLE001 - report back, don't raise into the loop
         return f"ERROR: failed to build PPTX: {exc}"
 
@@ -488,15 +672,23 @@ SPEC = LocalToolSpec(
     description=(
         "Create a PowerPoint (.pptx) slide deck and return a download link. Use this "
         "when the user asks for a presentation, slides, or a deck. Provide 'slides' "
-        "(array of {title?, bullets?, table?, stats?}) and optionally a deck 'title' "
-        "and 'subtitle' (rendered as a title slide) and a 'filename'. Each slide may "
-        "have a 'title', 'bullets' (array of short strings, one level), a 'table' "
-        "({headers?, rows[][]}), and/or 'stats' (array of up to "
+        "(array of {title?, bullets?, table?, stats?, image?, chart?}) and optionally "
+        "a deck 'title' and 'subtitle' (rendered as a title slide) and a 'filename'. "
+        "Each slide may have a 'title', 'bullets' (array of short strings, one "
+        "level), a 'table' ({headers?, rows[][]}), and/or 'stats' (array of up to "
         f"{MAX_STATS_PER_SLIDE} {{value, label, note?}} — a row of highlight-number "
         "cards, e.g. {value: '1956', label: 'Year established'}). Prefer 'stats' over "
         "'bullets' for a handful of key figures/facts at a glance — it reads far "
         "better than the same numbers written out as a bullet list, and is what a "
-        "human deck author would build for that content. Full Unicode is supported. "
+        "human deck author would build for that content. "
+        "A slide may INSTEAD have 'image' ({file_id, caption?} — a photo/logo/"
+        "screenshot already uploaded or generated this conversation, embedded at "
+        "native aspect ratio) or 'chart' ({chart_type, labels, series} — exactly "
+        "create_chart's own shape, rendered as a real, native, editable PowerPoint "
+        "chart, not a picture; prefer this over calling create_chart separately when "
+        "the chart belongs IN the deck). 'image'/'chart' fill the whole slide below "
+        "the title and cannot be combined with 'bullets'/'table'/'stats' on the same "
+        "slide — put those on their own slide instead. Full Unicode is supported. "
         f"Keep decks under {MAX_SLIDES} slides and {MAX_BULLETS_PER_SLIDE} bullets per "
         f"slide, and a table to {MAX_TABLE_ROWS_PER_SLIDE} rows (incl. header) on a "
         f"slide without bullets or {MAX_TABLE_ROWS_WITH_BULLETS} on one with bullets "
@@ -561,10 +753,67 @@ SPEC = LocalToolSpec(
                                 "cards — prefer this over 'bullets' for key figures at a glance."
                             ),
                         },
+                        "image": {
+                            "type": "object",
+                            "properties": {
+                                "file_id": {
+                                    "type": "string",
+                                    "description": (
+                                        "Id of an already-uploaded or generated raster image "
+                                        "(PNG/JPEG/WebP/TIFF/BMP) — not an SVG chart file."
+                                    ),
+                                },
+                                "caption": {
+                                    "type": "string",
+                                    "description": "Optional small caption shown below the image.",
+                                },
+                            },
+                            "required": ["file_id"],
+                            "description": (
+                                "Optional full-slide image (a photo/logo/screenshot). Fills the "
+                                "slide below the title; cannot combine with bullets/table/stats "
+                                "or with 'chart' on the same slide."
+                            ),
+                        },
+                        "chart": {
+                            "type": "object",
+                            "properties": {
+                                "chart_type": {
+                                    "type": "string",
+                                    "enum": list(chart_tool.CHART_TYPES),
+                                    "description": "Same as create_chart's 'chart_type'.",
+                                },
+                                "labels": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                    "description": "Same as create_chart's 'labels'.",
+                                },
+                                "series": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "name": {"type": "string"},
+                                            "data": {"type": "array", "items": {"type": "number"}},
+                                        },
+                                        "required": ["data"],
+                                    },
+                                    "description": "Same as create_chart's 'series'.",
+                                },
+                            },
+                            "required": ["chart_type", "labels", "series"],
+                            "description": (
+                                "Optional full-slide native chart — exactly create_chart's own "
+                                "shape, rendered as a real editable PowerPoint chart rather than "
+                                "a picture. Fills the slide below the title; cannot combine with "
+                                "bullets/table/stats or with 'image' on the same slide."
+                            ),
+                        },
                     },
                 },
                 "description": (
-                    "Slides in order; each needs at least a title, bullets, a table, or stats."
+                    "Slides in order; each needs at least a title, bullets, a table, stats, an "
+                    "image, or a chart."
                 ),
             },
             "filename": {
