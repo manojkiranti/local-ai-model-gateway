@@ -62,6 +62,42 @@ DATE_PROMPT = (
 )
 
 
+# DATE_PROMPT above already forbade answering time-varying figures from memory,
+# and it was not enough. Measured in production (docs/prod-incident-2026-09-20.md
+# §4): of 28 document questions asked in General chat, ~5 were answered from
+# training memory — NRB's governor and principal officers, NIC Asia's board of
+# directors and its executive committee — several carrying "based on publicly
+# available information as of my last update". DATE_PROMPT's enumeration is
+# financial ("exchange rates, prices, balances, published figures"), so a
+# question about PEOPLE read as outside it; GROUNDING_PROMPT's is "policy,
+# process, entitlements, products or internal rules", so it missed them inside
+# the `nrb` tab too, where the same questions were asked and are equally
+# unanswerable. Hence ONE rule, applied in BOTH scopes, naming the categories
+# that actually failed rather than repeating a general warning.
+#
+# The second sentence-group is not padding. A rule that buys honesty with
+# silence has made the product worse, and an assistant that hedges everything
+# trains its reader to ignore the hedge — the same reason a native /v1/extract
+# response DROPS `caveat` rather than nulling it. Both halves are measured by
+# scripts/eval_no_source_refusal.py: the refusals AND the controls.
+NO_SOURCE_PROMPT = (
+    "Sourcing: some answers can only come from a document or a tool result — "
+    "who currently holds a position, an organisation's current officials, board "
+    "or management, what a law, directive or circular says, and any current "
+    "figure, rate or deadline. Answer those ONLY from a tool result or from a "
+    "document in this conversation. If nothing here supplies it, say plainly "
+    "that you do not have a source for it, and say where it would come from "
+    "(which department's documents, or the organisation's own publication). "
+    "Never fill the gap from memory: do not name people, quote provisions or "
+    "state figures you were not given, and do not offer a remembered answer "
+    "with a caveat attached — a hedged answer from memory is still a wrong "
+    "answer.\n"
+    "This limits what you ASSERT, not what you discuss: definitions, general "
+    "concepts, worked calculations, drafting and ordinary conversation need no "
+    "source and must still be answered normally."
+)
+
+
 GROUNDING_PROMPT = (
     "This conversation is scoped to the {code} department. For any question "
     "about company policy, process, entitlements, products or internal rules, "
@@ -102,7 +138,15 @@ def build_system_prompt(settings: Settings) -> str:
             f"vendor, or how you were trained — that is not something you "
             f"disclose. Never claim to be human."
         )
-    prompt = f"{identity}\n{DATE_PROMPT.format(today=localtime.today_iso())}\n{WORKING_PROMPT}"
+    prompt = (
+        f"{identity}\n"
+        f"{DATE_PROMPT.format(today=localtime.today_iso())}\n"
+        # Directly after the date rule: the two anti-memory rules read as one
+        # block. Split apart they dilute each other, which is the buried-hint
+        # failure eval_rag_routing.py measured on tool descriptions.
+        f"{NO_SOURCE_PROMPT}\n"
+        f"{WORKING_PROMPT}"
+    )
 
     # Grounding is added ONLY for a department-scoped turn. A general chat has no
     # corpus, so instructing the model to answer only from retrieved documents
