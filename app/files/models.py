@@ -13,6 +13,7 @@ from datetime import datetime
 from uuid import uuid4
 
 from sqlalchemy import ForeignKey, Integer, String, func
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import DateTime
 
@@ -39,6 +40,10 @@ class GeneratedFile(Base):
     media_type: Mapped[str] = mapped_column(String(128), nullable=False)
     size: Mapped[int] = mapped_column(Integer, nullable=False)
     path: Mapped[str] = mapped_column(String(1024), nullable=False)  # on-disk location
+    # Written by production's .pptx preview feature (migration e1a4c6f9b2d7,
+    # reconstructed 2026-09-20); nothing here writes it yet. Declared so the
+    # ORM matches the deployed schema and autogenerate stays clean.
+    preview: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     # How the file got here: model output ('generated') or a user upload
     # ('uploaded'). Lets GET /v1/files filter, and the read tools target uploads.
     source: Mapped[str] = mapped_column(

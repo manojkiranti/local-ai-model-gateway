@@ -54,3 +54,32 @@ def test_every_earlier_chain_is_an_ancestor_of_the_head():
     assert CITATIONS in chain
     assert NRB_HEAD in chain
     assert BASELINE in chain
+
+
+# --- production parity -------------------------------------------------------
+#
+# This one IS pinned, on purpose. Production's alembic_version was measured at
+# `e1a4c6f9b2d7` on 2026-09-14 while this repo's head was `a3f7c21e8b04`, and a
+# schema diff of the two databases showed exactly one difference:
+# generated_files.preview (JSONB, nullable). The revision was reconstructed
+# here under the SAME id so the repo and the deployment agree about the
+# schema; a dump built here must restore into production without a second
+# head appearing. If a later migration lands, it must descend from this one.
+PRODUCTION_REVISION = "e1a4c6f9b2d7"
+
+
+def test_the_production_revision_exists_and_descends_from_the_old_head():
+    scripts = _scripts()
+    rev = scripts.get_revision(PRODUCTION_REVISION)
+    assert rev is not None
+    assert rev.down_revision == "a3f7c21e8b04"
+
+
+def test_the_generated_files_model_carries_the_production_preview_column():
+    from sqlalchemy.dialects.postgresql import JSONB
+
+    from app.files.models import GeneratedFile
+
+    col = GeneratedFile.__table__.c.preview
+    assert isinstance(col.type, JSONB)
+    assert col.nullable is True
