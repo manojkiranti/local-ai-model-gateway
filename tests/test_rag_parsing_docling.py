@@ -231,3 +231,35 @@ def test_wholly_front_matter_document_raises_the_front_matter_error(
     message = str(exc_info.value)
     assert "front matter or fragments" in message
     assert "scanned PDF" not in message
+
+
+def test_a_document_whose_title_block_docling_calls_a_heading_still_ingests(tmp_path):
+    """Production 2026-09-10: two .docx guidelines failed with "value too long
+    for type character varying(512)". Their title blocks — several lines of
+    bank name, document name and year — were classified by Docling as one
+    section header, and the heading path overflowed the `section` column.
+    The document must parse, and no chunk may carry a section wider than the
+    column that stores it."""
+    from docx import Document
+
+    from app.rag.models import DocumentChunk
+
+    column_width = DocumentChunk.__table__.c.section.type.length
+    title_block = (
+        "NIC ASIA Bank Limited Integrated Treasury Management Guideline and Procedures 2026 "
+        * 8
+    ).strip()
+    assert len(title_block) > column_width
+
+    doc = Document()
+    doc.add_heading(title_block, level=1)
+    doc.add_paragraph("This guideline governs treasury operations and dealing limits.")
+    doc.add_heading("Dealing Limits", level=2)
+    doc.add_paragraph("Intraday limits are approved by the ALCO and reviewed quarterly.")
+    path = tmp_path / "treasury.docx"
+    doc.save(path)
+
+    chunks = parse_to_chunks(path, "docx", max_chars=500, overlap_chars=50)
+
+    assert chunks, "the document must still produce chunks"
+    assert all(c.section is None or len(c.section) <= column_width for c in chunks)

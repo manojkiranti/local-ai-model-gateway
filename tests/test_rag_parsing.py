@@ -208,3 +208,54 @@ def test_settings_expose_the_skip_list_raw():
     s = Settings(rag_skip_sections="Table of Contents, Contents ,Index")
     assert s.rag_skipped_sections == {"Table of Contents", "Contents", "Index"}
     assert s.rag_chunk_min_body_chars == 40
+
+
+# --- the heading path is bounded by the column that stores it -----------------
+#
+# Measured on production 2026-09-10: two guideline .docx files failed ingestion
+# with "value too long for type character varying(512)" because Docling
+# classified a multi-line title block as a section header, and the heading path
+# it produced exceeded the `document_chunks.section` column. A heading path is
+# retrieval context, not a fact; a document must never fail to ingest over it.
+
+
+def test_heading_path_never_exceeds_the_section_column():
+    from app.rag.parsing import SECTION_MAX_CHARS, _heading_path
+
+    title_block = "NIC ASIA Bank Limited Integrated Treasury Management Guideline " * 12
+    assert len(title_block) > SECTION_MAX_CHARS  # the production shape
+
+    section = _heading_path([(1, title_block)])
+
+    assert section is not None
+    assert len(section) <= SECTION_MAX_CHARS
+
+
+def test_heading_path_keeps_the_deepest_heading_when_capped():
+    from app.rag.parsing import SECTION_MAX_CHARS, _heading_path
+
+    # A deep stack of long headings: the deepest is the one a chunk belongs to,
+    # so it is the one that must survive; the elision is marked, not silent.
+    stack = [(level, f"Heading level {level} " + "x" * 150) for level in range(1, 8)]
+    deepest = stack[-1][1]
+
+    section = _heading_path(stack)
+
+    assert section is not None
+    assert len(section) <= SECTION_MAX_CHARS
+    assert section.endswith(deepest)
+    assert section.startswith("…")
+
+
+def test_section_cap_matches_the_column_length():
+    """One constant, two readers: the cap in parsing and the column in models."""
+    from app.rag.models import DocumentChunk
+    from app.rag.parsing import SECTION_MAX_CHARS
+
+    assert SECTION_MAX_CHARS == DocumentChunk.__table__.c.section.type.length
+
+
+def test_a_short_heading_path_is_unchanged():
+    from app.rag.parsing import _heading_path
+
+    assert _heading_path([(1, "Chapter 4"), (2, "4.6 Limits")]) == "Chapter 4 > 4.6 Limits"

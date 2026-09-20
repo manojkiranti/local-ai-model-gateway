@@ -107,8 +107,25 @@ def _parse_spreadsheet(path: Path, *, max_chars: int) -> list[Chunk]:
     return renumber(collected)
 
 
+# `document_chunks.section` is VARCHAR(512); this is the one other reader of
+# that number (`test_section_cap_matches_the_column_length` holds them equal).
+# Docling can classify a multi-line title block as a section header — measured
+# on production 2026-09-10, where two .docx guidelines failed ingestion outright
+# with "value too long for type character varying(512)". A heading path is
+# retrieval context, never a fact, so it is bounded here rather than allowed to
+# fail the whole document.
+SECTION_MAX_CHARS = 512
+
+
 def _heading_path(stack: list[tuple[int, str]]) -> str | None:
-    return " > ".join(text for _level, text in stack) if stack else None
+    if not stack:
+        return None
+    path = " > ".join(text for _level, text in stack)
+    if len(path) <= SECTION_MAX_CHARS:
+        return path
+    # Keep the TAIL: the deepest heading is the one the chunk actually sits
+    # under, and the elision is marked so a reader knows context was dropped.
+    return "…" + path[-(SECTION_MAX_CHARS - 1):]
 
 
 def _normalize_heading(text: str) -> str:
