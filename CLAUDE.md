@@ -1062,9 +1062,12 @@ retained). Runbook: `docs/external-api.md`.
   stream with zero SSE chunks and the loop records it as a finished turn. Three
   consequences: (1) `docs/prod-incident-2026-09-20.md` §1's "tool calling works"
   probe passed only because it sent ONE small tool schema — it does **not** cover
-  a real payload; (2) the deployed gateway evidently does NOT reach Ollama
-  through this path, or every production answer would be blank — so measure the
-  deployed model from inside the bank network, not through this URL; (3) any eval
+  a real payload; (2) the deployed gateway does NOT reach Ollama through
+  this path and needs no change for it — `.env.docker` points at
+  `http://host.docker.internal:11434`, straight to Ollama on the same host, and
+  `docker-compose.vllm.yml` calls the public path "the smoke test only"; this is
+  a TESTING trap, so measure the deployed model from inside the bank network
+  rather than through this URL; (3) any eval
   pointed at it reports a model that answers nothing, which reads like a model
   fault and is not one.
 - MCP: gateway is the MCP client (streamable HTTP). Set `MCP_SERVER_URL` to enable;

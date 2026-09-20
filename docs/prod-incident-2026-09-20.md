@@ -236,9 +236,17 @@ Three consequences:
    payload. The conclusion "the model server is not at fault" still stands —
    nothing here implicates the model — but the evidence does not extend to a
    full-size request through that path.
-2. **Production does not reach Ollama this way**, or every answer would be blank.
-   The deployed model must be measured from inside the bank network, with
-   `scripts/eval_no_source_refusal.py` in its ordinary (agent-loop) mode.
+2. **Production does not reach Ollama this way, and needs no config change for
+   it.** `.env.docker` points the gateway at `http://host.docker.internal:11434`
+   — straight to Ollama on the same host, no proxy — and
+   `docker-compose.vllm.yml` already says "the public `/vllmmodel/` path exists
+   for the smoke test only … remove it". The behaviour agrees: through the WAF
+   every answer would be blank, and the complaint was that answers were *wrong*.
+   **This is a testing trap, not a production fault.** Worth confirming the
+   deployed `.env` really carries the internal URL when someone has server
+   access, since the above is read off the repo's templates.
+   The deployed model must therefore be measured from inside the bank network,
+   with `scripts/eval_no_source_refusal.py` in its ordinary (agent-loop) mode.
 3. `--direct` is the probe that fits: one system rule plus the question, no
    tools. It tests the rule's DESIGN, not the shipped string, and says so.
 
