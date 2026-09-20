@@ -1,0 +1,272 @@
+# =============================================================================
+#  nic-vllm - production model servers (vLLM)
+# =============================================================================
+#
+#  This is the PRODUCTION step of the staged plan begun with the Qwen3-0.6B
+#  smoke test. Same project name, same volume, same conventions, so
+#  `docker compose up -d` replaces the smoke-test container in place.
+#
+#  Two services, because vLLM serves exactly ONE model per process and the
+#  gateway needs two models:
+#
+#      vllm          Qwen3.5-35B-A3B      chat + tool calling      :11435
+#      vllm-embed    Qwen3-Embedding-4B   document search          :11436
+#
+#  BOTH ARE REQUIRED. With only `vllm` running the system looks healthy while
+#  department document search returns nothing. Embedding must be on vLLM
+#  rather than Ollama: the next piece of work indexes ~18,000 NRB documents,
+#  and Ollama serialises embedding requests where vLLM batches them.
+#
+#  -- 1. Prerequisites ---------------------------------------------------------
+#  Internet access to huggingface.co: ~28 GB of model weights (chat ~20 GB,
+#  embedding ~8 GB). The image is already present from the smoke test.
+#  Behind a proxy, add HTTPS_PROXY / HTTP_PROXY / NO_PROXY to .env - both
+#  services read them.
+#
+#  Clean the old smoke-test entries out of .env. These are no longer read and
+#  leaving them invites someone to "fix" a value that does nothing:
+#      VLLM_MODEL, VLLM_SERVED_MODEL_NAME, VLLM_GPU_MEMORY_UTILIZATION,
+#      VLLM_MAX_MODEL_LEN
+#  Model, memory and context are fixed in this file on purpose - they are
+#  the deployment, not tunables.
+#
+#  -- 2. Stop Ollama (keep it) -------------------------------------------------
+#  It holds ~24 GB of GPU memory for the chat model; both cannot be resident.
+#
+#      docker stop nic_ollama
+#      nvidia-smi                      # GPU memory should now be near zero
+#                                      #   apart from the 0.6B smoke test
+#
+#  Do NOT delete the Ollama container or its volume: it is the rollback path.
+#  The smoke-test vLLM container needs no manual removal - step 4 replaces it.
+#
+#  -- 3. Confirm the flags exist in this vLLM version --------------------------
+#  vLLM renames flags between releases. Run once before starting:
+#
+#      docker run --rm vllm/vllm-openai:v0.27.1 --help \
+#        | grep -E "runner|tool-call-parser|reasoning-parser|default-chat-template-kwargs|quantization"
+#
+#  If "qwen3_coder" is not among the --tool-call-parser choices, use
+#  "qwen3_xml" - the same model family's parser.
+#
+#  -- 4. Start -----------------------------------------------------------------
+#      docker compose up -d
+#      docker compose logs -f
+#
+#  First start downloads the weights and loads them; several minutes is
+#  normal. `docker ps` shows "health: starting" until ready (15 minutes is
+#  allowed for the chat model).
+#
+#  -- 5. Verify ----------------------------------------------------------------
+#      curl -s localhost:11435/v1/models          # must list  qwen3.5-chat
+#      curl -s localhost:11436/v1/models          # must list  qwen3-embed
+#
+#  Tool calling MUST work. The gateway attaches its tool list to every single
+#  request, so if this fails nothing works at all:
+#
+#      curl -s -X POST localhost:11435/v1/chat/completions \
+#        -H 'Content-Type: application/json' \
+#        -d '{"model":"qwen3.5-chat","messages":[{"role":"user","content":"hi"}],
+#             "tools":[{"type":"function","function":{"name":"t","description":"d",
+#             "parameters":{"type":"object","properties":{}}}}],"max_tokens":30}'
+#
+#      HTTP 400 mentioning "auto tool choice"  -> flags in step 3 did not apply
+#      reply text containing "<think>"          -> --reasoning-parser did not apply
+#
+#      curl -s -X POST localhost:11436/v1/embeddings \
+#        -H 'Content-Type: application/json' \
+#        -d '{"model":"qwen3-embed","input":"test"}'     # must return a vector
+#
+#  -- 6. Gateway configuration (done by the gateway team) ----------------------
+#  In the gateway's .env - no "/v1" on the URLs, the gateway appends it:
+#
+#      AGENT_BASE_URL=http://<HOST>:11435          # chat        (NEW)
+#      AGENT_MODEL=qwen3.5-chat                    #             (NEW)
+#      OLLAMA_BASE_URL=http://<HOST>:11436         # embeddings  (CHANGED)
+#      RAG_EMBED_MODEL=qwen3-embed                 #             (CHANGED)
+#      RAG_RERANK_ENABLED=false                    # see note below
+#
+#  <HOST> is 127.0.0.1 when the gateway runs directly on this server. When
+#  the gateway runs in Docker or on another machine, the ports must be
+#  reachable from there: set VLLM_BIND_ADDR=0.0.0.0 in .env AND firewall
+#  11435/11436 to the gateway's address - vLLM has no authentication of its
+#  own, and --api-key must NOT be used (the gateway sends no auth header).
+#
+#  Leave RAG_EMBED_DIM=1536 and CONTEXT_WINDOW_TOKENS=32768 unchanged.
+#
+#  Reranker: it was served by Ollama through the chat endpoint, which the
+#  embedding container does not have. With RAG_RERANK_ENABLED=true search
+#  still works (falls back to plain ranking) but logs a warning per query.
+#  Keep it false; re-enabling it is a separate follow-up.
+#
+#  Reverse proxy: the public /vllmmodel/ path exists for the smoke test only.
+#  Nothing needs the model reachable from the internet - remove it.
+#
+#  -- 7. After cutover: re-index documents (gateway team) ---------------------
+#  Existing document vectors came from Ollama's 8-bit build of the embedding
+#  model; this server runs the 16-bit build. Mismatched vectors make search
+#  worse WITHOUT failing, so all documents are re-ingested once (~3,600
+#  chunks, a few minutes).
+#
+#  -- 8. After the first successful start (optional hardening) ----------------
+#    * Set HF_HUB_OFFLINE=1 in .env so restarts never touch the internet (the
+#      weights are now in the nic_vllm_hf_cache volume).
+#    * Pin each model to its downloaded revision: add "--revision=<commit>"
+#      after "--model=..."; the commit is the directory name under
+#      /root/.cache/huggingface/hub/models--*/snapshots/ in the container.
+#
+#  -- 9. Rollback -------------------------------------------------------------
+#      docker compose down
+#      docker start nic_ollama
+#  then restore the previous gateway .env values and restart the gateway.
+#  No data is affected.
+#
+#  Reasoning behind every flag: docs/ollama-to-vllm-migration.md (gateway repo)
+# =============================================================================
+
+name: nic-vllm
+
+x-vllm: &vllm
+  # Pinned deliberately. :latest would let `docker compose pull` swap the
+  # inference engine under a running production model server. Qwen3.5 has had
+  # version-specific regressions (0.18.0 did not start it; 0.19 mis-parsed
+  # tool calls) - bump only after checking release notes, then repeat step 3.
+  # v0.27.1, released 2026-08-11
+  image: vllm/vllm-openai:${VLLM_IMAGE_TAG:-v0.27.1}
+  restart: unless-stopped
+  # Workers talk over shared memory: required for the KV-cache allocator and
+  # for tensor parallelism across the two A40s.
+  ipc: host
+  volumes:
+    # Named volume shared by both services: survives down/recreate, cannot be
+    # committed by accident, no UID-mismatch errors (the image runs as root).
+    - hf_cache:/root/.cache/huggingface
+  environment:
+    HF_HOME: /root/.cache/huggingface
+    # Only needed for gated repos. Both Qwen models are open.
+    HUGGING_FACE_HUB_TOKEN: ${HUGGING_FACE_HUB_TOKEN:-}
+    VLLM_LOGGING_LEVEL: ${VLLM_LOGGING_LEVEL:-INFO}
+    # Set in .env only after the first successful start (step 8).
+    HF_HUB_OFFLINE: ${HF_HUB_OFFLINE:-0}
+    HTTPS_PROXY: ${HTTPS_PROXY:-}
+    HTTP_PROXY: ${HTTP_PROXY:-}
+    NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1}
+  stop_grace_period: 60s
+  logging:
+    driver: json-file
+    options:
+      max-size: "50m"
+      max-file: "5"
+
+services:
+
+  # ---------------------------------------------------------------------------
+  #  CHAT / AGENT - what users talk to, and what calls every tool.
+  #  Same service and container name as the smoke test: `up -d` replaces it.
+  # ---------------------------------------------------------------------------
+  vllm:
+    <<: *vllm
+    container_name: nic_vllm
+    # Host-local by default. See step 6 before changing VLLM_BIND_ADDR.
+    ports:
+      - "${VLLM_BIND_ADDR:-127.0.0.1}:${VLLM_PORT:-11435}:8000"
+    command:
+      - --model=Qwen/Qwen3.5-35B-A3B-GPTQ-Int4
+      # Required by this checkpoint (its model card): experts INT4, rest BF16.
+      - --quantization=moe_wna16
+      # The name the gateway sends as AGENT_MODEL. Decoupled from the repo id
+      # so a model swap never forces a gateway change.
+      - --served-model-name=qwen3.5-chat
+      # Both A40s. device_ids below must list both.
+      - --tensor-parallel-size=2
+      # vLLM's equivalent of OLLAMA_CONTEXT_LENGTH. Must equal the gateway's
+      # CONTEXT_WINDOW_TOKENS. The model's native 262144 would need far more
+      # KV cache than the cards have; vLLM refuses to start rather than guess.
+      - --max-model-len=32768
+      # Fraction of EACH card. ~30 GB: ~11 GB of weights, the rest KV cache,
+      # which is what decides how many users are served at once. GPU 1 also
+      # hosts vllm-embed (0.25), so the two must stay under ~0.90 combined.
+      # If startup fails with an out-of-memory error, try 0.55 first.
+      - --gpu-memory-utilization=0.65
+      # REQUIRED, both. Without them vLLM rejects every gateway request with
+      # HTTP 400, because the gateway attaches its tool list to each one.
+      - --enable-auto-tool-choice
+      - --tool-call-parser=qwen3_coder
+      # REQUIRED, both. The model "thinks" by default: the parser keeps that
+      # reasoning out of the answer text, and the kwargs switch it off, which
+      # an agent workload wants (thinking costs hundreds of tokens per step).
+      - --reasoning-parser=qwen3
+      - '--default-chat-template-kwargs={"enable_thinking": false}'
+      - --host=0.0.0.0
+      - --port=8000
+      # No --enforce-eager: that was for the smoke test. CUDA graphs on.
+      # No --api-key: the gateway sends no Authorization header.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              # Literal list on purpose: Compose cannot expand a variable into
+              # multiple device ids.
+              device_ids: ["0", "1"]
+              capabilities: [gpu]
+    healthcheck:
+      # curl is not guaranteed inside the image; python3 always is.
+      test:
+        - CMD
+        - python3
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://localhost:8000/health')
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      # A cold 35B download + load. Shortening this marks a healthy container
+      # unhealthy while it is still starting normally.
+      start_period: 15m
+
+  # ---------------------------------------------------------------------------
+  #  EMBEDDINGS - department document search. Not optional (see header).
+  # ---------------------------------------------------------------------------
+  vllm-embed:
+    <<: *vllm
+    container_name: nic_vllm_embed
+    ports:
+      - "${VLLM_BIND_ADDR:-127.0.0.1}:${VLLM_EMBED_PORT:-11436}:8000"
+    command:
+      - --model=Qwen/Qwen3-Embedding-4B
+      - --served-model-name=qwen3-embed
+      # Serves /v1/embeddings. ("--task embed", which the model card still
+      # shows, was removed in vLLM 0.21.)
+      - --runner=pooling
+      # Indexed chunks are ~2,000 characters; this is generous. Unrelated to
+      # the chat model's 32768.
+      - --max-model-len=8192
+      # ~11.5 GB on GPU 1: ~8 GB of weights plus working memory for batches.
+      - --gpu-memory-utilization=0.25
+      - --host=0.0.0.0
+      - --port=8000
+      # The gateway reduces the 2560-dimension output to 1536 itself.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              # GPU 1 only. Small model, no sharding; pinning keeps the memory
+              # picture predictable.
+              device_ids: ["1"]
+              capabilities: [gpu]
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://localhost:8000/health')
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 10m
+
+volumes:
+  hf_cache:
+    # Same volume as the smoke test, so nothing already downloaded is lost.
+    name: nic_vllm_hf_cache
