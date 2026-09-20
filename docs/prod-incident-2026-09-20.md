@@ -145,7 +145,7 @@ compose loads `.env`.
 
 ---
 
-## 4. Cause C — the model answers from memory with no source ❌ NOT FIXED
+## 4. Cause C — the model answers from memory with no source ✅ FIXED
 
 28 document questions were asked in **General chat**, where no department corpus
 is active. The search tool correctly returned *"no department is active"*. What
@@ -164,11 +164,111 @@ NRB"* — were also asked **inside** the `nrb` tab, where they are equally
 unanswerable: the directives do not contain them. **No tool in the system knows
 NRB's current officials.**
 
-**Planned fix:** a system-prompt rule that an absent source produces "I don't
-have a source for that" rather than a memory answer, plus a run of
-`scripts/eval_rag_routing.py` to prove tool routing did not regress. That eval is
-mandatory here — `CLAUDE.md` records that a hint's *position* in a description
-measurably moved routing from 2/3 to 0/3.
+### The fix
+
+`NO_SOURCE_PROMPT` in `app/agent/loop.py`, applied in **both** scopes and placed
+immediately after `DATE_PROMPT` so the two anti-memory rules read as one block.
+
+`DATE_PROMPT` already forbade answering time-varying figures from memory and it
+was not enough: its enumeration is financial ("exchange rates, prices, balances,
+published figures"), so a question about PEOPLE read as outside it, and
+`GROUNDING_PROMPT`'s is "policy, process, entitlements, products or internal
+rules", so it missed them in the `nrb` tab too. The new rule names the categories
+that actually failed — who currently holds a position, an organisation's current
+officials/board/management, what a law, directive or circular says — forbids the
+hedged answer explicitly ("a hedged answer from memory is still a wrong answer"),
+and its second paragraph exempts definitions, calculations and drafting. That
+second paragraph is load-bearing, not padding; the ablation below is why.
+
+Tests: `tests/test_no_source_rule.py` (27, written first and watched fail).
+Live eval: `scripts/eval_no_source_refusal.py` — 15 cases, being the five
+questions production got wrong run in **both** General chat and the `nrb` tab,
+plus five CONTROLS that must still be answered. Its scorer is pure and
+deterministic (no judge model), so a broken metric cannot report a false pass.
+
+### The bug is MODEL-SPECIFIC, which is why the unit tests cannot see it
+
+Measured 2026-09-20. This matters for anyone who "verifies" a prompt change on a
+laptop:
+
+| model | unanswerable (10) | controls (5) |
+|---|---|---|
+| `qwen2.5:latest` (laptop), **no rule** | **10/10** | 5/5 |
+| `qwen2.5:latest` (laptop), with rule | 10/10 | 5/5 |
+| `qwen3.5:35b-a3b` (**production**), **no rule** | **0/10** | 5/5 |
+| `qwen3.5:35b-a3b`, sourcing half only | 10/10 | 4/5 |
+| `qwen3.5:35b-a3b`, **complete rule** | **10/10** | 5/5 |
+
+The laptop model refuses all ten with no rule at all, so it can only show the
+rule does no HARM. Production's model failed every one, and did it floridly —
+four different fabricated NRB governors across four questions ("Dr. Balram
+Pradhan Sthapit", "Dr. Chiran Lal Mishra", "Dr. Chiranjivi Nepal", "Shakti
+Khadka"), one answer visibly correcting itself mid-paragraph (*"Self-Correction:
+Wait, I need to be absolutely precise on names"*), and NIC Asia's own board
+invented three ways ("Ram Chandra Khanal", "Keshav Dev Pokharel", "Chandra
+Prakash Sharma"). None of these people hold these posts. This is the complaint,
+reproduced on demand.
+
+**The ablation:** with only the sourcing half, the model refused to say what CRR
+stands for. With the exemption paragraph it explains CRR in full and declines
+only the current figure — the intended behaviour. Do not "simplify" the rule by
+dropping that paragraph.
+
+The two `4/5` control rows are the same probe artifact in different clothes: the
+reduced probe (below) sends no identity block, so *"Who are you?"* genuinely has
+no source in it. Re-probed with one line of identity present, the production
+model answers "I am NIC AI, an AI assistant for NIC Bank" — hence 5/5 above.
+
+### Why the production numbers come from a REDUCED probe
+
+`https://www.nicasiabank.com/vllmmodel` is behind a WAF that **rejects any
+request body over ~1000 bytes and answers HTTP 200** with a 246-byte HTML page
+("Request Rejected … your support ID is …"). A real turn sends 21 tool schemas —
+**24.7 KB** — so through that path every turn returns an empty answer in ~0.1 s
+with `stop_reason: completed` and **no error anywhere**: `open_chat_stream` only
+guards `status_code >= 400`, so an HTML 200 becomes a stream with zero SSE
+chunks and the loop records a finished, blank turn.
+
+Three consequences:
+
+1. **§1's "tool calling works" line is narrower than it reads.** That probe
+   passed because it sent one small tool schema; it does not cover a real
+   payload. The conclusion "the model server is not at fault" still stands —
+   nothing here implicates the model — but the evidence does not extend to a
+   full-size request through that path.
+2. **Production does not reach Ollama this way**, or every answer would be blank.
+   The deployed model must be measured from inside the bank network, with
+   `scripts/eval_no_source_refusal.py` in its ordinary (agent-loop) mode.
+3. `--direct` is the probe that fits: one system rule plus the question, no
+   tools. It tests the rule's DESIGN, not the shipped string, and says so.
+
+### Routing did not regress — it improved
+
+`scripts/eval_rag_routing.py`, `EVAL_REPEAT=3`, `qwen2.5:latest`, MCP off, run
+before and after the change on the same machine:
+
+| case | before | after |
+|---|---|---|
+| `bs-dated-doc` | FLAKY 2/3 | **PASS 3/3** |
+| `spreadsheet-doc` | **FAIL 1/3** | **PASS 3/3** |
+| the other five | PASS 3/3 | PASS 3/3 |
+| exit | **FAILED** | **routing intact** |
+
+Note the baseline was *already failing on this laptop before the change* — worth
+knowing before anyone reads the "after" column as a clean bill of health it did
+not have to earn. The direction is explicable: the rule tells the model to go and
+get a source, so it reaches for `search_department_docs` more readily. Routing is
+flaky by nature and this is one run each, so treat it as "not a regression"
+rather than as a proven improvement.
+
+### Still open
+
+**A routing check against the PRODUCTION model has not been run.** The WAF makes
+it impossible from here — `eval_rag_routing.py` needs the full 21-tool payload,
+which is 24.7 KB. `qwen2.5` is not `qwen3.5:35b-a3b`, and this whole section
+exists because those two models behave differently. Run both evals from inside
+the bank network before deploying if you want that guarantee on the model that
+actually serves.
 
 ---
 
@@ -199,6 +299,8 @@ Nothing is merged and nothing is deployed.
 
 | Commit | |
 |---|---|
+| _(this commit)_ | `docs`: this section, the WAF finding, the model-specificity |
+| `8973564` | `fix(agent)`: the no-source rule + its live eval (Cause C) |
 | `8ad4889` | `fix(rag)`: bound the heading path (Cause D) |
 | `3111966` | `chore(alembic)`: reconstruct `e1a4c6f9b2d7` — **parked**, see below |
 | `d76b83a` | `chore(deploy)`: the vLLM compose handoff file |
@@ -209,10 +311,26 @@ Nothing is merged and nothing is deployed.
 |---|---|
 | `c16f7b0` | `fix(tools)`: never serve sample data from an unconfigured integration |
 
-Verification at time of commit: gateway **2680 passed, 115 skipped**; MCP
-**258 passed**, typecheck clean. The gateway skip count has no recorded baseline
-to compare against — `CLAUDE.md` warns that broken auth helpers turn ~86 tests
-into silent skips, so treat it as unverified rather than confirmed.
+Verification at `8973564`: gateway **2713 passed, 115 skipped, 0 failed**
+(7:50); MCP **258 passed**, typecheck clean. The **skip count is unchanged at
+115** against the earlier run, which is the number to watch — `CLAUDE.md` warns
+that broken auth helpers turn ~86 tests into silent skips a green run hides.
+
+One reconciliation note, because the arithmetic does not close. This run collects
+**2828** tests, of which 27 are the new module, leaving **2801** without it — six
+more than the 2680 + 115 = 2795 recorded above. Those six predate this work
+(`pytest --collect-only --ignore=tests/test_no_source_rule.py` gives 2801), so
+the earlier figure was already slightly stale rather than tests having appeared
+from nowhere. Flagged rather than quietly corrected, since the only reason to
+record the number is that someone can check it.
+
+**Run the evals too — neither runs under `pytest`, and both need a model
+server:**
+
+```bash
+MCP_SERVER_URL= EVAL_REPEAT=3 .venv/bin/python scripts/eval_rag_routing.py
+MCP_SERVER_URL= .venv/bin/python scripts/eval_no_source_refusal.py
+```
 
 **Do not push** until the GitHub token embedded in the gateway's `git remote -v`
 URL is rotated — it sits in plaintext in `.git/config`.
@@ -243,14 +361,30 @@ is the same class of gap that would make a future cutover fail silently.
 2. **Explain 10 September** — redeploy, database reset, manual delete? It must
    not recur.
 3. **Restrict the public `/vllmmodel/` path** (§1). Highest urgency; not
-   `--api-key`.
+   `--api-key`. Note it is *already* WAF'd for request SIZE (§4) — that is not
+   access control, and it does not stop `POST /api/show`, which worked.
+3b. **Tell us what the WAF rule is.** It rejects bodies over ~1000 bytes with an
+   HTTP **200** and an HTML page. If the deployed gateway is ever put behind it,
+   every chat answer goes blank with nothing in the logs. We need to know
+   whether the deployed gateway's own path to Ollama passes through it.
 4. Set the **MCP integration variables** (§3).
 5. Provide the **deployed gateway's commit**, and the AML `.docx` (§5).
 6. Optional: `OLLAMA_KEEP_ALIVE=-1`.
 
 ### Ours
 
-1. **Cause C** — the no-source rule plus the routing eval (§4).
+1. ~~**Cause C** — the no-source rule plus the routing eval.~~ **DONE (§4):**
+   `NO_SOURCE_PROMPT`, 27 tests, and a live eval measured 0/10 → 10/10 on the
+   production model. Two things it did NOT settle, both needing access from
+   inside the bank network: a routing-regression run against `qwen3.5:35b-a3b`
+   (the laptop run is §6), and the eval in its ordinary agent-loop mode against
+   the real 21-tool payload.
+1b. **Consider hardening `app/ollama/client.py` against a non-SSE 200.** Not done
+   — it is outside Cause C and wants its own decision. Today a 200 carrying HTML
+   yields an empty answer, `stop_reason: completed`, no error and no log line;
+   the §18 failure class, on the single most load-bearing request the product
+   makes. A content-type check, or "a stream that produced zero chunks is an
+   error", would turn a silent blank answer into a 502 naming the cause.
 2. **NRB corpus build.** Groundwork done: `local_ai_gateway_build` exists as a
    clone of the prod snapshot (so department and user ids line up for an export);
    the scope is **89 sources / 90 files / ~89 MB**, 27 already fetched, covering

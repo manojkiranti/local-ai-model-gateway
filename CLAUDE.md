@@ -1021,6 +1021,52 @@ retained). Runbook: `docs/external-api.md`.
   date made it *supply* a stale one, and NRB answers for 2023 quite happily, so
   the result looked right. Don't reintroduce `required: ["from"]`, and don't
   derive today from UTC — after 18:15 UTC that's yesterday in Kathmandu.
+- **With no source available the assistant must SAY so — `NO_SOURCE_PROMPT` is
+  that rule, and `DATE_PROMPT` was not enough.** Measured in production
+  (`docs/prod-incident-2026-09-20.md` §4): of 28 document questions asked in
+  General chat, ~5 were answered from training memory — NRB's governor and
+  principal officers, NIC Asia's board and executive committee — several carrying
+  "based on publicly available information as of my last update", which is a
+  memory answer with a disclaimer attached, not a refusal. `DATE_PROMPT` already
+  forbade answering time-varying figures from memory, but its enumeration is
+  financial ("exchange rates, prices, balances, published figures"), so a
+  question about PEOPLE read as outside it; `GROUNDING_PROMPT`'s is "policy,
+  process, entitlements, products or internal rules", so it missed them inside
+  the `nrb` tab too, where the same questions were asked and are equally
+  unanswerable — **no tool in the system knows NRB's current officials**. Hence
+  ONE rule in BOTH scopes, placed immediately after `DATE_PROMPT` so the two
+  anti-memory rules read as one block instead of diluting each other. Four things
+  a rewrite must not lose: (1) **the second paragraph is not padding** — it
+  exempts definitions, worked calculations and drafting, because a rule that buys
+  honesty with silence has made the product worse, and an assistant that hedges
+  everything trains its reader to ignore the hedge (the `/v1/extract`
+  dropped-`caveat` rule); (2) **the enumeration IS the fix** — a general "be
+  careful" is what was already there; (3) **the hedged answer is forbidden
+  explicitly**, because every earlier instruction was satisfied by "as of my last
+  update, the governor is X"; (4) **the bug is MODEL-SPECIFIC and the unit tests
+  cannot see it** — measured 2026-09-20, `qwen2.5:latest` refuses all ten
+  unanswerable cases with no rule at all, while production's `qwen3.5:35b-a3b`
+  invents a different NRB governor on each run (three fabricated names in one
+  answer, and `Dr. Chiranjibi Nepal` in another), so a green
+  `tests/test_no_source_rule.py` on this laptop proves the STRING is present,
+  never that the deployed model obeys it.
+  `scripts/eval_no_source_refusal.py` is the behavioural measurement, and it
+  scores CONTROLS as well as refusals so an over-refusing rule fails the run.
+- **The public `https://www.nicasiabank.com/vllmmodel` path is WAF'd at ~1 KB of
+  REQUEST BODY, and the rejection is an HTTP 200.** Measured 2026-09-20: a body
+  over ~1000 bytes comes back as a 246-byte HTML page ("Request Rejected … your
+  support ID is …"), while anything smaller streams normally. A real turn sends
+  21 tool schemas (**24.7 KB**), so through that path every turn returns an EMPTY
+  answer in ~0.1 s with `stop_reason: completed` and **no error anywhere**:
+  `open_chat_stream` only guards `status_code >= 400`, so an HTML 200 becomes a
+  stream with zero SSE chunks and the loop records it as a finished turn. Three
+  consequences: (1) `docs/prod-incident-2026-09-20.md` §1's "tool calling works"
+  probe passed only because it sent ONE small tool schema — it does **not** cover
+  a real payload; (2) the deployed gateway evidently does NOT reach Ollama
+  through this path, or every production answer would be blank — so measure the
+  deployed model from inside the bank network, not through this URL; (3) any eval
+  pointed at it reports a model that answers nothing, which reads like a model
+  fault and is not one.
 - MCP: gateway is the MCP client (streamable HTTP). Set `MCP_SERVER_URL` to enable;
   blank = agent runs with local tools only. `mcp` SDK v2: fn is `streamable_http_client`,
   tool field is `input_schema`.
