@@ -390,10 +390,11 @@ is the same class of gap that would make a future cutover fail silently.
    for their own testing, server otherwise isolated.** Optional hardening only —
    allow `/v1/*` and refuse `/api/*` at the proxy, which keeps the testing access
    while closing `/api/delete`. Not `--api-key` (§1).
-3b. **Tell us what the WAF rule is.** It rejects bodies over ~1000 bytes with an
-   HTTP **200** and an HTML page. If the deployed gateway is ever put behind it,
-   every chat answer goes blank with nothing in the logs. We need to know
-   whether the deployed gateway's own path to Ollama passes through it.
+3b. **Confirm the deployed `.env`'s model URL is the internal one** (folded into
+   item 5). Expected `http://host.docker.internal:11434` per `.env.docker`, in
+   which case the §4 WAF never touches production. Only worth a look because a
+   gateway accidentally pointed at the public path would answer every chat
+   blank with nothing in the logs.
 4. Set the **MCP integration variables** (§3).
 5. Provide the **deployed gateway's commit**, and the AML `.docx` (§5).
 6. Optional: `OLLAMA_KEEP_ALIVE=-1`.
