@@ -46,15 +46,33 @@ settings are `extra="ignore"`, so it is silently dropped. It was not masking a
 4096-context problem; `OLLAMA_CONTEXT_LENGTH` is genuinely set on the container.
 Remove the dead key anyway, so the next person does not trust it.
 
-### Security finding — raise before anything else
+### The public path is DELIBERATE — answered 2026-09-20
 
-That path is reachable **from the public internet with no credentials**, and
-Ollama has no authentication of its own. `POST /api/show` worked through the
-proxy, so Ollama's **write** endpoints are forwarded too — `/api/delete` would
-remove production models. Not tested, for obvious reasons.
+Raised here as an unexplained exposure; the answer is that `/vllmmodel/` is
+published **on purpose, for the team's own testing**, and the model server is
+otherwise isolated. So this is a known, accepted arrangement, not a hole nobody
+noticed, and the earlier "must be IP-restricted or removed, highest urgency"
+line is withdrawn.
 
-Must be IP-restricted or removed. Note this is *not* solved with `--api-key`:
-the gateway sends no `Authorization` header and would 401 on every request.
+What remains true, recorded so the accepted risk is the real one and not a
+smaller one:
+
+- The path takes **no credentials** and Ollama has no authentication of its own,
+  so anyone who finds the URL can run inference on the GPU.
+- `POST /api/show` worked through the proxy, so Ollama's **write** endpoints are
+  forwarded as well. `/api/delete` would remove a production model. Not tested,
+  for obvious reasons.
+- **The WAF does not mitigate that.** It rejects bodies over ~1 KB (§4), and
+  `{"model":"qwen3.5:35b-a3b"}` is about forty bytes — comfortably under. The
+  size limit blocks real *chat*, not the dangerous small administrative calls.
+
+That makes the exposure an **availability** risk on an isolated box (a wiped
+model means a re-pull and downtime), not a route into bank systems or data. If
+that trade is acceptable, nothing needs doing. If the write endpoints are worth
+closing while keeping the testing access, the proxy can allow `POST
+/v1/chat/completions` and `/v1/models` and refuse `/api/*` — cheaper than
+`--api-key`, which is *not* a solution here: the gateway sends no
+`Authorization` header and would 401 on every request.
 
 Separately: the model unloads after 5 minutes idle (`expires_at` in `/api/ps`),
 so the first user after a quiet period waits for a 23 GB reload.
@@ -368,9 +386,10 @@ is the same class of gap that would make a future cutover fail silently.
 1. **Re-upload the nine documents** (§2) to `nrb`, `hrdept` and `it`.
 2. **Explain 10 September** — redeploy, database reset, manual delete? It must
    not recur.
-3. **Restrict the public `/vllmmodel/` path** (§1). Highest urgency; not
-   `--api-key`. Note it is *already* WAF'd for request SIZE (§4) — that is not
-   access control, and it does not stop `POST /api/show`, which worked.
+3. ~~**Restrict the public `/vllmmodel/` path** (§1).~~ **Answered: deliberate,
+   for their own testing, server otherwise isolated.** Optional hardening only —
+   allow `/v1/*` and refuse `/api/*` at the proxy, which keeps the testing access
+   while closing `/api/delete`. Not `--api-key` (§1).
 3b. **Tell us what the WAF rule is.** It rejects bodies over ~1000 bytes with an
    HTTP **200** and an HTML page. If the deployed gateway is ever put behind it,
    every chat answer goes blank with nothing in the logs. We need to know
