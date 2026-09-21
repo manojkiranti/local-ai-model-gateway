@@ -41,10 +41,20 @@ async def test_describe_exposes_read_only_tools():
     except MCPUnavailableError as exc:
         pytest.skip(f"MCP server unreachable: {exc.message}")
 
-    # The demo server ships get_server_time / get_echo / list_examples — all
-    # read-like, so read_only mode exposes them and excludes nothing.
+    # `get_server_time` is the one tool the server exposes to an identity
+    # holding NO grants: every business tool is gated by FastMCP's `canAccess`
+    # at session construction, so an ungranted caller does not even see them.
+    # That is the contract this asserts — read_only mode excludes nothing here
+    # because what arrives is already the authorized set.
+    #
+    # It used to assert `get_echo` too, and that had been FAILING unnoticed
+    # since the MCP server dropped the tool (`784806a` there). This module
+    # skips when MCP is unreachable, MCP is usually down in dev, and a skip
+    # reads as a pass in a green run — the exact trap CLAUDE.md flags with
+    # "compare the skip count, not just the pass count". Found 2026-09-20 by
+    # starting the server to test something else.
     assert "get_server_time" in toolset.exposed_names
-    assert "get_echo" in toolset.exposed_names
+    assert toolset.excluded == []
 
 
 @pytest.mark.anyio
@@ -56,9 +66,12 @@ async def test_registry_dispatches_mcp_tool_roundtrip():
     try:
         async with mcp.session() as session:
             await registry.load_mcp_tools(mcp, session)
-            assert registry.backend_of("get_echo") == "mcp"
-            result = await registry.dispatch("get_echo", {"message": "roundtrip"})
+            assert registry.backend_of("get_server_time") == "mcp"
+            result = await registry.dispatch("get_server_time", {})
     except MCPUnavailableError as exc:
         pytest.skip(f"MCP server unreachable: {exc.message}")
 
-    assert result == "roundtrip"
+    # The tool returns the server's own UTC clock, so assert its SHAPE rather
+    # than a value — pinning the string would make this fail once a second.
+    assert isinstance(result, str) and result.strip()
+    assert "20" in result  # an ISO timestamp, not an error envelope
