@@ -287,14 +287,54 @@ get a source, so it reaches for `search_department_docs` more readily. Routing i
 flaky by nature and this is one run each, so treat it as "not a regression"
 rather than as a proven improvement.
 
+### Verified: the seam with Cause B, and the real MCP-sized menu
+
+Both evals ran again 2026-09-21 with the MCP server actually running (it was
+down for every measurement above), holding every MCP grant so FastMCP's
+`canAccess` lists the business tools instead of hiding them — the menu a real
+granted user faces: **32 tools / 41.0 KB**, not the 21 / 24.7 KB every number
+above was measured against.
+
+**`eval_no_source_refusal.py --grants` — 19/19 clean**, adding 4 cases that ask
+the exact questions production answered with invented MCP data (§3): a circular
+search, a leave-policy circular, a branch budget, an employee list. Each one now
+calls the MCP tool, receives Cause B's fail-closed error, and refuses instead of
+inventing —
+
+> *"I'm sorry, but the system currently does not have access to NRB's circulars
+> about ATM transactions. The iZone integration required for this search is not
+> configured at this time."*
+
+That is the seam this whole incident turns on, checked directly rather than
+inferred from each fix being individually correct.
+
+**`EVAL_GRANTS=1 eval_rag_routing.py` — 7/7, "routing intact"** at the 32-tool
+menu (same `qwen2.5`, `EVAL_REPEAT=3`). The bigger menu does not hurt routing.
+
+Both flags exist in the scripts now (`--grants`, `EVAL_GRANTS=1`) for re-running
+this against the deployed model once there is a route to it.
+
+### Also fixed: a non-stream 200 no longer reads as a blank answer
+
+`app/ollama/client.py` — a `200` whose content-type is html/xml, or a stream
+that yields zero SSE chunks, now raises `OllamaError(502)` naming the cause
+("check for a proxy, WAF or captive portal on that path") instead of the loop
+recording `stop_reason: completed` with nothing said. Verified against the real
+WAF response. This is insurance, not a live fix — nothing in production
+currently triggers it, since production doesn't reach Ollama through that path
+(§4 above) — but it turns the next occurrence of exactly this failure class
+into a 502 instead of a silent blank turn, wherever it happens.
+
 ### Still open
 
-**A routing check against the PRODUCTION model has not been run.** The WAF makes
-it impossible from here — `eval_rag_routing.py` needs the full 21-tool payload,
-which is 24.7 KB. `qwen2.5` is not `qwen3.5:35b-a3b`, and this whole section
-exists because those two models behave differently. Run both evals from inside
-the bank network before deploying if you want that guarantee on the model that
-actually serves.
+**A check against the PRODUCTION model — both the no-source rule and routing —
+has not been run.** The WAF makes it impossible from here: a real turn is 24.7 KB
+without MCP, 41.0 KB with it, and the WAF's ceiling is ~1 KB. `qwen2.5` is not
+`qwen3.5:35b-a3b`, and this whole section exists because those two models behave
+differently — the no-rule baseline is 0/10 on production and 10/10 on the
+laptop model with no rule at all. Run both evals (`--grants` included) from
+inside the bank network before deploying, if that guarantee on the model that
+actually serves is wanted before go-live.
 
 ---
 
@@ -325,7 +365,10 @@ Nothing is merged and nothing is deployed.
 
 | Commit | |
 |---|---|
-| _(this commit)_ | `docs`: this section, the WAF finding, the model-specificity |
+| `4d2a380` | `test(mcp)`: fix two tests silently skipping since `get_echo` was removed |
+| `392054a` | `test(evals)`: measure the no-source rule and routing at the real MCP menu |
+| `a09e78c` | `fix(ollama)`: a non-stream 200 is an error, not a blank answer |
+| `972bd25`…`d89aba9` | `docs`: this section, the WAF finding, the model-specificity |
 | `8973564` | `fix(agent)`: the no-source rule + its live eval (Cause C) |
 | `8ad4889` | `fix(rag)`: bound the heading path (Cause D) |
 | `3111966` | `chore(alembic)`: reconstruct `e1a4c6f9b2d7` — **parked**, see below |
@@ -337,25 +380,39 @@ Nothing is merged and nothing is deployed.
 |---|---|
 | `c16f7b0` | `fix(tools)`: never serve sample data from an unconfigured integration |
 
-Verification at `8973564`: gateway **2713 passed, 115 skipped, 0 failed**
-(7:50); MCP **258 passed**, typecheck clean. The **skip count is unchanged at
-115** against the earlier run, which is the number to watch — `CLAUDE.md` warns
-that broken auth helpers turn ~86 tests into silent skips a green run hides.
+Verification at `4d2a380`, with the MCP server actually running (not the
+case for any measurement above until this pass): gateway **2720 passed,
+113 skipped, 0 real failures** (7:11). One test failed on the full-suite run
+(`test_rag_ingest_e2e.py::test_upload_then_ingest_produces_searchable_chunks`,
+`'queued' != 'succeeded'`) and passed cleanly both alone and stashed against
+clean HEAD — confirmed queue contention (its own docstring names the mechanism:
+`claim_next` is FIFO over a queue shared with every test in the run), not a
+regression. MCP **258 passed**, typecheck clean.
 
-One reconciliation note, because the arithmetic does not close. This run collects
-**2828** tests, of which 27 are the new module, leaving **2801** without it — six
-more than the 2680 + 115 = 2795 recorded above. Those six predate this work
-(`pytest --collect-only --ignore=tests/test_no_source_rule.py` gives 2801), so
-the earlier figure was already slightly stale rather than tests having appeared
-from nowhere. Flagged rather than quietly corrected, since the only reason to
-record the number is that someone can check it.
+The skip count moved **115 → 113**: the two `test_mcp_integration.py` tests
+this pass fixed had been silently skipping (MCP unreachable) rather than
+failing (asserting on `get_echo`, a tool the MCP server no longer has) — the
+same trap the 115 number exists to watch for, caught by it working as intended.
+
+One reconciliation note, kept up because the last version of it was wrong when
+checked. This run collects **2834** tests: `test_no_source_rule.py` alone is
+now **29** (2 more than the 27 counted at `8973564` — the two tests added in
+`392054a`), so everything else is **2805**, four more than the 2801 counted
+there (`test_openai_client_stream.py`'s 4 new WAF-guard tests in `a09e78c`;
+`test_mcp_integration.py` stayed at 2). Verified with
+`pytest --collect-only`, not carried forward by arithmetic — the previous
+version of this note was off by one from not doing that.
 
 **Run the evals too — neither runs under `pytest`, and both need a model
-server:**
+server. `--grants`/`EVAL_GRANTS=1` also needs the MCP server running and holds
+every grant, for the real tool-menu size:**
 
 ```bash
 MCP_SERVER_URL= EVAL_REPEAT=3 .venv/bin/python scripts/eval_rag_routing.py
 MCP_SERVER_URL= .venv/bin/python scripts/eval_no_source_refusal.py
+# against the real 32-tool menu (needs: cd ../../node/local-llm-mcp && npm start)
+EVAL_REPEAT=3 EVAL_GRANTS=1 .venv/bin/python scripts/eval_rag_routing.py
+.venv/bin/python scripts/eval_no_source_refusal.py --grants
 ```
 
 **Do not push** until the GitHub token embedded in the gateway's `git remote -v`
@@ -402,17 +459,18 @@ is the same class of gap that would make a future cutover fail silently.
 ### Ours
 
 1. ~~**Cause C** — the no-source rule plus the routing eval.~~ **DONE (§4):**
-   `NO_SOURCE_PROMPT`, 27 tests, and a live eval measured 0/10 → 10/10 on the
-   production model. Two things it did NOT settle, both needing access from
-   inside the bank network: a routing-regression run against `qwen3.5:35b-a3b`
-   (the laptop run is §6), and the eval in its ordinary agent-loop mode against
-   the real 21-tool payload.
-1b. **Consider hardening `app/ollama/client.py` against a non-SSE 200.** Not done
-   — it is outside Cause C and wants its own decision. Today a 200 carrying HTML
-   yields an empty answer, `stop_reason: completed`, no error and no log line;
-   the §18 failure class, on the single most load-bearing request the product
-   makes. A content-type check, or "a stream that produced zero chunks is an
-   error", would turn a silent blank answer into a 502 naming the cause.
+   `NO_SOURCE_PROMPT`, 29 tests, a live eval measured 0/10 → 10/10 on the
+   production model, and — as of 2026-09-21 — the seam with Cause B's MCP fix
+   verified (19/19 with MCP live and every grant held) and routing checked at
+   the real 32-tool menu (7/7). What is STILL not settled, and needs access
+   from inside the bank network to close: both evals run against
+   `qwen3.5:35b-a3b` itself with the real payload — the WAF blocks it from here
+   at any size, with or without MCP.
+1b. ~~**Consider hardening `app/ollama/client.py` against a non-SSE 200.**~~
+   **DONE (`a09e78c`, 2026-09-21):** a 200 carrying html/xml, or a stream with
+   zero SSE chunks, now raises `OllamaError(502)` naming the cause instead of
+   the loop recording a blank, `stop_reason: completed` turn. Verified against
+   the real WAF response.
 2. **NRB corpus build.** Groundwork done: `local_ai_gateway_build` exists as a
    clone of the prod snapshot (so department and user ids line up for an export);
    the scope is **89 sources / 90 files / ~89 MB**, 27 already fetched, covering

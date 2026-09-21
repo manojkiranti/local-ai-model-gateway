@@ -1069,7 +1069,33 @@ retained). Runbook: `docs/external-api.md`.
   a TESTING trap, so measure the deployed model from inside the bank network
   rather than through this URL; (3) any eval
   pointed at it reports a model that answers nothing, which reads like a model
-  fault and is not one.
+  fault and is not one. **`app/ollama/client.py` now guards against this
+  shape of failure directly** (2026-09-21, `a09e78c`): a 200 whose content-type
+  matches html/xml, or a stream that yields zero parseable SSE chunks, raises
+  `OllamaError(502)` naming the content type and pointing at "a proxy, WAF or
+  captive portal on that path" — a NEGATIVE content-type test on purpose,
+  because Ollama does not always label the stream `text/event-stream` and a
+  positive requirement would reject working servers. Nothing in production
+  currently triggers this (production doesn't reach Ollama through the WAF'd
+  path), so treat it as insurance against the next proxy someone puts in
+  front of the model, not a fix to anything live.
+- **`NO_SOURCE_PROMPT` and the MCP fail-closed error are two halves of one
+  seam, and it stays unverified unless MCP is actually running.** Every
+  measurement of `NO_SOURCE_PROMPT` above (2026-09-20) ran with MCP off, so
+  nothing had checked what happens when a `local-llm-mcp` tool returns its
+  Cause-B "integration not configured … Do NOT answer from general knowledge"
+  error and the model has to decide what to do with it. Checked 2026-09-21 —
+  `scripts/eval_no_source_refusal.py --grants` (MCP live, every grant held via
+  `McpIdentity(roles=ROLES, permissions=PERMISSIONS)`, so FastMCP's `canAccess`
+  actually lists the business tools instead of hiding them from an ungranted
+  identity) — **19/19 clean**, including 4 new cases asking the exact
+  questions production answered with invented data. The model calls the tool,
+  gets the fail-closed error, and refuses. Same flag family
+  (`EVAL_GRANTS=1`) added to `eval_rag_routing.py`: **7/7 at the real
+  32-tool / 41.0 KB menu** a granted user actually faces, not the 21-tool
+  menu every earlier routing number was measured against — the bigger menu
+  does not hurt. Both numbers are laptop-model-only; see the WAF bullet above
+  for why the production model can't be measured this way yet.
 - MCP: gateway is the MCP client (streamable HTTP). Set `MCP_SERVER_URL` to enable;
   blank = agent runs with local tools only. `mcp` SDK v2: fn is `streamable_http_client`,
   tool field is `input_schema`.
