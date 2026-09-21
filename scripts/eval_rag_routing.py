@@ -102,14 +102,14 @@ KNOWN_MISSES: set[str] = set()
 BORDERLINE = {"spreadsheet-doc"}
 
 
-async def _run_case(prompt: str, settings, mcp) -> tuple[list[str], float]:
+async def _run_case(prompt: str, settings, mcp, identity=None) -> tuple[list[str], float]:
     ollama = OllamaClient(settings.chat_base_url, settings.ollama_timeout)
     t0 = time.time()
     try:
         with rag_context(DepartmentContext(id=1, code="eval")):
             out = await run_turn(
                 messages=[{"role": "user", "content": prompt}],
-                ollama=ollama, mcp=mcp, settings=settings, identity=None,
+                ollama=ollama, mcp=mcp, settings=settings, identity=identity,
             )
     finally:
         await ollama.aclose()
@@ -126,6 +126,17 @@ async def main() -> int:
     mcp = _build_mcp_client(settings)
     repeat = int(os.environ.get("EVAL_REPEAT", "1"))
 
+    # EVAL_GRANTS=1 holds every MCP grant, so FastMCP's `canAccess` LISTS the
+    # business tools instead of hiding them. That is the menu a real granted user
+    # routes from — measured 2026-09-20: 21 local tools / 24.7 KB of schemas with
+    # no grants, 32 tools / 41.0 KB with them. This eval exists because menu size
+    # changes routing, so the no-grants number is the optimistic one.
+    identity = None
+    if os.environ.get("EVAL_GRANTS") == "1":
+        from app.mcp.grants import McpIdentity, PERMISSIONS, ROLES
+
+        identity = McpIdentity(email="eval@local", roles=ROLES, permissions=PERMISSIONS)
+
     drop = {n for n in (os.environ.get("DROP_TOOLS") or "").split(",") if n}
     if drop:
         import app.tools.local as local_tools
@@ -139,6 +150,7 @@ async def main() -> int:
     print(f"model={settings.agent_model}  server={settings.chat_base_url}  "
           f"mcp={'on' if settings.mcp_server_url else 'off'}  "
           f"tools={len(local_tools.LOCAL_TOOLS)}  repeat={repeat}"
+          + ("  grants=all" if identity else "")
           + (f"  dropped={sorted(drop)}" if drop else ""))
     print("=" * 78)
 
@@ -147,7 +159,7 @@ async def main() -> int:
         hits = 0
         first_calls: list[str] = []
         for i in range(repeat):
-            calls, secs = await _run_case(prompt, settings, mcp)
+            calls, secs = await _run_case(prompt, settings, mcp, identity)
             if i == 0:
                 first_calls, first_secs = calls, secs
             hits += expected in calls

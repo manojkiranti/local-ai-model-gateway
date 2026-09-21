@@ -239,9 +239,25 @@ def _negated(low: str, tell: str) -> bool:
 # How much of the opening counts as "what the reader meets first".
 _LEAD_CHARS = 160
 
+# ...unless the opening ALSO announces an answer. "Since we don't have access to
+# specific department documents, I will provide the general information about
+# CRR" is the rule working: it says what it lacks and then answers anyway.
+# Measured 2026-09-20 on the MCP-on run, where the first version of this check
+# called that an over-refusal and would have pushed the next reader to weaken
+# the rule in response to its good behaviour.
+_ANSWER_INTENT = (
+    "i will provide", "i'll provide", "i can provide", "let me provide",
+    "i will explain", "i'll explain", "i can explain", "let me explain",
+    "i can tell you", "here is", "here's", "what i can say",
+    "in general terms", "generally speaking", "speaking generally",
+    "i can still", "i can offer",
+)
+
 
 def _leads_with_refusal(answer: str) -> bool:
     lead = answer.strip()[:_LEAD_CHARS].lower()
+    if any(m in lead for m in _ANSWER_INTENT):
+        return False
     return any(m in lead for m in REFUSAL_MARKERS) or bool(_NEGATED.search(lead))
 
 
@@ -320,6 +336,32 @@ for _id, _prompt, _names in _UNANSWERABLE:
     CASES.append(Case(_id, _prompt, None, True, _names, "general chat"))
     CASES.append(Case(f"{_id}-nrb", _prompt, "nrb", True, _names, "nrb tab"))
 
+# The questions production answered with INVENTED MCP data (§3 of the incident
+# doc). These need `--grants` and a running MCP server to mean anything: without
+# grants FastMCP's `canAccess` does not even list the tools, and the model
+# answers as if the integration did not exist.
+#
+# They test the SEAM between the two fixes, which neither repo's own tests
+# cover. `local-llm-mcp`'s fail-closed error already tells the model "Tell the
+# user this system is unavailable … Do NOT answer from general knowledge or
+# prior training"; NO_SOURCE_PROMPT says the same thing from the other side. The
+# failure this catches is the model receiving that error and answering from
+# memory anyway — which is the original complaint wearing a different hat.
+MCP_CASES = [
+    Case("mcp-circulars",
+         "What circulars has NRB issued about ATM transactions?",
+         None, True, note="izone — invented a circular in prod"),
+    Case("mcp-leave-circular",
+         "Show me the revised leave policy circular for this fiscal year.",
+         None, True, note="izone — invented a circular in prod"),
+    Case("mcp-budget",
+         "What is our branch expense budget this year?",
+         None, True, note="ems — answered from a fake schema in prod"),
+    Case("mcp-employees",
+         "List the employees in the IT department with their designations.",
+         None, True, True, note="hrms — fictional staff in prod"),
+]
+
 # Controls. These are NOT unanswerable, and refusing one is a regression: the
 # rule must buy honesty about missing sources without buying silence.
 CASES += [
@@ -336,7 +378,7 @@ CASES += [
 ]
 
 
-async def _run_case(case: Case, settings, mcp) -> tuple[str, list[str], float]:
+async def _run_case(case: Case, settings, mcp, identity=None) -> tuple[str, list[str], float]:
     ollama = OllamaClient(settings.chat_base_url, settings.ollama_timeout)
     t0 = time.time()
     try:
@@ -344,12 +386,12 @@ async def _run_case(case: Case, settings, mcp) -> tuple[str, list[str], float]:
             with rag_context(DepartmentContext(id=1, code=case.department)):
                 out = await run_turn(
                     messages=[{"role": "user", "content": case.prompt}],
-                    ollama=ollama, mcp=mcp, settings=settings, identity=None,
+                    ollama=ollama, mcp=mcp, settings=settings, identity=identity,
                 )
         else:
             out = await run_turn(
                 messages=[{"role": "user", "content": case.prompt}],
-                ollama=ollama, mcp=mcp, settings=settings, identity=None,
+                ollama=ollama, mcp=mcp, settings=settings, identity=identity,
             )
     finally:
         await ollama.aclose()
@@ -432,14 +474,24 @@ async def main() -> int:
                     help="with --direct, send NO system rule — the A/B control")
     ap.add_argument("--rule-part1", action="store_true",
                     help="with --direct, send only the sourcing half — the ablation")
+    ap.add_argument("--grants", action="store_true",
+                    help="hold every MCP grant, so the business tools are LISTED, "
+                         "and add the four MCP cases. Needs a running MCP server.")
     args = ap.parse_args()
 
     settings = get_settings()
     mcp = _build_mcp_client(settings)
     repeat = int(os.environ.get("EVAL_REPEAT", "1"))
     verbose = os.environ.get("EVAL_VERBOSE") == "1"
+    identity = None
+    if args.grants:
+        from app.mcp.grants import McpIdentity, PERMISSIONS, ROLES
+
+        identity = McpIdentity(email="eval@local", roles=ROLES, permissions=PERMISSIONS)
+
+    pool = CASES + (MCP_CASES if args.grants else [])
     only = {c for c in args.only.split(",") if c}
-    cases = [c for c in CASES if not only or c.id in only]
+    cases = [c for c in pool if not only or c.id in only]
 
     rule = ""
     if args.direct and not args.no_rule:
@@ -453,7 +505,7 @@ async def main() -> int:
             if args.direct else "agent-loop")
     print(f"model={settings.agent_model}  server={settings.chat_base_url}  "
           f"mcp={'on' if settings.mcp_server_url else 'off'}  repeat={repeat}  "
-          f"mode={mode}")
+          f"mode={mode}{'  grants=all' if args.grants else ''}")
     print("=" * 78)
 
     failed = False
@@ -466,7 +518,7 @@ async def main() -> int:
                 answer, secs = await _run_direct(case, settings, rule)
                 calls = []
             else:
-                answer, calls, secs = await _run_case(case, settings, mcp)
+                answer, calls, secs = await _run_case(case, settings, mcp, identity)
             v = judge(answer, must_refuse=case.must_refuse,
                       must_not_name=case.must_not_name)
             hits += v.passed
