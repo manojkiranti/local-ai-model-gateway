@@ -11,9 +11,17 @@ managed by the FastAPI lifespan (see ``app.main``).
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 import httpx
+
+
+# Content types a streaming endpoint never answers with. Deliberately a
+# NEGATIVE test: Ollama does not always label the stream `text/event-stream`,
+# so requiring SSE positively would reject working servers. See
+# `open_chat_stream`.
+_NOT_A_STREAM = re.compile(r"\b(?:html|xml)\b", re.IGNORECASE)
 
 
 class OllamaError(Exception):
@@ -204,6 +212,26 @@ class OllamaClient:
                 resp.status_code,
                 _error_from_body(body, f"Model server returned HTTP {resp.status_code}"),
             )
+
+        # A 200 is not proof this is a stream. Measured 2026-09-20: a WAF in
+        # front of the production model path rejects any request body over
+        # ~1 KB with HTTP **200** and an HTML page, and a real turn sends 21
+        # tool schemas (24.7 KB). Guarding only `>= 400` let that HTML through
+        # `aiter_lines()`, where it parsed as zero SSE chunks and the agent loop
+        # recorded a finished, EMPTY turn — no error, no log line, the user
+        # simply answered nothing. Naming the content type sends whoever reads
+        # the 502 to the proxy instead of to the model.
+        ctype = resp.headers.get("content-type", "")
+        if _NOT_A_STREAM.search(ctype):
+            await resp.aclose()
+            raise OllamaError(
+                502,
+                f"The model server returned HTTP 200 with content-type "
+                f"{ctype!r}, which is not an event stream. Something between "
+                f"this gateway and {self.base_url} answered instead of the "
+                f"model — check for a proxy, WAF or captive portal on that "
+                f"path.",
+            )
         return resp
 
     async def stream_chat(self, payload: dict[str, Any]):
@@ -227,11 +255,13 @@ class OllamaClient:
         resp = await self.open_chat_stream(payload)
         tool_acc: dict[int, dict[str, Any]] = {}
         finish_reason: str | None = None
+        saw_chunk = False
         try:
             async for line in resp.aiter_lines():
                 chunk = parse_sse_line(line)
                 if chunk is None:
                     continue
+                saw_chunk = True
                 if chunk is SSE_DONE:
                     break
                 choices = chunk.get("choices") or []
@@ -252,6 +282,20 @@ class OllamaClient:
                     finish_reason = choice["finish_reason"]
         finally:
             await resp.aclose()
+
+        # Belt and braces for the same failure with a content type the check
+        # above lets past (an empty body, or a proxy that labels its page
+        # text/plain). Not one parseable SSE chunk is never a real turn: even a
+        # refusal or an immediate stop carries a finish chunk. Yielding the
+        # usual terminal event here would report a successful empty answer,
+        # which is the outcome this whole guard exists to refuse.
+        if not saw_chunk:
+            raise OllamaError(
+                502,
+                f"The model server at {self.base_url} returned HTTP 200 but no "
+                f"stream events at all. The response was not an event stream — "
+                f"check for a proxy or WAF on that path.",
+            )
 
         calls = finalize_tool_calls(tool_acc)
         if calls:

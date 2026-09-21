@@ -244,3 +244,79 @@ def test_normalize_usage_fails_closed_on_a_partial_or_malformed_object():
     assert normalize_usage({"prompt_tokens": 1}) is None
     assert normalize_usage({"prompt_tokens": "not-a-number",
                              "completion_tokens": 1, "total_tokens": 1}) is None
+
+
+# --------------------------------------------------------------------------- #
+# A 200 that is not a stream
+# --------------------------------------------------------------------------- #
+# Measured 2026-09-20 against the production model path: a WAF in front of it
+# rejects any request body over ~1 KB and answers **HTTP 200** with an HTML
+# page. A real turn sends 21 tool schemas (24.7 KB), so every turn came back as
+# a 0.1 s EMPTY answer with `stop_reason: completed` and no error anywhere —
+# `open_chat_stream` only guards `status_code >= 400`, so the HTML sailed
+# through `aiter_lines()`, parsed as zero SSE chunks, and the agent loop
+# recorded a finished, blank turn.
+#
+# That is the §18 failure class on the single most load-bearing request the
+# product makes: every symptom looks like a healthy deployment, and the user
+# just sees the assistant answer nothing. Nothing in production currently
+# triggers it (the gateway reaches Ollama directly), so this is insurance
+# against a future proxy — which is exactly the kind of change that gets made
+# by somebody who will never read this file.
+
+WAF_HTML = (
+    b"<html><head><title>Request Rejected</title></head><body>The requested "
+    b"URL was rejected. Please consult with your administrator.<br><br>Your "
+    b"support ID is: 6109300449081253560</body></html>"
+)
+
+
+@pytest.mark.anyio
+async def test_a_200_carrying_html_is_an_error_not_an_empty_answer():
+    """The verbatim WAF response. It must not read as a completed empty turn."""
+    client = _client(
+        lambda req: httpx.Response(
+            200, content=WAF_HTML, headers={"content-type": "text/html; charset=utf-8"}
+        )
+    )
+    with pytest.raises(OllamaError) as exc:
+        await _drain(client)
+    assert exc.value.status_code == 502
+
+
+@pytest.mark.anyio
+async def test_the_error_names_the_content_type_so_a_proxy_is_identifiable():
+    """"the model server returned no events" would send the next person to the
+    model. Naming text/html sends them to whatever is in front of it."""
+    client = _client(
+        lambda req: httpx.Response(
+            200, content=WAF_HTML, headers={"content-type": "text/html; charset=utf-8"}
+        )
+    )
+    with pytest.raises(OllamaError) as exc:
+        await _drain(client)
+    assert "text/html" in str(exc.value.message)
+
+
+@pytest.mark.anyio
+async def test_a_200_that_yields_no_events_at_all_is_also_an_error():
+    """Belt and braces: a proxy could return an empty body with the right
+    content type, or none at all. Zero SSE chunks is never a real turn — even a
+    refusal carries a finish event."""
+    client = _client(lambda req: httpx.Response(200, content=b""))
+    with pytest.raises(OllamaError) as exc:
+        await _drain(client)
+    assert exc.value.status_code == 502
+
+
+@pytest.mark.anyio
+async def test_a_normal_stream_is_untouched_by_the_guard():
+    """The guard must not fire on the ordinary path — Ollama does not always
+    label the stream text/event-stream, so the content-type check has to be a
+    NEGATIVE test (reject html/json), never a positive one requiring SSE."""
+    body = _sse('{"choices":[{"delta":{"content":"hi"},"finish_reason":"stop"}]}', "[DONE]")
+    client = _client(
+        lambda req: httpx.Response(200, content=body, headers={"content-type": "text/plain"})
+    )
+    events = await _drain(client)
+    assert any(e.get("type") == "content" for e in events)
