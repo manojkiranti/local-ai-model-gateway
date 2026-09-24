@@ -138,6 +138,8 @@ OPERATIONAL = {
     "nrb_pipeline.py": ["--status"],
     "nrb_rag_ingest_corpus.py": ["--department", "nrb", "--report"],
     "nrb_recovery_cache.py": ["--stats"],
+    # --out is required; the guard fires (or admits) before anything is written.
+    "nrb_prod_scope.py": ["--out", "/dev/null"],
 }
 
 
