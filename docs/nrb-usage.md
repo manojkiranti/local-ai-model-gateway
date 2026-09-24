@@ -75,28 +75,60 @@ Three facts that explain 90% of the confusion:
 
 Work through this once. Every item is something that has actually broken.
 
-### 3.1 The database — **scratch only**
+### 3.1 The database — never `local_ai_gateway`, and it depends on the job
 
-NRB work runs against **`local_ai_gateway_p4`**, never `local_ai_gateway`. Every
-NRB script refuses to start otherwise and prints the resolved database name
-first. Set it once per shell:
+NRB work never runs against `local_ai_gateway` (the dev database). Which of the
+two NRB databases a script accepts depends on what it is for — the rule lives
+in `app/nrb/dbguard.py`:
+
+| database | who may use it | what it is |
+|---|---|---|
+| `local_ai_gateway_p4` | every NRB script | the scratch DB; holds the frozen 6A/6B/P7 cohorts |
+| `local_ai_gateway_build` | **operational** scripts only — `nrb_pipeline.py`, `nrb_rag_ingest_corpus.py`, `nrb_recovery_cache.py` | a clone of the production snapshot; its department and file ids ARE production's, so **build a corpus for production HERE** |
+
+The evidence scripts (holdout, legacy eval, native-2 compare, lexicon, P7
+cohort, the §17 sample, the supersession exercise) refuse the build clone on
+purpose: they measure cohorts that exist only in p4. Each guarded script prints
+the resolved database name before touching anything. **The stage scripts
+`nrb_sync.py`, `nrb_fetch.py` and `nrb_extract.py`, the worker and the runner
+check nothing** — point `DATABASE_URL` carefully.
+
+Set the target once per shell:
 
 ```bash
+# building a corpus for production:
+export NRB_DB='postgresql+asyncpg://gateway:<PASSWORD>@127.0.0.1:5432/local_ai_gateway_build'
+# evidence / experiments:
 export NRB_DB='postgresql+asyncpg://gateway:<PASSWORD>@127.0.0.1:5432/local_ai_gateway_p4'
 ```
 
 Take `<PASSWORD>` from your `.env` — do not paste it into a file, a ticket, or a
 chat. Every command below uses `DATABASE_URL="$NRB_DB"`.
 
-> `alembic current` against the *dev* database fails on this branch **by design**
-> (it is stamped at a revision that only exists on the deferred
-> `feat/rag-source-citations` branch). Do not "fix" it with `alembic stamp`, by
-> dropping a column, or by recreating the DB. See §9.10/§27 of the status doc.
+> **A database restored from a production dump is owned by `postgres`, not by
+> `gateway`, and the app role then cannot read a single table.** The build clone
+> failed exactly this way (`permission denied for table nrb_recoveries`) until
+> its 23 tables were moved to `gateway` on 2026-09-24. After any fresh restore,
+> run as the superuser:
+>
+> ```sql
+> DO $$ DECLARE r record; BEGIN
+>   FOR r IN SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+>            WHERE n.nspname = 'public' AND c.relkind = 'r' AND pg_get_userbyid(c.relowner) = 'postgres'
+>   LOOP EXECUTE format('ALTER TABLE public.%I OWNER TO gateway', r.relname); END LOOP;
+> END $$;
+> ```
+>
+> Column-owned sequences follow their tables. Leave the extensions (`vector`,
+> `plpgsql`) with `postgres`, as they are in p4. Never do this to
+> `gw_prod_snapshot`; it is the incident evidence.
 
-Migrate the scratch DB to head:
+All local databases are at one Alembic head (the lineage split in §9.10 of the
+status doc was resolved in §30, so the old "`alembic current` fails by design"
+warning no longer applies). To bring one to head:
 
 ```bash
-DATABASE_URL="$NRB_DB" .venv/bin/alembic upgrade head    # head is f4c1a90b7d62
+DATABASE_URL="$NRB_DB" .venv/bin/alembic upgrade head    # head is e1a4c6f9b2d7
 ```
 
 ### 3.2 Models pulled in Ollama

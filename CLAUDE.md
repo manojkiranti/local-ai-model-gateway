@@ -20,9 +20,31 @@ hardware, which model runs where (`qwen3.5:35b-a3b` chat, `qwen3-embedding:4b-q8
 Postgres + pgvector layout, ports, RAG settings, what is not yet live. Read it
 instead of guessing the environment; update it when any of it changes.
 
-**NRB work runs against the SCRATCH database `local_ai_gateway_p4`, not
-`local_ai_gateway`.** `DATABASE_URL=…/local_ai_gateway_p4` for every NRB sync,
-fetch and DB test.
+**NRB work never runs against `local_ai_gateway`, and which database it CAN use
+depends on what the script is for** (`app/nrb/dbguard.py`, 2026-09-24).
+EVIDENCE scripts — the holdout, legacy-eval, native-2 compare, lexicon, P7
+cohort, the §17 sample and the supersession exercise — stay on the SCRATCH
+database `local_ai_gateway_p4`, because they measure frozen cohorts that live
+there and the same numbers computed elsewhere would read as the recorded
+evidence without being it. OPERATIONAL scripts — `nrb_pipeline.py`,
+`nrb_rag_ingest_corpus.py`, `nrb_recovery_cache.py` — also admit
+`local_ai_gateway_build`, a clone of the production snapshot whose `nrb_files`,
+department (`nrb#1 hrdept#2 policy#3 it#4 guideline#10`) and user ids ARE
+production's, so a corpus built there exports without remapping a single id;
+p4 has no `nrb` department at all. The single-name rule was born of the Alembic
+split (§9.10) and outlived it (§30 resolved it); `tests/test_nrb_dbguard.py`
+fails if an evidence script ever learns the build name, so a blanket
+search-and-replace cannot widen them all at once. `gw_prod_snapshot` is on
+neither list — it is the incident evidence and stays a faithful record. Two
+traps: (1) the guard covers only these CLI entry points — `nrb_sync`/`nrb_fetch`/
+`nrb_extract`, the worker and the runner carry none and never did, so it is a
+typo-stopper, not a boundary; (2) **a database restored from a production dump
+is owned by `postgres`, and the app role cannot read it** — the build clone's
+23 tables had ZERO `gateway` privileges until 2026-09-24 (`permission denied for
+table nrb_recoveries` on the first query), fixed by moving the 23 tables to
+`gateway` (their 13 sequences follow; extensions stay `postgres`'s, as in p4).
+Any future restore needs the same step before the pipeline, worker or runner
+can touch it.
 
 **The Alembic lineage is RESOLVED (2026-08-19, §30) — one linear head, nothing
 stranded.** The old warning here (dev DB stamped at a revision that existed only on

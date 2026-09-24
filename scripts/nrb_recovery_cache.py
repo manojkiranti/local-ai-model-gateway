@@ -47,21 +47,19 @@ from sqlalchemy import text  # noqa: E402
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # noqa: E402
 
 from app.config import get_settings  # noqa: E402
+from app.nrb import dbguard  # noqa: E402
 from app.nrb import filestore, recovery_cache  # noqa: E402
 from app.nrb import rag as nrb_rag  # noqa: E402
 
-SCRATCH_DB = "local_ai_gateway_p4"
-
 
 def _guard() -> str:
+    # Operational work may run against the scratch DB or the production-shaped
+    # build clone; see app/nrb/dbguard.py for why evidence scripts may not.
     url = os.environ.get("DATABASE_URL", "")
-    name = url.rsplit("/", 1)[-1].split("?")[0]
-    if name != SCRATCH_DB:
-        print(
-            f"refusing to run: DATABASE_URL resolves to database {name!r}, "
-            f"but NRB work runs only against {SCRATCH_DB!r}.",
-            file=sys.stderr,
-        )
+    try:
+        name = dbguard.require(url, dbguard.BUILD_DATABASES)
+    except dbguard.RefusedDatabase as exc:
+        print(f"refusing to run: {exc}", file=sys.stderr)
         raise SystemExit(2)
     print(f"database: {name}")
     return url

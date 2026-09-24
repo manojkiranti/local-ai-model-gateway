@@ -477,8 +477,23 @@ is the same class of gap that would make a future cutover fail silently.
    Unified Directives 2082, the Payment Systems directive, AML/CFT directives and
    FX circulars; `nrb.org.np` is reachable from this laptop; docling, npttf2utf,
    rapidocr and onnxruntime are all installed in `.venv`.
-   **Blocker to resolve first:** `scripts/nrb_pipeline.py` refuses any database
-   other than `local_ai_gateway_p4`.
+   ~~**Blocker to resolve first:** `scripts/nrb_pipeline.py` refuses any database
+   other than `local_ai_gateway_p4`.~~ **RESOLVED 2026-09-24 — build in
+   `local_ai_gateway_build`, not p4.** Measured: p4 has no `nrb` department at
+   all, so a corpus built there would need `department_id` remapped on every
+   document and chunk under a composite FK; the build clone carries
+   production's own ids (`nrb#1 hrdept#2 policy#3 it#4 guideline#10`) and
+   production's own synced catalog (18,608 sources, fetch never succeeded), so
+   a delta built there inserts with no id translation. The single-name guard
+   was a leftover of the §9.10 Alembic split, which §30 resolved — all four
+   local databases now sit at one head. `app/nrb/dbguard.py` now admits the
+   build clone for the three operational scripts and keeps the eight evidence
+   scripts on p4 (their cohorts live there). **A second blocker surfaced doing
+   it:** the build clone, restored from a production dump, was owned by
+   `postgres`, and `gateway` had zero privileges on its 23 tables, so the
+   pipeline, worker and runner would all have failed on their first query.
+   Its tables are now owned by `gateway`, as p4's are; `gw_prod_snapshot` was
+   left alone. Both operational scripts now run cleanly against it.
 3. **Ship a delta, not a database.** Export only the new `nrb`/`hrdept`/`it`
    documents and chunks; leave production's live `policy`/`guideline` rows and its
    206 chat sessions alone.
