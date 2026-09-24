@@ -182,3 +182,37 @@ def test_an_evidence_script_never_names_the_build_clone(script):
     src = (REPO / "scripts" / script).read_text()
     assert "local_ai_gateway_p4" in src
     assert "local_ai_gateway_build" not in src
+
+
+# --------------------------------------------------------------------------- #
+# nrb_pipeline.py --dry-run without --run-now
+# --------------------------------------------------------------------------- #
+# Found 2026-09-24 building the production corpus: `--dry-run` is passed ONLY
+# to `execute_run`, so without `--run-now` the CLI called `request_run` and
+# inserted a REAL `queued` run carrying no dry-run marker at all — run 14 in
+# local_ai_gateway_build, requested as a dry run. Any runner that picks it up
+# executes it for real, and in production the compose `nrb-runner` service is
+# always polling. A flag the user typed must never be silently dropped, and
+# for a command whose whole job is "don't do it yet", dropping it inverts the
+# request.
+
+def test_pipeline_dry_run_without_run_now_refuses_before_touching_the_database():
+    out = _run("nrb_pipeline.py",
+               ["--department", "nrb", "--key", "https://x/a.pdf", "--dry-run"],
+               "local_ai_gateway_build")
+    assert out.returncode == 2, (out.returncode, out.stdout, out.stderr)
+    assert "--dry-run" in out.stderr and "--run-now" in out.stderr, out.stderr
+    # The dead port proves it: had it tried to queue a run, the error would be
+    # a connection failure, not this refusal.
+    assert "queued" not in out.stdout
+
+
+def test_pipeline_dry_run_with_run_now_is_still_accepted():
+    """The combination that DOES carry the flag must keep working: it gets past
+    argument checking and the guard, then fails on the dead port."""
+    out = _run("nrb_pipeline.py",
+               ["--department", "nrb", "--key", "https://x/a.pdf",
+                "--dry-run", "--run-now"],
+               "local_ai_gateway_build")
+    assert "only takes effect with --run-now" not in out.stderr
+    assert "database: local_ai_gateway_build" in out.stdout, (out.stdout, out.stderr)

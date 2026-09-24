@@ -145,6 +145,18 @@ async def main() -> int:
     ap.add_argument("--json", help="write the run summary here")
     args = ap.parse_args()
 
+    # `--dry-run` reaches only `execute_run`. Without `--run-now` this command
+    # calls `request_run`, which queues a REAL run carrying no dry-run marker —
+    # and a runner then executes it for real. Found 2026-09-24 when run 14 in
+    # local_ai_gateway_build was queued as "a dry run"; in production the
+    # compose `nrb-runner` is always polling. Refuse rather than drop the flag.
+    if args.dry_run and not args.run_now and not args.status:
+        print("refusing to run: --dry-run only takes effect with --run-now. "
+              "Without it this would QUEUE A REAL RUN (the dry-run flag is not "
+              "stored on the run), and a runner would execute it for real.",
+              file=sys.stderr)
+        return 2
+
     url = _guard()
     engine = create_async_engine(url)
     Session = async_sessionmaker(engine, expire_on_commit=False)
