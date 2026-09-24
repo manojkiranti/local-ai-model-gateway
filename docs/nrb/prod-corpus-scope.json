@@ -1,0 +1,3573 @@
+{
+  "schema_version": 1,
+  "purpose": "the production NRB corpus (docs/prod-incident-2026-09-20.md §7)",
+  "drawn_at": "2026-09-24T17:42:01+05:45",
+  "drawn_from": "local_ai_gateway_build",
+  "draw_rule": "active nrb_sources with an attached file, where document_type IN ('directive','act','rule_bylaw','forex') OR (document_type = 'circular' AND published_at, in Nepal time, is on or after 2025-07-17); one entry per distinct file (comparison_key)",
+  "circular_since": "2025-07-17",
+  "counts": {
+    "pool_source_file_pairs": 18536,
+    "files": 355,
+    "by_document_type": {
+      "act": 90,
+      "circular": 67,
+      "directive": 96,
+      "forex": 19,
+      "rule_bylaw": 83
+    },
+    "undated_circulars_refused": 0
+  },
+  "cohort_sha256": "309798e50a47c24257277f03f4496b5c98714e6714099476429d71b3981f738e",
+  "entries": [
+    {
+      "role": "corpus",
+      "comparison_key": "http://uat.nrb.org.np/wp-content/uploads/2020/04/Kharid-Biniyamawali-2071.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2015-04-20 12:37:45+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैंक खरिद विनियमावली, २०७१",
+      "filename": "Kharid-Biniyamawali-2071.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "http://uat.nrb.org.np/wp-content/uploads/2020/04/Problem_Bank_resolution_bylaws_2071.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2015-04-20 12:27:19+00:00",
+      "owner": "lgd",
+      "title": "समस्याग्रस्त संस्था रिजोलुसन विनियमावली, २०७१",
+      "filename": "Problem_Bank_resolution_bylaws_2071.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2012/12/१०.-सम्पत्ति-शुद्धीकरण-मनी-लाउन्डरिङ्ग-निवारण-ऐन-२०६३.pdf",
+      "document_type": "act",
+      "published_at": "2021-03-26 04:44:32+00:00",
+      "owner": "lgd",
+      "title": "सम्पत्ति शुद्धिकरण (मनी लाउन्डरिङ्ग) निवारण ऐन, २०६४",
+      "filename": "१०.-सम्पत्ति-शुद्धीकरण-मनी-लाउन्डरिङ्ग-निवारण-ऐन-२०६३.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2076_77_For_Non_Bank_FI-Attachment_Circular_01-new.pdf",
+      "document_type": "directive",
+      "published_at": "2019-12-30 17:47:59+00:00",
+      "owner": "bfr",
+      "title": "AML/CFT related Directive for Non-Bank",
+      "filename": "2076_77_For_Non_Bank_FI-Attachment_Circular_01-new.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Acquisition_Bylaws_2070.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2019-12-27 10:39:21+00:00",
+      "owner": "lgd",
+      "title": "Acquisition Bylaws 2070",
+      "filename": "Acquisition_Bylaws_2070.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Approved-Gold-and-Silver-Purchase-Minting-and-Sale-Working-Procedures-2075.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2019-12-27 10:39:46+00:00",
+      "owner": "lgd",
+      "title": "सुनचाँदी तथा अन्य धातु खरिद, टकमारी र बिक्री सम्बन्धी कार्यविधि, २०७५",
+      "filename": "Approved-Gold-and-Silver-Purchase-Minting-and-Sale-Working-Procedures-2075.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Assets_Money_Laundering_Prevention_Rule_2016.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2019-12-27 10:39:28+00:00",
+      "owner": "lgd",
+      "title": "Assets (Money) Laundering Prevention Rule, 2016",
+      "filename": "Assets_Money_Laundering_Prevention_Rule_2016.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Bank-and-Financial-Institutions-Resolution-Bylaws-2074.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2019-12-27 10:39:38+00:00",
+      "owner": "lgd",
+      "title": "बैंक तथा वित्तीय संस्था रिजोलुशन बिनियामावाली, २०७४",
+      "filename": "Bank-and-Financial-Institutions-Resolution-Bylaws-2074.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Bank_And_Financial_Instituion_Act_2017_-_English_Version_20190311-1.pdf",
+      "document_type": "act",
+      "published_at": "2019-12-26 04:55:09+00:00",
+      "owner": "lgd",
+      "title": "Bank and Financial Institution Act, 2073 (2017)",
+      "filename": "Bank_And_Financial_Instituion_Act_2017_-_English_Version_20190311-1.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Bank_and_financial_institutions_Rules_by_law_064_20720920.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2019-12-27 10:39:18+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैंक बैंक तथा वित्तीय संस्थाको शीघ्र सुधारात्मक कारवाही सम्बन्धि विनियमावली, २०६४ (संशोधन, २०७२ सहित )",
+      "filename": "Bank_and_financial_institutions_Rules_by_law_064_20720920.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Directive_on_graffiti_in_banknotes_20750423.pdf",
+      "document_type": "directive",
+      "published_at": "2020-03-19 20:37:26+00:00",
+      "owner": "cmd",
+      "title": "नेपाली नोटमा लेख्न वा कोर्न नहुने सम्बन्धी इजाजतपत्र प्राप्त बैंक तथा वित्तीय संस्थाहरुलाई परिपत्र",
+      "filename": "Directive_on_graffiti_in_banknotes_20750423.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Directives-Directive_to_Infrastructure_Development_Bank-new.pdf",
+      "document_type": "directive",
+      "published_at": "2019-12-31 09:04:51+00:00",
+      "owner": "bfr",
+      "title": "Directive to Infrastructure Development Bank",
+      "filename": "Directives-Directive_to_Infrastructure_Development_Bank-new.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Directives-Directive_to_Microfinance_FIs_2075-1.pdf",
+      "document_type": "directive",
+      "published_at": "2019-12-31 08:04:52+00:00",
+      "owner": "bfr",
+      "title": "Directive to Microfinance FIs, 2075",
+      "filename": "Directives-Directive_to_Microfinance_FIs_2075-1.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Directives-Directive_to_Microfinance_FIs_2076-new-1.pdf",
+      "document_type": "directive",
+      "published_at": "2019-12-31 12:04:53+00:00",
+      "owner": "bfr",
+      "title": "Directive to Microfinance FIs, 2076",
+      "filename": "Directives-Directive_to_Microfinance_FIs_2076-new-1.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Directives-Directives-to-Microfinance-FIs-2071-1.pdf",
+      "document_type": "directive",
+      "published_at": "2019-12-30 12:03:44+00:00",
+      "owner": "bfr",
+      "title": "Directives to Microfinance FIs, 2071",
+      "filename": "Directives-Directives-to-Microfinance-FIs-2071-1.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Directives-Directives-to-Microfinance-FIs-2071.pdf",
+      "document_type": "directive",
+      "published_at": "2019-12-18 09:34:50+00:00",
+      "owner": "bfr",
+      "title": "Directives to Microfinance FIs, 2071",
+      "filename": "Directives-Directives-to-Microfinance-FIs-2071.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Directives-Directives-to-Microfinance-FIs-2072.pdf",
+      "document_type": "directive",
+      "published_at": "2019-12-30 12:03:45+00:00",
+      "owner": "bfr",
+      "title": "Directives to Microfinance FIs, 2072",
+      "filename": "Directives-Directives-to-Microfinance-FIs-2072.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Directives-Directives-to-Microfinance-FIs_2074.pdf",
+      "document_type": "directive",
+      "published_at": "2019-12-30 17:45:48+00:00",
+      "owner": "bfr",
+      "title": "Directives to Microfinance FIs,_2074",
+      "filename": "Directives-Directives-to-Microfinance-FIs_2074.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Directives-Directives_to_Cooperatives_2058.pdf",
+      "document_type": "directive",
+      "published_at": "2019-12-30 17:29:37+00:00",
+      "owner": "bfr",
+      "title": "Directives_to_Cooperatives_2058",
+      "filename": "Directives-Directives_to_Cooperatives_2058.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Directives-Directives_to_Microfinance_FIs_2070.pdf",
+      "document_type": "directive",
+      "published_at": "2019-12-30 12:02:48+00:00",
+      "owner": "bfr",
+      "title": "Directives_to_Microfinance_FIs_2070",
+      "filename": "Directives-Directives_to_Microfinance_FIs_2070.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Directives-Directives_to_Microfinance_FIs_2073.pdf",
+      "document_type": "directive",
+      "published_at": "2019-12-30 12:03:47+00:00",
+      "owner": "bfr",
+      "title": "Directives to Microfinance FIs, 2073",
+      "filename": "Directives-Directives_to_Microfinance_FIs_2073.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Directives-Unified-Directives-2071.pdf",
+      "document_type": "directive",
+      "published_at": "2019-12-30 12:15:56+00:00",
+      "owner": "bfr",
+      "title": "Unified Directives 2071",
+      "filename": "Directives-Unified-Directives-2071.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Directives-Unified-Directives-2072.pdf",
+      "document_type": "directive",
+      "published_at": "2019-12-30 12:15:58+00:00",
+      "owner": "bfr",
+      "title": "Unified Directives 2072",
+      "filename": "Directives-Unified-Directives-2072.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Directives-Unified-_Directives-_2067-_English.pdf",
+      "document_type": "directive",
+      "published_at": "2019-12-30 12:04:59+00:00",
+      "owner": "bfr",
+      "title": "Unified Directives 2067 English",
+      "filename": "Directives-Unified-_Directives-_2067-_English.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Directives-Unified_Directives_-2067-1.pdf",
+      "document_type": "directive",
+      "published_at": "2019-12-30 12:05:01+00:00",
+      "owner": "bfr",
+      "title": "Unified Directives 2067",
+      "filename": "Directives-Unified_Directives_-2067-1.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Directives-Unified_Directives_-2067.pdf",
+      "document_type": "directive",
+      "published_at": "2019-12-30 17:29:39+00:00",
+      "owner": "bfr",
+      "title": "Unified_Directives_ 2067",
+      "filename": "Directives-Unified_Directives_-2067.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Directives-Unified_Directives_2068.pdf",
+      "document_type": "directive",
+      "published_at": "2019-12-30 12:06:42+00:00",
+      "owner": "bfr",
+      "title": "Unified Directives 2068",
+      "filename": "Directives-Unified_Directives_2068.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Directives-Unified_Directives_2069.pdf",
+      "document_type": "directive",
+      "published_at": "2019-12-30 12:10:03+00:00",
+      "owner": "bfr",
+      "title": "Unified Directives 2069",
+      "filename": "Directives-Unified_Directives_2069.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Directives-Unified_Directives_2070.pdf",
+      "document_type": "directive",
+      "published_at": "2019-12-30 12:10:05+00:00",
+      "owner": "bfr",
+      "title": "Unified Directives 2070",
+      "filename": "Directives-Unified_Directives_2070.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Directives-Unified_Directives_2073_Revised.pdf",
+      "document_type": "directive",
+      "published_at": "2019-12-30 12:25:08+00:00",
+      "owner": "bfr",
+      "title": "Unified Directives 2073 Revised",
+      "filename": "Directives-Unified_Directives_2073_Revised.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Directives-Unified_Directives_2074-1.pdf",
+      "document_type": "directive",
+      "published_at": "2019-12-30 12:25:09+00:00",
+      "owner": "bfr",
+      "title": "Unified Directives 2074",
+      "filename": "Directives-Unified_Directives_2074-1.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Directives-Unified_Directives_2075-1.pdf",
+      "document_type": "directive",
+      "published_at": "2019-12-30 13:05:11+00:00",
+      "owner": "bfr",
+      "title": "Unified Directives 2075",
+      "filename": "Directives-Unified_Directives_2075-1.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Directives-Unified_Directives_2076-new-1.pdf",
+      "document_type": "directive",
+      "published_at": "2019-12-31 09:05:13+00:00",
+      "owner": "bfr",
+      "title": "Unified Directives 2076",
+      "filename": "Directives-Unified_Directives_2076-new-1.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/FC-Loan.ABC_.pdf",
+      "document_type": "forex",
+      "published_at": "2019-09-09 06:26:07+00:00",
+      "owner": "fxm",
+      "title": "नेपाल राष्ट्र बैंकबाट इजाजतपत्रप्राप्त \"क\", \"ख\" र \"ग\" वर्गका बैंक तथा वित्तीय संस्थाहरुले परिवर्त्य विदेशी मुद्रामा ऋण लिन सक्ने संशाेधित व्यवस्था सम्बन्धी सूचना २०७६/०५/२३",
+      "filename": "FC-Loan.ABC_.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/FC-Loan.D.pdf",
+      "document_type": "forex",
+      "published_at": "2019-09-09 06:26:09+00:00",
+      "owner": "fxm",
+      "title": "लघु वित्त वित्तीय संस्थाहरुले परिवर्त्य विदेशी मुद्रामा ऋण लिन सक्ने सम्बन्धी संशाेधित व्यवस्था सम्बन्धी सूचना (२०७६/०५/२३)",
+      "filename": "FC-Loan.D.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/FIFL-Bylaws-2078-2080_Third-Amendment.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2024-02-11 10:59:23+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैंक विदेशी लगानी तथा विदेशी ऋण व्यवस्थापन विनियमावली, २०७८ (तेस्रो संशोधनसहित – मिति २०८०|१०|२६)",
+      "filename": "FIFL-Bylaws-2078-2080_Third-Amendment.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/FXM_notice_20190131.pdf",
+      "document_type": "forex",
+      "published_at": "2019-01-31 06:25:58+00:00",
+      "owner": "fxm",
+      "title": "लघु वित्त वित्तीय संस्थाहरुले परिवर्त्य विदेशी मुद्रामा ऋण लिन सक्ने नयाँ व्यवस्था सम्बन्धी सूचना (२०७५/१०/१७)",
+      "filename": "FXM_notice_20190131.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/ForexNotice20180403.pdf",
+      "document_type": "forex",
+      "published_at": "2018-04-03 06:25:50+00:00",
+      "owner": "fxm",
+      "title": "बाणिज्य बैंकहरुले परिवर्त्य विदेशी मुद्रामा ऋण लिन सक्ने व्यवस्था सम्बन्धी सूचना (२०७४/१२/२०)",
+      "filename": "ForexNotice20180403.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Gold-and-silver-Purchase-and-sale-Karyabidhi-2075-update-2077.02.16-Final.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2019-12-27 10:39:57+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैंक सुनचांदी तथा अन्य धातु खरिद, टकमरी र बिक्री सम्बन्धी कार्यविधि, २०७५",
+      "filename": "Gold-and-silver-Purchase-and-sale-Karyabidhi-2075-update-2077.02.16-Final.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Guidelines-Banking_Service_Fee_Guidelines_2067-1.pdf",
+      "document_type": "directive",
+      "published_at": "2019-12-18 09:38:17+00:00",
+      "owner": "bfr",
+      "title": "CEO’s Remuneration for B, C and D Class Institutions Guidelines 2068",
+      "filename": "Guidelines-Banking_Service_Fee_Guidelines_2067-1.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/IRC-2076-Karyabidhi-1.pdf",
+      "document_type": "act",
+      "published_at": "2019-12-27 08:50:29+00:00",
+      "owner": "pdm",
+      "title": "ब्याजदर करिडोरसम्बन्धी कार्यविधि, २०७६",
+      "filename": "IRC-2076-Karyabidhi-1.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Indian-Currency-Loan-by-Commercial-Bank_notice20181225.pdf",
+      "document_type": "forex",
+      "published_at": "2018-12-25 06:26:00+00:00",
+      "owner": "fxm",
+      "title": "वाणिज्य बैंकहरुले भारतीय मुद्रामा ऋण लिन सक्ने संशोधित व्यवस्था सम्बन्धी सूचना २०७५/०९/१०",
+      "filename": "Indian-Currency-Loan-by-Commercial-Bank_notice20181225.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Interest-Rate-Corridor-Procedure-1.pdf",
+      "document_type": "act",
+      "published_at": "2019-12-27 08:50:23+00:00",
+      "owner": "pdm",
+      "title": "ब्याजदर करिडोर सम्बन्धी कार्यविधि, २०७४",
+      "filename": "Interest-Rate-Corridor-Procedure-1.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Karmachari_Biniyamawali_3rd_Amend_From_HR_2074.12.28.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2019-12-27 10:39:41+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैक कर्मचारी सेवा विनियमावली, २०६८ (तेश्रो संशोधन सहित मिलाइएको)",
+      "filename": "Karmachari_Biniyamawali_3rd_Amend_From_HR_2074.12.28.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Karmachari_niyhamawali_amendment_2072_20720504.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2019-12-27 10:39:15+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैक कर्मचारी सेवा विनियमावली, २०६८ (दोश्रो संशोधन २०७२ सहित)",
+      "filename": "Karmachari_niyhamawali_amendment_2072_20720504.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Kharid-Biniyamawali-2071-Third-Amendment20181113.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2019-12-27 10:39:48+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैंक खरिद विनियमावली, २०७१ (तेस्रो संशोधन, २०७५ समेत मिलाइएको रुपमा)",
+      "filename": "Kharid-Biniyamawali-2071-Third-Amendment20181113.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Khula-Bazar-Biniyamawali-2071-SLF-Karyabidhi-SLF-Form-New.pdf",
+      "document_type": "act",
+      "published_at": "2019-12-27 08:50:22+00:00",
+      "owner": "pdm",
+      "title": "नेपाल राष्ट्र बैंक खुला बजार काराेबार विनियमावली, २०७१",
+      "filename": "Khula-Bazar-Biniyamawali-2071-SLF-Karyabidhi-SLF-Form-New.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/License_and_Ins_Bylaw.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2020-08-23 11:16:12+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बै‌क विदेशी विनिमय कारोवार इजाजत पत्र तथा निरीक्षण विनियमावली,२०६७",
+      "filename": "License_and_Ins_Bylaw.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Lilam-Nirdeshika-Final-Edited-Copy.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2019-12-27 10:39:51+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैंक लिलाम सम्बन्धी निर्देशिका, २०६५ (पहिलो संशोधन, २०७४ समेत मिलाइएको रुपमा)",
+      "filename": "Lilam-Nirdeshika-Final-Edited-Copy.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/MP_Formulation_Procedure_2016.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2019-12-27 10:39:19+00:00",
+      "owner": "lgd",
+      "title": "मौद्रिक नीति तर्जुमा कार्यविधि, २०७३",
+      "filename": "MP_Formulation_Procedure_2016.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Market_Maker_Procedure_2076.pdf",
+      "document_type": "act",
+      "published_at": "2019-12-27 08:50:25+00:00",
+      "owner": "pdm",
+      "title": "बजार निर्माता सम्बन्धी कार्यविधि, २०७० (दोस्रो संशोधन २०७६)",
+      "filename": "Market_Maker_Procedure_2076.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Merger-Acquisition-Bylaw-2073-4th-Revision20190127.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2019-12-27 10:39:36+00:00",
+      "owner": "lgd",
+      "title": "बैंक तथा वित्तीय संस्था एक आपसमा गाभ्ने /गाभिने (मर्जर) तथा प्राप्ति (एक्विजिशन) सम्बन्धी विनियमावली, २०७३",
+      "filename": "Merger-Acquisition-Bylaw-2073-4th-Revision20190127.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Merger-Acquisition-Bylaw-2073-Final.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2019-12-27 10:39:25+00:00",
+      "owner": "lgd",
+      "title": "बैंक तथा वित्तीय संस्था एक आपसमा गाभ्ने गाभिने (मर्जर) तथा प्राप्ति (एक्विजिशन) सम्बन्धी विनियमावली, २०७३",
+      "filename": "Merger-Acquisition-Bylaw-2073-Final.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Merger_By_laws_2068_Including_First_Amendment-new.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2019-12-27 10:39:22+00:00",
+      "owner": "lgd",
+      "title": "Merger Bylaws, 2068 (Including First Amendment)",
+      "filename": "Merger_By_laws_2068_Including_First_Amendment-new.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Merger_By_laws_2068_Including_First_Amendment_20720507.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2019-12-27 10:39:16+00:00",
+      "owner": "lgd",
+      "title": "बैंक तथा वित्तीयसंस्था एक आपसमा गाभ्ने वा गाभिने सम्बन्धी बिनियामवाली, २०६८ (२०६९ को पहिलो संसोधन समेत)",
+      "filename": "Merger_By_laws_2068_Including_First_Amendment_20720507.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/N.R.B.KharidBiniyamawali2071DosroSansodhan20740828.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2019-12-27 10:39:34+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैंक खरिद विनियमावली, २०७१ (दोश्रो संशोधन, २०७४ समेत मिलाइएको रुपमा)",
+      "filename": "N.R.B.KharidBiniyamawali2071DosroSansodhan20740828.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/NRB-Money-Changer-Bylaw-2077_1st-Amendement.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2022-05-05 05:34:29+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैंक मनिचेञ्जर इजाजतपत्र तथा निरीक्षण विनियमावली २०७७ (प्रथम संशोधनसहित)",
+      "filename": "NRB-Money-Changer-Bylaw-2077_1st-Amendement.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/NRB-Money-Changer-Bylaw-2077_3rd-Amendement.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2022-10-20 09:48:49+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैंक मनिचेन्जर इजाजतपत्र तथा निरीक्षण विनियमावली, २०७७ (तेस्रो संशोधनसहित)",
+      "filename": "NRB-Money-Changer-Bylaw-2077_3rd-Amendement.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/NRB_Board_of_Directors_Meeting_and_Seal_Related_Byrules_2063_revised.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2019-12-27 10:39:39+00:00",
+      "owner": "lgd",
+      "title": "NRB Board of Directors Meeting and Seal Related Byrules 2063 revised",
+      "filename": "NRB_Board_of_Directors_Meeting_and_Seal_Related_Byrules_2063_revised.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/NRB_Inspection_Supervision_ByLaw-2074_20740206.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2019-12-27 10:39:43+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैंक निरीक्षण तथा सुपरिवेक्षण विनियमावली, २०७४",
+      "filename": "NRB_Inspection_Supervision_ByLaw-2074_20740206.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Nepal-Rastra-Bank-Act-2002-English2074.12.21.pdf",
+      "document_type": "act",
+      "published_at": "2019-12-27 10:40:07+00:00",
+      "owner": "lgd",
+      "title": "Nepal Rastra Bank Act, 2002 (Consolidated Version in English)",
+      "filename": "Nepal-Rastra-Bank-Act-2002-English2074.12.21.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Nepal_RastraBank_Note_Dhulyaune_Niyamawali_2059.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2019-12-27 10:39:44+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैंक, नोट धुल्याउने नियमावली, २०५९ (पहिलो शंसोधन समेत)",
+      "filename": "Nepal_RastraBank_Note_Dhulyaune_Niyamawali_2059.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Nepal_Rastra_Bank_IPS_Karyabidhi_2073.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2019-12-27 10:39:26+00:00",
+      "owner": "lgd",
+      "title": "अन्तर बैंक भुक्तानी सम्बन्धि कार्यविधि, २०७३",
+      "filename": "Nepal_Rastra_Bank_IPS_Karyabidhi_2073.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Note-and-Sikka-Nirdeshika-206520181113.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2019-12-27 10:39:49+00:00",
+      "owner": "lgd",
+      "title": "नोट छपाई तथा सिक्का टकमरी सम्बन्धी निर्देशिका, २०६५ (पहिलो संशोधन, २०७५ समेत मिलाइएको रुपमा)",
+      "filename": "Note-and-Sikka-Nirdeshika-206520181113.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Notice_To_MFC_For_Loan28180910.pdf",
+      "document_type": "forex",
+      "published_at": "2018-09-10 06:25:55+00:00",
+      "owner": "fxm",
+      "title": "लघु वित्त वित्तीय संस्थाहरुले परिवर्त्य विदेशी मुद्रामा ऋण लिन सक्ने व्यवस्था सम्बन्धी सूचना (२०७५/०५/२५)",
+      "filename": "Notice_To_MFC_For_Loan28180910.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Notice_about_loan_in_ic.pdf",
+      "document_type": "forex",
+      "published_at": "2018-08-08 06:25:53+00:00",
+      "owner": "fxm",
+      "title": "बाणिज्य बैंकहरुले भारतीय मुद्रामा ऋण लिन सक्ने व्यवस्था सम्बन्धी सूचना (२०७५/०४/२३)",
+      "filename": "Notice_about_loan_in_ic.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Notice_of_Loan_for_Infra_project.pdf",
+      "document_type": "forex",
+      "published_at": "2018-07-16 06:25:51+00:00",
+      "owner": "fxm",
+      "title": "पुर्वाधार विकास निर्माणका आयोजनाहरुले विदेशबाट अल्पकालीन सापटी ल्याउन पाउने व्यवस्था सम्बन्धी सूचना (२०७५/०३/३२)",
+      "filename": "Notice_of_Loan_for_Infra_project.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/PSD_Directive_10.pdf",
+      "document_type": "directive",
+      "published_at": "2019-12-27 09:38:21+00:00",
+      "owner": "psd",
+      "title": "इलेक्ट्रोनिक माध्यमबाट हुने बैंकिङ्ग (इ–बैंकिङ्ग) सेवा सम्बन्धमा",
+      "filename": "PSD_Directive_10.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/PSD_Directive_11.pdf",
+      "document_type": "directive",
+      "published_at": "2019-12-27 09:38:22+00:00",
+      "owner": "psd",
+      "title": "Electronic Cheque Clearing सम्बन्धमा",
+      "filename": "PSD_Directive_11.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/PSD_Directive_8_076.pdf",
+      "document_type": "directive",
+      "published_at": "2019-12-27 09:38:17+00:00",
+      "owner": "psd",
+      "title": "POS मसिन मार्फत गरिने कारोबार र Online Reporting सम्बन्धमा",
+      "filename": "PSD_Directive_8_076.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/PSD_Directive_9_076.pdf",
+      "document_type": "directive",
+      "published_at": "2019-12-27 09:38:19+00:00",
+      "owner": "psd",
+      "title": "RTGS System सञ्चालन सम्बन्धमा",
+      "filename": "PSD_Directive_9_076.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Payment_and_Settlement_Bylaws_1st_amendment_adjusted_0730326.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2019-12-27 10:39:23+00:00",
+      "owner": "lgd",
+      "title": "Payment and Settlement By Laws 2072 (Including first amendment 2073)",
+      "filename": "Payment_and_Settlement_Bylaws_1st_amendment_adjusted_0730326.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Permission_Before_Publishing_Annual_Finacial_Statement_2075_05_14.pdf",
+      "document_type": "directive",
+      "published_at": "2019-12-27 09:38:14+00:00",
+      "owner": "psd",
+      "title": "वार्षिक वित्तीय विवरण सार्वजनिक/प्रकाशन गर्नुपूर्व स्वीकृति लिने सम्बन्धमा",
+      "filename": "Permission_Before_Publishing_Annual_Finacial_Statement_2075_05_14.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Prompt_Corrective_Action_Bylaws2074.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2019-12-27 10:39:31+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैंक बैंक तथा वित्तीय संस्थाको शीघ्र सुधारात्मक कारवाही सम्बन्धी विनियमावली, २०७४",
+      "filename": "Prompt_Corrective_Action_Bylaws2074.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Psd_Directives_1.pdf",
+      "document_type": "directive",
+      "published_at": "2019-12-27 09:38:03+00:00",
+      "owner": "psd",
+      "title": "विद्युतीय भुक्तानी कार्ड सञ्चालन सम्वन्धमा",
+      "filename": "Psd_Directives_1.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Psd_Directives_2.pdf",
+      "document_type": "directive",
+      "published_at": "2019-12-27 09:38:05+00:00",
+      "owner": "psd",
+      "title": "दूरसञ्चार सञ्जालमार्फत् स्वदेशी मुद्रामा गरिने वित्तीय सेवा सञ्चालन सम्वन्धमा",
+      "filename": "Psd_Directives_2.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Psd_Directives_3.pdf",
+      "document_type": "directive",
+      "published_at": "2019-12-27 09:38:07+00:00",
+      "owner": "psd",
+      "title": "विद्युतीय भुक्तानी सेवा प्रदान गर्दा अपनाउनु पर्ने सुरक्षा व्यवस्था",
+      "filename": "Psd_Directives_3.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Public_Debt_NRB_Margadarshan_2074-1.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2019-12-27 10:39:33+00:00",
+      "owner": "lgd",
+      "title": "राष्ट्रऋण व्यवस्थापन मार्गदर्शन, २०७४",
+      "filename": "Public_Debt_NRB_Margadarshan_2074-1.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Public_Debt_NRB_Margadarshan_2074.pdf",
+      "document_type": "act",
+      "published_at": "2019-12-27 08:50:21+00:00",
+      "owner": "pdm",
+      "title": "राष्ट्रऋण व्यवस्थापन मार्गदर्शन, २०७४",
+      "filename": "Public_Debt_NRB_Margadarshan_2074.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/RTGS-Rule-2019.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2020-11-23 06:55:05+00:00",
+      "owner": "lgd",
+      "title": "RTGS System Rules 2019",
+      "filename": "RTGS-Rule-2019.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Sales-Agents-Karya-Bidhi-2076-05-22Final.pdf",
+      "document_type": "act",
+      "published_at": "2019-12-27 08:50:28+00:00",
+      "owner": "pdm",
+      "title": "बिक्री एजेन्टसम्बन्धी कार्यविधि, २०७६",
+      "filename": "Sales-Agents-Karya-Bidhi-2076-05-22Final.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/SettlementBank20170807.pdf",
+      "document_type": "directive",
+      "published_at": "2019-12-27 09:38:08+00:00",
+      "owner": "psd",
+      "title": "सेटलमेन्ट बैंक (Settlement Bank) सम्बन्धमा",
+      "filename": "SettlementBank20170807.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Threshold_Limit_20750331.pdf",
+      "document_type": "directive",
+      "published_at": "2019-12-27 09:38:10+00:00",
+      "owner": "psd",
+      "title": "विद्युतीय मध्यमबाट गरिने कारोबार सीमा सम्बन्धमा",
+      "filename": "Threshold_Limit_20750331.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/directives_psd_20750616.pdf",
+      "document_type": "directive",
+      "published_at": "2019-12-27 09:38:16+00:00",
+      "owner": "psd",
+      "title": "लघुवित्त वित्तीय संस्थाहरुलाई भुक्तानी सेवा प्रदायकको अनुमति प्रदान गर्ने सम्बन्धमा",
+      "filename": "directives_psd_20750616.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/fxm_INRnotice20190227.pdf",
+      "document_type": "forex",
+      "published_at": "2019-02-27 06:26:02+00:00",
+      "owner": "fxm",
+      "title": "नेपाल राष्ट्र बैंकबाट इजाजतपत्रप्राप्त \"क\", \"ख\" र \"ग\" वर्गका बैंक तथा वित्तीय संस्थाहरुले भारतीय मुद्रामा ऋण लिन सक्ने व्यवस्था सम्बन्धी सूचना २०७५/११/१५",
+      "filename": "fxm_INRnotice20190227.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/fxm_notice20190227.pdf",
+      "document_type": "forex",
+      "published_at": "2019-02-27 06:26:03+00:00",
+      "owner": "fxm",
+      "title": "नेपाल राष्ट्र बैंकबाट इजाजतपत्रप्राप्त \"क\", \"ख\" र \"ग\" वर्गका बैंक तथा वित्तीय संस्थाहरुले परिवर्त्य विदेशी मुद्रामा ऋण लिन सक्ने व्यवस्था सम्बन्धी सूचना २०७५/११/१५",
+      "filename": "fxm_notice20190227.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/fxm_notice20190310.pdf",
+      "document_type": "forex",
+      "published_at": "2019-03-10 06:26:05+00:00",
+      "owner": "fxm",
+      "title": "हेजिंग सम्बन्धी नियमावली, २०७५",
+      "filename": "fxm_notice20190310.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/fxm_notice20750720.pdf",
+      "document_type": "forex",
+      "published_at": "2018-11-06 06:25:57+00:00",
+      "owner": "fxm",
+      "title": "वाणिज्य बैंकहरुले परिवर्त्य विदेशी मुद्रामा ऋण लिन सक्ने व्यवस्था सम्बन्धी सूचना (२०७५/०७/२०)",
+      "filename": "fxm_notice20750720.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/ofg_other_policies20190121-1.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2019-12-27 10:39:56+00:00",
+      "owner": "lgd",
+      "title": "हायर पर्चेज कर्जा दिने कम्पनीलाई स्वीकृति दिने नीतिगत एवं प्रक्रियागत व्यवस्था, २०७० (दोस्रो संसोधन, २०७५)",
+      "filename": "ofg_other_policies20190121-1.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/१७.वित्तीय-मध्यस्थताको-काम-गर्ने-संस्था-सम्बन्धी-ऐन-२०५५.pdf",
+      "document_type": "act",
+      "published_at": "2021-03-26 04:37:13+00:00",
+      "owner": "lgd",
+      "title": "वित्तीय मध्यस्थताको काम गर्ने संस्था सम्बन्धी ऐन, २०५५ (संशोधन सहित)",
+      "filename": "१७.वित्तीय-मध्यस्थताको-काम-गर्ने-संस्था-सम्बन्धी-ऐन-२०५५.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/४.-बैङ्किङ्ग-कसूर-तथा-सजाय-ऐन-२०६४.pdf",
+      "document_type": "act",
+      "published_at": "2021-03-26 04:55:05+00:00",
+      "owner": "lgd",
+      "title": "बैंकिंग कसुर तथा सजाय ऐन, २०६४ (पहिलो संशोधनलाई मिलाइएको)",
+      "filename": "४.-बैङ्किङ्ग-कसूर-तथा-सजाय-ऐन-२०६४.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/01/Bank-Tatha-Vittiya-Sanstha-Sambandhi-1...-2063.pdf",
+      "document_type": "act",
+      "published_at": "2019-12-11 18:41:07+00:00",
+      "owner": "lgd",
+      "title": "बैंक तथा वित्तीय संस्था सम्बन्धी ऐन, २०६३",
+      "filename": "Bank-Tatha-Vittiya-Sanstha-Sambandhi-1...-2063.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/01/banking-offence-and-punishment-act.pdf",
+      "document_type": "act",
+      "published_at": "2019-12-26 04:54:18+00:00",
+      "owner": "lgd",
+      "title": "Banking Offence and Punishment Act, 2064",
+      "filename": "banking-offence-and-punishment-act.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/01/nepal_rastra_bank_act_2002_english.pdf",
+      "document_type": "act",
+      "published_at": "2019-12-11 18:48:58+00:00",
+      "owner": "lgd",
+      "title": "Nepal Rasta Bank Act 2002",
+      "filename": "nepal_rastra_bank_act_2002_english.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/01/payment_and_settlement_act_2075.pdf",
+      "document_type": "act",
+      "published_at": "2020-01-04 07:20:16+00:00",
+      "owner": "psd",
+      "title": "भुक्तानी तथा फर्स्यौट ऐन, २०७५",
+      "filename": "payment_and_settlement_act_2075.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/01/risk_management_comm.pdf",
+      "document_type": "directive",
+      "published_at": "2008-01-04 15:10:01+00:00",
+      "owner": "cpd",
+      "title": "Nepal Rastra Bank, Working Procedure of Risk Management Committe",
+      "filename": "risk_management_comm.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/01/strategic_plan_2006-2010.pdf",
+      "document_type": "directive",
+      "published_at": "2020-01-04 15:11:08+00:00",
+      "owner": "cpd",
+      "title": "NRB, Strategic Plan 2006-2010",
+      "filename": "strategic_plan_2006-2010.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/01/strategic_plan_2012-2016.pdf",
+      "document_type": "directive",
+      "published_at": "2020-01-04 15:11:35+00:00",
+      "owner": "cpd",
+      "title": "NRB, Strategic Plan 2012-2016",
+      "filename": "strategic_plan_2012-2016.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/01/strategic_plan_2017-2021.pdf",
+      "document_type": "directive",
+      "published_at": "2020-01-04 15:12:04+00:00",
+      "owner": "cpd",
+      "title": "NRB, Strategic Plan 2017-2021",
+      "filename": "strategic_plan_2017-2021.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/03/Clean_Note_Policy_2070-71_Circular.pdf",
+      "document_type": "directive",
+      "published_at": "2020-03-20 08:16:40+00:00",
+      "owner": "cmd",
+      "title": "सफा नोट नीति कार्यान्वयन सम्बन्धमा",
+      "filename": "Clean_Note_Policy_2070-71_Circular.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/03/Foreign-Loan.pdf",
+      "document_type": "forex",
+      "published_at": "2020-03-12 10:58:26+00:00",
+      "owner": "fxm",
+      "title": "नेपाली नागरिक, फर्म तथा संस्थाहरूले विदेशबाट ऋण लिन पाउने व्यवस्थामा संशोधन सम्बन्धमा ।",
+      "filename": "Foreign-Loan.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/03/Notekosh_Karobar-2071.pdf",
+      "document_type": "directive",
+      "published_at": "2020-03-20 08:36:01+00:00",
+      "owner": "cmd",
+      "title": "नोटकोष कारोबारमा थप व्यवस्था भएको सम्बन्धमा",
+      "filename": "Notekosh_Karobar-2071.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/03/Notekosh_Karobar-cb-2071.pdf",
+      "document_type": "directive",
+      "published_at": "2020-03-20 08:35:20+00:00",
+      "owner": "cmd",
+      "title": "नोटकोष कारोबारमा थप व्यवस्था भएको सम्बन्धमा",
+      "filename": "Notekosh_Karobar-cb-2071.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/03/Notekosh_Karobar-dba-2071.pdf",
+      "document_type": "directive",
+      "published_at": "2020-03-20 08:34:36+00:00",
+      "owner": "cmd",
+      "title": "नोटकोष कारोबार संचालन गर्ने सम्बन्धमा",
+      "filename": "Notekosh_Karobar-dba-2071.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/03/Notekosh_Karobar-nbl-2071.pdf",
+      "document_type": "directive",
+      "published_at": "2020-03-20 08:33:29+00:00",
+      "owner": "cmd",
+      "title": "नोटकोष कारोबारमा थप व्यवस्था भएको सम्बन्धमा",
+      "filename": "Notekosh_Karobar-nbl-2071.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/03/Notekosh_Karobar-rbb-2071.pdf",
+      "document_type": "directive",
+      "published_at": "2020-03-20 08:17:08+00:00",
+      "owner": "cmd",
+      "title": "नोटकोष कारोबारमा थप व्यवस्था भएको सम्बन्धमा",
+      "filename": "Notekosh_Karobar-rbb-2071.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/03/PSD_Unified-Directives-2076.pdf",
+      "document_type": "directive",
+      "published_at": "2020-03-19 11:55:54+00:00",
+      "owner": "psd",
+      "title": "भुक्तानी प्रणाली सम्बन्धी एकीकृत निर्देशन –२०७६",
+      "filename": "PSD_Unified-Directives-2076.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/2_Procedure-Procedure.pdf",
+      "document_type": "act",
+      "published_at": "2019-12-01 06:40:45+00:00",
+      "owner": "pdm",
+      "title": "निक्षेप संकलन उपकरण सम्बन्धी कार्यविधि",
+      "filename": "2_Procedure-Procedure.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/Akasmik_Kharid_Karyabidhi072_207233.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2016-04-20 09:21:51+00:00",
+      "owner": "lgd",
+      "title": "आकस्मिक खरिद कार्यविधि",
+      "filename": "Akasmik_Kharid_Karyabidhi072_207233.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/Citizen_Saving_Bond_karyabidhi_2077-New.pdf",
+      "document_type": "act",
+      "published_at": "2019-12-01 06:21:36+00:00",
+      "owner": "pdm",
+      "title": "नागरिक बचतपत्रको बिक्री प्रक्रिया",
+      "filename": "Citizen_Saving_Bond_karyabidhi_2077-New.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/ExchangeLicence.pdf",
+      "document_type": "forex",
+      "published_at": "2017-04-13 13:12:42+00:00",
+      "owner": "fxm",
+      "title": "विदेशी लगानी वापतको विदेशी मुद्रा भित्र्याउने, लेखांकन गराउने र लाभांश लैजान दिइएको स्थायी सटही अनुमिपत्र बारेको सूचना",
+      "filename": "ExchangeLicence.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/FDI_Notice_2074-07-13.pdf",
+      "document_type": "forex",
+      "published_at": "2017-10-30 13:25:03+00:00",
+      "owner": "fxm",
+      "title": "प्रत्यक्ष बैदेशिक लगानी: पूँजी, ऋण, व्याज तथा लाभांस सम्बन्धी सूचना (२०७४/७/१३)",
+      "filename": "FDI_Notice_2074-07-13.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/FESB-Karyabidhi-2076-11-01.pdf",
+      "document_type": "act",
+      "published_at": "2019-12-01 06:27:47+00:00",
+      "owner": "pdm",
+      "title": "वैदेशिक रोजगार बचतपत्र सम्बन्धी कार्यविधि (संशोधन सहित ) २०६९",
+      "filename": "FESB-Karyabidhi-2076-11-01.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/Financial_Intermediation_Act_2056.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2003-04-20 12:40:57+00:00",
+      "owner": "lgd",
+      "title": "वित्तिय मध्यस्थता सम्वन्धी नियमावली २०५६",
+      "filename": "Financial_Intermediation_Act_2056.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/Foreign-Loan-Notice.pdf",
+      "document_type": "forex",
+      "published_at": "2015-11-20 13:06:35+00:00",
+      "owner": "fxm",
+      "title": "नेपाली फर्म, कम्पनी, उध्योग वा अन्य स‌ंस्थाहरुले आफ्नै कम्पनीका विदेशी व्यक्तिगत लगानीकर्ताबाट विदेशी मुद्रामा ऋण लिने सम्बन्धी थप सूचना",
+      "filename": "Foreign-Loan-Notice.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/Karcha-Byabastha-Biniyamabali2064Revised.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2004-04-20 13:07:15+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैंक खर्च व्यवस्था विनियमावली, २०६४ (संसोधन सहित )",
+      "filename": "Karcha-Byabastha-Biniyamabali2064Revised.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/Kharid-Biniyamawali-2071.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2015-04-20 12:37:45+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैंक खरिद विनियमावली, २०७१",
+      "filename": "Kharid-Biniyamawali-2071.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/Khula-Bazar-Biniyamawali-2071.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2015-04-20 12:32:44+00:00",
+      "owner": "lgd",
+      "title": "खुला बजार कारोवार बिनियमावली, २०७१",
+      "filename": "Khula-Bazar-Biniyamawali-2071.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/Market_Maker_Procedure_2070.pdf",
+      "document_type": "act",
+      "published_at": "2019-12-01 06:25:33+00:00",
+      "owner": "pdm",
+      "title": "बजार निर्माता सम्बन्धी कार्यविधि २०७०",
+      "filename": "Market_Maker_Procedure_2070.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/NRB-Cash-Byrules-2063-_Final_.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2007-04-20 13:33:13+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैंक नगद सम्बन्धी विनियमावली, २०६३",
+      "filename": "NRB-Cash-Byrules-2063-_Final_.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/NRBKagajatDhulayuneBiniyamabali2064.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2017-04-20 13:36:11+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैंक कागजात धुल्याउने बिनियमावली, २०६४",
+      "filename": "NRBKagajatDhulayuneBiniyamabali2064.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/NRB_Act_2058_20690805.pdf",
+      "document_type": "act",
+      "published_at": "2019-12-01 06:35:56+00:00",
+      "owner": "pdm",
+      "title": "नेपाल राष्ट्र बैंक ऐन,२०५८",
+      "filename": "NRB_Act_2058_20690805.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/NRB_Board_of_Directors_Meeting_and_Seal_Related_Byrules_2063.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2015-04-20 13:30:07+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैंक सञ्चालक समितिको बैठक तथा छाप सम्बन्धी विनियमावली, २०६३",
+      "filename": "NRB_Board_of_Directors_Meeting_and_Seal_Related_Byrules_2063.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/Nirdeshika_2068.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2012-04-20 12:49:13+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैंक प्रकाशन निर्देशिका, २०६८",
+      "filename": "Nirdeshika_2068.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/Online_Bidding_Proceduer.pdf",
+      "document_type": "act",
+      "published_at": "2019-12-01 06:42:11+00:00",
+      "owner": "pdm",
+      "title": "अनलाइन बोलकबोल सम्बन्धी कार्यविधि",
+      "filename": "Online_Bidding_Proceduer.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/Problem_Bank_resolution_bylaws_2071.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2015-04-20 12:27:19+00:00",
+      "owner": "lgd",
+      "title": "समस्याग्रस्त संस्था रिजोलुसन विनियमावली, २०७१",
+      "filename": "Problem_Bank_resolution_bylaws_2071.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/Procurement_Bylaw_Reviesed-20710409.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2020-04-20 08:50:37+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैंक खरिद विनियमावली, २०७१ (प्रथम संशोधन सहित)",
+      "filename": "Procurement_Bylaw_Reviesed-20710409.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/Rastra-Rin-Margadarsan-2060.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2004-04-20 13:00:27+00:00",
+      "owner": "lgd",
+      "title": "राष्ट्रऋण व्यवस्थापन मार्गदर्शन, २०६०",
+      "filename": "Rastra-Rin-Margadarsan-2060.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/Rastra_Rin_Niyamawali_2059_Dosro_Sansodhan_2067-1.pdf",
+      "document_type": "act",
+      "published_at": "2019-12-01 06:38:29+00:00",
+      "owner": "pdm",
+      "title": "राष्ट्रऋण नियमावली, २०५९ (दोस्रो संशोधन, २०६७)",
+      "filename": "Rastra_Rin_Niyamawali_2059_Dosro_Sansodhan_2067-1.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/Rastra_Rin_Niyamawali_2059_Dosro_Sansodhan_2067.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2011-04-20 13:13:46+00:00",
+      "owner": "lgd",
+      "title": "राष्ट्रऋण नियमावली, २०५९ (दोस्रो संशोधन, २०६७)",
+      "filename": "Rastra_Rin_Niyamawali_2059_Dosro_Sansodhan_2067.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/Rules_by_Law_akhatiyar_Final_20690104.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2004-04-20 13:02:16+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैंक अख्तियार प्रत्यायोजन विनियमावली, २०६५ (पहिलो संशोधन २०६८ सहित)",
+      "filename": "Rules_by_Law_akhatiyar_Final_20690104.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/auction_guidelines.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2004-04-20 13:04:59+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैंक लिलामसम्बन्धी निर्देशिका, २०६५",
+      "filename": "auction_guidelines.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/bylaws-of-the-notes-and-coin-printing.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2009-04-20 12:52:21+00:00",
+      "owner": "lgd",
+      "title": "नोट छपाई तथा सिक्का टकमरी निर्देशिका, २०६५",
+      "filename": "bylaws-of-the-notes-and-coin-printing.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/foreignLoan.pdf",
+      "document_type": "forex",
+      "published_at": "2017-05-21 13:21:24+00:00",
+      "owner": "fxm",
+      "title": "बैदेशिक लगानी सम्बन्धमा",
+      "filename": "foreignLoan.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/foreign_investment_notice.pdf",
+      "document_type": "forex",
+      "published_at": "2015-11-03 13:02:48+00:00",
+      "owner": "fxm",
+      "title": "विदेशबाट लिएको ऋण तथा लगानी सम्बन्धी विवरणको अभिलेख अद्यावधिक गर्ने सम्बन्धमा",
+      "filename": "foreign_investment_notice.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/nepal_rastra_bank_act_2002_english.pdf",
+      "document_type": "act",
+      "published_at": "2019-12-01 06:37:01+00:00",
+      "owner": "pdm",
+      "title": "नेपाल राष्ट्र बैंक ऐन, २०५८ (अंग्रेजी)",
+      "filename": "nepal_rastra_bank_act_2002_english.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/nepal_rastra_bank_karja_suchana_biniyamabali_2059_nepali.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2003-04-20 13:19:31+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैंक कर्जा सूचना विनियमावली, २०५९",
+      "filename": "nepal_rastra_bank_karja_suchana_biniyamabali_2059_nepali.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/nepal_rastra_bank_karya_byabastha_binimayali_2059_nepali.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2003-04-20 13:09:29+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैंक कार्य व्यवस्था, विनियमावली, २०५९",
+      "filename": "nepal_rastra_bank_karya_byabastha_binimayali_2059_nepali.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/nepal_rastra_bank_note_dhulyaune_niyamabali_2059_nepali.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2003-04-20 13:17:37+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैंक नोट धुल्याउने नियमावली, २०५९",
+      "filename": "nepal_rastra_bank_note_dhulyaune_niyamabali_2059_nepali.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/nepal_rastra_bank_note_sattabharna_niyamabali_2059-nepali.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2003-04-20 13:22:55+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैंक नोट सट्टा भर्ना नियमावली, २०५९",
+      "filename": "nepal_rastra_bank_note_sattabharna_niyamabali_2059-nepali.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/nepal_rastra_bank_note_tatha_sikka_niyamabali_2059_nepali.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2003-04-20 13:25:25+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैंक नोट तथा सिक्का नियमावली, २०५९",
+      "filename": "nepal_rastra_bank_note_tatha_sikka_niyamabali_2059_nepali.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/nepal_rastra_bank_nts_biniyamabali_2070_nepali.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2013-04-20 13:27:44+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैंक निरीक्षण तथा सु परिवेक्षण विनियमावली, २०७०",
+      "filename": "nepal_rastra_bank_nts_biniyamabali_2070_nepali.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/noticeJune12.pdf",
+      "document_type": "forex",
+      "published_at": "2017-05-21 13:17:20+00:00",
+      "owner": "fxm",
+      "title": "बैदेशिक ऋणका लागि धितोपत्र सुरक्षण तथा व्यक्तिगत जमानी दिने व्यवस्था",
+      "filename": "noticeJune12.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/nrb_high_study_procedure_2062revised.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2016-04-20 09:10:33+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैक उच्च अध्ययन सम्बन्धी कार्यविधि, २०६२ (संशोधन सहित)",
+      "filename": "nrb_high_study_procedure_2062revised.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/pdm_reen_patra_notice20200212-1.pdf",
+      "document_type": "act",
+      "published_at": "2019-12-01 06:29:14+00:00",
+      "owner": "pdm",
+      "title": "ऋणपत्रको प्राथमिक तथा दोश्रो बजार व्यवस्थापन नियमावली, २०६१",
+      "filename": "pdm_reen_patra_notice20200212-1.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/pdm_reen_patra_notice20200212.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2005-04-20 12:56:40+00:00",
+      "owner": "lgd",
+      "title": "ऋणपत्रको प्राथमिक तथा दोश्रो बजार व्यवस्थापन नियमावली, २०६१",
+      "filename": "pdm_reen_patra_notice20200212.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/public_debt_act_2059_nepali.pdf",
+      "document_type": "act",
+      "published_at": "2019-12-01 06:33:57+00:00",
+      "owner": "pdm",
+      "title": "राष्ट्रऋण ऐन, २०५९",
+      "filename": "public_debt_act_2059_nepali.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/06/Circular-8-Attachment-सरकारी-कारोवार-निर्देशिका-२०७६-पहिलो-संशोधन.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2020-06-23 09:33:56+00:00",
+      "owner": "lgd",
+      "title": "सरकारी कारोवार निर्देशिका, २०७६ (पहिलो संशोधन) लागू गरिएको बारे",
+      "filename": "Circular-8-Attachment-सरकारी-कारोवार-निर्देशिका-२०७६-पहिलो-संशोधन.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/06/Payment_and_Settlement_bylaws_2077-1.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2020-06-14 10:23:43+00:00",
+      "owner": "psd",
+      "title": "भुक्तानी तथा फछ्रर्यौट विनियमावली, २०७७",
+      "filename": "Payment_and_Settlement_bylaws_2077-1.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/06/नेपाल-राष्ट्र-बैंक-नगद-सम्बन्धी-विनियमावली-२०६३-मा-भएका-संशोधन.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2020-06-26 06:29:11+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैंक नगद सम्बन्धी विनियमावली, २०६३ मा संशोधन",
+      "filename": "नेपाल-राष्ट्र-बैंक-नगद-सम्बन्धी-विनियमावली-२०६३-मा-भएका-संशोधन.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/08/UNIFIED-DIRECTIVE-2077.pdf",
+      "document_type": "directive",
+      "published_at": "2020-08-28 07:12:49+00:00",
+      "owner": "psd",
+      "title": "भुक्तानी प्रणाली सम्बन्धी एकीकृत निर्देशन – २०७७",
+      "filename": "UNIFIED-DIRECTIVE-2077.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/09/IRC-2076-Karyabidhi-Second-amendment-2077.pdf",
+      "document_type": "act",
+      "published_at": "2020-09-07 07:18:53+00:00",
+      "owner": "pdm",
+      "title": "IRC 2076 Karyabidhi (Second amendment 2077)",
+      "filename": "IRC-2076-Karyabidhi-Second-amendment-2077.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/09/Unified-Directives-2077-2.pdf",
+      "document_type": "directive",
+      "published_at": "2020-09-13 08:18:16+00:00",
+      "owner": "bfr",
+      "title": "Unified Directives 2077",
+      "filename": "Unified-Directives-2077-2.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/10/UD-D-class-finalll.pdf",
+      "document_type": "directive",
+      "published_at": "2020-10-04 06:46:11+00:00",
+      "owner": "bfr",
+      "title": "Unified Directives to Microfinance FIs, 2077",
+      "filename": "UD-D-class-finalll.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/12/FESB-Karyabidhi.pdf",
+      "document_type": "act",
+      "published_at": "2020-12-14 06:39:41+00:00",
+      "owner": "pdm",
+      "title": "वैदेशिक रोजगार बचतपत्रसम्बन्धी कार्यविधि, २०६९ (दोस्रो संशोधन, २०७६)",
+      "filename": "FESB-Karyabidhi.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/02/IRC-Procedure-2076-3rd-amendment-2077-.pdf",
+      "document_type": "act",
+      "published_at": "2021-02-17 09:36:06+00:00",
+      "owner": "pdm",
+      "title": "IRC Procedure 2076 (3rd amendment 2077 )",
+      "filename": "IRC-Procedure-2076-3rd-amendment-2077-.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/02/NRB-Information-Communication-Policy-20747.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2021-02-23 06:09:01+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैंक सूचना तथा संचार नीति, २०७७",
+      "filename": "NRB-Information-Communication-Policy-20747.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/03/Jalinote20771210.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2021-03-23 06:39:50+00:00",
+      "owner": "cmd",
+      "title": "जाली नोट तथा खोटो सिक्का सम्बन्धी विनियमावली, २०७७",
+      "filename": "Jalinote20771210.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/03/१४.कम्पनी-ऐन-२०६३.pdf",
+      "document_type": "act",
+      "published_at": "2021-03-26 04:40:40+00:00",
+      "owner": "lgd",
+      "title": "कम्पनी ऐन, २०६३",
+      "filename": "१४.कम्पनी-ऐन-२०६३.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/03/१५.-दामासाही-सम्बन्धी-ऐन-२०६३.pdf",
+      "document_type": "act",
+      "published_at": "2021-03-26 04:39:55+00:00",
+      "owner": "lgd",
+      "title": "दामासाही ऐन, २०६३",
+      "filename": "१५.-दामासाही-सम्बन्धी-ऐन-२०६३.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/03/२.बैङ्क-तथा-वित्तिय-संस्था-सम्बन्धी-ऐन-२०७३.pdf",
+      "document_type": "act",
+      "published_at": "2021-03-26 04:59:02+00:00",
+      "owner": "lgd",
+      "title": "बैंक तथा वित्तीय संस्था सम्बन्धि कानुनमा संशोधन र एकीकरण गर्न बनेको ऐन, २०७३",
+      "filename": "२.बैङ्क-तथा-वित्तिय-संस्था-सम्बन्धी-ऐन-२०७३.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/03/२०.सुरक्षित-कारोबार-ऐन-२०६३.pdf",
+      "document_type": "act",
+      "published_at": "2021-03-26 04:34:12+00:00",
+      "owner": "lgd",
+      "title": "सुरक्षित कारोवार ऐन, २०६३",
+      "filename": "२०.सुरक्षित-कारोबार-ऐन-२०६३.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/03/२२.सार्वजनिक-खरिद-ऐन-२०६३.pdf",
+      "document_type": "act",
+      "published_at": "2021-03-26 04:32:27+00:00",
+      "owner": "lgd",
+      "title": "सार्वजनिक खरिद ऐन, २०६३",
+      "filename": "२२.सार्वजनिक-खरिद-ऐन-२०६३.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/03/३.-विदेशी-विनिमय-नियमित-गर्ने-ऐन-२०१९.pdf",
+      "document_type": "act",
+      "published_at": "2021-03-26 04:56:40+00:00",
+      "owner": "lgd",
+      "title": "विदेशी विनिमय (नियमित गर्ने) ऐन, २०१९ (संशोधन सहित)",
+      "filename": "३.-विदेशी-विनिमय-नियमित-गर्ने-ऐन-२०१९.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/03/५.-भुक्तानी-तथा-फर्स्यौट-ऐन-२०७५.pdf",
+      "document_type": "act",
+      "published_at": "2021-03-26 04:54:11+00:00",
+      "owner": "lgd",
+      "title": "भुक्तानी तथा फर्स्यौट ऐन, २०७५",
+      "filename": "५.-भुक्तानी-तथा-फर्स्यौट-ऐन-२०७५.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/03/९.राष्ट्र-ऋण-ऐन-२०५९.pdf",
+      "document_type": "act",
+      "published_at": "2021-03-26 04:45:26+00:00",
+      "owner": "lgd",
+      "title": "राष्ट्र ऋण ऐन, २०५९",
+      "filename": "९.राष्ट्र-ऋण-ऐन-२०५९.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/07/Directive-2076-SEBON.pdf",
+      "document_type": "directive",
+      "published_at": "2022-08-18 05:12:45+00:00",
+      "owner": "fiu",
+      "title": "Securities Board of Nepal (SEBON): AML/CFT Directives for Securities Companies",
+      "filename": "Directive-2076-SEBON.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/07/FIU-Bylaw_2077.pdf",
+      "document_type": "act",
+      "published_at": "2021-07-27 05:07:15+00:00",
+      "owner": "fiu",
+      "title": "वित्तीय जानकारी इकाई सम्बन्धी विनियमावली, २०७७",
+      "filename": "FIU-Bylaw_2077.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/07/सम्पत्ति-शुद्धीकरण-मनी-लाउन्डरिङ्ग-निवारण-नियमावली-२०७३.pdf",
+      "document_type": "act",
+      "published_at": "2021-07-29 05:08:20+00:00",
+      "owner": "fiu",
+      "title": "सम्पत्ति शुद्धीकरण (मनी लाउण्डरिङ्ग) निवारण नियमावली, २०७३",
+      "filename": "सम्पत्ति-शुद्धीकरण-मनी-लाउन्डरिङ्ग-निवारण-नियमावली-२०७३.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/07/सम्पत्ति_शुद्धीकरण_ऐन_२०६४_दोस्रो_संशोधन.pdf",
+      "document_type": "act",
+      "published_at": "2021-07-29 05:09:03+00:00",
+      "owner": "fiu",
+      "title": "सम्पत्ति शुद्धीकरण (मनी लाउण्डरिङ्ग) निवारण ऐन, २०६४",
+      "filename": "सम्पत्ति_शुद्धीकरण_ऐन_२०६४_दोस्रो_संशोधन.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/07/११.सङ्गठित-अपराध-निवारण-ऐन-२०७०.pdf",
+      "document_type": "act",
+      "published_at": "2021-03-26 04:43:22+00:00",
+      "owner": "lgd",
+      "title": "सङ्गठित अपराध निवारण ऐन, २०७०",
+      "filename": "११.सङ्गठित-अपराध-निवारण-ऐन-२०७०.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/07/१२.कसुरजन्य-सम्पत्ति-तथा-साधन-रोक्का-नियन्त्रण-तथा-जफत-ऐन-२०७०.pdf",
+      "document_type": "act",
+      "published_at": "2021-03-26 04:42:51+00:00",
+      "owner": "lgd",
+      "title": "कसुरजन्य सम्पत्ति तथा साधन रोक्का नियन्त्रण तथा जफत ऐन, २०७०",
+      "filename": "१२.कसुरजन्य-सम्पत्ति-तथा-साधन-रोक्का-नियन्त्रण-तथा-जफत-ऐन-२०७०.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/07/१३.-बैङ्क-तथा-वित्तीय-संस्थाको-ऋण-असुली-ऐन-२०५८.pdf",
+      "document_type": "act",
+      "published_at": "2021-03-26 04:41:07+00:00",
+      "owner": "lgd",
+      "title": "बैङ्क तथा वित्तीय संस्थाको ऋण असुली ऐन, २०५८",
+      "filename": "१३.-बैङ्क-तथा-वित्तीय-संस्थाको-ऋण-असुली-ऐन-२०५८.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/07/१६.धितो-पत्र-सम्बन्धी-ऐन-२०६३.pdf",
+      "document_type": "act",
+      "published_at": "2021-03-26 04:38:39+00:00",
+      "owner": "lgd",
+      "title": "धितो पत्र सम्बन्धी ऐन, २०६३",
+      "filename": "१६.धितो-पत्र-सम्बन्धी-ऐन-२०६३.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/07/१८.औद्योगिक-व्यवसाय-ऐन-२०७६.pdf",
+      "document_type": "act",
+      "published_at": "2021-03-26 04:36:00+00:00",
+      "owner": "lgd",
+      "title": "औद्योगिक व्यवसाय ऐन, २०७६",
+      "filename": "१८.औद्योगिक-व्यवसाय-ऐन-२०७६.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/07/१९.विद्यूतीय-इलेक्ट्रोनिक-कारोबार-ऐन-२०६३.pdf",
+      "document_type": "act",
+      "published_at": "2021-03-26 04:35:59+00:00",
+      "owner": "lgd",
+      "title": "विद्यूतीय (इलेक्ट्रोनिक) कारोबार ऐन, २०६३",
+      "filename": "१९.विद्यूतीय-इलेक्ट्रोनिक-कारोबार-ऐन-२०६३.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/07/२१.सूचनाको-हक-सम्बन्धी-ऐन-२०६४.pdf",
+      "document_type": "act",
+      "published_at": "2021-03-26 04:33:26+00:00",
+      "owner": "lgd",
+      "title": "सूचनाको हक सम्बन्धी ऐन, २०६४",
+      "filename": "२१.सूचनाको-हक-सम्बन्धी-ऐन-२०६४.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/07/२३.उपभोक्ता-संरक्षण-ऐन-२०७५.pdf",
+      "document_type": "act",
+      "published_at": "2019-12-27 04:54:12+00:00",
+      "owner": "lgd",
+      "title": "उपभोक्ता संरक्षण ऐन, २०७५",
+      "filename": "२३.उपभोक्ता-संरक्षण-ऐन-२०७५.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/07/२४.वैयक्तिक-गोपनीयता-सम्बन्धी-ऐन-२०७५.pdf",
+      "document_type": "act",
+      "published_at": "2019-12-27 04:53:12+00:00",
+      "owner": "lgd",
+      "title": "वैयक्तिक गोपनीयता सम्बन्धी ऐन, २०७५",
+      "filename": "२४.वैयक्तिक-गोपनीयता-सम्बन्धी-ऐन-२०७५.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/07/२५.श्रम-ऐन-२०७४.pdf",
+      "document_type": "act",
+      "published_at": "2019-12-27 04:52:23+00:00",
+      "owner": "lgd",
+      "title": "श्रम ऐन, २०७४",
+      "filename": "२५.श्रम-ऐन-२०७४.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/07/२६.सहकारी-सम्बन्धी-कानूनलाई-संशोधन.pdf",
+      "document_type": "act",
+      "published_at": "2019-12-27 04:51:57+00:00",
+      "owner": "lgd",
+      "title": "सहकारी सम्बन्धी कानूनलाई संशोधन",
+      "filename": "२६.सहकारी-सम्बन्धी-कानूनलाई-संशोधन.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/07/२७.सामाजिक-सुरक्षा-ऐन-२०७५.pdf",
+      "document_type": "act",
+      "published_at": "2019-12-27 04:50:31+00:00",
+      "owner": "lgd",
+      "title": "सामाजिक सुरक्षा ऐन, २०७५",
+      "filename": "२७.सामाजिक-सुरक्षा-ऐन-२०७५.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/07/२८.मुलुकी-अपराध-संहिता-२०७४.pdf",
+      "document_type": "act",
+      "published_at": "2019-12-27 04:49:16+00:00",
+      "owner": "lgd",
+      "title": "मुलुकी अपराध संहिता, २०७४",
+      "filename": "२८.मुलुकी-अपराध-संहिता-२०७४.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/07/२९.मुलुकी-देवानी-संहिता-२०७४.pdf",
+      "document_type": "act",
+      "published_at": "2019-12-27 04:48:17+00:00",
+      "owner": "lgd",
+      "title": "मुलुकी देवानी संहिता, २०७४",
+      "filename": "२९.मुलुकी-देवानी-संहिता-२०७४.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/07/६.-विनिमेय-अधिकारपत्र-ऐन-२०३४.pdf",
+      "document_type": "act",
+      "published_at": "2021-03-26 04:53:28+00:00",
+      "owner": "lgd",
+      "title": "विनिमेय अधिकारपत्र ऐन, २०३४",
+      "filename": "६.-विनिमेय-अधिकारपत्र-ऐन-२०३४.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/07/७.विदेशी-लगानी-तथा-प्रविधि-हस्तान्तरण-ऐन-२०७५-1.pdf",
+      "document_type": "act",
+      "published_at": "2021-03-26 04:52:51+00:00",
+      "owner": "lgd",
+      "title": "विदेशी लगानी तथा प्रविधि हस्तान्तरण ऐन, २०७५",
+      "filename": "७.विदेशी-लगानी-तथा-प्रविधि-हस्तान्तरण-ऐन-२०७५-1.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/07/८.विदेशी-लगानीमा-प्रतिवन्ध-लगाउने-ऐन-२०२१.pdf",
+      "document_type": "act",
+      "published_at": "2021-03-26 04:51:05+00:00",
+      "owner": "lgd",
+      "title": "विदेशमा लगानी गर्न प्रतिबन्ध लगाउने ऐन, २०२१",
+      "filename": "८.विदेशी-लगानीमा-प्रतिवन्ध-लगाउने-ऐन-२०२१.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/08/FXMD-Circular-NRB-Foreign-Investment-and-Loan-Mgt-Bylaw-2078-2.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2021-08-10 09:47:28+00:00",
+      "owner": "fxm",
+      "title": "नेपाल राष्ट्र बैंक विदेशी लगानी तथा विदेशी ऋण व्यवस्थापन विनियमावली, २०७८",
+      "filename": "FXMD-Circular-NRB-Foreign-Investment-and-Loan-Mgt-Bylaw-2078-2.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/09/Oversight-Bylaws-2078-PSD.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2021-09-02 05:27:28+00:00",
+      "owner": "lgd",
+      "title": "भुक्तानी प्रणाली निरीक्षण तथा सुपरिवेक्षण विनियमावली, २०७८",
+      "filename": "Oversight-Bylaws-2078-PSD.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/09/Unified-Directive-2078-Payment-System-Department.pdf",
+      "document_type": "directive",
+      "published_at": "2021-09-14 09:04:33+00:00",
+      "owner": "psd",
+      "title": "भुक्तानी प्रणाली सम्बन्धी एकीकृत निर्देशन – २०७८",
+      "filename": "Unified-Directive-2078-Payment-System-Department.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/11/NRB-Information-Communication-Policy-2078-with-1st-Amd-1.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2021-11-01 10:59:05+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैंक सूचना तथा सञ्चार नीति, २०७७ (पहिलो संशोधनसहित)",
+      "filename": "NRB-Information-Communication-Policy-2078-with-1st-Amd-1.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/11/OMO-Bylaws-2078-new.pdf",
+      "document_type": "act",
+      "published_at": "2021-11-14 06:13:29+00:00",
+      "owner": "pdm",
+      "title": "नेपाल राष्ट्र बैंक खुला बजार कारोबार विनियमावली, २०७८",
+      "filename": "OMO-Bylaws-2078-new.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/11/Unified-Directives-2078-1.pdf",
+      "document_type": "directive",
+      "published_at": "2021-11-15 10:17:15+00:00",
+      "owner": "bfr",
+      "title": "Unified Directive, 2078",
+      "filename": "Unified-Directives-2078-1.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/01/D-Circular-no-5-1.pdf",
+      "document_type": "directive",
+      "published_at": "2022-01-04 09:28:32+00:00",
+      "owner": "bfr",
+      "title": "Unified Directives to Microfinance FIs, 2078",
+      "filename": "D-Circular-no-5-1.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/01/OMO-Karyabidhi.pdf",
+      "document_type": "act",
+      "published_at": "2022-01-27 06:19:20+00:00",
+      "owner": "pdm",
+      "title": "नेपाल राष्ट्र बैंक खुला बजार कारोबारसम्बन्धी कार्यविधि, २०७८",
+      "filename": "OMO-Karyabidhi.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/02/Circular-2-NIFRA-1.pdf",
+      "document_type": "directive",
+      "published_at": "2022-02-10 07:35:07+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. २(पूर्वाधार): नेपाल राष्ट्र बैंकबाट इजाजतपत्रप्राप्त पूर्वाधार विकास बैंकलाई जारी गरिएको निर्देशन, २०७८",
+      "filename": "Circular-2-NIFRA-1.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/02/Directives-for-Infrastructure-Development-Banks-2078-1.pdf",
+      "document_type": "directive",
+      "published_at": "2022-02-10 07:37:15+00:00",
+      "owner": "bfr",
+      "title": "Unified Directives to Infrastructure Development Bank,2078",
+      "filename": "Directives-for-Infrastructure-Development-Banks-2078-1.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/02/NRB_NBFISD-Inspection-and-Supervision-Bylaws-2081.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2024-10-21 06:33:14+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैंक गैर-बैंक वित्तीय संस्था निरीक्षण तथा सुपरिवेक्षण विनियमावली, २०८१",
+      "filename": "NRB_NBFISD-Inspection-and-Supervision-Bylaws-2081.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/03/Citizen-Saving-Bond-Primary-Sale-Process-2.pdf",
+      "document_type": "act",
+      "published_at": "2022-03-11 07:52:56+00:00",
+      "owner": "pdm",
+      "title": "नागरिक बचतपत्रकाे प्राथमिक बिक्री प्रक्रिया (दाेस्राे संशाेधन २०७८)",
+      "filename": "Citizen-Saving-Bond-Primary-Sale-Process-2.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/03/SP-4-Text-for-website.pdf",
+      "document_type": "directive",
+      "published_at": "2022-03-04 07:38:36+00:00",
+      "owner": "cpd",
+      "title": "NRB, Strategic Plan 2022-2026",
+      "filename": "SP-4-Text-for-website.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/06/Bikri-Agent-Sambandhi-Karyabidhi-2076.pdf",
+      "document_type": "act",
+      "published_at": "2022-06-01 11:21:33+00:00",
+      "owner": "pdm",
+      "title": "बिक्री एजेन्ट सम्बन्धी कार्यविधि, २०७६ (पहिलाे संशाेधन, २०७९)",
+      "filename": "Bikri-Agent-Sambandhi-Karyabidhi-2076.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/06/RemittanceByLaw2079.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2022-06-09 07:13:47+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैंक विप्रेषण कारोबार निरीक्षण तथा सुपरिवेक्षण विनियमावली, २०७९",
+      "filename": "RemittanceByLaw2079.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/07/NRB-Note-Dhulaune-Niyemawali-2078.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2022-07-18 04:42:34+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैंक नोट धुल्याउने नियमावली – २०७८",
+      "filename": "NRB-Note-Dhulaune-Niyemawali-2078.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/08/11.1-TCSP-circular.pdf",
+      "document_type": "directive",
+      "published_at": "2022-08-12 10:37:26+00:00",
+      "owner": "fiu",
+      "title": "Office of Company Registrar: AML/CFT Directives for Trust or Company Service Providers (TCSPs)",
+      "filename": "11.1-TCSP-circular.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/08/AMLCFT-Directives-Casinos_2nd-Amendment.pdf",
+      "document_type": "directive",
+      "published_at": "2022-08-14 06:50:41+00:00",
+      "owner": "fiu",
+      "title": "Ministry of Culture, Tourism and Civil Aviation: AML/CFT Directives for CASINOS",
+      "filename": "AMLCFT-Directives-Casinos_2nd-Amendment.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/08/AMLCFT-Directives-for-Real-Estate_DOLMA-with-TFS-Guidelines.pdf",
+      "document_type": "directive",
+      "published_at": "2022-08-13 10:39:04+00:00",
+      "owner": "fiu",
+      "title": "Department of Land Management and Archive (DOLMA): AML/CFT Directives for Real Estate Business/Agents",
+      "filename": "AMLCFT-Directives-for-Real-Estate_DOLMA-with-TFS-Guidelines.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/08/Cooperative_DCOOP_2082-Kartik.pdf",
+      "document_type": "directive",
+      "published_at": "2022-08-17 05:11:18+00:00",
+      "owner": "fiu",
+      "title": "Department of Cooperatives: AML/CFT Directives for Cooperatives",
+      "filename": "Cooperative_DCOOP_2082-Kartik.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/08/DPMS_IRD_2082-Mangsir.pdf",
+      "document_type": "directive",
+      "published_at": "2022-08-15 05:56:51+00:00",
+      "owner": "fiu",
+      "title": "Inland Revenue Department: AML/CFT Directives for Dealers in precious stones and metals",
+      "filename": "DPMS_IRD_2082-Mangsir.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/08/EPF-CIT-AML-CFT.pdf",
+      "document_type": "directive",
+      "published_at": "2022-08-20 05:10:26+00:00",
+      "owner": "fiu",
+      "title": "Nepal Rastra Bank (NRB): AML/CFT Directives for EPF, CIT and SSF",
+      "filename": "EPF-CIT-AML-CFT.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/08/Inland-Revenue-Department-AMLCFT-Directives-for-Approved-Retirement-Funds.pdf",
+      "document_type": "directive",
+      "published_at": "2022-08-16 05:55:52+00:00",
+      "owner": "fiu",
+      "title": "Inland Revenue Department: AML/CFT Directives for Approved Retirement Funds",
+      "filename": "Inland-Revenue-Department-AMLCFT-Directives-for-Approved-Retirement-Funds.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/08/NRB-Moneychanger-License-and-Inspection-Bylaws-2077-2nd-Amendment.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2022-08-17 04:51:32+00:00",
+      "owner": "fxm",
+      "title": "नेपाल राष्ट्र बैंक मनिचेन्जर इजाजतपत्र तथा निरीक्षण विनियमावली, २०७७ मा संसोधन गरिएको सम्बन्धमा",
+      "filename": "NRB-Moneychanger-License-and-Inspection-Bylaws-2077-2nd-Amendment.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/08/Nepal-Insurance-Authority-AML.CFT-Directives-for-Insurance-companies.pdf",
+      "document_type": "directive",
+      "published_at": "2022-08-19 05:11:55+00:00",
+      "owner": "fiu",
+      "title": "Nepal Insurance Authority: AML/CFT Directives for Insurance companies",
+      "filename": "Nepal-Insurance-Authority-AML.CFT-Directives-for-Insurance-companies.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/08/Nepal-Rastra-Bank-NRB-AML.CFT-Directives-for-A-B-C-class-BFIs.pdf",
+      "document_type": "directive",
+      "published_at": "2022-08-25 02:35:35+00:00",
+      "owner": "fiu",
+      "title": "Nepal Rastra Bank (NRB): AML/CFT Directives for A, B & C class BFIs",
+      "filename": "Nepal-Rastra-Bank-NRB-AML.CFT-Directives-for-A-B-C-class-BFIs.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/08/Nepal-Rastra-Bank-NRB-AML.CFT-Directives-for-Infrastructure-Development-Bank_compressed.pdf",
+      "document_type": "directive",
+      "published_at": "2022-08-21 05:29:53+00:00",
+      "owner": "fiu",
+      "title": "Nepal Rastra Bank (NRB): AML/CFT Directives for Infrastructure Development Bank",
+      "filename": "Nepal-Rastra-Bank-NRB-AML.CFT-Directives-for-Infrastructure-Development-Bank_compressed.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/08/Nepal-Rastra-Bank-NRB-AML.CFT-Directives-for-Microfinance-FIs.pdf",
+      "document_type": "directive",
+      "published_at": "2022-08-24 05:24:45+00:00",
+      "owner": "fiu",
+      "title": "Nepal Rastra Bank (NRB): AML/CFT Directives for Microfinance FIs",
+      "filename": "Nepal-Rastra-Bank-NRB-AML.CFT-Directives-for-Microfinance-FIs.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/08/Nepal-Rastra-Bank-NRB-AML.CFT-Directives-for-PSP.PSOs_.pdf",
+      "document_type": "directive",
+      "published_at": "2022-08-22 10:48:33+00:00",
+      "owner": "fiu",
+      "title": "Nepal Rastra Bank (NRB): AML/CFT Directives for PSP/PSOs",
+      "filename": "Nepal-Rastra-Bank-NRB-AML.CFT-Directives-for-PSP.PSOs_.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/08/Nepal-Rastra-Bank-NRB.AML_.CFT-Directives-for-Money-changers-and-Remittance-companies..pdf",
+      "document_type": "directive",
+      "published_at": "2022-08-23 09:14:40+00:00",
+      "owner": "fiu",
+      "title": "Nepal Rastra Bank (NRB): AML/CFT Directives for Money changers and Remittance companies",
+      "filename": "Nepal-Rastra-Bank-NRB.AML_.CFT-Directives-for-Money-changers-and-Remittance-companies..pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/08/The-Institute-of-Chartered-Accountants-of-Nepal-ICAN-AMLCFT-Directives-for-Auditors-and-Accountants.pdf",
+      "document_type": "directive",
+      "published_at": "2022-08-12 07:11:35+00:00",
+      "owner": "fiu",
+      "title": "The Institute of Chartered Accountants of Nepal (ICAN): AML/CFT Directives for Auditors and Accountants",
+      "filename": "The-Institute-of-Chartered-Accountants-of-Nepal-ICAN-AMLCFT-Directives-for-Auditors-and-Accountants.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/08/सम्पत्ति-शुद्धीकरण-मनी-लाउन्डरिङ्ग-निवारण-नियमावली-२०७०.pdf",
+      "document_type": "act",
+      "published_at": "2021-07-28 10:33:19+00:00",
+      "owner": "fiu",
+      "title": "सम्पत्ति शुद्धीकरण (मनी लाउन्डरिङ्ग) निवारण (सूचीकृत व्यक्ति, समूह वा संगठनको सम्पत्ति वा कोष रोक्का) नियमावली, २०७०",
+      "filename": "सम्पत्ति-शुद्धीकरण-मनी-लाउन्डरिङ्ग-निवारण-नियमावली-२०७०.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/11/Merger-Acquisition-Bylaw-2073-5th-Revision.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2022-11-13 08:28:33+00:00",
+      "owner": "lgd",
+      "title": "बैंक तथा वित्तीय संस्था एक आपसमा गाभ्ने / गाभिने (मर्जर) तथा प्राप्ति (एक्विजिशन) सम्बन्धी विनियमावली २०७३ (पाँचौं संशोधन, २०७९)",
+      "filename": "Merger-Acquisition-Bylaw-2073-5th-Revision.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/01/NRB-Inspection-and-Supervision-Biniyamawali-2074-First-Amendment-2079.docx.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2023-01-04 09:06:36+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैंक निरीक्षण तथा सुपरिवेक्षण विनियमावली, २०७४ (प्रथम संशोधन २०७९)",
+      "filename": "NRB-Inspection-and-Supervision-Biniyamawali-2074-First-Amendment-2079.docx.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/01/PSD_unified-Directive-2079_Letter-combined.pdf",
+      "document_type": "directive",
+      "published_at": "2023-01-30 12:07:30+00:00",
+      "owner": "psd",
+      "title": "भुक्तानी प्रणाली सम्बन्धी एकीकृत निर्देशन – २०७९",
+      "filename": "PSD_unified-Directive-2079_Letter-combined.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/02/Unified-Directives-2079-Magh-published.pdf",
+      "document_type": "directive",
+      "published_at": "2023-02-14 11:27:02+00:00",
+      "owner": "bfr",
+      "title": "Unified Directives, 2079",
+      "filename": "Unified-Directives-2079-Magh-published.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/03/नेपाल-राष्ट्र-बैंक-ऐन-२०१२.pdf",
+      "document_type": "act",
+      "published_at": "2023-03-09 10:52:55+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैंक ऐन, २०१२",
+      "filename": "नेपाल-राष्ट्र-बैंक-ऐन-२०१२.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/04/Unified-Directive-Microfinance-2079PR.pdf",
+      "document_type": "directive",
+      "published_at": "2023-04-13 10:42:39+00:00",
+      "owner": "bfr",
+      "title": "Unified Directives to Microfinance FIs, 2079",
+      "filename": "Unified-Directive-Microfinance-2079PR.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/05/भुक्तानी-तथा-फर्छ्योट-विनियमावली-पहिलो-संशोधन-२०८०-२०७७.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2023-05-16 10:59:57+00:00",
+      "owner": "psd",
+      "title": "भुक्तानी तथा फर्छ्याैट विनियमावली (पहिलो संशोधन, २०८०), २०७७",
+      "filename": "भुक्तानी-तथा-फर्छ्योट-विनियमावली-पहिलो-संशोधन-२०८०-२०७७.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/08/OMO-Bylaws-2078-3rd.Revision-2080.pdf",
+      "document_type": "act",
+      "published_at": "2023-08-30 07:07:58+00:00",
+      "owner": "pdm",
+      "title": "नेपाल राष्ट्र बैंक खुला बजार कारोबार विनियमावली (तेस्राे संशोधन, २०८०), २०७८",
+      "filename": "OMO-Bylaws-2078-3rd.Revision-2080.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/10/Unified-Directives-2080-Final-Upload.pdf",
+      "document_type": "directive",
+      "published_at": "2023-10-17 11:36:33+00:00",
+      "owner": "bfr",
+      "title": "Unified Directives A,B and C 2080",
+      "filename": "Unified-Directives-2080-Final-Upload.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/10/Unified-Directives-of-Infrastructure-Development-Banks-2080-asoj-end.pdf",
+      "document_type": "directive",
+      "published_at": "2023-10-17 11:38:53+00:00",
+      "owner": "bfr",
+      "title": "Unified Directives for Infrastructure Development Bank 2080",
+      "filename": "Unified-Directives-of-Infrastructure-Development-Banks-2080-asoj-end.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/11/Unified-Directive-2080-Final-Upload-3.pdf",
+      "document_type": "directive",
+      "published_at": "2023-11-20 11:04:26+00:00",
+      "owner": "psd",
+      "title": "नेपाल राष्ट्र बैंकबाट भुक्तानीसम्बन्धी कार्य गर्न अनुमतिपत्रप्राप्त संस्थाहरूलाई जारी गरिएको भुक्तानी प्रणालीसम्बन्धी एकीकृत निर्देशन – २०८०",
+      "filename": "Unified-Directive-2080-Final-Upload-3.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/12/FXMD_Circular-04FX-Transaction-Licensing-and-Inspection-Bylaw-2077_second-Amendment.2080.81.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2023-12-11 07:00:16+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैंक विदेशी विनिमय कारोबार इजाजतपत्र तथा निरीक्षण विनियमावली, २०७७ (दोस्रो संशोधनसहित – मितिः २०८०/०८/२५)",
+      "filename": "FXMD_Circular-04FX-Transaction-Licensing-and-Inspection-Bylaw-2077_second-Amendment.2080.81.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/02/2.-OMO-Bylaws-2078_Prop_4th-Revision-upload.pdf",
+      "document_type": "act",
+      "published_at": "2024-02-11 10:41:21+00:00",
+      "owner": "pdm",
+      "title": "नेपाल राष्ट्र बैंक खुला बजार कारोबार विनियमावली (चाैथाे संशोधन, २०८०), २०७८",
+      "filename": "2.-OMO-Bylaws-2078_Prop_4th-Revision-upload.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/02/OMO-Procedure-2078_Prop.-4th.-Revision-Upload.pdf",
+      "document_type": "act",
+      "published_at": "2024-02-11 10:42:58+00:00",
+      "owner": "pdm",
+      "title": "नेपाल राष्ट्र बैंक खुला बजार कारोबारसम्बन्धी कार्यविधि (चाैथाे संशोधन, २०८०), २०७८",
+      "filename": "OMO-Procedure-2078_Prop.-4th.-Revision-Upload.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/04/NRB-Inspection-and-Supervision-Biniyamawali-2074-second-Amendment-2080.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2024-04-03 06:34:32+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैंक निरीक्षण तथा सुपरिवेक्षण विनियमावली, २०७४ (दोस्रो संशोधन २०८०)",
+      "filename": "NRB-Inspection-and-Supervision-Biniyamawali-2074-second-Amendment-2080.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/04/सम्पत्ति-शुद्धीकरण-निवारण-तथा-अन्य-केही-ऐनलाई-संशोधन-गर्न-बनेको-ऐन-२०८०.pdf",
+      "document_type": "act",
+      "published_at": "2024-04-16 05:13:36+00:00",
+      "owner": "fiu",
+      "title": "सम्पत्ति शुद्धीकरण (मनी लाउण्डरिङ्ग) निवारण तथा व्यावसायिक वातावरण प्रवर्द्धन सम्बन्धी केही ऐनलाई संशोधन गर्ने ऐन, २०८०",
+      "filename": "सम्पत्ति-शुद्धीकरण-निवारण-तथा-अन्य-केही-ऐनलाई-संशोधन-गर्न-बनेको-ऐन-२०८०.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/04/सम्पत्ति-शुद्धीकरण-मनी-लाउन्डरिङ्ग-निवारण-ऐन-२०६४-संशोधन-२०८०.pdf",
+      "document_type": "act",
+      "published_at": "2024-04-28 10:06:50+00:00",
+      "owner": "fiu",
+      "title": "सम्पत्ति शुद्धीकरण (मनी लाउण्डरिङ्ग) निवारण ऐन, २०६४ (संशोधन, २०८०)",
+      "filename": "सम्पत्ति-शुद्धीकरण-मनी-लाउन्डरिङ्ग-निवारण-ऐन-२०६४-संशोधन-२०८०.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/06/Nepal-Rastra-Bank-NRB.AML_.CFT-Directives-for-Hire-Purchase-companies.pdf",
+      "document_type": "directive",
+      "published_at": "2024-06-03 09:24:28+00:00",
+      "owner": "fiu",
+      "title": "Nepal Rastra Bank (NRB): AML/CFT Directives for Hire Purchase companies",
+      "filename": "Nepal-Rastra-Bank-NRB.AML_.CFT-Directives-for-Hire-Purchase-companies.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/06/OMO-Procedure-2078_5th.-Revision-Final.pdf",
+      "document_type": "act",
+      "published_at": "2024-06-24 10:41:25+00:00",
+      "owner": "pdm",
+      "title": "नेपाल राष्ट्र बैंक खुला बजार कारोबारसम्बन्धी कार्यविधि (पाँचाै संशोधन, २०८१), २०७८",
+      "filename": "OMO-Procedure-2078_5th.-Revision-Final.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/08/OMO-Bylaws-2078_-5th-Revision-Final.pdf",
+      "document_type": "act",
+      "published_at": "2024-08-23 07:39:15+00:00",
+      "owner": "pdm",
+      "title": "नेपाल राष्ट्र बैंक खुला बजार कारोबार विनियमावली (पाँचाै संशोधन, २०८१), २०७८",
+      "filename": "OMO-Bylaws-2078_-5th-Revision-Final.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/08/OMO-Procedure-2078_6th.-Revision-Final-5.7-3.pdf",
+      "document_type": "act",
+      "published_at": "2024-08-23 07:40:32+00:00",
+      "owner": "pdm",
+      "title": "नेपाल राष्ट्र बैंक खुला बजार कारोबारसम्बन्धी कार्यविधि (छैठाैं संशोधन, २०८१), २०७८",
+      "filename": "OMO-Procedure-2078_6th.-Revision-Final-5.7-3.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/11/सम्पत्ति-शुद्धीकरण-मनी-लाउन्डरिङ्ग-निवारण-नियमावली-२०८१.pdf",
+      "document_type": "act",
+      "published_at": "2024-11-05 06:42:26+00:00",
+      "owner": "fiu",
+      "title": "सम्पत्ति शुद्धीकरण (मनी लाउन्डरिङ्ग) निवारण नियमावली, २०८१",
+      "filename": "सम्पत्ति-शुद्धीकरण-मनी-लाउन्डरिङ्ग-निवारण-नियमावली-२०८१.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/12/OMO-Procedure-2078_7th.-Revision.pdf",
+      "document_type": "act",
+      "published_at": "2024-12-24 06:20:32+00:00",
+      "owner": "pdm",
+      "title": "नेपाल राष्ट्र बैंक खुला बजार कारोबारसम्बन्धी कार्यविधि (साताैं संशोधन, २०८१), २०७८",
+      "filename": "OMO-Procedure-2078_7th.-Revision.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/01/MFI-for-upload.pdf",
+      "document_type": "directive",
+      "published_at": "2025-01-13 10:58:35+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. ६ (घ) २०८१ /८२ : एकीकृत निर्देशन,२०८१ जारी गरिएको सम्बन्धमा ।",
+      "filename": "MFI-for-upload.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/01/NIFRA-Unified-Directive.pdf",
+      "document_type": "directive",
+      "published_at": "2025-01-13 10:53:45+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. ६ (पुर्वाधार ) २०८१ /८२ : एकीकृत निर्देशन,२०८१ जारी गरिएको सम्बन्धमा ।",
+      "filename": "NIFRA-Unified-Directive.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/01/UD-2081-ABC-merged.pdf",
+      "document_type": "directive",
+      "published_at": "2025-01-13 10:45:06+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. ७ (क,ख,ग) २०८१ /८२ : एकीकृत निर्देशन,२०८१ जारी गरिएको सम्बन्धमा ।",
+      "filename": "UD-2081-ABC-merged.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/01/थप-नियमनकारी-निकाय-तथा-थप-सम्वद्ध-कसुरहरु.pdf",
+      "document_type": "act",
+      "published_at": "2025-01-03 05:54:51+00:00",
+      "owner": "fiu",
+      "title": "थप नियमनकारी निकाय तथा थप सम्वद्ध कसुरहरु",
+      "filename": "थप-नियमनकारी-निकाय-तथा-थप-सम्वद्ध-कसुरहरु.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/02/सम्पत्ति-शुद्धीकरण-मनी-लाउन्डरिङ्ग-निवारण-ऐन-२०६४-संशोधन-२०८०-2.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2025-02-17 09:15:30+00:00",
+      "owner": "mlpsd",
+      "title": "सम्पत्ति शुद्धीकरण मनीलाउन्डरिङ्ग निवारण ऐन २०६४ संशोधन २०८०",
+      "filename": "सम्पत्ति-शुद्धीकरण-मनी-लाउन्डरिङ्ग-निवारण-ऐन-२०६४-संशोधन-२०८०-2.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/02/सम्पत्ति-शुद्धीकरण-मनी-लाउन्डरिङ्ग-निवारण-नियमावली-२०८१.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2025-02-17 11:01:22+00:00",
+      "owner": "mlpsd",
+      "title": "सम्पत्ति शुद्धीकरण मनी लाउन्डरिङ्ग निवारण नियमावली २०८१",
+      "filename": "सम्पत्ति-शुद्धीकरण-मनी-लाउन्डरिङ्ग-निवारण-नियमावली-२०८१.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/02/हेजिङ्ग-नियमावली-२०७९.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2025-02-09 09:03:42+00:00",
+      "owner": "lgd",
+      "title": "हेजिङ्ग नियमावली, २०७९",
+      "filename": "हेजिङ्ग-नियमावली-२०७९.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/03/Payment-System-related-Unified-Directives-2081-1.pdf",
+      "document_type": "directive",
+      "published_at": "2025-03-07 08:20:29+00:00",
+      "owner": "psd",
+      "title": "नेपाल राष्ट्र बैंकबाट भुक्तानीसम्बन्धी कार्य गर्न अनुमतिपत्रप्राप्त संस्थाहरूलाई जारी गरिएको भुक्तानी प्रणालीसम्बन्धी एकीकृत निर्देशन – २०८१",
+      "filename": "Payment-System-related-Unified-Directives-2081-1.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/04/18-2081-Final-Khata-Rokka-Fukuwa-1st-Ammendment-Publish.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2025-04-01 10:20:46+00:00",
+      "owner": "mlpsd",
+      "title": "बैंक खाता रोक्का तथा फुकुवासम्बन्धी विनियमावली, २०८१",
+      "filename": "18-2081-Final-Khata-Rokka-Fukuwa-1st-Ammendment-Publish.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/04/Circular-Forex.pdf",
+      "document_type": "directive",
+      "published_at": "2025-04-01 07:08:32+00:00",
+      "owner": "mlpsd",
+      "title": "AML/CFT Directives : Foreign Exchange Related",
+      "filename": "Circular-Forex.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/04/Directive-D-class.pdf",
+      "document_type": "directive",
+      "published_at": "2025-04-01 07:04:06+00:00",
+      "owner": "mlpsd",
+      "title": "AML/CFT Directive: ‘D’ class Licensed Institutions",
+      "filename": "Directive-D-class.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/04/Directive-NIFRA.pdf",
+      "document_type": "directive",
+      "published_at": "2025-04-01 07:21:17+00:00",
+      "owner": "mlpsd",
+      "title": "AML/CFT Directives : Infrastructure Development Bank",
+      "filename": "Directive-NIFRA.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/04/Directives-PSO_PSP.pdf",
+      "document_type": "directive",
+      "published_at": "2025-04-01 07:12:04+00:00",
+      "owner": "mlpsd",
+      "title": "AML/CFT Directives: PSO/PSP",
+      "filename": "Directives-PSO_PSP.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/04/EPF-CIT-SSF-AML-CFT.pdf",
+      "document_type": "directive",
+      "published_at": "2025-04-01 07:28:40+00:00",
+      "owner": "mlpsd",
+      "title": "AML/CFT Directives : EPF/CIT/SSF",
+      "filename": "EPF-CIT-SSF-AML-CFT.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/04/Hirepurchase-AML_CFT-regulation.pdf",
+      "document_type": "directive",
+      "published_at": "2025-04-01 07:13:00+00:00",
+      "owner": "mlpsd",
+      "title": "AML/CFT Directives: Hire Purchase Company",
+      "filename": "Hirepurchase-AML_CFT-regulation.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/04/Unified-Directives-2082-Direction-no-19-for-A-B-and-C-class-BFIs.pdf",
+      "document_type": "directive",
+      "published_at": "2025-04-01 06:59:29+00:00",
+      "owner": "mlpsd",
+      "title": "AML/CFT Directives : ‘A’, ‘B’, ‘C’ class Licensed Institutions",
+      "filename": "Unified-Directives-2082-Direction-no-19-for-A-B-and-C-class-BFIs.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/07/1_2082.04.01_FEMD-Circular.pdf",
+      "document_type": "circular",
+      "published_at": "2025-07-17 10:38:46+00:00",
+      "owner": "fxm",
+      "title": "१/२०८२–८३ः एकीकृत परिपत्र–२०८१ मा संशोधन सम्बन्धमा (राहदानी बापतको सटही, NDF, AML/CFT) । २०८२/०४/०१ ।",
+      "filename": "1_2082.04.01_FEMD-Circular.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/07/Cheque-Dishonour-Related-Manual-FInal_V1.pdf",
+      "document_type": "act",
+      "published_at": "2025-07-10 10:29:16+00:00",
+      "owner": "bfr",
+      "title": "सूचना नं. १६ /०८१ –८२ चेक अनादर गरेको व्यहोरा प्रमाणित गर्ने कार्यविधि जारी गरिएको सम्बन्धमा ।",
+      "filename": "Cheque-Dishonour-Related-Manual-FInal_V1.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/07/ECL-Guidelines-First-Amendment-To-be-Published.pdf",
+      "document_type": "act",
+      "published_at": "2025-07-30 05:31:48+00:00",
+      "owner": "bfr",
+      "title": "सूचना नं. ३/०८२ –८३: NFRS 9- Expected Credit Loss Related Guidelines, 2024 (First Amendment) जारी गरिएको सम्बन्धमा ।",
+      "filename": "ECL-Guidelines-First-Amendment-To-be-Published.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/07/Notice1-Guidancenote-1.pdf",
+      "document_type": "act",
+      "published_at": "2025-07-27 11:22:30+00:00",
+      "owner": "bfr",
+      "title": "सूचना नं. १ /०८२ –८३ Guidance Note on Interest Income Recognition, 2025 जारी गरिएको सम्बन्धमा ।",
+      "filename": "Notice1-Guidancenote-1.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/07/Notice2-ECL-amendment.pdf",
+      "document_type": "act",
+      "published_at": "2025-07-27 11:29:03+00:00",
+      "owner": "bfr",
+      "title": "सूचना नं. २/०८२ –८३ NFRS 9- Expected Credit Loss Related Guidelines, 2024 मा संशोधन/परिमार्जन/थप ।",
+      "filename": "Notice2-ECL-amendment.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/07/नेपाल-राष्ट्र-बैङ्क-ऐन-२०५८.pdf",
+      "document_type": "act",
+      "published_at": "2025-07-18 04:01:53+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैंक ऐन, २०५८",
+      "filename": "नेपाल-राष्ट्र-बैङ्क-ऐन-२०५८.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/07/बैङ्क-तथा-वित्तीय-संस्था-सम्बन्धी-ऐन-२०७३.pdf",
+      "document_type": "act",
+      "published_at": "2025-07-18 04:04:55+00:00",
+      "owner": "lgd",
+      "title": "बैंक तथा वित्तीय संस्था सम्बन्धी ऐन, २०७३",
+      "filename": "बैङ्क-तथा-वित्तीय-संस्था-सम्बन्धी-ऐन-२०७३.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/07/बैङ्किङ्ग-कसूर-तथा-सजाय-ऐन-२०६४.pdf",
+      "document_type": "act",
+      "published_at": "2025-07-18 04:08:37+00:00",
+      "owner": "lgd",
+      "title": "बैंकिङ्ग कसूर तथा सजाय ऐन, २०६४",
+      "filename": "बैङ्किङ्ग-कसूर-तथा-सजाय-ऐन-२०६४.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/07/भुक्तानी-तथा-फर्स्यौट-ऐन-२०७५.pdf",
+      "document_type": "act",
+      "published_at": "2025-07-22 05:30:49+00:00",
+      "owner": "lgd",
+      "title": "भुक्तानी तथा फर्स्यौट ऐन, २०७५",
+      "filename": "भुक्तानी-तथा-फर्स्यौट-ऐन-२०७५.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/07/विदेशी-विनिमय-नियमित-गर्ने-ऐन-२०१९.pdf",
+      "document_type": "act",
+      "published_at": "2025-07-22 05:40:47+00:00",
+      "owner": "lgd",
+      "title": "विदेशी विनिमय (नियमित गर्ने) ऐन, २०१९",
+      "filename": "विदेशी-विनिमय-नियमित-गर्ने-ऐन-२०१९.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/07/विनिमेय-अधिकारपत्र-ऐन-२०३४.pdf",
+      "document_type": "act",
+      "published_at": "2025-07-22 05:37:19+00:00",
+      "owner": "lgd",
+      "title": "विनिमेय अधिकारपत्र ऐन, २०३४",
+      "filename": "विनिमेय-अधिकारपत्र-ऐन-२०३४.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/07/सम्पत्ति-शुद्धीकरण-मनी-लाउन्डरिङ्ग-निवारण-ऐन-२०६४.pdf",
+      "document_type": "act",
+      "published_at": "2025-07-18 04:06:42+00:00",
+      "owner": "lgd",
+      "title": "सम्पत्ति शुद्धीकरण (मनी लाउन्डरिङ्ग) निवारण ऐन, २०६४",
+      "filename": "सम्पत्ति-शुद्धीकरण-मनी-लाउन्डरिङ्ग-निवारण-ऐन-२०६४.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/07/सार्वजनिक-खरिद-ऐन-२०६४.pdf",
+      "document_type": "act",
+      "published_at": "2025-07-22 05:27:01+00:00",
+      "owner": "lgd",
+      "title": "सार्वजनिक खरिद ऐन, २०६३",
+      "filename": "सार्वजनिक-खरिद-ऐन-२०६४.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/07/सूचनाको-हक-सम्बन्धी-ऐन-२०६४.pdf",
+      "document_type": "act",
+      "published_at": "2025-07-22 05:20:18+00:00",
+      "owner": "lgd",
+      "title": "सूचनाको हक सम्बन्धी ऐन, २०६४",
+      "filename": "सूचनाको-हक-सम्बन्धी-ऐन-२०६४.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/08/2_2082.04.22_FEMD-Circular.pdf",
+      "document_type": "circular",
+      "published_at": "2025-08-07 11:01:59+00:00",
+      "owner": "fxm",
+      "title": "२/२०८२-८३: विदेशी विनिमय सम्बन्धी एकीकृत परिपत्र–२०८१ मा संशोधन । २०८२/०४/२२",
+      "filename": "2_2082.04.22_FEMD-Circular.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/08/3_2082.05.01_FEMD-Circular_Silver.pdf",
+      "document_type": "circular",
+      "published_at": "2025-08-17 05:46:52+00:00",
+      "owner": "fxm",
+      "title": "३/२०८२–८३ः एकीकृत परिपत्र–२०८१ मा संशोधन (उद्योगलाई चाँदी आयातको सटही सुविधा) । २०८२/०५/०१",
+      "filename": "3_2082.05.01_FEMD-Circular_Silver.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/08/AGM-Clearance-Final-1.pdf",
+      "document_type": "act",
+      "published_at": "2025-08-27 11:21:16+00:00",
+      "owner": "bfr",
+      "title": "सूचना नं. ४/०८२ –८३ : इजाजतपत्रप्राप्त बैंक तथा वित्तीय संस्थाको वार्षिक साधारण सभा प्रयोजनको लागि वित्तीय विवरण प्रकाशन गर्न सहमति प्रदान गर्ने तथा लाभांश स्वीकृत गर्ने सम्बन्धी कार्यविधि , २०८२।",
+      "filename": "AGM-Clearance-Final-1.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/08/CSR-Guidelines-2082-Publish-1.pdf",
+      "document_type": "act",
+      "published_at": "2025-08-29 11:21:15+00:00",
+      "owner": "bfr",
+      "title": "सूचना नं. ६/०८२ –८३ : बैंक तथा वित्तीय संस्थाको संस्थागत सामाजिक उत्तरदायित्वसम्बन्धी मार्गदर्शन, २०८१ (प्रथम संशोधन, २०८२) जारी गरिएको सम्बन्धमा ।",
+      "filename": "CSR-Guidelines-2082-Publish-1.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/08/Circular-1-CSR-NIFRA-Publish.pdf",
+      "document_type": "circular",
+      "published_at": "2025-08-29 11:32:53+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. १ (पूर्वाधार): नेपाल राष्ट्र बैंकबाट इजाजतपत्रप्राप्त पूर्वाधार विकास बैंकलाई जारी गरिएको एकीकृत निर्देशन, २०८१ मा संशोधन/परिमार्जन/थप ।",
+      "filename": "Circular-1-CSR-NIFRA-Publish.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/08/Circular-1-D-Final-Upload.pdf",
+      "document_type": "circular",
+      "published_at": "2025-08-24 12:01:07+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. १ (घ): नेपाल राष्ट्र बैंकबाट इजाजतपत्रप्राप्त “घ” वर्गका लघुवित्त वित्तीय संस्थाहरुलाई जारी गरिएको एकीकृत निर्देशन, २०८१ मा संशोधन/परिमार्जन/थप ।",
+      "filename": "Circular-1-D-Final-Upload.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/08/Circular-1-LFAR_merged-2.pdf",
+      "document_type": "circular",
+      "published_at": "2025-08-18 11:12:33+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. १ (क,ख,ग): नेपाल राष्ट्र बैंकबाट “क”, “ख” र “ग” वर्गका इजाजतपत्रप्राप्त संस्थाहरुलाई जारी गरिएको एकीकृत निर्देशन, २०८१ मा संशोधन/परिमार्जन/थप ।",
+      "filename": "Circular-1-LFAR_merged-2.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/08/Circular-2-ABC-final-upload.pdf",
+      "document_type": "circular",
+      "published_at": "2025-08-24 11:57:27+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. २ (क,ख,ग): नेपाल राष्ट्र बैंकबाट “क”, “ख” र “ग” वर्गका इजाजतपत्रप्राप्त संस्थाहरुलाई जारी गरिएको एकीकृत निर्देशन, २०८१ मा संशोधन/परिमार्जन/थप ।",
+      "filename": "Circular-2-ABC-final-upload.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/08/Circular-2-MF-CSR-Publish.pdf",
+      "document_type": "circular",
+      "published_at": "2025-08-29 11:31:02+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. २ (घ): नेपाल राष्ट्र बैंकबाट इजाजतपत्रप्राप्त “घ” वर्गका लघुवित्त वित्तीय संस्थाहरुलाई जारी गरिएको एकीकृत निर्देशन, २०८१ मा संशोधन/परिमार्जन/थप ।",
+      "filename": "Circular-2-MF-CSR-Publish.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/08/Circular-4-ABC-Publish.pdf",
+      "document_type": "circular",
+      "published_at": "2025-08-29 11:26:25+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. ४ (क,ख,ग): नेपाल राष्ट्र बैंकबाट “क”, “ख” र “ग” वर्गका इजाजतपत्रप्राप्त संस्थाहरुलाई जारी गरिएको एकीकृत निर्देशन, २०८१ मा संशोधन/परिमार्जन/थप ।",
+      "filename": "Circular-4-ABC-Publish.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/08/Circular-no.-3_Final-for-upload.pdf",
+      "document_type": "circular",
+      "published_at": "2025-08-28 12:21:27+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. ३ (क,ख,ग): नेपाल राष्ट्र बैंकबाट “क”, “ख” र “ग” वर्गका इजाजतपत्रप्राप्त संस्थाहरुलाई जारी गरिएको एकीकृत निर्देशन, २०८१ मा संशोधन/परिमार्जन/थप ।",
+      "filename": "Circular-no.-3_Final-for-upload.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/09/2082.05.31_FXMD-Circular_Mustang-Customs.pdf",
+      "document_type": "circular",
+      "published_at": "2025-09-16 06:46:20+00:00",
+      "owner": "fxm",
+      "title": "४/२०८२–८३ः एकीकृत परिपत्र–२०८१ मा संशोधन (मुस्ताङ्ग भन्सार) । २०८२/०५/३१",
+      "filename": "2082.05.31_FXMD-Circular_Mustang-Customs.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/09/ABC-Circular-F.pdf",
+      "document_type": "circular",
+      "published_at": "2025-09-26 07:49:19+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. ५ (क,ख,ग): नेपाल राष्ट्र बैंकबाट “क”, “ख” र “ग” वर्गका इजाजतपत्रप्राप्त संस्थाहरुलाई जारी गरिएको एकीकृत निर्देशन, २०८१ मा संशोधन/परिमार्जन/थप ।",
+      "filename": "ABC-Circular-F.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/09/Limit-Enhancement.pdf",
+      "document_type": "circular",
+      "published_at": "2025-09-25 11:17:40+00:00",
+      "owner": "psd",
+      "title": "भुक्तानी सेवा प्रदायकहरुले सञ्चालन गरेका वालेटमा रकम जम्मा गर्ने सीमा (संख्या) लाई अस्थायी रुपमा बृद्धि गरिएको सम्बन्धमा ।",
+      "filename": "Limit-Enhancement.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/10/5-2082-83-amendment-in-UC.pdf",
+      "document_type": "circular",
+      "published_at": "2025-10-10 06:02:56+00:00",
+      "owner": "fxm",
+      "title": "५/२०८२–८३ः एकीकृत परिपत्र–२०८१ मा संशोधन । २०८२/०६/२४",
+      "filename": "5-2082-83-amendment-in-UC.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/10/CSR-Guidelines-2nd-Amendment.pdf",
+      "document_type": "circular",
+      "published_at": "2025-10-14 12:02:26+00:00",
+      "owner": "bfr",
+      "title": "सूचना नं. ०९/०८२ –८३ : बैंक तथा वित्तीय संस्थाको संस्थागत सामाजिक उत्तरदायित्वसम्बन्धी मार्गदर्शन, २०८१ (दोस्रो संशोधन, २०८२) जारी गरिएको सम्बन्धमा ।",
+      "filename": "CSR-Guidelines-2nd-Amendment.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/10/Circular-06-F.pdf",
+      "document_type": "circular",
+      "published_at": "2025-10-08 14:07:45+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. ६ (क,ख,ग): नेपाल राष्ट्र बैंकबाट “क”, “ख” र “ग” वर्गका इजाजतपत्रप्राप्त संस्थाहरुलाई जारी गरिएको एकीकृत निर्देशन, २०८१ मा संशोधन/परिमार्जन/थप ।",
+      "filename": "Circular-06-F.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/10/Circular_PSD.pdf",
+      "document_type": "directive",
+      "published_at": "2025-10-10 08:19:56+00:00",
+      "owner": "psd",
+      "title": "भुक्तानी प्रणालीसम्बन्धी एकीकृत निर्देशन, २०८१ को अ. प्रा. निर्देशन नं ५/०८१ मा संशोधन गरिएको सम्बन्धमा ।",
+      "filename": "Circular_PSD.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/10/Notice-11-1.pdf",
+      "document_type": "circular",
+      "published_at": "2025-10-17 08:09:05+00:00",
+      "owner": "bfr",
+      "title": "सूचना नं ११/२०८२-८३: भन्सार जाँचपास गर्न आवश्यक पर्ने बैंकिङ्ग सेवा सुचारु गर्ने सम्बन्धमा ।",
+      "filename": "Notice-11-1.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/11/DSIB-Framework-2025.pdf",
+      "document_type": "circular",
+      "published_at": "2025-11-24 10:19:14+00:00",
+      "owner": "bfr",
+      "title": "सूचना नं १२/२०८२-८३: Framework for Dealing with Domestic Systemically Important Banks (D-SIBs), 2025 जारी गरिएको सम्बन्धमा ।",
+      "filename": "DSIB-Framework-2025.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/12/7-208283-unified-circular-amendment.pdf",
+      "document_type": "circular",
+      "published_at": "2025-12-28 09:38:33+00:00",
+      "owner": "fxm",
+      "title": "७/२०८२–८३ः एकीकृत परिपत्र–२०८१ मा संशोधन (चाँदी आयातको सटही सुविधा) । २०८२/०९/१३",
+      "filename": "7-208283-unified-circular-amendment.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/12/Circular-2-NIFRA.pdf",
+      "document_type": "circular",
+      "published_at": "2025-12-15 04:47:17+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. २ (पूर्वाधार): नेपाल राष्ट्र बैंकबाट इजाजतपत्रप्राप्त पूर्वाधार विकास बैंकलाई जारी गरिएको एकीकृत निर्देशन, २०८१ मा संशोधन/परिमार्जन/थप ।",
+      "filename": "Circular-2-NIFRA.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/12/Circular-3-for-MFIs-1.pdf",
+      "document_type": "circular",
+      "published_at": "2025-12-02 11:26:22+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. ३ (घ): नेपाल राष्ट्र बैंकबाट घ वर्गका लघुवित्त वित्तीय संस्थाहरुलाई जारी गरिएको एकीकृत निर्देशन, २०८१ मा संशोधन/परिमार्जन/थप ।",
+      "filename": "Circular-3-for-MFIs-1.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/12/Circular-7-ABC_merged.pdf",
+      "document_type": "circular",
+      "published_at": "2025-12-02 11:22:36+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. ७ (क,ख,ग): नेपाल राष्ट्र बैंकबाट “क”, “ख” र “ग” वर्गका इजाजतपत्रप्राप्त संस्थाहरुलाई जारी गरिएको एकीकृत निर्देशन, २०८१ मा संशोधन/परिमार्जन/थप ।",
+      "filename": "Circular-7-ABC_merged.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/12/Circular-8-ABC.pdf",
+      "document_type": "circular",
+      "published_at": "2025-12-15 04:45:20+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. ८ (क,ख,ग): नेपाल राष्ट्र बैंकबाट “क”, “ख” र “ग” वर्गका इजाजतपत्रप्राप्त संस्थाहरुलाई जारी गरिएको एकीकृत निर्देशन, २०८१ मा संशोधन/परिमार्जन/थप ।",
+      "filename": "Circular-8-ABC.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/12/FIFL-Fifth-Amendment-2025.12.29.pdf",
+      "document_type": "circular",
+      "published_at": "2025-12-29 11:07:45+00:00",
+      "owner": "fxm",
+      "title": "८/२०८२–८३: नेपाल राष्ट्र बैंक विदेशी लगानी तथा विदेशी ऋण व्यवस्थापन विनियमावली, २०७८ मा पाँचाै संशोधन । २०८२/०९/१४",
+      "filename": "FIFL-Fifth-Amendment-2025.12.29.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/12/HR-Bylaw-Amendment-2.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2025-12-05 07:36:36+00:00",
+      "owner": "lgd",
+      "title": "नेपाल राष्ट्र बैंक , कर्मचारी सेवा विनियमावली, २०६८ ( चौथो संसोधन, २०८२ )",
+      "filename": "HR-Bylaw-Amendment-2.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/12/Notice-14_NCBL.pdf",
+      "document_type": "directive",
+      "published_at": "2025-12-21 10:28:19+00:00",
+      "owner": "bfr",
+      "title": "सूचना नं १४/२०८२-८३: सीमित बैंकिङ्ग कारोबार गर्ने गरी इजाजतपत्रप्राप्त सहकारी बैंकका लागि निर्देशन, २०८२ जारी गरिएको सम्बन्धमा ।",
+      "filename": "Notice-14_NCBL.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/12/nifra.pdf",
+      "document_type": "circular",
+      "published_at": "2025-12-15 10:25:05+00:00",
+      "owner": "fxm",
+      "title": "६/२०८२–८३ः एकीकृत परिपत्र–२०८१ मा संशोधन (पूर्वाधार विकास बैंक सम्बन्धी)। २०८२/०८/२९",
+      "filename": "nifra.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/01/Amendment-ABC_final.pdf",
+      "document_type": "circular",
+      "published_at": "2026-01-09 11:20:46+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. ९ (क,ख,ग): नेपाल राष्ट्र बैंकबाट “क”, “ख” र “ग” वर्गका इजाजतपत्रप्राप्त संस्थाहरुलाई जारी गरिएको एकीकृत निर्देशन, २०८१ मा संशोधन/परिमार्जन/थप ।",
+      "filename": "Amendment-ABC_final.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/01/MFI-Circular-4.pdf",
+      "document_type": "circular",
+      "published_at": "2026-01-09 11:25:13+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. ४ (घ): नेपाल राष्ट्र बैंकबाट घ वर्गका लघुवित्त वित्तीय संस्थाहरुलाई जारी गरिएको एकीकृत निर्देशन, २०८१ मा संशोधन/परिमार्जन/थप ।",
+      "filename": "MFI-Circular-4.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/01/MFI-Circular-5-U.pdf",
+      "document_type": "circular",
+      "published_at": "2026-01-16 07:35:58+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. ५ (घ): नेपाल राष्ट्र बैंकबाट घ वर्गका लघुवित्त वित्तीय संस्थाहरुलाई जारी गरिएको एकीकृत निर्देशन, २०८१ मा संशोधन/परिमार्जन/थप ।",
+      "filename": "MFI-Circular-5-U.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/01/MFI-Unified-Directive-2082.pdf",
+      "document_type": "directive",
+      "published_at": "2026-01-16 07:37:37+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. ६ (घ) २०८२/८३: एकीकृत निर्देशन, २०८२ जारी गरिएको सम्बन्धमा ।",
+      "filename": "MFI-Unified-Directive-2082.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/01/Nifra-Unified-Directive-2082.pdf",
+      "document_type": "directive",
+      "published_at": "2026-01-16 07:48:11+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. ३ (पूर्वाधार ) २०८२/८३ : एकीकृत निर्देशन,२०८२ जारी गरिएको सम्बन्धमा ।",
+      "filename": "Nifra-Unified-Directive-2082.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/01/Notice-15.pdf",
+      "document_type": "circular",
+      "published_at": "2026-01-09 11:12:58+00:00",
+      "owner": "bfr",
+      "title": "सूचना नं १५/२०८२-८३: नगद कारोबारको सीमा सम्बन्धमा ।",
+      "filename": "Notice-15.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/01/Notice-16.pdf",
+      "document_type": "circular",
+      "published_at": "2026-01-26 10:28:17+00:00",
+      "owner": "bfr",
+      "title": "सूचना नं १६/२०८२-८३: आमनिर्वाचनका लागि छुट्टै बैक खाता खोल्ने सम्बन्धमा ।",
+      "filename": "Notice-16.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/01/Unified-Directive-ABC-2082.pdf",
+      "document_type": "directive",
+      "published_at": "2026-01-16 07:45:36+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. १० (क, ख, ग) २०८२/८३: एकीकृत निर्देशन, २०८२ जारी गरिएको सम्बन्धमा ।",
+      "filename": "Unified-Directive-ABC-2082.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/01/सम्पत्ति-शुद्धीकरण-मनी-लाउन्डरिङ्ग-निवारण-नियमावली-पहिलो-संशोधन-२०८२.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2026-01-10 05:25:33+00:00",
+      "owner": "mlpsd",
+      "title": "सम्पत्ति शुद्धीकरण (मनी लाउन्डरिङ्ग) निवारण (पहिलो संशोधन) नियमावली, २०८२",
+      "filename": "सम्पत्ति-शुद्धीकरण-मनी-लाउन्डरिङ्ग-निवारण-नियमावली-पहिलो-संशोधन-२०८२.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/01/सम्पत्ति-शुद्धीकरण-मनी-लाउन्डरिङ्ग-निवारण-पहिलो-संशोधन-नियमावली-२०८२-५६-९-२४.pdf",
+      "document_type": "act",
+      "published_at": "2026-01-09 12:51:33+00:00",
+      "owner": "fiu",
+      "title": "सम्पत्ति शुद्धीकरण (मनी लाउन्डरिङ्ग) निवारण (पहिलो संशोधन) नियमावली, २०८२",
+      "filename": "सम्पत्ति-शुद्धीकरण-मनी-लाउन्डरिङ्ग-निवारण-पहिलो-संशोधन-नियमावली-२०८२-५६-९-२४.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/02/सम्पत्ति-शुद्धीकरण-मनी-लाउन्डरिङ्ग-निवारण-नियमावली-२०८१-पहिलो-संशोधन-पुस-24-गते.pdf",
+      "document_type": "act",
+      "published_at": "2026-02-25 09:02:21+00:00",
+      "owner": "fiu",
+      "title": "सम्पत्ति शुद्धीकरण (मनी लाउन्डरिङ्ग) निवारण नियमावली, २०८१ पहिलो संशोधन पुस 24 गते",
+      "filename": "सम्पत्ति-शुद्धीकरण-मनी-लाउन्डरिङ्ग-निवारण-नियमावली-२०८१-पहिलो-संशोधन-पुस-24-गते.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/03/Amendment-of-Directive-No-1-1.2-of-Payment-System-Related-Unified-Directives-2081.pdf",
+      "document_type": "circular",
+      "published_at": "2026-03-17 11:26:17+00:00",
+      "owner": "psd",
+      "title": "भुक्तानी प्रणालीसम्बन्धी एकीकृत निर्देशन, २०८१ को अ. प्रा. निर्देशन नं. १/०८१ को बुँदा नं. १ को (२) मा संशोधन गरिएको सम्बन्धमा ।",
+      "filename": "Amendment-of-Directive-No-1-1.2-of-Payment-System-Related-Unified-Directives-2081.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/03/Circular-11-ABC_publish.pdf",
+      "document_type": "circular",
+      "published_at": "2026-03-13 08:21:26+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. ११ (क, ख, ग) २०८२/८३: नेपाल राष्ट्र बैंकबाट “क”, “ख” र “ग” वर्गका इजाजतपत्रप्राप्त संस्थाहरुलाई जारी गरिएको एकीकृत निर्देशन, २०८२ मा संशोधन/परिमार्जन/थप ।",
+      "filename": "Circular-11-ABC_publish.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/03/Election-Commision-Notice-18.pdf",
+      "document_type": "circular",
+      "published_at": "2026-03-03 10:40:39+00:00",
+      "owner": "bfr",
+      "title": "सूचना नं १८/२०८२-८३: आमनिर्वाचनको अवधिमा बैंकिङ सेवा प्रवाह गर्ने सम्बन्धमा ।",
+      "filename": "Election-Commision-Notice-18.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/03/NIFRA-04.pdf",
+      "document_type": "circular",
+      "published_at": "2026-03-17 11:33:15+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. ४ (पूर्वाधार ) २०८२/८३ : नेपाल राष्ट्र बैंकबाट इजाजतपत्रप्राप्त पूर्वाधार विकास बैंकलाई जारी गरिएको एकीकृत निर्देशन, २०८२ मा संशोधन/परिमार्जन/थप ।",
+      "filename": "NIFRA-04.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/03/Notice-for-Banking-Operation-in-Election.pdf",
+      "document_type": "circular",
+      "published_at": "2026-03-01 11:44:29+00:00",
+      "owner": "bfr",
+      "title": "सूचना नं १७/२०८२-८३: आमनिर्वाचनको अवधिमा बैंकिङ सेवा प्रवाह गर्ने सम्बन्धमा ।",
+      "filename": "Notice-for-Banking-Operation-in-Election.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/03/circular-12-abc_publish.pdf",
+      "document_type": "circular",
+      "published_at": "2026-03-17 12:00:54+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. १२ (क, ख, ग) २०८२/८३: नेपाल राष्ट्र बैंकबाट “क”, “ख” र “ग” वर्गका इजाजतपत्रप्राप्त संस्थाहरुलाई जारी गरिएको एकीकृत निर्देशन, २०८२ मा संशोधन/परिमार्जन/थप ।",
+      "filename": "circular-12-abc_publish.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/04/Circular-13_merged-1.pdf",
+      "document_type": "circular",
+      "published_at": "2026-04-05 11:28:22+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. १३ (क, ख, ग) २०८२/८३: नेपाल राष्ट्र बैंकबाट “क”, “ख” र “ग” वर्गका इजाजतपत्रप्राप्त संस्थाहरुलाई जारी गरिएको एकीकृत निर्देशन, २०८२ मा संशोधन/परिमार्जन/थप ।",
+      "filename": "Circular-13_merged-1.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/04/Circular-13_merged.pdf",
+      "document_type": "circular",
+      "published_at": "2026-04-05 11:28:22+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. १३ (क, ख, ग) २०८२/८३: नेपाल राष्ट्र बैंकबाट “क”, “ख” र “ग” वर्गका इजाजतपत्रप्राप्त संस्थाहरुलाई जारी गरिएको एकीकृत निर्देशन, २०८२ मा संशोधन/परिमार्जन/थप ।",
+      "filename": "Circular-13_merged.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/04/PSD-UD-2082.pdf",
+      "document_type": "directive",
+      "published_at": "2026-04-16 06:04:00+00:00",
+      "owner": "psd",
+      "title": "नेपाल राष्ट्र बैंकबाट भुक्तानीसम्बन्धी कार्य गर्न अनुमतिपत्रप्राप्त संस्थाहरूलाई जारी गरिएको भुक्तानी प्रणालीसम्बन्धी एकीकृत निर्देशन – २०८२",
+      "filename": "PSD-UD-2082.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/04/Remittance-Bylaws-for-Upload.pdf",
+      "document_type": "circular",
+      "published_at": "2026-04-01 11:02:40+00:00",
+      "owner": "fxm",
+      "title": "९/२०८२–८३: नेपाल राष्ट्र बैंक विप्रेषण विनियमावली, २०७९ मा दाेस्राे संशोधन । २०८२/१२/१८",
+      "filename": "Remittance-Bylaws-for-Upload.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/04/circular-10-upload.pdf",
+      "document_type": "circular",
+      "published_at": "2026-04-05 11:54:54+00:00",
+      "owner": "fxm",
+      "title": "१०/२०८२–८३ः एकीकृत परिपत्र–२०८१ मा संशोधन । २०८२/१२/२२",
+      "filename": "circular-10-upload.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/04/for-upload-UC.pdf",
+      "document_type": "circular",
+      "published_at": "2026-04-07 11:33:04+00:00",
+      "owner": "fxm",
+      "title": "११/२०८२–८३ एकीकृत परिपत्र–२०८२ जारी गरिएको सम्बन्धमा । २०८२/१२/२४",
+      "filename": "for-upload-UC.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/05/Circular-14-F.pdf",
+      "document_type": "circular",
+      "published_at": "2026-05-22 12:53:25+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. १४ (क, ख, ग) २०८२/८३: नेपाल राष्ट्र बैंकबाट “क”, “ख” र “ग” वर्गका इजाजतपत्रप्राप्त संस्थाहरुलाई जारी गरिएको एकीकृत निर्देशन, २०८२ मा संशोधन/परिमार्जन/थप ।",
+      "filename": "Circular-14-F.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/05/Nepal-Rastra-Bank-Notekosh-Bewasthapan-Nirdeshika-2082.pdf",
+      "document_type": "directive",
+      "published_at": "2026-05-26 06:29:00+00:00",
+      "owner": "cmd",
+      "title": "नेपाल राष्ट्र बैंक, नोटकोष व्यवस्थापन निर्देशिका, २०८२",
+      "filename": "Nepal-Rastra-Bank-Notekosh-Bewasthapan-Nirdeshika-2082.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/06/12of208283.pdf",
+      "document_type": "circular",
+      "published_at": "2026-06-09 06:29:25+00:00",
+      "owner": "fxm",
+      "title": "१२/२०८२–८३ः एकीकृत परिपत्र–२०८२ मा संशोधन । २०८३/०२/२६",
+      "filename": "12of208283.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/06/Circular-15-ABC-F.pdf",
+      "document_type": "circular",
+      "published_at": "2026-06-10 11:00:56+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. १५ (क, ख, ग) २०८२/८३: नेपाल राष्ट्र बैंकबाट “क”, “ख” र “ग” वर्गका इजाजतपत्रप्राप्त संस्थाहरुलाई जारी गरिएको एकीकृत निर्देशन, २०८२ मा संशोधन/परिमार्जन/थप ।",
+      "filename": "Circular-15-ABC-F.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/06/Circular-5-NIFRA-F.pdf",
+      "document_type": "circular",
+      "published_at": "2026-06-10 11:02:57+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. ५ (पूर्वाधार ) २०८२/८३ : नेपाल राष्ट्र बैंकबाट इजाजतपत्रप्राप्त पूर्वाधार विकास बैंकलाई जारी गरिएको एकीकृत निर्देशन, २०८२ मा संशोधन/परिमार्जन/थप ।",
+      "filename": "Circular-5-NIFRA-F.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/06/Circular-7-F.pdf",
+      "document_type": "circular",
+      "published_at": "2026-06-10 11:05:12+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. ०७ (घ): नेपाल राष्ट्र बैंकबाट घ वर्गका लघुवित्त वित्तीय संस्थाहरुलाई जारी गरिएको एकीकृत निर्देशन, २०८२ मा संशोधन/परिमार्जन/थप ।",
+      "filename": "Circular-7-F.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/06/Circular_16_ABC_upload.pdf",
+      "document_type": "circular",
+      "published_at": "2026-06-18 11:17:29+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. १६ (क, ख, ग) २०८२/८३: नेपाल राष्ट्र बैंकबाट “क”, “ख” र “ग” वर्गका इजाजतपत्रप्राप्त संस्थाहरुलाई जारी गरिएको एकीकृत निर्देशन, २०८२ मा संशोधन/परिमार्जन/थप ।",
+      "filename": "Circular_16_ABC_upload.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/06/Circular_17_ABC_upload.pdf",
+      "document_type": "circular",
+      "published_at": "2026-06-24 12:08:24+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. १७ (क, ख, ग) २०८२/८३: नेपाल राष्ट्र बैंकबाट “क”, “ख” र “ग” वर्गका इजाजतपत्रप्राप्त संस्थाहरुलाई जारी गरिएको एकीकृत निर्देशन, २०८२ मा संशोधन/परिमार्जन/थप ।",
+      "filename": "Circular_17_ABC_upload.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/06/Circular_6NIFRA_Final_upload.pdf",
+      "document_type": "circular",
+      "published_at": "2026-06-18 11:22:04+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. ६ (पूर्वाधार ) २०८२/८३ : नेपाल राष्ट्र बैंकबाट इजाजतपत्रप्राप्त पूर्वाधार विकास बैंकलाई जारी गरिएको एकीकृत निर्देशन, २०८२ मा संशोधन/परिमार्जन/थप ।",
+      "filename": "Circular_6NIFRA_Final_upload.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/06/Circular_8D_final_Upload.pdf",
+      "document_type": "circular",
+      "published_at": "2026-06-18 11:19:19+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. ८ (घ): नेपाल राष्ट्र बैंकबाट घ वर्गका लघुवित्त वित्तीय संस्थाहरुलाई जारी गरिएको एकीकृत निर्देशन, २०८२ मा संशोधन/परिमार्जन/थप ।",
+      "filename": "Circular_8D_final_Upload.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/06/Circular_9_D_Upload.pdf",
+      "document_type": "circular",
+      "published_at": "2026-06-24 12:08:41+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. ९ (घ): नेपाल राष्ट्र बैंकबाट घ वर्गका लघुवित्त वित्तीय संस्थाहरुलाई जारी गरिएको एकीकृत निर्देशन, २०८२ मा संशोधन/परिमार्जन/थप ।",
+      "filename": "Circular_9_D_Upload.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/06/Notice-no.-22_Model-Employee-Bylaws.pdf",
+      "document_type": "circular",
+      "published_at": "2026-06-17 06:04:21+00:00",
+      "owner": "bfr",
+      "title": "सूचना नं २२/२०८२/०८३ : राय/सुझाव उपलब्ध गराउने सम्बन्धमा ।",
+      "filename": "Notice-no.-22_Model-Employee-Bylaws.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/06/भुक्तानी-प्रणालीसम्बन्धी-एकीकृत-निर्देशन-२०८२-मा-संशोधन-गरिएको-।.pdf",
+      "document_type": "circular",
+      "published_at": "2026-06-02 09:40:53+00:00",
+      "owner": "psd",
+      "title": "भुक्तानी प्रणालीसम्बन्धी एकीकृत निर्देशन, २०८२ मा संशोधन गरिएको सम्बन्धमा ।",
+      "filename": "भुक्तानी-प्रणालीसम्बन्धी-एकीकृत-निर्देशन-२०८२-मा-संशोधन-गरिएको-।.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/06/विद्युतीय-माध्यमबाट-प्रवाह-हुने-कर्जा-Digital-Lending-सम्बन्धी-मार्गदर्शन-२०७८-संशोधन.pdf",
+      "document_type": "circular",
+      "published_at": "2026-06-08 11:07:34+00:00",
+      "owner": "psd",
+      "title": "विद्युतीय माध्यमबाट प्रवाह हुने कर्जा (Digital Lending) सम्बन्धी मार्गदर्शन, २०७८ संशोधन गरिएको सम्बन्धमा ।",
+      "filename": "विद्युतीय-माध्यमबाट-प्रवाह-हुने-कर्जा-Digital-Lending-सम्बन्धी-मार्गदर्शन-२०७८-संशोधन.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/07/1.pdf",
+      "document_type": "circular",
+      "published_at": "2026-07-23 11:34:38+00:00",
+      "owner": "fxm",
+      "title": "१/२०८३–८४ः एकीकृत परिपत्र–२०८२ मा संशोधन (भा.रू.सम्बन्धमा)। २०८३/०४/०७",
+      "filename": "1.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/07/AML_CFT_Supervision_Bylaw_2083-1.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2026-07-22 11:09:55+00:00",
+      "owner": "mlpsd",
+      "title": "सम्पत्ति शुद्धीकरण आतङ्ककारी क्रियाकलाप तथा आम विनाशका हातहतियार निर्माण तथा विस्तारमा वित्तीय लगानी (प्रोलिफरेसन फाइनान्सिङ्ग) निवारणसम्बन्धी निरीक्षण तथा सुपरिवेक्षण विनियमावली, २०८३",
+      "filename": "AML_CFT_Supervision_Bylaw_2083-1.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/07/AML_CFT_Supervision_Bylaw_2083.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2026-07-22 10:58:00+00:00",
+      "owner": "mlpsd",
+      "title": "सम्पत्ति शुद्धीकरण आतङ्ककारी क्रियाकलाप तथा आम विनाशका हातहतियार निर्माण तथा विस्तारमा वित्तीय लगानी (प्रोलिफरेसन फाइनान्सिङ्ग) निवारणसम्बन्धी निरीक्षण तथा सुपरिवेक्षण विनियमावली, २०८३",
+      "filename": "AML_CFT_Supervision_Bylaw_2083.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/07/Circular-18-v1-1.pdf",
+      "document_type": "circular",
+      "published_at": "2026-07-13 09:43:36+00:00",
+      "owner": "mlpsd",
+      "title": "Addition in Direction no. 19 Unified Directives, 2082",
+      "filename": "Circular-18-v1-1.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/07/Circular-18-v1.pdf",
+      "document_type": "circular",
+      "published_at": "2026-07-10 10:45:08+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. १८ (क, ख, ग) २०८२/८३: नेपाल राष्ट्र बैंकबाट “क”, “ख” र “ग” वर्गका इजाजतपत्रप्राप्त संस्थाहरुलाई जारी गरिएको एकीकृत निर्देशन, २०८२ मा संशोधन/परिमार्जन/थप ।",
+      "filename": "Circular-18-v1.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/07/Circular19_Final0331.pdf",
+      "document_type": "circular",
+      "published_at": "2026-07-15 13:47:15+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. १९ (क, ख, ग) २०८२/८३: नेपाल राष्ट्र बैंकबाट “क”, “ख” र “ग” वर्गका इजाजतपत्रप्राप्त संस्थाहरुलाई जारी गरिएको एकीकृत निर्देशन, २०८२ मा संशोधन/परिमार्जन/थप ।",
+      "filename": "Circular19_Final0331.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/07/Karyabidhi-samsodhan-2nd-latest.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2026-07-15 10:12:01+00:00",
+      "owner": "lgd",
+      "title": "मौद्रिक नीति तर्जुमा कार्यविधि, २०७३ (दोस्रो संशोधन, २०८३)",
+      "filename": "Karyabidhi-samsodhan-2nd-latest.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/07/No.-15-amendment.pdf",
+      "document_type": "circular",
+      "published_at": "2026-07-24 09:25:02+00:00",
+      "owner": "psd",
+      "title": "भुक्तानी प्रणालीसम्बन्धी एकीकृत निर्देशन, २०८२ मा संशोधन गरिएको सम्बन्धमा ।",
+      "filename": "No.-15-amendment.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/07/सम्पत्ति-शुद्धीकरण-मनी-लाउन्डरिङ्ग-निवारण-तेस्रो-संशोधन-ऐन-२०८३.pdf",
+      "document_type": "rule_bylaw",
+      "published_at": "2026-07-15 06:33:47+00:00",
+      "owner": "mlpsd",
+      "title": "सम्पत्ति शुद्धीकरण (मनी लाउन्डरिङ्ग) निवारण (तेस्रो संशोधन) ऐन, २०८३",
+      "filename": "सम्पत्ति-शुद्धीकरण-मनी-लाउन्डरिङ्ग-निवारण-तेस्रो-संशोधन-ऐन-२०८३.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/08/Circular-1-ABC-F-V1.pdf",
+      "document_type": "circular",
+      "published_at": "2026-08-27 11:18:55+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. १ (क, ख, ग) २०८३/८४: नेपाल राष्ट्र बैंकबाट “क”, “ख” र “ग” वर्गका इजाजतपत्रप्राप्त संस्थाहरुलाई जारी गरिएको एकीकृत निर्देशन, २०८२ मा संशोधन/परिमार्जन/थप ।",
+      "filename": "Circular-1-ABC-F-V1.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/08/Circular-1-F.pdf",
+      "document_type": "circular",
+      "published_at": "2026-08-27 11:24:07+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. १ (घ) ८३।८४: नेपाल राष्ट्र बैंकबाट घ वर्गका लघुवित्त वित्तीय संस्थाहरुलाई जारी गरिएको एकीकृत निर्देशन, २०८२ मा संशोधन/परिमार्जन/थप ।",
+      "filename": "Circular-1-F.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/08/Circular-2.pdf",
+      "document_type": "circular",
+      "published_at": "2026-08-29 09:51:03+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. २ (क, ख, ग) २०८३/८४: नेपाल राष्ट्र बैंकबाट “क”, “ख” र “ग” वर्गका इजाजतपत्रप्राप्त संस्थाहरुलाई जारी गरिएको एकीकृत निर्देशन, २०८२ मा संशोधन/परिमार्जन/थप ।",
+      "filename": "Circular-2.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/08/Interest-rate-Circular-2083.05.08.pdf",
+      "document_type": "circular",
+      "published_at": "2026-08-24 07:42:19+00:00",
+      "owner": "pdm",
+      "title": "ब्याजदरसम्बन्धी विवरण उपलब्ध गराउने सम्बन्धमा ।",
+      "filename": "Interest-rate-Circular-2083.05.08.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/08/PSD-Notice-0515.pdf",
+      "document_type": "circular",
+      "published_at": "2026-08-31 09:15:08+00:00",
+      "owner": "psd",
+      "title": "प्रधानमन्त्री दैवी प्रकोप उद्धार कोषमा रकम जम्मा गर्दा नक्कली बैंक खाता वा QR प्रयोग गरी हुन सक्ने ठगीप्रति सावधान रहने सम्बन्धी सूचना ।",
+      "filename": "PSD-Notice-0515.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/08/PSD-Notice-to-BFIs.pdf",
+      "document_type": "circular",
+      "published_at": "2026-08-31 09:10:43+00:00",
+      "owner": "psd",
+      "title": "मोबाइल बैंकिङ्ग प्रणालीमार्फत प्रधानमन्त्री राहत कोषमा रकम जम्मा गर्ने सम्बन्धमा ।",
+      "filename": "PSD-Notice-to-BFIs.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/08/मोबाइल-बैंकिङ्ग-वेब-एप्लिकेशन-तथा-ई-मनीको-माध्यम-मार्फत-हुने-कारोवारसम्बन्धमा।.pdf",
+      "document_type": "circular",
+      "published_at": "2026-08-27 09:31:18+00:00",
+      "owner": "psd",
+      "title": "मोबाइल बैंकिङ्ग, वेब एप्लिकेशन, तथा ई-मनीको माध्यम मार्फत हुने कारोवारसम्बन्धमा।",
+      "filename": "मोबाइल-बैंकिङ्ग-वेब-एप्लिकेशन-तथा-ई-मनीको-माध्यम-मार्फत-हुने-कारोवारसम्बन्धमा।.pdf",
+      "extension": "pdf"
+    },
+    {
+      "role": "corpus",
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/09/Circular-2_F.pdf",
+      "document_type": "circular",
+      "published_at": "2026-09-01 11:48:49+00:00",
+      "owner": "bfr",
+      "title": "परिपत्र नं. २ (घ) ८३।८४: नेपाल राष्ट्र बैंकबाट घ वर्गका लघुवित्त वित्तीय संस्थाहरुलाई जारी गरिएको एकीकृत निर्देशन, २०८२ मा संशोधन/परिमार्जन/थप ।",
+      "filename": "Circular-2_F.pdf",
+      "extension": "pdf"
+    }
+  ]
+}
