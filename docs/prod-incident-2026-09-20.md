@@ -1,6 +1,6 @@
 # Production accuracy incident — findings & handoff
 
-**Opened:** 2026-09-20. **Status:** 2 of 3 causes fixed (unmerged, undeployed).
+**Opened:** 2026-09-20. **Status:** causes B, C and D are fixed on our side (unmerged, undeployed). Cause A, the missing corpus, is being rebuilt: **to resume, start at §9**, which records what production's own database showed and exactly where the build stopped.
 
 NIC Bank reported production answers were "not accurate, especially NRB data and
 a couple of documents". This is what was actually wrong, how it was established,
@@ -471,7 +471,7 @@ is the same class of gap that would make a future cutover fail silently.
    zero SSE chunks, now raises `OllamaError(502)` naming the cause instead of
    the loop recording a blank, `stop_reason: completed` turn. Verified against
    the real WAF response.
-2. **NRB corpus build.** Groundwork done: `local_ai_gateway_build` exists as a
+2. **NRB corpus build — IN PROGRESS, see §9 for the current state and the exact resume steps.** As of 2026-09-26: scope frozen (355 files), 351 fetched, 338 documents queued in `nrb`, 1 ingested, 1 failed on an embedding timeout, worker stopped. The history below is kept for context. Groundwork done: `local_ai_gateway_build` exists as a
    clone of the prod snapshot (so department and user ids line up for an export);
    the scope is **89 sources / 90 files / ~89 MB**, 27 already fetched, covering
    Unified Directives 2082, the Payment Systems directive, AML/CFT directives and
@@ -494,10 +494,10 @@ is the same class of gap that would make a future cutover fail silently.
    pipeline, worker and runner would all have failed on their first query.
    Its tables are now owned by `gateway`, as p4's are; `gw_prod_snapshot` was
    left alone. Both operational scripts now run cleanly against it.
-3. **Ship a delta, not a database.** Export only the new `nrb`/`hrdept`/`it`
+3. ~~**Ship a delta, not a database.**~~ **Superseded by the user's decision (§9.1):** production sends a fresh dump, we load the corpus into it and send the whole database back. The point below still holds for *what* moves: Export only the new `nrb`/`hrdept`/`it`
    documents and chunks; leave production's live `policy`/`guideline` rows and its
    206 chat sessions alone.
-4. **Do not embed locally for production.** This laptop's RTX 4050 (6 GB) cannot
+4. ~~**Do not embed locally for production.**~~ **Measured safe (§9.2 item 6):** same model digest, vectors within cosine 0.9997, identical ranking. The concern below applies only if production moves to vLLM/BF16: This laptop's RTX 4050 (6 GB) cannot
    hold the BF16 embedding model, and quantising it would change the vector build.
    Production stays on Ollama with `qwen3-embedding:4b-q8_0`, so vectors built here
    with the same tag are compatible — but the safer shape is to ship the expensive,
@@ -528,3 +528,183 @@ extract elements from a scalar"*.
 
 Deleted-but-cited documents come from the same table via `m.sources`, joined
 back to `documents` on `src->>'document_id'` to see which no longer exist.
+
+---
+
+## 9. Rebuilding production's knowledge base — findings and how to resume
+
+**Started 2026-09-24. State as of 2026-09-26: the NRB corpus build is paused
+with 1 of 338 documents ingested. It is not running.** Everything below was
+read from `local_ai_gateway_build`, a clone of the production snapshot, unless
+it says otherwise.
+
+### 9.1 The goal, and three decisions the user made
+
+**Goal (user, 2026-09-24):** build ONE database holding everything, correctly
+embedded (the NRB corpus, the user's own files and the existing `policy` and
+`guideline` documents), and send that database to production, which then
+serves from it.
+
+| Decision | Choice |
+|---|---|
+| How it reaches production | **Production sends a FRESH dump just before cutover and pauses writes. We load the corpus into that dump and send the whole database back.** No production write is lost. |
+| NRB scope | **Regulatory core + circulars since 2025-07-17**: every directive, act, rule/bylaw and forex document regardless of date, plus circulars published on or after Shrawan 1 of FY 2082/83. Frozen as `docs/nrb/prod-corpus-scope.json`, **355 files, `309798e5…`**. |
+| The user's own files | The user will put them in a folder and say which tab each goes to (`nrb`, `hrdept` or `it`). **Not received yet.** |
+
+Correction on the scope label: it was offered as "this FY's circulars", but
+FY 2082/83 **ended** on 2026-07-16. The approved date (2025-07-17) covers the
+**previous** fiscal year plus the current one (FY 2083/84) so far, about 14
+months. The date is what was approved, and the date is what the scope uses.
+
+### 9.2 What production's own database showed
+
+1. **Production never fetched a single NRB file.** `nrb_pipeline_runs` holds
+   13 runs, all requested by `dte@nicasiabank.com` between 18 August and 9
+   September:
+   - **Runs 2 and 8: `PermissionError: [Errno 13] Permission denied:
+     '/app/nrb_files/.incoming'`.** The containers run as **uid 10001**
+     (`appuser` in `Dockerfile` and `Dockerfile.worker`), and the `nrb_files`
+     named volume they mount at `/app/nrb_files` is not writable by that user.
+   - **Runs 3–7, 9, 11 and 13: `DiscoveryError: could not read the NRB category
+     taxonomy`**, with `timeout: timed out` or `transport error
+     (RemoteProtocolError)`. The production server cannot reliably reach
+     nrb.org.np.
+   - **Runs 1, 10 and 12 "succeeded" with `selected: 0, created: 0, queued:
+     0`.** They were green runs that did nothing, the §18 failure class. This is
+     why the `nrb` tab never held a real corpus, separate from the 10 September
+     deletion.
+
+   **Consequence for cutover:** production's NRB runner can't build or refresh
+   the corpus until both are fixed. The volume is fixed with `chown -R
+   10001:10001` on its host path (or by creating `/app/nrb_files` in the image
+   owned by `appuser` before first mount). Outbound access to nrb.org.np is
+   their network team's call. Building here avoids both. **But the blobs we
+   ship must land on that volume readable by uid 10001**, or every NRB citation
+   download 404s for a document listed as `ready`.
+
+2. **The snapshot is 2+ weeks stale.** The newest chat message and document
+   are from **2026-09-11** and the newest user from 2026-09-02. That staleness
+   is why the transfer has to go through a fresh dump.
+
+3. **Production's ids** (these must line up at cutover):
+   - departments `nrb#1 hrdept#2 policy#3 it#4 guideline#10`;
+   - string ids for `documents`, `chat_sessions`, `chat_messages`,
+     `ingest_jobs`, `generated_files` and `api_keys`, which never collide;
+   - integer sequences for `users`, `departments`, `document_chunks` and every
+     `nrb_*` table, which can collide with rows production created after the
+     snapshot. A transplant must key on stable identities (document id strings,
+     `nrb_files.comparison_key`) and let the target assign chunk ids.
+
+4. **Production's catalog at snapshot time:** 18,608 sources and 18,300 files,
+   0 fetched. The `documents` table held 27 `ready`, 3 `failed` and 1
+   `archived`; `ingest_jobs` held 27 `succeeded` and 4 `failed`, with nothing
+   queued. Two of the three failed documents are the `guideline` files that hit
+   the heading-path bug fixed in `8ad4889` (§5), so **re-ingesting them should
+   now succeed.**
+
+5. **A database restored from a production dump is owned by `postgres`, and
+   the app role cannot read any of it.** All 23 tables in the build clone had
+   ZERO `gateway` privileges (`permission denied for table nrb_recoveries` on
+   the first query). They were fixed on 2026-09-24 by moving the 23 tables to
+   `gateway`; the 13 sequences followed automatically, and the extensions stay
+   `postgres`'s, as they are in p4. `gw_prod_snapshot` was left untouched. **The
+   fresh dump will need the same step before anything local can touch it.** The
+   exact statement is in `docs/nrb-usage.md` §3.1.
+
+6. **Embedding here is compatible with production, measured and not assumed.**
+   The laptop and production both run `qwen3-embedding:4b-q8_0` with the
+   **identical digest `357d756ba8e5a3f2`**. The same passages (English,
+   Devanagari, mixed) embedded on both give cosine **0.9997–0.9999**, and a
+   production-embedded query ranks laptop-embedded documents **in exactly the
+   same order**. The earlier "do not embed locally" warning applied to the
+   planned vLLM/BF16 move, not to today's setup. If production moves to vLLM,
+   every vector, its own included, has to be rebuilt anyway.
+
+### 9.3 What has been built
+
+| Step | Result |
+|---|---|
+| Recovery stack check on the known blob `e08988860534` | 1 page OCR'd + 49 converted, **0 withheld**, matching §16's record exactly. PP-OCRv5 Devanagari on onnxruntime; npttf2utf, docling and rapidocr all present. |
+| Catalog sync, run 5 | +199 sources, +203 files, 1 withdrawn by NRB, **0 errors**. The dry run predicted exactly the same. Catalog is now 18,807 / 18,503. |
+| Scope frozen (`7fe297c`) | 355 files: directive 96, act 90, rule_bylaw 83, forex 19, circular 67. The sync added 8 circulars, including **Circulars No. 1 and No. 2 of FY 2083/84**. |
+| Pipeline run 14: fetch, extract, enqueue | 351 fetched; 2 are **HTTP 404 on NRB's own site** (a 2071 microfinance directive and a 2065 currency-note guideline, both long superseded); 2 on the blocked `uat.nrb.org.np` host. The 351 URLs are **338 distinct blobs** (13 identical PDFs published twice), giving **338 documents / 338 jobs** in `nrb`, with 0 conflicts and 0 missing blobs. Run 14 is `awaiting_jobs`. |
+| Ingest, the worker | **1 succeeded** (4 chunks). **1 FAILED**: `981ec3977be2…`, *सरकारी कारोवार निर्देशिका, २०७६* (143 pages, 198 chunks) with `Ollama request timed out`. **336 still queued.** The worker is not running. |
+
+### 9.4 Problems the next session must handle
+
+1. **Embedding timeout on large documents.** The worker embeds with
+   `OLLAMA_TIMEOUT=120` s per request in batches of `RAG_EMBED_BATCH=32` chunks,
+   and a batch of long Devanagari chunks exceeded that on this laptop's RTX 4050
+   (6 GB). Both are environment variables, so no code change is needed. Set them
+   **for the worker process only**, for example `RAG_EMBED_BATCH=8
+   OLLAMA_TIMEOUT=600`. **This fix is untested.** Confirm it on the failed
+   document before leaving 336 jobs to it.
+2. **A failed document is never re-selected by an ordinary pass.**
+   `nrb_rag_ingest_corpus.py --retry-failed` is the only way back (§21.1).
+3. **Memory is tight.** This laptop has 14 GB, and Claude Code's background
+   shells were reaped under memory pressure on 2026-09-24. Run the worker on its
+   own: no test suite, no evals, no second heavy process at the same time.
+4. **Never `pkill -f` a pattern that another process's command line contains.**
+   `pkill -f "app.nrb.runner"` also killed a monitor whose script mentioned that
+   string. Stop processes by PID.
+5. **`scripts/nrb_pipeline.py --dry-run` without `--run-now` used to queue a
+   REAL run.** That's how run 14 was created. Fixed in `804918e` (it now
+   refuses), but remember it when reading run 14's history.
+
+### 9.5 How to resume, step by step
+
+```bash
+cd ~/newlaptop/projects/python/local-ai-model-gateway
+# the build DB URL, reusing the credentials already in .env (never paste them)
+export BUILD_DB="$(grep '^DATABASE_URL=' .env | cut -d= -f2- | sed -E 's#/[^/?]+(\?.*)?$##')/local_ai_gateway_build"
+
+# 1. Re-queue the one failed document (look first, then do it)
+DATABASE_URL="$BUILD_DB" .venv/bin/python scripts/nrb_rag_ingest_corpus.py \
+    --department nrb --cohort docs/nrb/prod-corpus-scope.json --retry-failed --dry-run
+DATABASE_URL="$BUILD_DB" .venv/bin/python scripts/nrb_rag_ingest_corpus.py \
+    --department nrb --cohort docs/nrb/prod-corpus-scope.json --retry-failed
+
+# 2. Start the worker ALONE, with the larger timeout and smaller batch
+DATABASE_URL="$BUILD_DB" RAG_EMBED_BATCH=8 OLLAMA_TIMEOUT=600 \
+    .venv/bin/python -m app.rag.worker
+
+# 3. Watch progress (a second terminal)
+PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d local_ai_gateway_build -tAc "
+  SELECT j.status, count(*) FROM ingest_jobs j
+  JOIN documents d ON d.id = j.document_id
+  JOIN departments dp ON dp.id = d.department_id
+  WHERE dp.code = 'nrb' GROUP BY 1 ORDER BY 1"
+
+# 4. When the queue is empty, settle run 14
+DATABASE_URL="$BUILD_DB" .venv/bin/python scripts/nrb_pipeline.py --status --run 14
+```
+
+Then, in order:
+
+5. **Verify by ROUTE SPLIT, not by job status** (CLAUDE.md: every NRB
+   deployment failure looks like success). Check the counts per route in
+   `document_chunks.metadata` and that no document is `ready` with 0 chunks.
+   Then run a few retrieval queries in the `nrb` department, including the
+   FY 2083/84 circulars.
+6. **Re-ingest the 2 `guideline` documents** that failed on the heading-path
+   bug, now fixed.
+7. **Ingest the user's files** into `nrb`, `hrdept` or `it`, once they send
+   the folder.
+8. **Write the cutover transplant.** It doesn't exist yet. It must: restore the
+   fresh dump locally (and fix its ownership, 9.2 item 5); **re-draw the scope
+   with `scripts/nrb_prod_scope.py` against the fresh catalog**, which may have
+   newer circulars; move documents, chunks, `nrb_*` rows and recovery-cache rows
+   keyed on stable ids; ship the blobs **owned by uid 10001**; and verify with
+   the same route split before sending the database back.
+
+### 9.6 Commits from this work (`fix/prod-accuracy-findings`, unpushed)
+
+| Commit | |
+|---|---|
+| `4aba5c2` | `app/nrb/dbguard.py`: operational scripts may use the build clone; evidence scripts stay on p4 |
+| `ee2062f` | `scripts/nrb_prod_scope.py`: the scope rule, frozen to a file (Nepal-time cutoff) |
+| `7fe297c` | `docs/nrb/prod-corpus-scope.json`: the frozen 355-file scope |
+| `804918e` | `nrb_pipeline.py --dry-run` without `--run-now` now refuses |
+
+Full suite at `4aba5c2`: **2747 passed, 115 skipped, 0 failed.** Pushing still
+waits on rotating the GitHub token in `.git/config`.

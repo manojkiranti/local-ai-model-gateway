@@ -46,6 +46,14 @@ table nrb_recoveries` on the first query), fixed by moving the 23 tables to
 Any future restore needs the same step before the pipeline, worker or runner
 can touch it.
 
+**The PRODUCTION corpus build is IN PROGRESS in `local_ai_gateway_build` and is
+paused — resume from `docs/prod-incident-2026-09-20.md` §9**, which holds what
+production's own database showed (it never fetched a single NRB file: volume
+permissions and nrb.org.np timeouts), the user's three decisions (fresh-dump
+cutover, the frozen 355-file scope, their own files still to come), the exact
+state (338 documents queued, 1 ingested, 1 failed on an embedding timeout) and
+the commands to continue.
+
 **The Alembic lineage is RESOLVED (2026-08-19, §30) — one linear head, nothing
 stranded.** The old warning here (dev DB stamped at a revision that existed only on
 a deferred branch, `alembic current` failing "by design") is **obsolete**: citations
@@ -219,7 +227,9 @@ re-deriving status from chat history.
   .venv/bin/python -m app.nrb.runner            # NRB staging: sync→fetch→extract→enqueue
   .venv/bin/python -m app.rag.worker            # recovery→chunk→embed→supersession
   ```
-  For NRB work every one of them needs `DATABASE_URL=…/local_ai_gateway_p4`.
+  For NRB work every one of them needs `DATABASE_URL` pointed at the NRB
+  database — `…/local_ai_gateway_p4` for experiments, `…/local_ai_gateway_build`
+  for the production corpus (see `app/nrb/dbguard.py`).
 
 ## Postgres (local dev)
 Local PG17 via TCP. Superuser: `postgres`/`postgres` on 127.0.0.1:5432 (peer auth
