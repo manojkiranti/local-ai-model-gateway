@@ -46,13 +46,18 @@ table nrb_recoveries` on the first query), fixed by moving the 23 tables to
 Any future restore needs the same step before the pipeline, worker or runner
 can touch it.
 
-**The PRODUCTION corpus build is IN PROGRESS in `local_ai_gateway_build` and is
-paused — resume from `docs/prod-incident-2026-09-20.md` §9**, which holds what
-production's own database showed (it never fetched a single NRB file: volume
-permissions and nrb.org.np timeouts), the user's three decisions (fresh-dump
-cutover, the frozen 355-file scope, their own files still to come), the exact
-state (338 documents queued, 1 ingested, 1 failed on an embedding timeout) and
-the commands to continue.
+**The PRODUCTION corpus build is IN PROGRESS in `local_ai_gateway_build` —
+read `docs/prod-incident-2026-09-20.md` §9**, which holds what production's own
+database showed (it never fetched a single NRB file: volume permissions and
+nrb.org.np timeouts), the user's three decisions (fresh-dump cutover, the frozen
+355-file scope, their own files still to come) and the commands to continue.
+**§9.7 is the latest state (2026-09-26):** the embedding-timeout fix is tested
+(`RAG_EMBED_BATCH=8 OLLAMA_TIMEOUT=600`, worker env only), the failed document
+ingested, and a worker was left draining the queue at ~3.5 s/chunk (~a day;
+embedding is half on CPU because `OLLAMA_CONTEXT_LENGTH=32768` also sizes the
+embedding model). It also records §17.6's broken-ToUnicode corruption turning
+up in the production corpus, cited as `native` with no VERIFY caveat, and the
+query to size it before cutover.
 
 **The Alembic lineage is RESOLVED (2026-08-19, §30) — one linear head, nothing
 stranded.** The old warning here (dev DB stamped at a revision that existed only on

@@ -1,6 +1,6 @@
 # Production accuracy incident — findings & handoff
 
-**Opened:** 2026-09-20. **Status:** causes B, C and D are fixed on our side (unmerged, undeployed). Cause A, the missing corpus, is being rebuilt: **to resume, start at §9**, which records what production's own database showed and exactly where the build stopped.
+**Opened:** 2026-09-20. **Status:** causes B, C and D are fixed on our side (unmerged, undeployed). Cause A, the missing corpus, is being rebuilt: **to resume, start at §9**, which records what production's own database showed and where the build stands. Its latest state is §9.7.
 
 NIC Bank reported production answers were "not accurate, especially NRB data and
 a couple of documents". This is what was actually wrong, how it was established,
@@ -533,10 +533,11 @@ back to `documents` on `src->>'document_id'` to see which no longer exist.
 
 ## 9. Rebuilding production's knowledge base — findings and how to resume
 
-**Started 2026-09-24. State as of 2026-09-26: the NRB corpus build is paused
-with 1 of 338 documents ingested. It is not running.** Everything below was
-read from `local_ai_gateway_build`, a clone of the production snapshot, unless
-it says otherwise.
+**Started 2026-09-24. Resumed 2026-09-26 18:43 (§9.7): the timeout fix was
+tested on the failed document (ingested, 198 chunks), and the worker is
+draining the NRB queue at ~3.5 s/chunk, roughly a day in total.** Everything
+below was read from `local_ai_gateway_build`, a clone of the production
+snapshot, unless it says otherwise.
 
 ### 9.1 The goal, and three decisions the user made
 
@@ -637,8 +638,9 @@ months. The date is what was approved, and the date is what the scope uses.
    and a batch of long Devanagari chunks exceeded that on this laptop's RTX 4050
    (6 GB). Both are environment variables, so no code change is needed. Set them
    **for the worker process only**, for example `RAG_EMBED_BATCH=8
-   OLLAMA_TIMEOUT=600`. **This fix is untested.** Confirm it on the failed
-   document before leaving 336 jobs to it.
+   OLLAMA_TIMEOUT=600`. **Tested 2026-09-26 (§9.7): an 8-chunk batch takes
+   20–34 s, so 600 s is ~18x headroom; 32 chunks at ~3.5 s each was right at
+   the old 120 s limit.**
 2. **A failed document is never re-selected by an ordinary pass.**
    `nrb_rag_ingest_corpus.py --retry-failed` is the only way back (§21.1).
 3. **Memory is tight.** This laptop has 14 GB, and Claude Code's background
@@ -659,6 +661,10 @@ cd ~/newlaptop/projects/python/local-ai-model-gateway
 export BUILD_DB="$(grep '^DATABASE_URL=' .env | cut -d= -f2- | sed -E 's#/[^/?]+(\?.*)?$##')/local_ai_gateway_build"
 
 # 1. Re-queue the one failed document (look first, then do it)
+#    NOTE: the retry is a NEW job row and claim_next is oldest-first, so a
+#    plain worker runs it LAST, after everything already queued. To test it
+#    first, run that one job alone (§9.7 did it by calling
+#    worker.process_job on the job id), then start the worker.
 DATABASE_URL="$BUILD_DB" .venv/bin/python scripts/nrb_rag_ingest_corpus.py \
     --department nrb --cohort docs/nrb/prod-corpus-scope.json --retry-failed --dry-run
 DATABASE_URL="$BUILD_DB" .venv/bin/python scripts/nrb_rag_ingest_corpus.py \
@@ -708,3 +714,71 @@ Then, in order:
 
 Full suite at `4aba5c2`: **2747 passed, 115 skipped, 0 failed.** Pushing still
 waits on rotating the GitHub token in `.git/config`.
+
+### 9.7 Resumed 2026-09-26: the fix tested, the queue draining
+
+**The failed document now ingests.** `--retry-failed` (dry run first) requeued
+exactly one document, `981ec3977be2…`, as new job `fb4fb7d3…`; the original
+failure stays on job `7fbfafa1…`, which is why `failed | 1` still appears in
+the per-status job count. That job was run ALONE, through the worker's own
+`process_job`, with `RAG_EMBED_BATCH=8 OLLAMA_TIMEOUT=600`:
+
+| | |
+|---|---|
+| Recovery | warm: 143 units reused, converter 0, OCR 0 (cached on 2026-09-24) |
+| Embedding | 25 batches of 8, **min 19.8 s, median 28.2 s, max 33.6 s**, against a 600 s limit |
+| Result | `ready`, **198 chunks**, all `native`, 0 null embeddings, pages 1–143 except page 2 (6 characters, correctly unchunked) |
+
+**Why embedding is slow here, and what is not the cause.** The worker is not the
+problem. Ollama's systemd unit sets `OLLAMA_CONTEXT_LENGTH=32768` for the chat
+model, and that default also sizes the EMBEDDING model's KV cache: `api/ps`
+shows `qwen3-embedding:4b-q8_0` at **10.1 GB, of which 4.4 GB is in VRAM**, and
+`llama-server` holds ~6.2 GB of system RAM for the rest. So embedding runs half
+on CPU at **~3.5 s per chunk**, which is also exactly why 32 chunks hit 120 s.
+Not changed: the §9.2 item 6 compatibility with production was measured under
+this setup, and 32k also rules out silent truncation of a long Devanagari
+chunk. A smaller context would be a large speed-up, but it needs its own
+check (same vectors, no truncation) before a corpus is embedded that way.
+
+**The worker was then started for the rest of the queue** at 18:43, detached
+(`setsid nohup`), PID **308118**, same two overrides, verified from
+`/proc/<pid>/environ`. Measured over its first 11 documents: **3.52 s per chunk
+including recovery**, so embedding dominates. At ~1.4 chunks per page over the
+queue's 17,735 pages, that is **~24,000–30,000 chunks, about 24–30 hours**.
+Stop it by PID only (`kill -TERM 308118`, which the worker handles cleanly);
+a job killed mid-run is swept as stale on the next start.
+
+**Memory is at the edge.** Swap was full (2.0/2.0 GB) with ~1.5 GB available.
+The worker grew to ~2.5 GB once docling and OCR were loaded, and `llama-server`
+holds ~6.2 GB. If the kernel kills `llama-server`, Ollama respawns it, but the
+job in flight fails and needs `--retry-failed`. So after the queue drains,
+**check for new `failed` jobs before settling run 14.**
+
+**A second document with §17.6's broken-ToUnicode text.** `981ec3977be2` routes
+`native`, yet its chunks read `प्रर्देि` for प्रदेश and `र्ी` for यी. A halant
+directly followed by a dependent vowel sign (`्[ािीुूृेैोौ]`) is impossible in
+correctly spelled Devanagari, and it separates the known case cleanly:
+
+| Chunks | Flagged |
+|---|---|
+| p4, `075bf12eb087` (the known §17.6 document) | 6 / 8 |
+| p4, every other `native` NRB chunk | 3 / 624 |
+| p4, `legacy_conversion` | 2 / 589 |
+| build, `981ec3977be2` | **158 / 198 (79.8%)** |
+
+OCR chunks flag often too (33/58 on p4), but they already carry the VERIFY
+caveat; the gap is `native` text, which by §29.2 is cited **without** one.
+This is a measurement, not a detector: nothing routes on it, the holdout is
+untouched, and a real fix is still `native-3` + a new cohort + a Nepali reader.
+**When the queue drains, run the same query over every `native` chunk** in
+`nrb` to size the problem across the corpus before cutover:
+
+```sql
+SELECT left(d.id,12), count(*) AS chunks,
+       count(*) FILTER (WHERE c.content ~ '्[ािीुूृेैोौ]') AS flagged
+FROM document_chunks c JOIN documents d ON d.id = c.document_id
+JOIN departments dp ON dp.id = d.department_id
+WHERE dp.code = 'nrb' AND d.status = 'ready' AND c.metadata->>'route' = 'native'
+GROUP BY 1 HAVING count(*) FILTER (WHERE c.content ~ '्[ािीुूृेैोौ]') > 0
+ORDER BY 3 DESC;
+```
