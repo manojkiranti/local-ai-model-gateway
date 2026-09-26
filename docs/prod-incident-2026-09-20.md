@@ -740,13 +740,30 @@ this setup, and 32k also rules out silent truncation of a long Devanagari
 chunk. A smaller context would be a large speed-up, but it needs its own
 check (same vectors, no truncation) before a corpus is embedded that way.
 
-**The worker was then started for the rest of the queue** at 18:43, detached
-(`setsid nohup`), PID **308118**, same two overrides, verified from
-`/proc/<pid>/environ`. Measured over its first 11 documents: **3.52 s per chunk
-including recovery**, so embedding dominates. At ~1.4 chunks per page over the
-queue's 17,735 pages, that is **~24,000–30,000 chunks, about 24–30 hours**.
-Stop it by PID only (`kill -TERM 308118`, which the worker handles cleanly);
-a job killed mid-run is swept as stale on the next start.
+**The worker was then started for the rest of the queue, and `setsid nohup`
+does NOT keep it alive.** Claude Code runs inside VS Code's snap, so everything
+it launches lands in VS Code's cgroup (`snap.code.code-….scope`); `setsid` and
+reparenting to `systemd --user` do not leave a cgroup, and a `/model` switch
+tears the scope down and kills the worker with it. That happened twice
+(18 then 37 documents done), each time stranding the in-flight job as
+`running` until the stale sweep fails it. Since 20:23 it runs as its OWN
+transient user unit, which survives that:
+
+```bash
+systemd-run --user --unit=nrb-worker --collect --working-directory="$PWD" \
+  -E RAG_EMBED_BATCH=8 -E OLLAMA_TIMEOUT=600 \
+  bash -c 'export DATABASE_URL="$(grep "^DATABASE_URL=" .env | cut -d= -f2- | sed -E "s#/[^/?]+(\?.*)?\$##")/local_ai_gateway_build"; exec .venv/bin/python -m app.rag.worker >> /home/manoj/nrb-worker.log 2>&1'
+systemctl --user status nrb-worker      # state; `stop` ends it cleanly (SIGTERM)
+tail -f /home/manoj/nrb-worker.log
+```
+
+The URL is computed inside the unit from `.env`, so the password is not in the
+unit's command line. Measured over 35 documents: **3.35 s per chunk including
+recovery**, 1.23 chunks/page, 1,245 characters/chunk. With 301 documents /
+16,873 pages left at 20:23, that is **~20,750–27,100 chunks, about 19–25
+hours** uninterrupted; the six ~450-page Unified Directive editions dominate.
+**Each killed worker leaves one failed job**; run `--retry-failed` once the
+queue drains.
 
 **Memory is at the edge.** Swap was full (2.0/2.0 GB) with ~1.5 GB available.
 The worker grew to ~2.5 GB once docling and OCR were loaded, and `llama-server`
