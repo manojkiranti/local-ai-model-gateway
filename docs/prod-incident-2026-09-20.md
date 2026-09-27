@@ -765,6 +765,41 @@ hours** uninterrupted; the six ~450-page Unified Directive editions dominate.
 **Each killed worker leaves one failed job**; run `--retry-failed` once the
 queue drains.
 
+**The laptop shut down at 21:27 on 2026-09-26** (booted 09:01 next day), which
+stopped the unit, Ollama and Postgres together: Kharid Biniyamawali failed on
+`Server disconnected`, and the in-flight job was stranded. So a shutdown or
+suspend stops the build too; keep the laptop on and plugged in.
+
+**Two defects found by the run, both FIXED 2026-09-27** (tests first, each
+watched failing):
+
+1. **U+0000 in a PDF text layer failed the document on every attempt.** Page
+   210 of Unified Directives 2067 carries one (as do 2068, 2069 and 2070, one
+   page each; 2071–2082 and the other 28 Unified Directive files are clean).
+   Postgres TEXT rejects it, so the recovery-cache write failed (a warning, by
+   design) and then, **after ~8 minutes of embedding**, the chunk insert
+   failed the job. Fix: `recovery.PageText.__post_init__` removes it — every
+   route builds a `PageText`, so cold recovery, a refreshed cached unit and
+   the cache write are all covered, while `extraction` is untouched and its
+   evidence `char_count`s stay reproducible.
+2. **A killed worker stranded its document forever.** `jobs.sweep_stale`
+   failed the JOB but left the DOCUMENT `pending`, with no job: the corpus
+   pass skips it (the row exists) and `--retry-failed` skips it (not
+   `failed`). Fix: the sweep now demotes the document by
+   `worker._record_failure`'s rule (`failed` unless `ready` or `archived`) in
+   the same statement. The three documents already stranded (Labour Act 2074,
+   `strategic_plan_2006-2010`, `NRB_Inspection_Supervision_ByLaw-2074`) were
+   set to `failed` by hand with the same predicate, so `--retry-failed`
+   selected 5: those three, Unified Directives 2067 and Kharid Biniyamawali.
+
+Verified on the real file before the queue resumed: Unified Directives 2067's
+retried job, run alone through `worker.process_job`, is **`ready` with 377
+chunks** (all `legacy_conversion`, 243 of 245 pages, 0 null embeddings, page
+210 included). Its recovery-cache row now exists (245 units; page 210 keeps
+423 characters). Full suite: **2768 passed, 115 skipped, 0 failed**, the skip
+count unchanged. The worker restarted at 09:30 on the fixed code; the other
+four retries are at the back of the queue.
+
 **Memory is at the edge.** Swap was full (2.0/2.0 GB) with ~1.5 GB available.
 The worker grew to ~2.5 GB once docling and OCR were loaded, and `llama-server`
 holds ~6.2 GB. If the kernel kills `llama-server`, Ollama respawns it, but the
