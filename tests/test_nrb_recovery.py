@@ -819,3 +819,22 @@ def test_importing_the_router_does_not_import_docling_or_onnxruntime():
         [sys.executable, "-c", code], cwd=REPO, capture_output=True, text=True
     )
     assert proc.returncode == 0, f"leaked into the import path: {proc.stdout.strip()}"
+
+
+# --------------------------------------------------------------------------- #
+# U+0000 — Postgres TEXT cannot store it, and a PDF text layer can contain it.
+# One on page 210 of Unified Directives 2067 (and one each in 2068–2070) failed
+# the recovery-cache write AND, ~8 minutes of embedding later, the chunk insert,
+# on every attempt (2026-09-26). `PageText` is where every route's output meets,
+# so that is where it is removed; the extractor's own text is left alone so the
+# frozen evidence (`nrb_extractions.char_count`) stays reproducible.
+# --------------------------------------------------------------------------- #
+def test_recovered_text_carries_no_nul():
+    page = recovery.PageText(1, recovery.ROUTE_NATIVE, "clean", "नेपाल\x00 राष्ट्र\x00\x00 बैंक")
+    assert page.text == "नेपाल राष्ट्र बैंक"
+
+
+def test_a_page_of_nothing_but_nul_is_not_indexable():
+    """`str.strip()` does not remove U+0000, so without the scrub this page
+    would be chunked and embedded as a passage of nothing."""
+    assert recovery.PageText(1, recovery.ROUTE_NATIVE, "clean", "\x00\x00\n\x00").indexable is False

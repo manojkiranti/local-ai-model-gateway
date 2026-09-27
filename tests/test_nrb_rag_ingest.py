@@ -316,3 +316,17 @@ def _nrb_result(*, family="pdf", status="suspicious", reason="legacy_font_suspec
     from .test_nrb_recovery import _result
 
     return _result(family=family, status=status, reason=reason, text=text, ratio=ratio)
+
+
+def test_a_nul_in_recovered_text_never_reaches_a_chunk():
+    """The consumer-visible half of the U+0000 scrub (see test_nrb_recovery):
+    a chunk carrying one is rejected by Postgres after its embedding is paid."""
+    recovered = recovery.RecoveredDocument(
+        family="pdf", plan="native", plan_reason="clean", gate_ratio=None,
+        pages=(recovery.PageText(1, recovery.ROUTE_NATIVE, "clean",
+                                 "नेपाल\x00 राष्ट्र बैंक"),),
+    )
+    chunks = nrb_rag.chunks_from_recovery(
+        recovered, max_chars=MAX_CHARS, overlap_chars=OVERLAP
+    )
+    assert [c.content for c in chunks] == ["नेपाल राष्ट्र बैंक"]

@@ -204,6 +204,15 @@ class PageText:
     error: str | None = None
     detail: dict[str, Any] = field(default_factory=dict)
 
+    def __post_init__(self) -> None:
+        # U+0000 is never text, and Postgres TEXT cannot store it: one in a PDF
+        # text layer failed both the recovery-cache write and the chunk insert,
+        # on every attempt. Every route builds a PageText, so scrubbing here
+        # covers cold recovery, a refreshed unit and any future route alike;
+        # `extraction` is left untouched so its evidence counts stay reproducible.
+        if "\x00" in self.text:
+            object.__setattr__(self, "text", self.text.replace("\x00", ""))
+
     @property
     def indexable(self) -> bool:
         """May this page's text be chunked, embedded and served as a citation?
