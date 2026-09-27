@@ -19,7 +19,15 @@ from sqlalchemy import func, select, text, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .models import JOB_FAILED, JOB_QUEUED, JOB_RUNNING, IngestJob
+from .models import (
+    JOB_FAILED,
+    JOB_QUEUED,
+    JOB_RUNNING,
+    STATUS_ARCHIVED,
+    STATUS_FAILED,
+    STATUS_READY,
+    IngestJob,
+)
 
 
 class JobConflict(Exception):
@@ -130,19 +138,38 @@ async def sweep_stale(session: AsyncSession, *, stale_minutes: int) -> int:
 
     This is what makes a killed worker recoverable: failing the job releases
     `ux_ingest_jobs_active_document`, so the document can be queued again.
+
+    The DOCUMENT is demoted too, by `worker._record_failure`'s rule: `failed`
+    unless it is already `ready` (a dead re-ingest leaves its previous chunks
+    intact) or `archived`. Leaving it `pending` stranded it — no job, skipped
+    by the NRB corpus pass because the row exists and by `--retry-failed`
+    because it is not `failed`. The status is re-checked under the row lock the
+    UPDATE takes, so an archive landing concurrently is respected.
     """
     result = await session.execute(
         text(
             """
-            UPDATE ingest_jobs
-               SET status      = :failed,
-                   finished_at = now(),
-                   error       = COALESCE(error,
-                                 'worker stopped heartbeating; swept as stale')
-             WHERE status = :running
-               AND heartbeat_at < now() - make_interval(mins => :mins)
+            WITH swept AS (
+                UPDATE ingest_jobs
+                   SET status      = :failed,
+                       finished_at = now(),
+                       error       = COALESCE(error,
+                                     'worker stopped heartbeating; swept as stale')
+                 WHERE status = :running
+                   AND heartbeat_at < now() - make_interval(mins => :mins)
+             RETURNING document_id
+            ), demoted AS (
+                UPDATE documents
+                   SET status = :doc_failed, updated_at = now()
+                 WHERE id IN (SELECT document_id FROM swept)
+                   AND status NOT IN (:ready, :archived)
+             RETURNING id
+            )
+            SELECT count(*) FROM swept
             """
         ),
-        {"failed": JOB_FAILED, "running": JOB_RUNNING, "mins": stale_minutes},
+        {"failed": JOB_FAILED, "running": JOB_RUNNING, "mins": stale_minutes,
+         "doc_failed": STATUS_FAILED, "ready": STATUS_READY,
+         "archived": STATUS_ARCHIVED},
     )
-    return result.rowcount or 0
+    return result.scalar_one()

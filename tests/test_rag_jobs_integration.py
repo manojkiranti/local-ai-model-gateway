@@ -249,6 +249,43 @@ def test_sweep_leaves_a_live_job_alone(docs):
     assert swept == 0 and status == JOB_RUNNING
 
 
+def _sweep_a_dead_worker(s, document_id):
+    """Claim a job for `document_id`, let its heartbeat die, sweep. Doc status."""
+    async def go():
+        await jobs.enqueue(s, document_id=document_id)
+        await s.commit()
+        job = await jobs.claim_next(s)
+        await s.commit()
+        await s.execute(text(
+            "UPDATE ingest_jobs SET heartbeat_at = now() - interval '1 hour'"
+            " WHERE id = :i"), {"i": job.id})
+        await s.commit()
+        await jobs.sweep_stale(s, stale_minutes=10)
+        await s.commit()
+        return (await s.execute(text(
+            "SELECT status FROM documents WHERE id = :i"), {"i": document_id}
+        )).scalar_one()
+    return go()
+
+
+def test_a_swept_job_fails_a_document_that_never_had_a_good_version(docs):
+    """Otherwise the document stays `pending` with NO job: the NRB corpus pass
+    skips it (the row exists) and `--retry-failed` skips it (it is not
+    `failed`), so it is never ingested. Three NRB documents were stranded
+    exactly like this by killed workers on 2026-09-26/27."""
+    assert _run(lambda s: _sweep_a_dead_worker(s, docs["a"])) == "failed"
+
+
+@pytest.mark.parametrize("serving", ["ready", "archived"])
+def test_a_swept_job_leaves_a_serving_document_alone(docs, serving):
+    """The `_record_failure` rule: a dead RE-ingest must not libel a document
+    whose previous chunks are still there and correct."""
+    _sql(lambda c: c.execute(text(
+        "UPDATE documents SET status = :s WHERE id = :i"),
+        {"s": serving, "i": docs["a"]}))
+    assert _run(lambda s: _sweep_a_dead_worker(s, docs["a"])) == serving
+
+
 def test_a_swept_job_frees_the_document_for_a_retry(docs):
     """The whole point of the sweep — the partial unique index must let go."""
     async def go(s):
