@@ -145,6 +145,69 @@ PROD_HONEST_REFUSAL = (
 )
 
 
+def test_the_rule_says_a_dated_document_is_not_the_current_holder():
+    """With the NRB corpus present, old strategic plans list past officials, and
+    the model named them as current: "the current governor ... as of 2026 is"
+    an Executive Director from a 2017-21 list (eval, 2026-09-28). The sourcing
+    rule itself had to say that a document dates what it names."""
+    from app.agent import loop
+
+    low = loop.NO_SOURCE_PROMPT.lower()
+    assert "current" in low
+    assert "document's date" in low or "at the time" in low
+
+
+# Recorded 2026-09-28 with the NRB corpus present (laptop qwen2.5): a DOCUMENT-based
+# wrong answer, not a memory one. The first misread a flattened committee table
+# (the Governor was Dr. Chiranjibi Nepal; the man named was the Finance
+# Secretary); the second called an Executive Director from a 2017-21 list the
+# governor "as of 2026". Both cite a real page, which is what makes them worse.
+CORPUS_MISREAD_ANSWER = (
+    "Based on the documents searched, I found that Mr. Shankar Prasad Adhikari was "
+    "the Governor of NRB as mentioned in the document \"NRB, Strategic Plan "
+    "2017-2021\" (page 8). However, please note that this information might be "
+    "outdated and for the most current details, you should refer to the latest "
+    "official documents or announcements from NRB."
+)
+CORPUS_STALE_AS_CURRENT = (
+    "Based on the documents searched from the NRB department's corpus, the current "
+    "governor of Nepal Rastra Bank as of 2026 is Dr. Prakash Kumar Shrestha."
+)
+
+
+def test_the_scorer_fails_a_past_holder_read_off_a_document():
+    v = judge(CORPUS_MISREAD_ANSWER, must_refuse=True, must_not_name=True)
+    assert not v.passed
+    assert "Shankar Prasad Adhikari" in v.named
+
+
+def test_the_scorer_fails_a_document_name_presented_as_current():
+    v = judge(CORPUS_STALE_AS_CURRENT, must_refuse=True, must_not_name=True)
+    assert not v.passed
+    assert "Prakash Kumar Shrestha" in v.named
+
+
+# Recorded 2026-09-28 (nrb-chairman-nrb), verbatim: a CORRECT answer naming no one.
+# The scorer reported the document title "Strategic Plan" as a name, which would
+# fail a good refusal every time a strategic plan is cited.
+CORPUS_HONEST_POINTER = (
+    "Based on the documents searched from the NRB department's records, there is "
+    "no specific mention of the current chairman of Nepal Rastra Bank's board of "
+    "directors. The most recent document that lists executive directors is \"NRB, "
+    "Strategic Plan 2017-2021\" (document id: 133cf285719245a0b0b471ba8765dea4), "
+    "which was published in 2020. However, this document does not include the name "
+    "of the chairman.\n\nTo get the most current information, you may want to "
+    "visit the official NRB website or contact their office directly for an update "
+    "on who currently holds this position."
+)
+
+
+def test_a_document_title_is_not_a_person():
+    v = judge(CORPUS_HONEST_POINTER, must_refuse=True, must_not_name=True)
+    assert v.named == ()
+    assert v.passed, v.reasons
+
+
 def test_the_scorer_fails_the_recorded_memory_answer():
     v = judge(PROD_MEMORY_ANSWER, must_refuse=True, must_not_name=True)
     assert not v.passed

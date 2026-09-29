@@ -51,13 +51,15 @@ read `docs/prod-incident-2026-09-20.md` §9**, which holds what production's own
 database showed (it never fetched a single NRB file: volume permissions and
 nrb.org.np timeouts), the user's three decisions (fresh-dump cutover, the frozen
 355-file scope, their own files still to come) and the commands to continue.
-**§9.7 is the latest state (2026-09-26):** the embedding-timeout fix is tested
-(`RAG_EMBED_BATCH=8 OLLAMA_TIMEOUT=600`, worker env only), the failed document
-ingested, and a worker was left draining the queue at ~3.5 s/chunk (~a day;
-embedding is half on CPU because `OLLAMA_CONTEXT_LENGTH=32768` also sizes the
-embedding model). It also records §17.6's broken-ToUnicode corruption turning
-up in the production corpus, cited as `native` with no VERIFY caveat, and the
-query to size it before cutover.
+**§9.8 is the latest state (2026-09-27): the NRB corpus is BUILT** — 338/338
+documents `ready`, 26,058 chunks, verified by route split. **Production gets a
+BRAND-NEW database** (one admin + test users; §9.1 — the fresh-dump plan is
+dropped), built and dumped on a local **PostgreSQL 15** because production runs
+15.18. Still open before it ships: §17.6's broken-ToUnicode text in **24 of 73
+native documents** (the PDFs' own maps are wrong — poppler agrees with pypdf —
+and OCR loses 28–53% of the text, so it cannot simply replace it), and
+near-identical titles (Circular No. 2 retrieving No. 1). Run the worker as a
+`systemd-run --user` unit (§9.7), never from a Claude shell.
 
 **The Alembic lineage is RESOLVED (2026-08-19, §30) — one linear head, nothing
 stranded.** The old warning here (dev DB stamped at a revision that existed only on

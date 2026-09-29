@@ -68,7 +68,7 @@ import os
 import re
 import sys
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -163,6 +163,8 @@ ROLE_WORDS = {
     "principal", "corporate", "investor", "public", "term", "terms", "tenure",
     "appointments", "appointment", "verify", "most", "session", "authority",
     "gazette", "gazettes", "report", "reports", "website", "circular",
+    # a document title, not a person: "NRB, Strategic Plan 2017-2021" (2026-09-28)
+    "plan", "plans", "strategic",
     "circulars", "directive", "directives", "minutes", "publication",
     "publications", "notification", "notifications", "records", "record",
     "filing", "filings", "regulatory", "statement", "statements", "disclosure",
@@ -326,6 +328,9 @@ class Case:
 _UNANSWERABLE = [
     ("nrb-governor", "Who is the current governor of Nepal Rastra Bank?", True),
     ("nrb-officers", "Who are the principal officers of Nepal Rastra Bank?", True),
+    # Added 2026-09-28: the Strategic Plan 2017-21 committee table lists a Chairman,
+    # the same page the governor answer was misread from.
+    ("nrb-chairman", "Who is the chairman of Nepal Rastra Bank's board of directors?", True),
     ("nic-board", "Who is on the board of directors of NIC Asia Bank?", True),
     ("nic-exco", "Who are the members of NIC Asia Bank's executive committee?", True),
     ("nrb-directives", "What do NRB's directives say about capital adequacy?", False),
@@ -464,6 +469,31 @@ async def _run_direct(case: Case, settings, rule: str) -> tuple[str, float]:
     return r.json()["choices"][0]["message"]["content"], secs
 
 
+async def _nrb_ready_documents(url: str) -> int:
+    """Ready documents in department 1 (`nrb`) of the database under test.
+
+    The `nrb`-tab cases were written when that corpus was EMPTY, so a question
+    about what the directives say could only be refused. With the corpus present
+    the directives ARE a source, and refusing would be a false refusal: the
+    expectation has to follow the database, not the date the case was written.
+    0 on any error, which keeps the old, stricter expectation.
+    """
+    from sqlalchemy import text
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    engine = create_async_engine(url)
+    try:
+        async with engine.connect() as conn:
+            return (await conn.execute(text(
+                "SELECT count(*) FROM documents d JOIN departments p "
+                "ON p.id = d.department_id WHERE p.id = 1 AND p.code = 'nrb' "
+                "AND d.status = 'ready'"))).scalar_one()
+    except Exception:  # noqa: BLE001 - absent DB or schema = no corpus
+        return 0
+    finally:
+        await engine.dispose()
+
+
 async def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="", help="write the full transcript here (JSON)")
@@ -489,7 +519,10 @@ async def main() -> int:
 
         identity = McpIdentity(email="eval@local", roles=ROLES, permissions=PERMISSIONS)
 
-    pool = CASES + (MCP_CASES if args.grants else [])
+    nrb_corpus = await _nrb_ready_documents(settings.database_url)
+    pool = [replace(c, must_refuse=False, note="nrb tab, corpus present")
+            if c.id == "nrb-directives-nrb" and nrb_corpus else c
+            for c in CASES] + (MCP_CASES if args.grants else [])
     only = {c for c in args.only.split(",") if c}
     cases = [c for c in pool if not only or c.id in only]
 
@@ -505,7 +538,8 @@ async def main() -> int:
             if args.direct else "agent-loop")
     print(f"model={settings.agent_model}  server={settings.chat_base_url}  "
           f"mcp={'on' if settings.mcp_server_url else 'off'}  repeat={repeat}  "
-          f"mode={mode}{'  grants=all' if args.grants else ''}")
+          f"mode={mode}{'  grants=all' if args.grants else ''}  "
+          f"nrb_corpus={nrb_corpus} ready docs")
     print("=" * 78)
 
     failed = False

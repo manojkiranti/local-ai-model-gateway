@@ -533,9 +533,10 @@ back to `documents` on `src->>'document_id'` to see which no longer exist.
 
 ## 9. Rebuilding production's knowledge base — findings and how to resume
 
-**Started 2026-09-24. Resumed 2026-09-26 18:43 (§9.7): the timeout fix was
-tested on the failed document (ingested, 198 chunks), and the worker is
-draining the NRB queue at ~3.5 s/chunk, roughly a day in total.** Everything
+**Started 2026-09-24. The NRB corpus is BUILT (2026-09-27 19:59, §9.8): all
+338 documents `ready`, 26,058 chunks.** §9.7 records the run and the two
+defects it found (both fixed); §9.8 the result, the garbled-native-text finding
+and a retrieval smoke test. Production gets a brand-new database (§9.1). Everything
 below was read from `local_ai_gateway_build`, a clone of the production
 snapshot, unless it says otherwise.
 
@@ -548,7 +549,7 @@ serves from it.
 
 | Decision | Choice |
 |---|---|
-| How it reaches production | **Production sends a FRESH dump just before cutover and pauses writes. We load the corpus into that dump and send the whole database back.** No production write is lost. |
+| How it reaches production | ~~Production sends a FRESH dump just before cutover and pauses writes; we load the corpus into it and send the whole database back.~~ **Changed 2026-09-27: we send a BRAND-NEW database** with one admin and some test users. Production's own database (its chats, users and grants) is not carried over. Production runs **PostgreSQL 15.18** and this laptop 16.15, so the new database is built and dumped on a local PostgreSQL 15. |
 | NRB scope | **Regulatory core + circulars since 2025-07-17**: every directive, act, rule/bylaw and forex document regardless of date, plus circulars published on or after Shrawan 1 of FY 2082/83. Frozen as `docs/nrb/prod-corpus-scope.json`, **355 files, `309798e5…`**. |
 | The user's own files | The user will put them in a folder and say which tab each goes to (`nrb`, `hrdept` or `it`). **Not received yet.** |
 
@@ -834,3 +835,71 @@ WHERE dp.code = 'nrb' AND d.status = 'ready' AND c.metadata->>'route' = 'native'
 GROUP BY 1 HAVING count(*) FILTER (WHERE c.content ~ '्[ािीुूृेैोौ]') > 0
 ORDER BY 3 DESC;
 ```
+
+### 9.8 The NRB corpus is built (2026-09-27, 19:59)
+
+**All 338 in-scope NRB documents are `ready` in `local_ai_gateway_build`:
+26,058 chunks, 676 MB** (the whole database). Verified by route split, not job
+status: `native` 14,964 chunks (73 documents), `legacy_conversion` 10,403 (194),
+`ocr` 691 (pages in 135); **0 `ready` documents without chunks, 0 chunks
+without an embedding**. The worker was stopped once the queue was empty.
+
+**Pipeline run 14 settled as `partial`, and that is the truthful answer.** It
+counts only its own 338 original jobs, of which 7 failed (the embedding
+timeout, the NUL file, the Ollama drop at shutdown, four documents killed
+mid-run); every one of those documents was then recovered by a separate
+`--retry-failed` pass, which by design is not attached to the run. Its fetch
+stage also records NRB's own two HTTP 404s.
+
+**The kernel OOM killer took the worker at 16:23:54** (`global_oom`, swap
+full; the worker was the largest process in the user session at 2.6 GB).
+Nothing was lost: the document had finished recovery, the cache held all 373
+units, and the retry re-embedded it warm (converter 0, OCR 0). With a laptop
+this full, a second heavy process (a frontend dev server, a test run) is
+enough to trigger it. The embedding-context change in §9.7 would free 3–4 GB.
+
+**Garbled native text: 24 of the 73 `native` documents, 1,635 chunks (~6% of
+the corpus)** flag on ≥20% of their chunks, among them the Consumer
+Protection, Negotiable Instruments, Payment & Settlement and Foreign
+Investment Acts and the AML rules. What was established, read-only:
+
+- **The PDFs themselves are wrong, not our extractor.** Poppler's `pdftotext`
+  returns byte-for-byte the same errors as pypdf (47/32/16 impossible
+  sequences on the three test pages), and the files are tagged but carry no
+  `/ActualText` to fall back on. Nearly all of them are **Microsoft Word
+  exports** with Unicode Devanagari fonts (Kalimati, Fontasy Himali, Arial
+  Unicode MS); most clean ones come from Distiller, iLovePDF or Print To PDF.
+- **OCR fixes the spelling and loses the content.** Three routes on the same
+  three pages:
+
+  | Page | native | rapidocr 200 dpi | rapidocr 300 dpi | docling (pipeline) |
+  |---|---|---|---|---|
+  | directive p.21 | 2,102 chars / 47 bad | −43% / 4 | −39% / 4 | −35% / 4 |
+  | Consumer Protection Act p.14 | 1,242 / 32 | −28% / 1 | −52% / 1 | −53% / 0 |
+  | Negotiable Instruments Act p.3 | 1,327 / 16 | −38% / 2 | −43% / 3 | −41% / 3 |
+
+  On the Consumer Protection page, docling returned five fragments for 27
+  native lines; the whole exception list (क)–(ङ) and section 15 were gone. So
+  OCR **cannot replace** native text for an Act.
+- The lexicon hit rate is NOT a usable judge here (native even scores higher on
+  two of three pages); the impossible-sequence count is.
+
+Options, undecided: (1) caveat those pages as VERIFY (small); (2) index the
+page's OCR text *beside* the native text for search (medium); (3) rebuild the
+right Unicode from the embedded fonts' glyph IDs, like the Preeti converter,
+if Word's font subsets kept their cmap/GSUB tables (large; a five-minute
+feasibility check comes first); (4) look for cleaner copies of the Acts, e.g.
+the Nepal Law Commission's. Any of them is a new extractor version and a new
+cohort, never a tweak against the spent holdout.
+
+**Retrieval smoke test** (6 questions, written by the assistant, so a smoke
+test and not evidence): the new FY 2083/84 Unified Circular amendment, the
+Consumer Protection Act (despite its garbling) and the Negotiable Instruments
+Act (via its second, correctly converted copy) rank **1**; the AML Rules 2081
+rank 10 behind nine sibling AML documents; the forex licensing bylaw lost to
+a circular about that bylaw. **Circular No. 2 of FY 2083/84 did not reach the
+top 12 — Circular No. 1 ranked first.** Their titles differ by one digit, and
+a chunk does not carry its document's title, so nothing in the index tells
+them apart. Letting the lexical channel also match `documents.title` would
+need no re-embedding; it is the obvious candidate fix, to be measured on a
+real question set.
