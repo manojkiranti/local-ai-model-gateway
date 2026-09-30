@@ -50,12 +50,18 @@ class FileRecord:
     media_type: str
     size: int
     created_at: str
+    # Structured source content behind this file (currently: create_pptx's own
+    # {title, subtitle, slides}), for a faithful per-slide frontend preview.
+    # None for every other tool and for uploads.
+    preview: dict | None = None
 
 
 class FileSink(Protocol):
     """Something that can persist a generated file and return its record."""
 
-    async def save(self, data: bytes, *, filename: str, media_type: str) -> FileRecord: ...
+    async def save(
+        self, data: bytes, *, filename: str, media_type: str, preview: dict | None = None
+    ) -> FileRecord: ...
 
 
 class FileSource(Protocol):
@@ -123,15 +129,19 @@ class FileStore:
             raise RuntimeError("FileStore is not configured (call configure() first).")
         return self._dir
 
-    async def save(self, data: bytes, *, filename: str, media_type: str) -> FileRecord:
+    async def save(
+        self, data: bytes, *, filename: str, media_type: str, preview: dict | None = None
+    ) -> FileRecord:
         """Persist a file. Delegates to the active turn sink if one is installed,
         else does a flat on-disk write tracked in the per-process index."""
         sink = _current_sink.get()
         if sink is not None:
-            return await sink.save(data, filename=filename, media_type=media_type)
-        return self._save_local(data, filename=filename, media_type=media_type)
+            return await sink.save(data, filename=filename, media_type=media_type, preview=preview)
+        return self._save_local(data, filename=filename, media_type=media_type, preview=preview)
 
-    def _save_local(self, data: bytes, *, filename: str, media_type: str) -> FileRecord:
+    def _save_local(
+        self, data: bytes, *, filename: str, media_type: str, preview: dict | None = None
+    ) -> FileRecord:
         file_id = uuid4().hex
         # On-disk name is the UUID + original extension; the caller-supplied
         # filename is NOT used to build the path (no traversal from user input).
@@ -145,6 +155,7 @@ class FileStore:
             media_type=media_type,
             size=len(data),
             created_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            preview=preview,
         )
         self._records[file_id] = record
         return record

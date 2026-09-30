@@ -43,7 +43,15 @@ WORKING_PROMPT = (
     "on the ACTIVE files unless the user names a different file by name — files "
     "marked superseded were replaced by a newer upload. Never describe a file's "
     "contents from earlier in the conversation; call a file tool on the id you "
-    "intend to answer about."
+    "intend to answer about.\n"
+    "Pagination: many tools return one page at a time (hasMore/nextOffset or "
+    "similar) rather than everything in one call. If the user asks for a "
+    "COMPLETE list, EVERY match, or wants the results exported to a file "
+    "(Excel/PDF/PPTX/Word), keep calling the tool with the next page until "
+    "nothing is left, then use that full aggregated set — never build an export "
+    "from just the first page, and never stop partway through and ask whether "
+    "to continue when the user already asked for everything. Only stop early if "
+    "the user asked for a sample, a preview, or a specific count."
 )
 
 

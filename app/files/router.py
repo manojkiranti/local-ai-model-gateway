@@ -2,7 +2,10 @@
   POST /v1/files       — upload a file the model can read (spreadsheet or document)
   GET  /v1/files       — the caller's files, newest first (the "my files" list)
   GET  /v1/files/{id}  — download one file the caller owns
+  GET  /v1/files/{id}/preview — structured preview content behind a generated file
   DELETE /v1/files/{id} — delete one file the caller owns
+  GET  /v1/branding/pptx-cover, /v1/branding/pptx-header — the org's pptx
+       template artwork (shared, not per-user), for the deck preview panel
 
 Ownership is enforced from the Postgres `generated_files` index, not the raw id:
 the id resolves to a row only when it belongs to the caller, so another user's
@@ -39,12 +42,54 @@ from ..auth.dependencies import get_current_user
 from ..config import get_settings
 from ..db.session import get_session
 from ..users.models import User
+from ..tools.local import pptx as pptx_tool
 from . import ingest, readers, repository as repo
 from .store import file_store
 
 router = APIRouter(prefix="/v1", tags=["files"])
 
 _CHUNK = 64 * 1024
+
+
+@router.get(
+    "/branding/pptx-cover",
+    summary="The org's PPTX template cover background, for the deck preview panel",
+    responses={
+        200: {"content": {"image/jpeg": {}}, "description": "The cover background image."},
+        401: {"description": "Missing/invalid JWT."},
+        404: {"description": "No branded template is configured on this deployment, or it has no cover slide."},
+    },
+)
+async def get_pptx_cover_background(user: User = Depends(get_current_user)):
+    # Read fresh from the template file on every call (via a thread — this is
+    # sync python-pptx/zip/XML work) rather than serving a pre-extracted copy,
+    # so swapping the template file (see app/tools/local/pptx.py) updates this
+    # preview background with no separate step. Not cached here; the
+    # Cache-Control header still lets the browser skip repeat fetches.
+    data = await asyncio.to_thread(pptx_tool.cover_background_bytes)
+    if data is None:
+        raise HTTPException(status_code=404, detail="no branded template configured")
+    return Response(
+        content=data, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=300"}
+    )
+
+
+@router.get(
+    "/branding/pptx-header",
+    summary="The org's PPTX template content-slide background, for the deck preview panel",
+    responses={
+        200: {"content": {"image/jpeg": {}}, "description": "The content-slide background image."},
+        401: {"description": "Missing/invalid JWT."},
+        404: {"description": "No branded template is configured on this deployment."},
+    },
+)
+async def get_pptx_header_background(user: User = Depends(get_current_user)):
+    data = await asyncio.to_thread(pptx_tool.header_background_bytes)
+    if data is None:
+        raise HTTPException(status_code=404, detail="no branded template configured")
+    return Response(
+        content=data, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=300"}
+    )
 
 
 class FileMeta(BaseModel):
@@ -54,6 +99,16 @@ class FileMeta(BaseModel):
     size: int
     source: str
     created_at: datetime
+
+
+class FilePreviewResponse(BaseModel):
+    """The exact structured content create_pptx validated and rendered from —
+    not a re-extraction of the saved bytes — so the frontend can draw each
+    slide itself rather than parsing the binary file."""
+
+    title: str
+    subtitle: str
+    slides: list[dict]
 
 
 class FileListResponse(BaseModel):
@@ -239,6 +294,31 @@ async def get_file(
         filename=record.filename,
         headers={"X-Content-Type-Options": "nosniff"},
     )
+
+
+@router.get(
+    "/files/{file_id}/preview",
+    response_model=FilePreviewResponse,
+    summary="Structured preview content behind a generated file the caller owns",
+    responses={
+        401: {"description": "Missing/invalid JWT."},
+        404: {"description": "Unknown file id, not owned by the caller, or no structured "
+                              "preview was recorded for it (not every tool provides one)."},
+    },
+)
+async def get_file_preview(
+    file_id: str,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    record = await repo.get_owned_file(session, file_id=file_id, user_id=user.id)
+    # Unknown id, not-owned, and no-preview-recorded all read as 404 — same
+    # no-existence-oracle rule as the download route, plus: a file with no
+    # preview is not a special case the client needs to distinguish from one
+    # that was never generated at all.
+    if record is None or record.preview is None:
+        raise HTTPException(status_code=404, detail="no preview available for this file")
+    return record.preview
 
 
 @router.delete(

@@ -53,6 +53,17 @@ def test_tool_instructions_survive_the_identity_block():
     assert "final answer" in p.lower()
 
 
+def test_prompt_requires_full_pagination_before_a_complete_list_or_export():
+    """Regression: a model that stops after one page of a paginated tool (e.g.
+    list_hrms_employees) and asks the user whether to continue, instead of
+    aggregating every page itself, produced an incomplete Excel/PDF export
+    when the user had already asked for everything."""
+    low = build_system_prompt(_settings(assistant_name="NIC AI")).lower()
+    assert "hasmore" in low or "nextoffset" in low
+    assert "complete list" in low
+    assert "never stop partway through and ask" in low
+
+
 @pytest.mark.anyio
 async def test_loop_sends_the_settings_derived_prompt():
     """The wire that breaks silently: the loop must build from THIS turn's

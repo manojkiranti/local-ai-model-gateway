@@ -121,6 +121,44 @@ def test_table_at_cap_with_bullets_is_created():
     assert result.startswith("Created"), result
 
 
+def test_bad_stats_is_error():
+    # An empty list (or dict) is falsy, so it hits the generic "needs at least
+    # one of" check first — same as bullets: [] already does; a non-empty
+    # value of the wrong type reaches the stats-specific validation.
+    assert _run({"slides": [{"stats": "x"}]}).startswith("ERROR: slides[0].stats must be")
+    assert _run({"slides": [{"stats": {"not": "a list"}}]}).startswith("ERROR: slides[0].stats must be")
+    assert _run({"slides": [{"stats": [{"label": "no value"}]}]}).startswith(
+        "ERROR: slides[0].stats[0] must be an object with 'value' and 'label'"
+    )
+    assert _run({"slides": [{"stats": [{"value": "1"}]}]}).startswith(
+        "ERROR: slides[0].stats[0] must be an object with 'value' and 'label'"
+    )
+
+
+def test_too_many_stats_is_refused():
+    stats = [{"value": str(i), "label": f"l{i}"} for i in range(pptx_tool.MAX_STATS_PER_SLIDE + 1)]
+    result = _run({"slides": [{"title": "x", "stats": stats}]})
+    assert result.startswith("ERROR: slides[0].stats has")
+    assert str(pptx_tool.MAX_STATS_PER_SLIDE) in result
+
+
+def test_stats_at_cap_is_created():
+    stats = [{"value": str(i), "label": f"l{i}"} for i in range(pptx_tool.MAX_STATS_PER_SLIDE)]
+    result = _run({"slides": [{"title": "x", "stats": stats}]})
+    assert result.startswith("Created"), result
+
+
+def test_slide_with_only_stats_is_valid():
+    # 'stats' alone satisfies the "needs at least one of" requirement, same as
+    # bullets/table alone.
+    result = _run({"slides": [{"stats": [{"value": "1", "label": "l"}]}]})
+    assert result.startswith("Created"), result
+
+
+def test_slide_needing_content_error_mentions_stats():
+    assert "stats" in _run({"slides": [{}]})
+
+
 # ---- rendering --------------------------------------------------------------
 
 
@@ -203,6 +241,56 @@ def test_bullets_and_table_shrink_keeps_body_left_and_width():
     assert body.width == layout_body.width
 
 
+def test_stats_slide_present():
+    result = _run(
+        {
+            "slides": [
+                {
+                    "title": "Institution at a Glance",
+                    "stats": [
+                        {"value": "1956", "label": "Year established"},
+                        {"value": "18.4B", "label": "USD in reserves", "note": "As of Mar 2024"},
+                    ],
+                }
+            ]
+        }
+    )
+    texts = _slide_texts(result)
+    assert "Institution at a Glance" in texts
+    assert "1956" in texts and "Year established" in texts
+    assert "18.4B" in texts and "USD in reserves" in texts and "As of Mar 2024" in texts
+
+
+def test_stats_and_bullets_on_one_slide_do_not_overlap():
+    """Regression: the stats row and the (repositioned) bullet box below it
+    must not collide — both must render with distinct, non-overlapping
+    vertical spans."""
+    result = _run(
+        {
+            "slides": [
+                {
+                    "title": "Both",
+                    "stats": [{"value": "1", "label": "one"}, {"value": "2", "label": "two"}],
+                    "bullets": ["a summary line"],
+                }
+            ]
+        }
+    )
+    texts = _slide_texts(result)
+    assert "1" in texts and "one" in texts and "a summary line" in texts
+
+    from pptx import Presentation
+
+    record = file_store.get(_link_id(result))
+    prs = Presentation(record.path)
+    slide = prs.slides[0]
+    body = slide.placeholders[1]
+    stat_shapes = [s for s in slide.shapes if s.shape_type == 1]  # MSO_SHAPE_TYPE.AUTO_SHAPE
+    assert len(stat_shapes) == 2
+    stats_bottom = max(s.top + s.height for s in stat_shapes)
+    assert body.top >= stats_bottom  # bullets start at/after the stats row ends
+
+
 def test_ragged_table_rows_are_padded():
     result = _run({"slides": [{"table": {"headers": ["x", "y", "z"], "rows": [["1"], ["1", "2", "3", "4"]]}}]})
     assert result.startswith("Created"), result
@@ -215,6 +303,26 @@ def test_full_unicode_preserved():
     texts = _slide_texts(result)
     assert "Café 🚀 “quotes”" in texts
     assert "नेपाल राष्ट्र बैंक" in texts and "smile 😀" in texts
+
+
+def test_saved_record_carries_the_structured_preview():
+    """The frontend renders a per-slide preview from the exact validated args,
+    not a re-extraction of the saved bytes — so the saved FileRecord's
+    `.preview` must be that same {title, subtitle, slides}, verbatim."""
+    result = _run(
+        {
+            "title": "Quarterly Review",
+            "subtitle": "Q3 2026",
+            "slides": [{"title": "Highlights", "bullets": ["a", "b"]}],
+        }
+    )
+    record = file_store.get(_link_id(result))
+    assert record is not None
+    assert record.preview == {
+        "title": "Quarterly Review",
+        "subtitle": "Q3 2026",
+        "slides": [{"title": "Highlights", "bullets": ["a", "b"]}],
+    }
 
 
 def test_filename_suffix_is_forced():

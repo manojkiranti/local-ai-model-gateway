@@ -171,6 +171,76 @@ def test_delete_is_owner_scoped_and_removes_file():
         assert client.delete("/v1/files/deadbeef", headers=owner).status_code == 404
 
 
+def test_pptx_file_has_a_structured_preview_and_html_does_not():
+    """create_pptx's own validated {title, subtitle, slides} comes back
+    verbatim from GET /v1/files/{id}/preview — not a re-extraction of the
+    saved bytes — is owner-scoped exactly like the download route, and a file
+    with no recorded preview (create_html) 404s rather than crashing."""
+    with TestClient(app) as client:
+        owner = _auth(client, OWNER_EMAIL)
+        other = _auth(client, OTHER_EMAIL)
+        app.state.mcp = FakeMCP()
+
+        app.state.ollama = FakeOllama(
+            _tool_then_answer(
+                "create_pptx",
+                {
+                    "title": "Quarterly Review",
+                    "subtitle": "Q3 2026",
+                    "slides": [{"title": "Highlights", "bullets": ["a", "b"]}],
+                    "filename": "review",
+                },
+            )
+        )
+        r = client.post("/v1/chat", json={"message": "make a deck"}, headers=owner)
+        assert r.status_code == 200
+
+        files = client.get("/v1/files", headers=owner).json()["files"]
+        mine = [f for f in files if f["filename"] == "review.pptx"]
+        assert mine, f"created deck not listed: {files}"
+        fid = mine[0]["id"]
+
+        # --- owner reads back the exact structured content ---
+        preview = client.get(f"/v1/files/{fid}/preview", headers=owner)
+        assert preview.status_code == 200
+        body = preview.json()
+        assert body["title"] == "Quarterly Review"
+        assert body["subtitle"] == "Q3 2026"
+        assert body["slides"] == [{"title": "Highlights", "bullets": ["a", "b"]}]
+
+        # --- a DIFFERENT user cannot read it; unknown id -> 404 ---
+        assert client.get(f"/v1/files/{fid}/preview", headers=other).status_code == 404
+        assert client.get("/v1/files/deadbeef/preview", headers=owner).status_code == 404
+
+        # --- a file with no structured preview recorded -> 404, not a crash ---
+        app.state.ollama = FakeOllama(
+            _tool_then_answer("create_html", {"html_content": HTML, "filename": "plain"})
+        )
+        client.post("/v1/chat", json={"message": "make a page"}, headers=owner)
+        html_fid = [
+            f for f in client.get("/v1/files", headers=owner).json()["files"]
+            if f["filename"] == "plain.html"
+        ][0]["id"]
+        assert client.get(f"/v1/files/{html_fid}/preview", headers=owner).status_code == 404
+
+
+def test_pptx_branding_images_are_authed_and_shared_not_owner_scoped():
+    """Unlike a generated file, the template artwork isn't tied to any one
+    user's row — any authenticated caller gets it, and it's still a 401
+    without a token (same bearer-auth discipline as every other file route)."""
+    with TestClient(app) as client:
+        owner = _auth(client, OWNER_EMAIL)
+        other = _auth(client, OTHER_EMAIL)
+
+        for path in ("/v1/branding/pptx-cover", "/v1/branding/pptx-header"):
+            assert client.get(path).status_code == 401
+            for headers in (owner, other):
+                r = client.get(path, headers=headers)
+                assert r.status_code == 200
+                assert r.headers["content-type"] == "image/jpeg"
+                assert len(r.content) > 1000
+
+
 def test_streaming_turn_also_owns_generated_file():
     """The sink is installed INSIDE the async generator Starlette iterates, so a
     file created during a streaming turn must still get an owned row (guards the

@@ -3,9 +3,27 @@
 Slide-based content model — a deck's unit is a slide, so the model supplies
 `slides[]` of {title?, bullets?, table?} plus an optional deck `title`/`subtitle`
 that becomes a title slide. The `table` shape is create_docx's exactly, so the
-model reuses what it already knows. Rendered with python-pptx on its default
-template (full Unicode, no fonts or system libraries). A file tool, so it flows
-through the per-user file sink like create_docx/create_pdf.
+model reuses what it already knows. A file tool, so it flows through the
+per-user file sink like create_docx/create_pdf.
+
+Rendered on the org's branded template (`assets/pptx_template.pptx`) rather
+than python-pptx's generic default, so every deck comes out looking the same
+— not a per-generation "custom" look. The template's slide MASTER carries the
+brand background (logo, divider line, anniversary badge) with no override on
+any of its 11 stock-named layouts, so every layout inherits it automatically;
+`_LAYOUT_TITLE`/`_LAYOUT_TITLE_AND_CONTENT`/`_LAYOUT_TITLE_ONLY` index into
+that same standard Office layout order (verified against the file's own
+slideMaster1.xml `sldLayoutIdLst`, not assumed), so they need no remapping.
+The template ships 3 example slides from whoever built it in PowerPoint. One
+of them is a bold full-slide "cover" (its own picture background, no stock
+layout has this) — `_find_cover_slide` locates it and it is REUSED directly
+as the deck's title slide (`_add_cover_title_text` adds plain text boxes onto
+it; no image is re-embedded or reconstructed), while `_remove_other_slides`
+drops the remaining two example slides, or every deck would open with
+unwanted blank slides ahead of its content. If the asset is missing (e.g. a
+checkout that stripped it) or has no such cover slide, fall back to a
+placeholder-based title slide on python-pptx's blank default rather than
+failing the tool outright.
 
 Caps are module constants, not arguments: the model must not be able to raise
 the limit that bounds the file it asks the process to build.
@@ -15,10 +33,13 @@ from __future__ import annotations
 
 import asyncio
 from io import BytesIO
+from pathlib import Path
 from typing import Any
 
 from ...files.store import PPTX_MEDIA_TYPE, file_store
 from .base import LocalToolSpec
+
+_TEMPLATE_PATH = Path(__file__).parent / "assets" / "pptx_template.pptx"
 
 MAX_SLIDES = 50
 MAX_BULLETS_PER_SLIDE = 20
@@ -30,6 +51,9 @@ MAX_BULLETS_PER_SLIDE = 20
 # MAX_SLIDES/MAX_BULLETS_PER_SLIDE.
 MAX_TABLE_ROWS_PER_SLIDE = 12
 MAX_TABLE_ROWS_WITH_BULLETS = 8
+# One row, so a clean 1x4 grid rather than wrapping — matches the reference
+# "key facts at a glance" layout this exists to reproduce.
+MAX_STATS_PER_SLIDE = 4
 
 _DEFAULT_FILENAME = "presentation.pptx"
 
@@ -47,8 +71,9 @@ def _validate(args: dict[str, Any]) -> tuple[str, str, list[dict], str] | str:
             return f"ERROR: slides[{idx}] must be an object with title/bullets/table."
         bullets = slide.get("bullets")
         table = slide.get("table")
-        if not (slide.get("title") or bullets or table is not None):
-            return f"ERROR: slides[{idx}] needs at least one of 'title', 'bullets', or 'table'."
+        stats = slide.get("stats")
+        if not (slide.get("title") or bullets or table is not None or stats):
+            return f"ERROR: slides[{idx}] needs at least one of 'title', 'bullets', 'table', or 'stats'."
         if bullets is not None:
             if not isinstance(bullets, list) or not all(isinstance(b, str) for b in bullets):
                 return f"ERROR: slides[{idx}].bullets must be an array of strings."
@@ -78,6 +103,20 @@ def _validate(args: dict[str, Any]) -> tuple[str, str, list[dict], str] | str:
                     f"{cap} on a slide {'with bullets' if has_bullets else 'without bullets'}. "
                     "Split the table across slides."
                 )
+        if stats is not None:
+            if not isinstance(stats, list) or not stats:
+                return f"ERROR: slides[{idx}].stats must be a non-empty array of {{value, label, note?}}."
+            if len(stats) > MAX_STATS_PER_SLIDE:
+                return (
+                    f"ERROR: slides[{idx}].stats has {len(stats)} items; the limit is "
+                    f"{MAX_STATS_PER_SLIDE} per slide."
+                )
+            for sidx, stat in enumerate(stats):
+                if not isinstance(stat, dict) or not stat.get("value") or not stat.get("label"):
+                    return (
+                        f"ERROR: slides[{idx}].stats[{sidx}] must be an object with "
+                        "'value' and 'label' (both required; 'note' optional)."
+                    )
 
     title = str(args.get("title") or "")
     subtitle = str(args.get("subtitle") or "")
@@ -127,40 +166,290 @@ def _add_table(slide, table: dict, top_emu: int, slide_width: int) -> None:
         r += 1
 
 
+# Brand red (#E60012, matching the frontend's own --primary token). Hardcoded
+# rather than pulled from the template's theme palette because that palette
+# is still stock Office blue/orange (verified against its own theme1.xml) —
+# only the master's BACKGROUND was branded, never its color scheme. This
+# matches the tool's existing brand-specific assumptions (the whole template
+# is NIC-ASIA-specific already); a different org's template would want these
+# recolored too.
+_STAT_VALUE_COLOR = (0xE6, 0x00, 0x12)
+_STAT_CARD_FILL = (0xFC, 0xEA, 0xEB)
+_STAT_CARD_BORDER = (0xF0, 0xC5, 0xC9)
+
+
+def _add_stats(slide, stats: list[dict], top_emu: int, height_emu: int, slide_width: int) -> None:
+    """A row of up to MAX_STATS_PER_SLIDE rounded-rectangle "stat cards" — a
+    large colored value, a label, and an optional smaller note — for
+    highlight-figures content ("key facts at a glance"). The single
+    highest-impact layout beyond a plain bullet list for the kind of numeric
+    highlights a deck author reaches for."""
+    from pptx.dml.color import RGBColor
+    from pptx.enum.shapes import MSO_SHAPE
+    from pptx.enum.text import PP_ALIGN
+    from pptx.util import Emu, Pt
+
+    n = len(stats)
+    margin = int(slide_width * 0.05)
+    gap = int(slide_width * 0.02)
+    card_width = (slide_width - 2 * margin - (n - 1) * gap) // n
+
+    for i, stat in enumerate(stats):
+        left = margin + i * (card_width + gap)
+        shape = slide.shapes.add_shape(
+            MSO_SHAPE.ROUNDED_RECTANGLE, Emu(left), Emu(top_emu), Emu(card_width), Emu(height_emu)
+        )
+        shape.fill.solid()
+        shape.fill.fore_color.rgb = RGBColor(*_STAT_CARD_FILL)
+        shape.line.color.rgb = RGBColor(*_STAT_CARD_BORDER)
+        shape.line.width = Pt(0.75)
+        shape.shadow.inherit = False
+
+        tf = shape.text_frame
+        tf.word_wrap = True
+        inset = Emu(int(card_width * 0.09))
+        tf.margin_left = inset
+        tf.margin_right = inset
+        tf.margin_top = Emu(int(height_emu * 0.12))
+
+        p_value = tf.paragraphs[0]
+        p_value.alignment = PP_ALIGN.LEFT
+        run_value = p_value.add_run()
+        run_value.text = str(stat["value"])
+        run_value.font.size = Pt(28)
+        run_value.font.bold = True
+        run_value.font.color.rgb = RGBColor(*_STAT_VALUE_COLOR)
+
+        p_label = tf.add_paragraph()
+        run_label = p_label.add_run()
+        run_label.text = str(stat["label"])
+        run_label.font.size = Pt(12)
+        run_label.font.bold = True
+
+        note = stat.get("note")
+        if note:
+            p_note = tf.add_paragraph()
+            run_note = p_note.add_run()
+            run_note.text = str(note)
+            run_note.font.size = Pt(9)
+            run_note.font.color.rgb = RGBColor(0x66, 0x66, 0x66)
+
+
+_P14_SECTION_EXT_URI = "{521415D9-36F7-43E2-AB2F-B90AF26B5E84}"
+
+# Position/font of the title-slide cover's title+subtitle text, lifted directly
+# from the template's own slideLayout1.xml ctrTitle/subTitle placeholders (and
+# the master's titleStyle/bodyStyle for font) so plain text boxes land exactly
+# where those placeholders would have, without being placeholders themselves.
+_COVER_TITLE_XFRM = (1524000, 1122363, 9144000, 2387600)
+_COVER_SUBTITLE_XFRM = (1524000, 3602038, 9144000, 1655762)
+
+
+def _find_cover_slide(prs):
+    """Return (rId, Slide) for the template's own example slide that has a
+    full-slide picture background override (its bold cover design — logo +
+    corner graphics), or (None, None). Generic by structure (first slide with
+    its own `<p:bg>` picture-fill override) rather than hardcoded to a
+    filename, so it still works if the template is swapped for a different
+    branded file with the same authoring pattern. Pairs each `<p:sldId>` XML
+    entry with its Slide by walking both lists in lockstep (they share order),
+    so the rId can be used later to decide which example slide survives
+    `_remove_other_slides` without a second lookup."""
+    from pptx.oxml.ns import qn
+
+    for sld_elem, slide in zip(prs.slides._sldIdLst, prs.slides):
+        cSld = slide._element.find(qn("p:cSld"))
+        bg = cSld.find(qn("p:bg"))
+        if bg is not None and bg.find(f'{qn("p:bgPr")}/{qn("a:blipFill")}') is not None:
+            return sld_elem.rId, slide
+    return None, None
+
+
+def _picture_background_bytes(slide_or_master) -> bytes | None:
+    """Raw image bytes behind a slide's or slide master's own full-slide
+    picture background (its `<p:bg>` blipFill override), or None if it has no
+    such override. Shared by the cover-slide reuse above and by the branding
+    endpoints below, which read the master's own background — the plain
+    header/logo/badge art every content slide inherits with no override."""
+    from pptx.oxml.ns import qn
+
+    cSld = slide_or_master._element.find(qn("p:cSld"))
+    bg = cSld.find(qn("p:bg")) if cSld is not None else None
+    if bg is None:
+        return None
+    blip = bg.find(f'{qn("p:bgPr")}/{qn("a:blipFill")}/{qn("a:blip")}')
+    if blip is None:
+        return None
+    rid = blip.get(qn("r:embed"))
+    return slide_or_master.part.rels[rid].target_part.blob
+
+
+def cover_background_bytes() -> bytes | None:
+    """The template's own cover-slide background artwork, read fresh from the
+    template file every call (not cached) — see the module docstring: the
+    slide/generation path already re-reads the template each time, and this
+    keeps the frontend's deck-preview branding equally in sync with whatever
+    template file is on disk right now, with no separate update step if the
+    template is swapped. None if the asset is missing or has no such slide."""
+    if not _TEMPLATE_PATH.exists():
+        return None
+    from pptx import Presentation
+
+    prs = Presentation(str(_TEMPLATE_PATH))
+    _, slide = _find_cover_slide(prs)
+    return _picture_background_bytes(slide) if slide is not None else None
+
+
+def header_background_bytes() -> bytes | None:
+    """The template's slide MASTER's own background artwork — the plain
+    header/logo/badge look every content slide inherits — read fresh from the
+    template file every call, same reasoning as `cover_background_bytes`."""
+    if not _TEMPLATE_PATH.exists():
+        return None
+    from pptx import Presentation
+
+    prs = Presentation(str(_TEMPLATE_PATH))
+    return _picture_background_bytes(prs.slide_masters[0])
+
+
+def _remove_other_slides(prs, keep_rid: str | None) -> None:
+    """Drop every template example slide except the one whose relationship id
+    is `keep_rid` (or all of them, if None) — leaving the slide masters/layouts
+    intact. Standard python-pptx idiom: no `delete_slide` API exists.
+
+    PowerPoint's "Sections" feature keeps its own slide-id list in a
+    presentation.xml extLst extension, duplicating sldIdLst. Draining sldIdLst
+    without also dropping that extension leaves it pointing at slide ids that
+    exist nowhere in the file — python-pptx's own reader doesn't validate this
+    (so a reload-and-inspect check won't catch it), but PowerPoint silently
+    "repairs" it and stricter readers (WPS) refuse to open the file at all.
+    Stale regardless of whether one example slide survives or none do, so this
+    strip always runs.
+    """
+    from pptx.oxml.ns import qn
+
+    xml_slides = prs.slides._sldIdLst
+    for sld in list(xml_slides):
+        if sld.rId == keep_rid:
+            continue
+        prs.part.drop_rel(sld.rId)
+        xml_slides.remove(sld)
+
+    ext_lst = prs.part._element.find(qn("p:extLst"))
+    if ext_lst is not None:
+        for ext in ext_lst.findall(qn("p:ext")):
+            if ext.get("uri") == _P14_SECTION_EXT_URI:
+                ext_lst.remove(ext)
+
+
+def _add_cover_title_text(slide, title: str, subtitle: str) -> None:
+    """Add title/subtitle as plain text boxes directly onto the template's own
+    cover slide — reusing its existing background untouched, no image
+    re-embedding — styled to match its Title Slide layout's ctrTitle/subTitle
+    placeholders (position/size/font lifted from slideLayout1.xml and the
+    master's title/body styles). Deliberately plain text boxes, not
+    placeholders: this slide's own layout link (Blank) defines neither
+    ctrTitle nor subTitle, and adding placeholder shapes with no matching
+    layout definition is exactly the kind of structural mismatch a strict
+    reader can refuse (see `_remove_other_slides`'s Sections lesson)."""
+    from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
+    from pptx.util import Emu, Pt
+
+    title_box = slide.shapes.add_textbox(*(Emu(v) for v in _COVER_TITLE_XFRM))
+    tf = title_box.text_frame
+    tf.word_wrap = True
+    tf.vertical_anchor = MSO_ANCHOR.BOTTOM
+    p = tf.paragraphs[0]
+    p.alignment = PP_ALIGN.CENTER
+    run = p.add_run()
+    run.text = title
+    run.font.size = Pt(60)
+    run.font.name = "Calibri Light"
+
+    if subtitle:
+        sub_box = slide.shapes.add_textbox(*(Emu(v) for v in _COVER_SUBTITLE_XFRM))
+        tf2 = sub_box.text_frame
+        tf2.word_wrap = True
+        p2 = tf2.paragraphs[0]
+        p2.alignment = PP_ALIGN.CENTER
+        run2 = p2.add_run()
+        run2.text = subtitle
+        run2.font.size = Pt(24)
+        run2.font.name = "Calibri"
+
+
 def _build_pptx_bytes(title: str, subtitle: str, slides: list[dict]) -> bytes:
     """Render the deck with python-pptx. Sync — run in a thread."""
     from pptx import Presentation
     from pptx.util import Emu
 
-    prs = Presentation()
+    cover_slide = None
+    if _TEMPLATE_PATH.exists():
+        prs = Presentation(str(_TEMPLATE_PATH))
+        cover_rid, cover_slide = _find_cover_slide(prs)
+        # No deck title -> no title slide at all, matching the pre-template
+        # contract; drop the cover example along with the other two.
+        _remove_other_slides(prs, keep_rid=cover_rid if title else None)
+        if not title:
+            cover_slide = None
+    else:
+        prs = Presentation()
 
     if title:
-        ts = prs.slides.add_slide(prs.slide_layouts[_LAYOUT_TITLE])
-        ts.shapes.title.text = title
-        ts.placeholders[1].text = subtitle  # empty string leaves the placeholder blank
+        if cover_slide is not None:
+            _add_cover_title_text(cover_slide, title, subtitle)
+        else:
+            ts = prs.slides.add_slide(prs.slide_layouts[_LAYOUT_TITLE])
+            ts.shapes.title.text = title
+            ts.placeholders[1].text = subtitle  # empty string leaves the placeholder blank
 
     for spec in slides:
         bullets = spec.get("bullets") or []
         table = spec.get("table")
+        stats = spec.get("stats") or []
         layout = _LAYOUT_TITLE_AND_CONTENT if bullets else _LAYOUT_TITLE_ONLY
         slide = prs.slides.add_slide(prs.slide_layouts[layout])
         slide.shapes.title.text = str(spec.get("title") or "")
 
+        # Zone offsets (fractions of slide height) are calibrated against this
+        # template's own title placeholder, which the master pushes down to
+        # ~29% to clear the branded header artwork (logo + divider line) --
+        # not the stock Office default's ~5%-25%. A template swap would need
+        # these recalibrated the same way.
+        if stats:
+            _add_stats(
+                slide, stats, int(prs.slide_height * 0.30), int(prs.slide_height * 0.22), prs.slide_width
+            )
+
         if bullets:
             _add_bullets(slide, bullets)
-            if table is not None:
-                # Shrink the bullet box to the upper part so the table fits below it.
-                # Capture the inherited left/width first: python-pptx placeholder
-                # position setters write a bare xfrm, so setting only top/height
-                # zeroes left/width instead of keeping the layout's values.
+            if stats or table is not None:
+                # Shrink/reposition the bullet box so it doesn't collide with
+                # whatever else shares the slide. Capture the inherited
+                # left/width first: python-pptx placeholder position setters
+                # write a bare xfrm, so setting only top/height zeroes
+                # left/width instead of keeping the layout's values. Below the
+                # stats row when one is present (matching the reference "cards
+                # + one summary line" layout); otherwise the existing
+                # bullets+table split.
                 body = slide.placeholders[1]
                 left, width = body.left, body.width
-                body.top = Emu(int(prs.slide_height * 0.22))
-                body.height = Emu(int(prs.slide_height * 0.30))
+                if stats:
+                    body.top = Emu(int(prs.slide_height * 0.55))
+                    body.height = Emu(int(prs.slide_height * 0.33))
+                else:
+                    body.top = Emu(int(prs.slide_height * 0.30))
+                    body.height = Emu(int(prs.slide_height * 0.22))
                 body.left = left
                 body.width = width
         if table is not None:
-            table_top = int(prs.slide_height * (0.55 if bullets else 0.25))
+            # All three (stats+bullets+table) on one slide is an unsupported
+            # edge case visually -- it renders without error but cramped, and
+            # is not a combination the tool's own description encourages.
+            if stats:
+                table_top = int(prs.slide_height * (0.80 if bullets else 0.55))
+            else:
+                table_top = int(prs.slide_height * (0.55 if bullets else 0.32))
             _add_table(slide, table, table_top, prs.slide_width)
 
     buffer = BytesIO()
@@ -179,7 +468,13 @@ async def _create_pptx(args: dict[str, Any]) -> str:
     except Exception as exc:  # noqa: BLE001 - report back, don't raise into the loop
         return f"ERROR: failed to build PPTX: {exc}"
 
-    record = await file_store.save(data, filename=filename, media_type=PPTX_MEDIA_TYPE)
+    # The exact validated args, not a re-extraction from the saved bytes — lets
+    # the frontend render a faithful per-slide preview (real bullets/tables)
+    # instead of parsing the binary file, which has no browser-native renderer.
+    preview = {"title": title, "subtitle": subtitle, "slides": slides}
+    record = await file_store.save(
+        data, filename=filename, media_type=PPTX_MEDIA_TYPE, preview=preview
+    )
     # Same string shape as create_excel/create_pdf/create_docx so the frontend parses it identically.
     return (
         f"Created PowerPoint presentation '{record.filename}' "
@@ -193,14 +488,19 @@ SPEC = LocalToolSpec(
     description=(
         "Create a PowerPoint (.pptx) slide deck and return a download link. Use this "
         "when the user asks for a presentation, slides, or a deck. Provide 'slides' "
-        "(array of {title?, bullets?, table?}) and optionally a deck 'title' and "
-        "'subtitle' (rendered as a title slide) and a 'filename'. Each slide may have "
-        "a 'title', 'bullets' (array of short strings, one level) and/or a 'table' "
-        "({headers?, rows[][]}). Full Unicode is supported. Keep decks under "
-        f"{MAX_SLIDES} slides and {MAX_BULLETS_PER_SLIDE} bullets per slide, and a "
-        f"table to {MAX_TABLE_ROWS_PER_SLIDE} rows (incl. header) on a slide without "
-        f"bullets or {MAX_TABLE_ROWS_WITH_BULLETS} on one with bullets — a table does "
-        "not paginate on a slide, unlike a document. For a "
+        "(array of {title?, bullets?, table?, stats?}) and optionally a deck 'title' "
+        "and 'subtitle' (rendered as a title slide) and a 'filename'. Each slide may "
+        "have a 'title', 'bullets' (array of short strings, one level), a 'table' "
+        "({headers?, rows[][]}), and/or 'stats' (array of up to "
+        f"{MAX_STATS_PER_SLIDE} {{value, label, note?}} — a row of highlight-number "
+        "cards, e.g. {value: '1956', label: 'Year established'}). Prefer 'stats' over "
+        "'bullets' for a handful of key figures/facts at a glance — it reads far "
+        "better than the same numbers written out as a bullet list, and is what a "
+        "human deck author would build for that content. Full Unicode is supported. "
+        f"Keep decks under {MAX_SLIDES} slides and {MAX_BULLETS_PER_SLIDE} bullets per "
+        f"slide, and a table to {MAX_TABLE_ROWS_PER_SLIDE} rows (incl. header) on a "
+        f"slide without bullets or {MAX_TABLE_ROWS_WITH_BULLETS} on one with bullets "
+        "— a table does not paginate on a slide, unlike a document. For a "
         "document rather than slides use create_docx or create_pdf."
     ),
     parameters={
@@ -236,9 +536,36 @@ SPEC = LocalToolSpec(
                             "required": ["rows"],
                             "description": "Optional simple table.",
                         },
+                        "stats": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "value": {
+                                        "type": "string",
+                                        "description": "The highlight figure, e.g. '1956' or '18.4B'.",
+                                    },
+                                    "label": {
+                                        "type": "string",
+                                        "description": "What the figure is, e.g. 'Year established'.",
+                                    },
+                                    "note": {
+                                        "type": "string",
+                                        "description": "Optional smaller supporting detail.",
+                                    },
+                                },
+                                "required": ["value", "label"],
+                            },
+                            "description": (
+                                f"Optional row of up to {MAX_STATS_PER_SLIDE} highlight-number "
+                                "cards — prefer this over 'bullets' for key figures at a glance."
+                            ),
+                        },
                     },
                 },
-                "description": "Slides in order; each needs at least a title, bullets, or a table.",
+                "description": (
+                    "Slides in order; each needs at least a title, bullets, a table, or stats."
+                ),
             },
             "filename": {
                 "type": "string",

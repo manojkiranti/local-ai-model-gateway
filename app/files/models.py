@@ -40,15 +40,18 @@ class GeneratedFile(Base):
     media_type: Mapped[str] = mapped_column(String(128), nullable=False)
     size: Mapped[int] = mapped_column(Integer, nullable=False)
     path: Mapped[str] = mapped_column(String(1024), nullable=False)  # on-disk location
-    # Written by production's .pptx preview feature (migration e1a4c6f9b2d7,
-    # reconstructed 2026-09-20); nothing here writes it yet. Declared so the
-    # ORM matches the deployed schema and autogenerate stays clean.
-    preview: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     # How the file got here: model output ('generated') or a user upload
     # ('uploaded'). Lets GET /v1/files filter, and the read tools target uploads.
     source: Mapped[str] = mapped_column(
         String(16), nullable=False, server_default="generated"
     )
+    # Structured source content behind a rendered file (currently: create_pptx's
+    # own {title, subtitle, slides} — the exact validated tool args, not a
+    # re-extraction from the saved bytes), so the frontend can render a faithful
+    # per-slide preview instead of trying to parse the binary. NULL for every
+    # other tool and for uploads; a new tool opts in by passing `preview=...` to
+    # `file_store.save`, nothing else needs to change.
+    preview: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

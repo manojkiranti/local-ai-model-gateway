@@ -27,9 +27,11 @@ async def record_file(
     path: str,
     session_id: Optional[str] = None,
     source: str = "generated",
+    preview: Optional[dict] = None,
 ) -> GeneratedFile:
     """Insert one file row (does not commit). `source` is 'generated' (tool
-    output) or 'uploaded' (user upload)."""
+    output) or 'uploaded' (user upload). `preview` is the structured source
+    content behind a rendered file (currently only create_pptx supplies one)."""
     row = GeneratedFile(
         id=id,
         user_id=user_id,
@@ -39,6 +41,7 @@ async def record_file(
         size=size,
         path=path,
         source=source,
+        preview=preview,
     )
     session.add(row)
     await session.flush()

@@ -23,7 +23,9 @@ class PostgresFileSink:
         self.user_id = user_id
         self.session_id = session_id
 
-    async def save(self, data: bytes, *, filename: str, media_type: str) -> FileRecord:
+    async def save(
+        self, data: bytes, *, filename: str, media_type: str, preview: dict | None = None
+    ) -> FileRecord:
         file_id = uuid4().hex
         ext = Path(filename).suffix or ".bin"
         # Per-user subfolder; the UUID (not the caller filename) is the on-disk
@@ -44,6 +46,7 @@ class PostgresFileSink:
                 media_type=media_type,
                 size=len(data),
                 path=str(path),
+                preview=preview,
             )
             await session.commit()
 
@@ -54,4 +57,5 @@ class PostgresFileSink:
             media_type=media_type,
             size=len(data),
             created_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            preview=preview,
         )
