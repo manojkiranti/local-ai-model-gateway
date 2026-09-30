@@ -42,8 +42,9 @@ from ..auth.dependencies import get_current_user
 from ..config import get_settings
 from ..db.session import get_session
 from ..users.models import User
+from ..tools.local import memo as memo_tool
 from ..tools.local import pptx as pptx_tool
-from . import ingest, readers, repository as repo
+from . import ingest, pdf_convert, readers, repository as repo
 from .store import file_store
 
 router = APIRouter(prefix="/v1", tags=["files"])
@@ -89,6 +90,24 @@ async def get_pptx_header_background(user: User = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="no branded template configured")
     return Response(
         content=data, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=300"}
+    )
+
+
+@router.get(
+    "/branding/memo-logo",
+    summary="The logo printed on generated memos, for the memo preview panel",
+    responses={
+        200: {"content": {"image/png": {}}, "description": "The memo logo."},
+        401: {"description": "Missing/invalid JWT."},
+        404: {"description": "No memo logo is configured on this deployment."},
+    },
+)
+async def get_memo_logo(user: User = Depends(get_current_user)):
+    data = memo_tool.logo_bytes()
+    if data is None:
+        raise HTTPException(status_code=404, detail="no memo logo configured")
+    return Response(
+        content=data, media_type="image/png", headers={"Cache-Control": "private, max-age=300"}
     )
 
 
@@ -321,6 +340,58 @@ async def get_file_preview(
     return record.preview
 
 
+# LibreOffice is CPU- and memory-heavy; a burst of previews must queue, not
+# fork a dozen soffice processes.
+_PDF_SLOTS = asyncio.Semaphore(2)
+
+
+@router.get(
+    "/files/{file_id}/pdf",
+    summary="A PDF rendering of an Office file the caller owns, for the preview panel",
+    responses={
+        200: {"content": {"application/pdf": {}}, "description": "The file rendered as PDF."},
+        401: {"description": "Missing/invalid JWT."},
+        404: {"description": "Unknown file id, or not owned by the caller."},
+        410: {"description": "File no longer available on disk."},
+        415: {"description": "Not an Office file (.docx/.pptx/.xlsx)."},
+        422: {"description": "The file could not be converted."},
+        503: {"description": "PDF conversion is not installed on this deployment."},
+    },
+)
+async def get_file_pdf(
+    file_id: str,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Convert (once, then cached) and serve a .docx/.pptx/.xlsx as a PDF, so
+    the browser can show it inline exactly as it will print. Owner-scoped like
+    the download: 404 for unknown and not-yours alike."""
+    record = await repo.get_owned_file(session, file_id=file_id, user_id=user.id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="file not found")
+    source = Path(record.path)
+    if source.suffix.lower() not in pdf_convert.CONVERTIBLE_EXTS:
+        raise HTTPException(status_code=415, detail="only Office files can be previewed as PDF")
+    if not source.exists():
+        raise HTTPException(status_code=410, detail="file no longer available")
+    if not pdf_convert.available():
+        raise HTTPException(status_code=503, detail="PDF preview is not enabled on this deployment")
+    async with _PDF_SLOTS:
+        try:
+            pdf = await asyncio.to_thread(pdf_convert.convert_to_pdf, source)
+        except pdf_convert.ConvertError as exc:
+            raise HTTPException(status_code=422, detail=f"could not convert this file: {exc}") from exc
+    return FileResponse(
+        pdf,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": "inline",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "private, no-store",
+        },
+    )
+
+
 @router.delete(
     "/files/{file_id}",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -343,8 +414,9 @@ async def delete_file(
     await session.commit()  # DB is the source of truth; drop the row first
     # Best-effort unlink of the on-disk file (a leftover file is harmless; a row
     # pointing at a missing file would only 410 on download).
-    try:
-        os.remove(path)
-    except FileNotFoundError:
-        pass
+    for leftover in (path, pdf_convert.cached_pdf_path(Path(path))):
+        try:
+            os.remove(leftover)
+        except FileNotFoundError:
+            pass
     return Response(status_code=status.HTTP_204_NO_CONTENT)

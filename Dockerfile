@@ -58,6 +58,25 @@ WORKDIR /app
 # Prebuilt virtualenv from the builder stage — no compilers in the final image.
 COPY --from=builder /opt/venv /opt/venv
 
+# ---- Optional: Office -> PDF previews (GET /v1/files/{id}/pdf) ------------
+# LibreOffice (headless Writer/Impress/Calc) converts a generated .docx/.pptx/
+# .xlsx to PDF so the preview panel shows the real layout. ~450 MB, so a build
+# ARG like INSTALL_OCR: compose turns it on, a bare `docker build .` stays slim
+# and the route answers 503. Placed BEFORE the app code is copied so a code
+# change does not reinstall it. Fonts: Liberation is metric-compatible with Arial
+# and Courier New (the memo's fonts — without it line breaks and page breaks
+# differ from Word), and Lohit Devanagari renders Nepali text.
+ARG INSTALL_DOC_PDF=false
+RUN if [ "$INSTALL_DOC_PDF" = "true" ]; then \
+        apt-get update \
+        && apt-get install -y --no-install-recommends \
+            libreoffice-writer-nogui libreoffice-impress-nogui libreoffice-calc-nogui \
+            fonts-liberation2 fonts-lohit-deva fonts-lohit-deva-nepali fontconfig \
+        && rm -rf /var/lib/apt/lists/*; \
+    else \
+        echo "Office->PDF preview OMITTED (INSTALL_DOC_PDF=false) — /v1/files/{id}/pdf will answer 503"; \
+    fi
+
 # Application code + migrations. (No .env — see .dockerignore.)
 COPY app ./app
 COPY alembic ./alembic

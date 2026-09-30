@@ -48,6 +48,7 @@ from ..users.schemas import UserOut
 from . import directory
 from .dependencies import get_current_user_optional
 from .directory import DirectoryOutcome
+from .login_name import LoginNameError, canonical_login, directory_name
 from .schemas import LoginRequest, RegisterRequest, TokenResponse
 from .security import create_access_token, hash_password, verify_password
 from .throttle import LoginThrottle, get_throttle
@@ -175,7 +176,9 @@ async def _verify_directory(
         )
         raise _directory_unavailable()
 
-    outcome = await directory.verify_credentials(identifier, password)
+    outcome = await directory.verify_credentials(
+        directory_name(identifier, settings.ad_login_name), password
+    )
     if outcome is DirectoryOutcome.UNAVAILABLE:
         # Not counted against the throttle: an outage is not a failed attempt,
         # and counting it would lock every user out for the whole outage.
@@ -211,14 +214,22 @@ async def _login_unknown_identifier(
 @router.post(
     "/login",
     response_model=TokenResponse,
-    summary="Log in with email + password (local or Active Directory), receive a JWT",
+    summary=(
+        "Log in with email or username + password (local or Active Directory), "
+        "receive a JWT"
+    ),
 )
 async def login(
     body: LoginRequest, session: AsyncSession = Depends(get_session)
 ) -> TokenResponse:
     settings = get_settings()
     throttle = get_throttle()
-    identifier = body.email.lower()
+    try:
+        identifier = canonical_login(body.email, settings.login_email_domain)
+    except LoginNameError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from None
 
     retry_after = throttle.retry_after(identifier)
     if retry_after is not None:

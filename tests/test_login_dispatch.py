@@ -441,3 +441,73 @@ def test_a_successful_login_clears_the_failure_count(ad, created):
 
     assert ok.status_code == 200
     assert after == [401, 401], "the counter should have restarted after the success"
+
+
+# --------------------------------------------------------------------------
+# Sign-in with a bare username (LOGIN_EMAIL_DOMAIN)
+# --------------------------------------------------------------------------
+
+@pytest.fixture()
+def username_domain(monkeypatch):
+    """Usernames map to @example.com, so created rows are cleaned like the rest."""
+    monkeypatch.setenv("LOGIN_EMAIL_DOMAIN", "example.com")
+    get_settings.cache_clear()
+    yield "example.com"
+    get_settings.cache_clear()
+
+
+def test_a_username_signs_in_as_the_same_account_as_its_email(ad, username_domain, created):
+    email = _fresh("uname")
+    username = email.split("@")[0]
+    with TestClient(app) as client:
+        resp = _login(client, username)
+    created.add(email)
+
+    assert resp.status_code == 200
+    assert ad.calls == [(email, PASSWORD)], "AD is asked about the full address (upn)"
+    assert _user_row(email) is not None, "the account is keyed by the mapped email"
+
+
+def test_a_windows_domain_prefix_is_dropped(ad, username_domain, created):
+    email = _fresh("uname-dom")
+    with TestClient(app) as client:
+        resp = _login(client, "NICASIA\\" + email.split("@")[0])
+    created.add(email)
+
+    assert resp.status_code == 200
+    assert ad.calls == [(email, PASSWORD)]
+
+
+def test_sam_mode_sends_only_the_username_to_the_directory(ad, username_domain, created, monkeypatch):
+    monkeypatch.setenv("AD_LOGIN_NAME", "sam")
+    get_settings.cache_clear()
+    email = _fresh("uname-sam")
+    username = email.split("@")[0]
+    with TestClient(app) as client:
+        resp = _login(client, username)
+    created.add(email)
+
+    assert resp.status_code == 200
+    assert ad.calls == [(username, PASSWORD)]
+
+
+def test_a_local_user_can_sign_in_with_the_username_part(ad, username_domain, created):
+    email = _fresh("uname-local")
+    with TestClient(app) as client:
+        _make_local_user(client, email)
+        created.add(email)
+        resp = _login(client, email.split("@")[0])
+
+    assert resp.status_code == 200
+    assert ad.calls == [], "a local password must still never reach the directory"
+
+
+def test_a_username_without_a_configured_domain_is_422(ad, monkeypatch):
+    monkeypatch.setenv("LOGIN_EMAIL_DOMAIN", "")
+    get_settings.cache_clear()
+    with TestClient(app) as client:
+        resp = _login(client, "someone")
+
+    assert resp.status_code == 422
+    assert resp.json()["detail"] == "Sign in with your full email address."
+    assert ad.calls == []

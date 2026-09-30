@@ -55,6 +55,13 @@ class Settings(BaseSettings):
     ad_auth_base_url: str = ""
     ad_auth_connect_timeout: float = 5.0
     ad_auth_read_timeout: float = 10.0
+    # Sign-in with a bare username: `shristi.b` (or `NICASIA\shristi.b`) is the
+    # account `shristi.b@<login_email_domain>`. Blank = full email required.
+    # See app/auth/login_name.py.
+    login_email_domain: str = ""
+    # What the AD shim is asked about: "upn" = the full email (the original
+    # behaviour), "sam" = only the username before the @ (sAMAccountName).
+    ad_login_name: Literal["upn", "sam"] = "upn"
 
     # --- Login rate limiting -------------------------------------------------
     # Applies to BOTH providers. It exists mainly because of AD: an unthrottled

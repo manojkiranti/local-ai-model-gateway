@@ -39,6 +39,9 @@ services:
         # is still slim — only the compose (deployment) path carries OCR. See
         # docs/image-ocr.md.
         INSTALL_OCR: ${INSTALL_OCR:-true}
+        # Office -> PDF previews in the side panel (LibreOffice, ~450 MB). Same
+        # COMPOSE-default reasoning as INSTALL_OCR; see the Dockerfile.
+        INSTALL_DOC_PDF: ${INSTALL_DOC_PDF:-true}
     env_file: .env.docker
     ports:
       - "8000:8000"

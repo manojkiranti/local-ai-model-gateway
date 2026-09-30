@@ -185,6 +185,7 @@ def _add_bullets(slide, bullets: list[str]) -> None:
         paragraph = body.paragraphs[0] if i == 0 else body.add_paragraph()
         paragraph.text = text
         paragraph.level = 0
+    _set_text_size(body, CONTENT_BODY_PT)
 
 
 def _add_table(slide, table: dict, top_emu: int, slide_width: int) -> None:
@@ -210,6 +211,8 @@ def _add_table(slide, table: dict, top_emu: int, slide_width: int) -> None:
         for c in range(ncols):
             grid.cell(r, c).text = str(row[c]) if c < len(row) else ""
         r += 1
+    for cell in grid.iter_cells():
+        _set_text_size(cell.text_frame, CONTENT_BODY_PT)
 
 
 def _add_image(
@@ -309,6 +312,7 @@ def _add_chart(slide, chart: dict, top_emu: int, height_emu: int, slide_width: i
 _STAT_VALUE_COLOR = (0xE6, 0x00, 0x12)
 _STAT_CARD_FILL = (0xFC, 0xEA, 0xEB)
 _STAT_CARD_BORDER = (0xF0, 0xC5, 0xC9)
+_STAT_LABEL_COLOR = (0x22, 0x22, 0x22)
 
 
 def _add_stats(slide, stats: list[dict], top_emu: int, height_emu: int, slide_width: int) -> None:
@@ -358,6 +362,9 @@ def _add_stats(slide, stats: list[dict], top_emu: int, height_emu: int, slide_wi
         run_label.text = str(stat["label"])
         run_label.font.size = Pt(12)
         run_label.font.bold = True
+        # Explicit: a filled shape's text defaults to the theme's light colour
+        # (white), which is invisible on the pale card.
+        run_label.font.color.rgb = RGBColor(*_STAT_LABEL_COLOR)
 
         note = stat.get("note")
         if note:
@@ -557,7 +564,9 @@ def _apply_deck_font(prs, typeface: str) -> None:
 # divider line (which sits at ~15% of slide height) and stopping short of the
 # logo (which starts at ~86% of slide width). Fractions of slide size.
 _HEADER_TITLE_BOX = (0.025, 0.02, 0.80, 0.13)  # left, top, width, height
-_HEADER_TITLE_PT = 24
+# Content slides (every slide but the cover): title and body text sizes.
+CONTENT_TITLE_PT = 20
+CONTENT_BODY_PT = 16
 # Where content starts below the header. The branded layouts' own title sits
 # BELOW the divider (18-29%), with the body at 30%; once the title moves up
 # into the header, content moves up by the same margin. The stock python-pptx
@@ -583,7 +592,19 @@ def _place_title_in_header(slide, slide_width: int, slide_height: int) -> None:
     tf.vertical_anchor = MSO_ANCHOR.MIDDLE
     for paragraph in tf.paragraphs:
         paragraph.alignment = PP_ALIGN.LEFT
-        paragraph.font.size = Pt(_HEADER_TITLE_PT)
+
+
+def _set_text_size(text_frame, size_pt: int, *, bold: bool | None = None) -> None:
+    """Size (and optionally bold) every paragraph AND run: PowerPoint renders
+    existing text from its runs, so a paragraph-level default alone is ignored."""
+    from pptx.util import Pt
+
+    for paragraph in text_frame.paragraphs:
+        fonts = [paragraph.font, *(run.font for run in paragraph.runs)]
+        for font in fonts:
+            font.size = Pt(size_pt)
+            if bold is not None:
+                font.bold = bold
 
 
 def _build_pptx_bytes(
@@ -623,6 +644,7 @@ def _build_pptx_bytes(
         layout = _LAYOUT_TITLE_AND_CONTENT if bullets else _LAYOUT_TITLE_ONLY
         slide = prs.slides.add_slide(prs.slide_layouts[layout])
         slide.shapes.title.text = str(spec.get("title") or "")
+        _set_text_size(slide.shapes.title.text_frame, CONTENT_TITLE_PT, bold=True)
 
         # Zone offsets are fractions of slide height, all relative to `top`:
         # on the branded template the title sits in the header band above

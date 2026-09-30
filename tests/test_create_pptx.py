@@ -588,3 +588,53 @@ def test_tool_is_registered_once():
 
 def test_description_routes_documents_to_create_docx():
     assert "create_docx" in pptx_tool.SPEC.description
+
+
+def test_content_slides_use_a_20pt_bold_title_and_16pt_body_but_the_cover_does_not():
+    from pptx import Presentation
+    from pptx.util import Pt
+
+    result = _run(
+        {
+            "title": "Quarterly Review",
+            "subtitle": "Q3",
+            "slides": [
+                {"title": "Highlights", "bullets": ["one", "two"]},
+                {"title": "Numbers", "table": {"headers": ["A", "B"], "rows": [["1", "2"]]}},
+            ],
+        }
+    )
+    prs = Presentation(file_store.get(_link_id(result)).path)
+    cover, bullets_slide, table_slide = prs.slides
+
+    for slide in (bullets_slide, table_slide):
+        runs = [r for p in slide.shapes.title.text_frame.paragraphs for r in p.runs]
+        assert runs and all(r.font.size == Pt(pptx_tool.CONTENT_TITLE_PT) and r.font.bold for r in runs)
+
+    body_runs = [r for p in bullets_slide.placeholders[1].text_frame.paragraphs for r in p.runs]
+    assert [r.font.size for r in body_runs] == [Pt(pptx_tool.CONTENT_BODY_PT)] * 2
+
+    grid = next(s for s in table_slide.shapes if s.has_table).table
+    cell_runs = [r for cell in grid.iter_cells() for p in cell.text_frame.paragraphs for r in p.runs]
+    assert cell_runs and all(r.font.size == Pt(pptx_tool.CONTENT_BODY_PT) for r in cell_runs)
+
+    # The cover keeps its own large title (60pt), untouched by the content sizes.
+    cover_sizes = {r.font.size for s in cover.shapes if s.has_text_frame
+                   for p in s.text_frame.paragraphs for r in p.runs}
+    assert Pt(pptx_tool.CONTENT_TITLE_PT) not in cover_sizes
+    assert Pt(60) in cover_sizes
+
+
+def test_every_stat_card_run_has_an_explicit_colour():
+    """A filled shape's text defaults to the theme's light colour (white) —
+    invisible on the pale card — so no run may inherit it."""
+    from pptx import Presentation
+
+    result = _run({"slides": [{"title": "Key facts", "stats": [{"value": "NRB", "label": "Regulator", "note": "since 1956"}]}]})
+    slide = Presentation(file_store.get(_link_id(result)).path).slides[0]
+    card = next(s for s in slide.shapes if s.shape_type is not None and s.has_text_frame and "Regulator" in s.text_frame.text)
+    runs = [r for p in card.text_frame.paragraphs for r in p.runs]
+    assert {r.text for r in runs} == {"NRB", "Regulator", "since 1956"}
+    for run in runs:
+        assert run.font.color.type is not None, f"{run.text!r} inherits the shape colour"
+        assert run.font.color.rgb != (0xFF, 0xFF, 0xFF)
