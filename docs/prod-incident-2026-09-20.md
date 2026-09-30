@@ -940,7 +940,7 @@ matches no chunk: **8 of 9 real test questions had 0 lexical hits** on
 tell `परिपत्र नं. २` from `नं. १` (their text differs only in a zero-padded
 `०२`). OR-semantics with function words removed helped only 3 of 9 alone.
 
-**Design A (awaiting approval): a title channel.** Rank documents by title
+**Design A (approved and BUILT 2026-09-30 — see §9.11): a title channel.** Rank documents by title
 match (OR terms, function words removed, Devanagari↔ASCII digit folding), add
 each matching document's best chunk by vector distance, fuse as a third RRF
 channel in `app/rag/retrieval.py`. Query-time only (338 titles): no migration,
@@ -972,3 +972,88 @@ cohort with a Nepali reader. Probe: `/home/manoj/ab-rule/font_check.py`.
 named in 5 runs vs 9. Still failing: officer lists from the strategic plans
 (0/3 either way) — the staff-list pages themselves are the source; a table
 misread (the Finance Secretary as governor) survives prompts.
+
+### 9.11 Design A built: the title channel (2026-09-30)
+
+**What changed, all in `app/rag/retrieval.py`** (query-time; no migration, no
+re-ingest, the delivered database untouched). A third RRF channel ranks the
+department's `ready` documents by how many of the question's DISTINCT terms
+their title contains (OR semantics, `RANK()`), and enters each through its one
+chunk nearest the query vector; documents tied at the pool boundary all get in.
+A term is a `to_tsvector('english', …)` lexeme after ASCII digits are folded
+**to Devanagari** (the parser splits `२०८३/८४` in two but keeps `2083/84`
+whole) and a pure number's leading zeros are dropped, so `2`/`२`/`02`/`०२` are
+one term. `TITLE_IGNORED_TERMS` drops Nepali grammar from the QUESTION (written
+from the §9.10 questions, **not reviewed by a Nepali reader**) plus `nrb` (below).
+Two changes to the existing channels: **every channel now ranks with `RANK()`,
+not `ROW_NUMBER()`** — identical text gives identical vectors, and
+`ROW_NUMBER()` ranked the twins 1 and 2 on row order, an invented lead that
+under RRF exactly cancels the title's real one — and `RetrievedChunk.title_rank`
+(defaulted; diagnostics only, like `dense_rank`). The statement takes one new
+bind parameter, `ignored_terms`; the two callers that run `_SEARCH_SQL` directly
+(`tests/test_nrb_supersession.py`, `scripts/nrb_supersession_exercise.py`) pass it.
+
+**Tests first** (`tests/test_rag_retrieval_integration.py`, 29 pass): the twin
+test (identical text and vector, titled "…नं. १"/"…नं. २"; the No. 2 question
+must put No. 2 first AND strictly ahead, parametrized with the mirror question
+so that an order ignoring titles can satisfy at most one — it failed on No. 2
+before the change), tied dense and lexical ranks, a document reached ONLY
+through its title (one-chunk pool), digits across scripts both ways, zero
+padding both ways, function words, `nrb`, and three guards — department
+isolation, non-ready documents taking no title rank, a function-word-only
+question. Each guard was mutation-checked: removing the filter it protects fails
+it and only it.
+
+**Measured on `ai_gateway`** (the §9.10 questions, the tool's own path: query
+embedding → `search_chunks(limit=rag_rerank_pool)` → rank of the first chunk
+whose title matches §9.10's regex; `-` = not in the 50-row pool):
+
+| question | before | after | how |
+|---|---|---|---|
+| circ2 NE (Circular No. 2) | - | **7** | title rank 1, dense 26 |
+| corridor NE | 1 | 1 | |
+| corridor EN | 2 | 4 | Nepali title, no title match |
+| BAFIA NE | 1 | 1 | |
+| BAFIA EN | - | - | the ENGLISH BAFIA copy is rank 1 (was 3); the regex wants the Nepali title |
+| UD2082 NE | - | - | |
+| UD2082 EN | 6 | 7 | |
+| forex NE | 2 | 2 | |
+| forex EN | 18 | - | outside the top 12 either way; top 3 are the money-changer bylaw and forex AML directives |
+| **in the top 12** | **5/9** | **6/9** | |
+
+The nine questions were written by the assistant: a smoke test, not evidence
+(the yardstick is still C, the human-written cohort). **The first build
+regressed corridor EN from 2 to 16:** "NRB" is in dozens of English titles, so
+each tied at title rank 1 on that one word and outvoted the corridor document,
+whose title is Nepali. Ignoring `nrb` alone restores it to 4 (the §9.10 probe's
+`get`/`work`/`requir` changed nothing and are real content words elsewhere — HR
+has "Work From Home" — so they are not ignored; `nepal`/`rastra` changed nothing
+and are how "Nepal Rastra Bank Act" is found). **Rejected, measured:** a
+two-term minimum (UD2082 EN fell out of the pool), `LIMIT :pool` on documents
+instead of keeping ties whole (same; the cut among tied documents is arbitrary),
+and ranking ties by title coverage (title-alone UD2082 NE 1 → 3).
+
+**Cost:** the statement median went **4.4 → 36.7 ms, worst 34 → 288 ms**
+(UD2082 EN: 103 documents tied inside the pool, 15,897 chunk vectors scored by a
+sequential scan). Small next to a model turn, but it grows with ties and corpus
+size — the bank's own files will add both. Bounding it without the arbitrary cut
+is the open follow-up.
+
+**Still open:** English questions cannot match Nepali titles (the §9.10
+title-embedding step); UD2082 NE's answer is outside the pool (its title matches
+only `एकीकृत निर्देशन २०८२`, shared by 25 documents tied at rank 1); RRF's k=60
+compresses ranks, so a title lead of one rank can only cancel a dense lead of
+one rank — circ2 reaches 7, not 1. **Not deployed** — it ships with the next
+code deploy (which, §9.9, first needs their `.pptx` preview merged).
+Reproduce: `/home/manoj/title-channel/` (`measure_title_channel.py OUT.json`,
+`latency.py`, `variants.py`; `before.txt`/`after.txt`), run with `DATABASE_URL`
+pointed at `ai_gateway` in a `systemd-run --user` unit.
+
+**Evaluation & improvement.** *Success metric:* the share of real questions whose
+expected document is in the top 12 the model sees (today 6/9 on the smoke set).
+*Eval:* the nine questions above, scored by the reproduce scripts; the frozen
+50-question cohort (C) replaces them once a person writes its questions.
+*Feedback capture:* each chunk's `dense_rank`/`lexical_rank`/`title_rank`, so a
+bad answer is attributable to a channel from the stored ranks. *Review loop:*
+re-run the measurement after every retrieval change and after each corpus
+addition, and read the ignored-terms list with a Nepali reader.

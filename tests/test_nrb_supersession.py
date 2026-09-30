@@ -43,7 +43,7 @@ from app.rag import worker
 from app.rag.chunking import Chunk
 from app.rag.ingest import DocumentGone
 from app.rag.models import STATUS_ARCHIVED, STATUS_FAILED, STATUS_READY
-from app.rag.retrieval import _SEARCH_SQL, _vector_literal
+from app.rag.retrieval import TITLE_IGNORED_TERMS, _SEARCH_SQL, _vector_literal
 
 DEPT_CODE = "test-nrb-supersede"
 RACE_DEPT_CODE = "test-nrb-supersede-race"
@@ -467,6 +467,7 @@ def test_retrieval_returns_the_current_version_and_not_the_archived_one():
                     "qvec": _vector_literal([0.0] * (dim - 1) + [1.0]),
                     "qtext": "monetary policy circular",
                     "dept": dept.id, "pool": 50, "rrf_k": 60, "limit": 10,
+                    "ignored_terms": list(TITLE_IGNORED_TERMS),
                 },
             )
         ).mappings().all()

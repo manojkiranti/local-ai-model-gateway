@@ -190,8 +190,12 @@ file.
 | `RAG_INGEST_POLL_SECONDS` | 2.0 | worker poll |
 | `RAG_INGEST_STALE_MINUTES` / `_HEARTBEAT_SECONDS` | 10 / 30 | heartbeat keeps long parses from being swept |
 
-Retrieval is **hybrid**: pgvector cosine (dense) + `ts_rank_cd` (keyword), fused
-by RRF, then (once enabled) cross-encoder reranked and thresholded — an RRF score
+Retrieval is **hybrid**: pgvector cosine (dense) + `ts_rank_cd` (keyword) + a
+**title channel** (documents ranked by how many of the question's terms their
+title contains, digits folded across scripts, Nepali function words ignored; each
+enters through its chunk nearest the query — query-time, no migration; see
+`docs/prod-incident-2026-09-20.md` §9.11), fused by RRF with tied scores given
+tied ranks, then (once enabled) cross-encoder reranked and thresholded — an RRF score
 is rank-derived and carries no absolute meaning, which is why abstention needs the
 reranker rather than a cutoff on `rrf_score`. The department is **never a tool argument** — it comes from the session
 via a contextvar, so prompt injection has nothing to target.

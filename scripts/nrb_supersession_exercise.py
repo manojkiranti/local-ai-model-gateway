@@ -64,7 +64,7 @@ from app.nrb import corpus  # noqa: E402
 from app.ollama.client import OllamaClient  # noqa: E402
 from app.rag import repository as dept_repo  # noqa: E402
 from app.rag import worker  # noqa: E402
-from app.rag.retrieval import _SEARCH_SQL, _vector_literal  # noqa: E402
+from app.rag.retrieval import TITLE_IGNORED_TERMS, _SEARCH_SQL, _vector_literal  # noqa: E402
 
 SCRATCH_DB = "local_ai_gateway_p4"
 DEPT = "nrb-p7-supersede"
@@ -207,6 +207,7 @@ async def _retrieve(Session, dept_id: int, query: str) -> set[str]:
                     "qvec": _vector_literal([0.0] * (dim - 1) + [1.0]),
                     "qtext": query, "dept": dept_id,
                     "pool": 100, "rrf_k": 60, "limit": 20,
+                    "ignored_terms": list(TITLE_IGNORED_TERMS),
                 },
             )
         ).mappings().all()
