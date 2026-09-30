@@ -1505,6 +1505,21 @@ retained). Runbook: `docs/external-api.md`.
   here" means. `POST .../members` is also promote/demote, so
   `grant_department` upserts: `on_conflict_do_nothing` would report success while
   leaving the old level in place.
+- **`DEFAULT_DEPARTMENTS` (default `nrb`) is granted ONCE, at account creation,
+  and never again.** Added 2026-09-30 after the bank restored the user-less
+  release database and no first login could see the NRB tab. Both creation paths
+  (`register`, `_login_unknown_identifier`) call `auth.router.
+  _grant_default_departments` after the user row is committed; it never fails the
+  sign-in (logged, and the rollback's expired user is refreshed). Three things a
+  rewrite must not lose: (1) it is **insert-if-absent** via
+  `rag_repo.grant_default_departments`, NOT `grant_department` — that one is the
+  promote/demote path and rewrites `granted_by`/`granted_at` on conflict, which
+  would erase who made someone an owner; (2) `granted_by` NULL marks the grant as
+  automatic, and only ACTIVE users and departments qualify, so a retired code is
+  skipped silently; (3) **re-granting on every login is deliberately NOT done** —
+  it would undo an admin's revocation at the user's next sign-in. Accounts that
+  predate a default are caught up by `scripts/grant_default_departments.py`
+  (dry run by default, `--apply`).
 - **On `POST .../members`, an ABSENT `role` preserves the level; it does not mean
   viewer.** `GrantCreate.role` is `DepartmentRole | None = None`, and the upsert
   writes `role` only when it was supplied. Defaulting absence to `viewer` looks

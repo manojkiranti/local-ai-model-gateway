@@ -63,6 +63,18 @@ def _insert_local(email):
     )
 
 
+@pytest.fixture(autouse=True)
+def _no_default_departments(monkeypatch):
+    """These tests assert EXACTLY which departments an explicit grant exposes.
+    A deployment's DEFAULT_DEPARTMENTS (nrb, since 2026-09-30) would add one to
+    every account these tests create, so it is switched off here; the default
+    grant itself is tested in test_login_dispatch.py."""
+    monkeypatch.setenv("DEFAULT_DEPARTMENTS", "")
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
+
+
 @pytest.fixture()
 def cleanup():
     _skip_if_no_db()

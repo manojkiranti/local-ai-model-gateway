@@ -237,8 +237,16 @@ def test_an_unknown_identifier_is_provisioned_on_a_directory_success(ad, created
     assert row["is_active"] is True
 
 
-def test_a_provisioned_user_sees_no_departments_until_granted(ad, created):
-    """Auto-provisioning grants access to the assistant, not to any corpus."""
+def test_a_provisioned_user_sees_no_departments_when_no_default_is_configured(
+    ad, created, monkeypatch
+):
+    """With DEFAULT_DEPARTMENTS empty, provisioning grants the assistant, not a corpus.
+
+    Since 2026-09-30 a deployment names default departments (NRB is public
+    regulatory text, so every account gets it); this keeps the other half of the
+    rule: nothing beyond what is configured is ever granted automatically."""
+    monkeypatch.setenv("DEFAULT_DEPARTMENTS", "")
+    get_settings.cache_clear()
     email = _fresh("ad-nodept")
     with TestClient(app) as client:
         resp = _login(client, email)
@@ -249,6 +257,119 @@ def test_a_provisioned_user_sees_no_departments_until_granted(ad, created):
 
     assert depts.status_code == 200
     assert depts.json() == []
+
+
+def _grants(email):
+    """(department code, role, granted_by) for every grant the user holds."""
+    return [tuple(r) for r in _sql(lambda c: c.execute(text(
+        "SELECT d.code, ud.role, ud.granted_by FROM user_departments ud"
+        " JOIN users u ON u.id = ud.user_id JOIN departments d ON d.id = ud.department_id"
+        " WHERE u.email = :e ORDER BY d.code"), {"e": email})).all()]
+
+
+@pytest.fixture()
+def default_dept(monkeypatch):
+    """A throwaway ACTIVE department configured as the default, plus a retired one."""
+    tag = uuid.uuid4().hex[:8]
+    active, retired = f"dflt{tag}", f"dfltoff{tag}"
+
+    async def make(conn):
+        await conn.execute(text(
+            "INSERT INTO departments (code, name, is_active)"
+            " VALUES (:a, 'Default', true), (:r, 'Retired', false)"), {"a": active, "r": retired})
+    _sql(make)
+    monkeypatch.setenv("DEFAULT_DEPARTMENTS", active)
+    get_settings.cache_clear()
+    yield {"active": active, "retired": retired}
+
+    async def drop(conn):
+        codes = {"c": [active, retired]}
+        await conn.execute(text(
+            "DELETE FROM user_departments WHERE department_id IN"
+            " (SELECT id FROM departments WHERE code = ANY(:c))"), codes)
+        await conn.execute(text("DELETE FROM departments WHERE code = ANY(:c)"), codes)
+    _sql(drop)
+
+
+def test_a_provisioned_user_gets_the_default_departments_as_viewer(ad, created, default_dept):
+    """NRB for everyone (decided 2026-09-30): the bank restored a database with no
+    users, every first login became a member with no grant, and nobody saw the
+    NRB tab. The grant is automatic (granted_by NULL) and the weakest level."""
+    email = _fresh("ad-dflt")
+    with TestClient(app) as client:
+        resp = _login(client, email)
+        created.add(email)
+        assert resp.status_code == 200
+        headers = {"Authorization": f"Bearer {resp.json()['access_token']}"}
+        depts = client.get("/v1/departments", headers=headers).json()
+
+    assert [(d["code"], d["role"]) for d in depts] == [(default_dept["active"], "viewer")]
+    assert _grants(email) == [(default_dept["active"], "viewer", None)]
+
+
+def test_a_registered_local_user_gets_the_default_departments(ad, created, default_dept):
+    email = _fresh("local-dflt")
+    with TestClient(app) as client:
+        _make_local_user(client, email)
+        created.add(email)
+
+    assert _grants(email) == [(default_dept["active"], "viewer", None)]
+
+
+def test_an_unknown_or_retired_default_is_skipped_and_login_still_works(
+    ad, created, default_dept, monkeypatch
+):
+    monkeypatch.setenv("DEFAULT_DEPARTMENTS", f"nosuch{uuid.uuid4().hex[:6]}, {default_dept['retired']}")
+    get_settings.cache_clear()
+    email = _fresh("ad-skip")
+    with TestClient(app) as client:
+        resp = _login(client, email)
+        created.add(email)
+
+    assert resp.status_code == 200
+    assert _grants(email) == []
+
+
+def test_the_backfill_grants_existing_users_and_never_demotes(created, default_dept):
+    """For accounts created before the defaults existed (the bank's first users).
+    An existing grant is left EXACTLY as it is -- level and granted_at -- and a
+    deactivated account is not given access."""
+    _skip_if_no_db()
+    plain, owner, gone = _fresh("bf-plain"), _fresh("bf-owner"), _fresh("bf-gone")
+    for e in (plain, owner):
+        _insert_ad_user(e)
+    _insert_ad_user(gone, is_active=False)
+    created.update({plain, owner, gone})
+
+    async def own(conn):
+        await conn.execute(text(
+            "INSERT INTO user_departments (user_id, department_id, role, granted_at)"
+            " SELECT u.id, d.id, 'owner', '2026-01-01T00:00:00Z' FROM users u, departments d"
+            " WHERE u.email = :e AND d.code = :c"), {"e": owner, "c": default_dept["active"]})
+    _sql(own)
+
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+    from app.rag import repository as rag_repo
+
+    async def backfill():
+        engine = create_async_engine(get_settings().database_url, poolclass=NullPool)
+        try:
+            async with async_sessionmaker(engine)() as session:
+                n = await rag_repo.grant_default_departments(
+                    session, codes=[default_dept["active"]])
+                await session.commit()
+                return n
+        finally:
+            await engine.dispose()
+    asyncio.run(backfill())
+
+    assert _grants(plain) == [(default_dept["active"], "viewer", None)]
+    assert _grants(owner) == [(default_dept["active"], "owner", None)]
+    kept_at = _sql(lambda c: c.execute(text(
+        "SELECT ud.granted_at FROM user_departments ud JOIN users u ON u.id = ud.user_id"
+        " WHERE u.email = :e"), {"e": owner})).scalar_one()
+    assert kept_at.isoformat().startswith("2026-01-01"), "an existing grant was rewritten"
+    assert _grants(gone) == []
 
 
 def test_a_rejected_unknown_identifier_creates_no_user(ad, created):

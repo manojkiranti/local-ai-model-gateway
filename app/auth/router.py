@@ -42,6 +42,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import Settings, get_settings
 from ..db.session import get_session
+from ..rag import repository as rag_repo
 from ..users import repository as users_repo
 from ..users.models import PROVIDER_AD, PROVIDER_LOCAL, ROLE_ADMIN, ROLE_MEMBER, User
 from ..users.schemas import UserOut
@@ -150,7 +151,36 @@ async def register(
             status_code=status.HTTP_409_CONFLICT, detail="Email already registered"
         )
     await session.refresh(user)
+    await _grant_default_departments(session, user)
     return user
+
+
+async def _grant_default_departments(session: AsyncSession, user: User) -> None:
+    """Give a NEW account the configured default departments (`DEFAULT_DEPARTMENTS`).
+
+    Called once, at account creation, from both paths that create one. Never
+    fails the sign-in: the account is already committed, so a failure here is
+    logged and the user simply has no default tab yet. Deliberately NOT repeated
+    on every login, which would silently undo an admin's revocation; accounts
+    created before a default existed are covered by
+    `scripts/grant_default_departments.py`.
+    """
+    codes = get_settings().default_department_codes
+    if not codes:
+        return
+    try:
+        added = await rag_repo.grant_default_departments(
+            session, codes=codes, user_ids=[user.id]
+        )
+        await session.commit()
+    except Exception:  # noqa: BLE001 - a missing grant must not become a failed login
+        await session.rollback()
+        await session.refresh(user)  # the rollback expired it; the caller reads it
+        logger.warning("could not grant default departments to user %s", user.id,
+                       exc_info=True)
+        return
+    if added:
+        logger.info("granted %d default department(s) to user %s", added, user.id)
 
 
 def _verify_local(
@@ -205,6 +235,7 @@ async def _login_unknown_identifier(
         session, email=identifier, role=role
     )
     logger.info("provisioned directory user %s with role %s", identifier, role)
+    await _grant_default_departments(session, user)
     return user
 
 

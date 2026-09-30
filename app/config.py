@@ -40,6 +40,13 @@ class Settings(BaseSettings):
     # becomes admin so there's always a way in.
     admin_emails: str = ""
 
+    # Departments every NEW account gets at `viewer`, comma-separated codes.
+    # NRB is public regulatory text, so everyone may search it (decided
+    # 2026-09-30, after the bank restored a user-less database and no first login
+    # could see the NRB tab). Granted once, at account creation; an unknown or
+    # inactive code is skipped. Empty = no automatic grants.
+    default_departments: str = "nrb"
+
     # --- Active Directory authentication -------------------------------------
     # An internal HTTP shim in front of AD. It answers ONLY "Success" or
     # "Failed": no email, no display name, no group membership. So it decides
@@ -447,6 +454,10 @@ class Settings(BaseSettings):
     @staticmethod
     def _csv(value: str) -> list[str]:
         return [item.strip() for item in value.split(",") if item.strip()]
+
+    @property
+    def default_department_codes(self) -> list[str]:
+        return [c.lower() for c in self._csv(self.default_departments)]
 
     @property
     def admin_email_set(self) -> set[str]:

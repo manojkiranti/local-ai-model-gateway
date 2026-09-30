@@ -7,7 +7,7 @@ transaction boundary.
 
 from __future__ import annotations
 
-from sqlalchemy import Row, delete, func, select
+from sqlalchemy import Row, delete, func, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -128,6 +128,37 @@ async def grant_department(
         },
     )
     await session.execute(stmt)
+
+
+async def grant_default_departments(
+    session: AsyncSession,
+    *,
+    codes: list[str],
+    user_ids: list[int] | None = None,
+) -> int:
+    """Give accounts `viewer` on the default departments. Returns grants added.
+
+    Insert-if-absent, deliberately NOT `grant_department`: that one is the
+    promote/demote path and refreshes `granted_by`/`granted_at` on conflict, so
+    reusing it would rewrite the audit record of whoever made someone an owner.
+    Here an existing grant is never touched, whatever its level. `granted_by`
+    NULL marks the grant as automatic. Only ACTIVE departments and ACTIVE users,
+    so an unknown or retired code is simply skipped. `user_ids=None` is the
+    backfill over every account.
+    """
+    if not codes:
+        return 0
+    result = await session.execute(
+        text(
+            "INSERT INTO user_departments (user_id, department_id, role, granted_by) "
+            "SELECT u.id, d.id, :level, NULL FROM users u CROSS JOIN departments d "
+            "WHERE d.code = ANY(:codes) AND d.is_active AND u.is_active "
+            "AND (CAST(:ids AS integer[]) IS NULL OR u.id = ANY(CAST(:ids AS integer[]))) "
+            "ON CONFLICT (user_id, department_id) DO NOTHING"
+        ),
+        {"level": LEVEL_VIEWER, "codes": list(codes), "ids": user_ids},
+    )
+    return result.rowcount or 0
 
 
 async def revoke_department(
