@@ -15,6 +15,8 @@ fpdf2>=2.7
 python-docx>=1.1
 python-pptx>=1.0
 pypdf>=6.0
+# Renders a cited PDF's pages as images for the view-only viewer (app/rag/pages.py).
+pypdfium2>=5.0
 # Image uploads: dimensions for the attachment summary, the format allowlist,
 # and the decoded-PIXEL cap. That cap is a security control on the upload path
 # (router.py's zip guard cannot see a 200-byte PNG that decodes to 40000x40000),

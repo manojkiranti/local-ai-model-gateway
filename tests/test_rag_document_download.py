@@ -189,14 +189,17 @@ def test_download_uses_the_original_filename(env):
     assert "leave.csv" in resp.headers["content-disposition"]
 
 
-def test_member_can_download_a_ready_document(env):
+def test_a_member_cannot_download_a_ready_document_they_can_read(env):
+    """Downloading is admin-only. A member who may READ the document gets 403
+    (not 404 — it exists and is theirs to view, as page images) and no bytes."""
     client, admin, member, _outsider, code = env
     doc_id = _upload(client, admin, code).json()["document_id"]
     _mark_ready(doc_id)
 
     resp = client.get(_url(code, doc_id), headers=member)
-    assert resp.status_code == 200
-    assert resp.content == CSV
+    assert resp.status_code == 403
+    assert "administrators" in resp.json()["detail"]
+    assert CSV not in resp.content
 
 
 # --------------------------------------------------------------------------- #
@@ -361,3 +364,69 @@ def test_an_nrb_document_downloads_from_the_filestore(env, tmp_path, monkeypatch
     assert resp.status_code == 200
     assert resp.content == payload
     assert resp.headers["content-type"] == "application/pdf"
+
+
+# --------------------------------------------------------------------------- #
+# View-only page images (GET …/pages, …/pages/{n}) — what non-admins get
+# --------------------------------------------------------------------------- #
+def _pdf(pages: int = 2) -> bytes:
+    from pypdf import PdfWriter
+
+    writer = PdfWriter()
+    for _ in range(pages):
+        writer.add_blank_page(width=300, height=400)
+    buf = io.BytesIO()
+    writer.write(buf)
+    return buf.getvalue()
+
+
+def _upload_pdf(client, headers, code, data):
+    return client.post(
+        f"/v1/departments/{code}/documents",
+        files={"file": ("circular.pdf", io.BytesIO(data), "application/pdf")},
+        data={"title": "Circular"},
+        headers=headers,
+    )
+
+
+def test_a_member_views_a_pdf_as_page_images_with_no_store(env):
+    client, admin, member, _outsider, code = env
+    data = _pdf(pages=2)
+    doc_id = _upload_pdf(client, admin, code, data).json()["document_id"]
+    _mark_ready(doc_id)
+    base = f"/v1/departments/{code}/documents/{doc_id}/pages"
+
+    count = client.get(base, headers=member)
+    assert count.status_code == 200
+    assert count.json() == {"page_count": 2}
+    assert "no-store" in count.headers["cache-control"]
+
+    page = client.get(f"{base}/2", headers=member)
+    assert page.status_code == 200
+    assert page.headers["content-type"] == "image/png"
+    assert page.content.startswith(b"\x89PNG")
+    assert "no-store" in page.headers["cache-control"]
+    assert data not in page.content  # an image, never the file
+
+    assert client.get(f"{base}/3", headers=member).status_code == 404
+    assert client.get(f"{base}/0", headers=member).status_code == 404
+
+
+def test_page_images_apply_the_same_access_rules_as_the_download(env):
+    client, admin, member, outsider, code = env
+    doc_id = _upload_pdf(client, admin, code, _pdf()).json()["document_id"]
+    base = f"/v1/departments/{code}/documents/{doc_id}/pages"
+
+    assert client.get(base, headers=member).status_code == 404  # still pending
+    _mark_ready(doc_id)
+    assert client.get(base, headers=outsider).status_code == 403
+    assert client.get(f"{base}/1").status_code in (401, 403)
+
+
+def test_page_images_are_pdf_only(env):
+    client, admin, member, _outsider, code = env
+    doc_id = _upload(client, admin, code).json()["document_id"]  # a CSV
+    _mark_ready(doc_id)
+
+    resp = client.get(f"/v1/departments/{code}/documents/{doc_id}/pages", headers=member)
+    assert resp.status_code == 415

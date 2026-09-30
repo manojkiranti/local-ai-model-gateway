@@ -9,6 +9,7 @@ use.
 
 from __future__ import annotations
 
+import asyncio
 import re
 from pathlib import Path
 
@@ -23,7 +24,7 @@ from fastapi import (
     UploadFile,
     status,
 )
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -558,21 +559,10 @@ def _document_path(doc, settings) -> Path:
     return resolve_storage_path(doc.storage_key, settings.rag_docs_base)
 
 
-@router.get(
-    "/{code}/documents/{document_id}/download",
-    response_class=FileResponse,
-    responses={
-        403: {"description": "You have no grant for this department."},
-        404: {"description": "Unknown department/document, or not readable by you."},
-    },
-)
-async def download_department_document(
-    code: str,
-    document_id: str,
-    user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+async def _readable_document(
+    session: AsyncSession, user: User, code: str, document_id: str
 ):
-    """Serve a corpus document's original bytes — what a chat citation links to.
+    """The document and the path of its bytes, if `user` may read it.
 
     Status codes follow the routes beside this one rather than one blanket rule:
     an ungranted **department** is 403 (as in `_require_level`, and as
@@ -582,9 +572,7 @@ async def download_department_document(
     documents, matching the list route: a pending or archived document is not
     part of the corpus their answers can cite, and distinguishing "exists but
     you may not have it" from "does not exist" would leak the corpus's shape.
-
-    Behind JWT like every other download here, so the frontend must fetch with
-    the Authorization header and build a blob URL.
+    Shared by the download and the page-image routes so both answer the same.
     """
     dept, level = await _require_level(session, user, code, LEVEL_VIEWER)
     doc = await docs_repo.get_document(session, document_id)
@@ -614,12 +602,133 @@ async def download_department_document(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Document file is missing"
         )
+    return doc, path
 
+
+# Page images are a view, not a copy: never cached by the browser or a proxy.
+_NO_STORE = {"Cache-Control": "no-store, private"}
+
+
+@router.get(
+    "/{code}/documents/{document_id}/download",
+    response_class=FileResponse,
+    responses={
+        403: {
+            "description": "You have no grant for this department, or you are not "
+            "an administrator (downloading is admin-only; others use /pages)."
+        },
+        404: {"description": "Unknown department/document, or not readable by you."},
+    },
+)
+async def download_department_document(
+    code: str,
+    document_id: str,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Serve a corpus document's original bytes — **administrators only**.
+
+    Everyone else who may read the document views it as rendered page images
+    (`GET …/pages`), so the file itself — and its selectable, printable text
+    layer — never reaches their browser. The admin check comes AFTER the
+    document is resolved, so a non-admin still gets 404 for a document they
+    could not read anyway and 403 only for one they can view but not download.
+
+    Behind JWT like every other download here, so the frontend must fetch with
+    the Authorization header and build a blob URL.
+    """
+    doc, path = await _readable_document(session, user, code, document_id)
+    if user.role != ROLE_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Downloading documents is restricted to administrators.",
+        )
     return FileResponse(
         path,
         media_type=_MEDIA_TYPES.get(doc.file_type, "application/octet-stream"),
         filename=_download_filename(doc),
     )
+
+
+async def _readable_pdf(session, user, code, document_id) -> Path:
+    doc, path = await _readable_document(session, user, code, document_id)
+    if doc.file_type != "pdf":
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Only PDF documents can be viewed here.",
+        )
+    return path
+
+
+@router.get(
+    "/{code}/documents/{document_id}/pages",
+    responses={
+        403: {"description": "You have no grant for this department."},
+        404: {"description": "Unknown department/document, or not readable by you."},
+        415: {"description": "The document is not a PDF."},
+    },
+)
+async def department_document_pages(
+    code: str,
+    document_id: str,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """How many pages a cited PDF has, for the view-only page viewer.
+
+    Open to anyone who may read the document (same checks as the download);
+    each page is then fetched as an image from `…/pages/{page}`.
+    """
+    from . import pages
+
+    path = await _readable_pdf(session, user, code, document_id)
+    try:
+        count = await asyncio.to_thread(pages.page_count, path)
+    except pages.PageError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="This document could not be opened as a PDF.",
+        ) from exc
+    return JSONResponse({"page_count": count}, headers=_NO_STORE)
+
+
+@router.get(
+    "/{code}/documents/{document_id}/pages/{page}",
+    response_class=Response,
+    responses={
+        200: {"content": {"image/png": {}}, "description": "The page as a PNG."},
+        403: {"description": "You have no grant for this department."},
+        404: {"description": "Unknown document, not readable by you, or no such page."},
+        415: {"description": "The document is not a PDF."},
+    },
+)
+async def department_document_page(
+    code: str,
+    document_id: str,
+    page: int,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """One page of a cited PDF rendered as a PNG (1-based `page`).
+
+    The view-only path: an image carries no text layer to select or copy, and
+    no file to save or print. Rendered per request and sent `no-store`.
+    """
+    from . import pages
+
+    path = await _readable_pdf(session, user, code, document_id)
+    try:
+        png = await asyncio.to_thread(pages.render_page_png, path, page)
+    except IndexError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="No such page"
+        ) from None
+    except pages.PageError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="This document could not be opened as a PDF.",
+        ) from exc
+    return Response(content=png, media_type="image/png", headers=_NO_STORE)
 
 
 @router.delete(
