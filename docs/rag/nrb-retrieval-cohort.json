@@ -1,0 +1,358 @@
+{
+  "parameters": {
+    "generated_at": "2026-09-29",
+    "department": "nrb",
+    "negatives_from": null,
+    "document_count": 338,
+    "chunk_count": 26058,
+    "sha256": null
+  },
+  "limitations": [
+    "Chunk-derived questions reuse their source document's vocabulary, so they flatter the lexical channel. The answerable set measures an upper bound on recall; the negatives carry the trustworthy signal.",
+    "One department's corpus supports no population claim. Re-sweep for a corpus that differs in size or character.",
+    "expect_document_id is DOCUMENT granularity: the right document via the wrong passage scores as a hit. expect_section is diagnostic only.",
+    "Negatives are human-authored placeholders, not drawn from a second department's corpus, because only one department (risk_compliance) is populated at generation time. This is a different bias from corpus-derived negatives, not a lesser one: a human must invent questions this department's corpus genuinely cannot answer, rather than borrowing real questions from elsewhere."
+  ],
+  "questions": [
+    {
+      "id": "q001",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: बिक्री एजेन्टसम्बन्धी कार्यविधि, २०७६] 5 अनुसूची १ बै.फा.रा.ऋ.बै.रो.ब.प. १ वैदेशिक रोजगार बचतपत्रको लागि आवेदन फारम (आवेदकको नाममा खरिद गर्न) नेपाल राष्ट्र बैंक मितिः २०..../..../.... राष्ट्र ऋण व्यव",
+      "expect_document_id": "0031edd1ea2741f782a50abb1afa2463",
+      "expect_section": null
+    },
+    {
+      "id": "q002",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: Unified Directives 2068] is adequate to ensure well-ordered and prudent conduct of business. The bank should conduct periodic reviews of its risk management process to ensure its integr",
+      "expect_document_id": "01648917af86409eac639af444355a2d",
+      "expect_section": null
+    },
+    {
+      "id": "q003",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: बैंक तथा वित्तीय संस्था एक आपसमा गाभ्ने /गाभिने (मर्जर) तथा प्राप्ति (एक्विजिशन) सम्बन्धी विनियमावली, २०७३] 5 (४) उप–विनियम (३) बमोजिम गठन गरिएको संयुक्त मर्जर वा प्राप्ति (एक्विजिशन) समितिले आफ्नो कार्यहरु समयबद्ध तथा मितव्ययी ढङ्गले गर्नु पर्नेछ । समितिका पदाधिकारीह",
+      "expect_document_id": "017f61f4b27e4735ac0d8f823404878f",
+      "expect_section": null
+    },
+    {
+      "id": "q004",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: परिपत्र नं. ५ (घ): नेपाल राष्ट्र बैंकबाट घ वर्गका लघुवित्त वित्तीय संस्थाहरुलाई जारी गरिएको एकीकृत निर्देशन, २०८१ मा संशोधन/परिमार्जन/थप ।] यस बैंकबाट “घ” वर्गको इजाजतपत्रप्राप्त लघुवित्त वित्तीय संस्थाहरुलाई जारी गरिएको एकीकृत निर्देशन, २०८१ मा संशोधन/परिमार्जन/थप । क्र.सं. व्यवस्था नं. विद्यमान व्",
+      "expect_document_id": "02051c62b9144124989060f53d96f3b1",
+      "expect_section": null
+    },
+    {
+      "id": "q005",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: परिपत्र नं. ७ (क,ख,ग) २०८१ /८२ : एकीकृत निर्देशन,२०८१ जारी गरिएको सम्बन्धमा ।] xfnsf] 7]ufgf, 6]lnkmf]g g+=, df]jfOn g+=, Od]n 7]ufgf_ (11) ;~rfns, sfo{sf/L k|d'v / vftf ;~rfnsx?sf] kf;kf]6{ ;fO{hsf] kmf]6f] / gful/stf jf /fli6«o kl/rokq j",
+      "expect_document_id": "03adb4a07a1f4936b2bbb013d440ea88",
+      "expect_section": null
+    },
+    {
+      "id": "q006",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: नेपाल राष्ट्र बैंक मनिचेञ्जर इजाजतपत्र तथा निरीक्षण विनियमावली २०७७ (प्रथम संशोधनसहित)] 10 (३) राष्ट्र बैंकले निरीक्षण तथा सुपरिवेक्षणका लागि आवश्यकता अनुसार निरीक्षण तथा सुपरिवेक्षण टोली खटाउने छ । (४) विभागबाट काठमाडौं उपत्यका बाहिरका मनिचेञ्जरको",
+      "expect_document_id": "0412eb5a09ba480db2456d7d14ebcb83",
+      "expect_section": null
+    },
+    {
+      "id": "q007",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: १/२०८२–८३ः एकीकृत परिपत्र–२०८१ मा संशोधन सम्बन्धमा (राहदानी बापतको सटही, NDF, AML/CFT) । २०८२/०४/०१ ।] Acronyms/ Abbreviations ALPA Asset (Money) Laundering Prevention Act, 2008 ALPR Asset (Money) Laundering Prevention Rules, 2024 DNFBPs Designated Non-Financial ",
+      "expect_document_id": "0452db39fa2946ac822f0af84320b21a",
+      "expect_section": null
+    },
+    {
+      "id": "q008",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: बैंक तथा वित्तीय संस्था सम्बन्धी ऐन, २०६३] 1 बैंक तथा वित्तीय संस्था सम्बन्धी ऐन, २०६३ प्रमाणीकरण मिति नेपाल राजपत्रमा प्रकाशित मिति @)^#.&.!(.! @)^#.&.!(.! बैङ्क तथा वित्तीय संस्था सम्बन्धी कानूनलाई संश",
+      "expect_document_id": "05bf5a2032a047c7a13d6dfaa4e7d756",
+      "expect_section": null
+    },
+    {
+      "id": "q009",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: सूचना नं. १ /०८२ –८३ Guidance Note on Interest Income Recognition, 2025 जारी गरिएको सम्बन्धमा ।] transitioned as follows: Interest income on Year 1 (FY 2081/82) Year 2 (FY 2082/83) Year 3 (FY 2083/84) Stage 1 Financial Assets Based on coupon interest rate o",
+      "expect_document_id": "05d64d38e5944b0b889ed06d039db53c",
+      "expect_section": null
+    },
+    {
+      "id": "q010",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: नेपाल राष्ट्र बैंक खुला बजार कारोबार विनियमावली, २०७८] े छ । (४) ब्याजदर कोरिडोरका उपकरण प्रयोग गर्ने तोकिएका संस्थाको बैंकमा खाता हुनु पर्नेछ । २१ स्थायी तरलता सुविधाः अल्पकालीन सम्झौतीत दायित्व भुक्तानी लगायत बैंक",
+      "expect_document_id": "066d8dd5d2574608b89fd9946fb67852",
+      "expect_section": null
+    },
+    {
+      "id": "q011",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: मौद्रिक नीति तर्जुमा कार्यविधि, २०७३ (दोस्रो संशोधन, २०८३)] (२) कार्यान्वयन तालिकाको मस्यौदा तयार पार्दा मौद्रिक नीतिका े प्रावधान कार्यान्वयन मापन गर्ने सूचक, अपेक्षित उपलब्धी, जिम्मेवार विभाग र कार्यान्वयन गर्न लाग्ने ",
+      "expect_document_id": "067bad06d13a4eb0bec703db170d11dc",
+      "expect_section": null
+    },
+    {
+      "id": "q012",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: Electronic Cheque Clearing सम्बन्धमा] महाशय, यस बैकबाट भुक्तानी सम्बन्धी कार्य गर्ने संस्था/संयन्त्रलाई भुक्तानी तथा फस्योट ऐन, २०७५ को दफा ४५ ले दिएको अधिकार प्रयोग गरी देहाय बमोजिम अ. प्रा. निदेशन",
+      "expect_document_id": "07236746d7f44dbf8cfceb5a64501b43",
+      "expect_section": null
+    },
+    {
+      "id": "q013",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: बैंकिङ्ग कसूर तथा सजाय ऐन, २०६४] (संवत् २०8२ साल वैशाख मसान्तसम्म भएका संशोधन ममलाइएको) (3)  (छ) “ढुकुट को कारोबार” भन्नालह एक आपसमा रकम उठा सिममतका आधारमा आलोपालो गर रकम मलनह वा ददनह गर गरहको",
+      "expect_document_id": "0728a8c5ffad4143bcd32a02be90157c",
+      "expect_section": null
+    },
+    {
+      "id": "q014",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: धितो पत्र सम्बन्धी ऐन, २०६३] (24) (३) उपदफा (२) बमोजिम सूचना प्राप्त भएको पन्ध्र दिनभित्र बोर्डले प्रतिनिधिको नाम, ठेगाना तथा अन्य आवश्यक विवरण खुलाइ र् तोकिए बमोजिम दर्ता किताबमा दर्ता गरी",
+      "expect_document_id": "073984c93e724b36871f9b5da184984a",
+      "expect_section": null
+    },
+    {
+      "id": "q015",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: बाणिज्य बैंकहरुले परिवर्त्य विदेशी मुद्रामा ऋण लिन सक्ने व्यवस्था सम्बन्धी सूचना (२०७४/१२/२०)] विदेशी विनिमय व्यवस्थापन विभाग सम्बन्धी सूचना विदेशी विनिमय (नियमित गने) ऐन, २०१९ को दफा १०ख. ले दिएको अधिकार प्रयोग गरी यस बैंकबाट इजाजतपत्रप्रापत गरेका बाणिज्",
+      "expect_document_id": "08d1054a68234580a991b24896aa4f94",
+      "expect_section": null
+    },
+    {
+      "id": "q016",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: परिपत्र नं. ८ (घ): नेपाल राष्ट्र बैंकबाट घ वर्गका लघुवित्त वित्तीय संस्थाहरुलाई जारी गरिएको एकीकृत निर्देशन, २०८२ मा संशोधन/परिमार्जन/थप ।] यस बैंकबाट इजाजतपत्रप्राप्त “घ” वर्गका लघुवित्त वित्तीय संस्थालाई जारी गरिएको एकीकृत निर्देशन, २०८२ मा संशोधन/परिमार्जन/थप ९ढ० विगतमा संलग्न भएको कार्य, संस्था,",
+      "expect_document_id": "097edee58d3c4346a48cd862bdc8a41b",
+      "expect_section": null
+    },
+    {
+      "id": "q017",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: जाली नोट तथा खोटो सिक्का सम्बन्धी विनियमावली, २०७७] - ९९. - 2 बैक वा वित्तीय संस्थावाट निक्षेप दाखिला गदा वा वैंकबाट नोटकोष निरीक्षणको 2 आवश्यक विवरण सहित पठाउनु पर्ने्छ । - b 0 - गरिने हैन । तर सक्कली दागी नोटको",
+      "expect_document_id": "0a6e0d637bd54a979630ed0d9d0a581d",
+      "expect_section": null
+    },
+    {
+      "id": "q018",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: नेपाल राष्ट्र बैंक खुला बजार कारोबारसम्बन्धी कार्यविधि (साताैं संशोधन, २०८१), २०७८] नेपाल राष्ट्र बैंक खुला बजार कारोबारसम्बन्धी कार्यविधि (सातौं संशोधन, २०८१), २०७८ पेज द्दघ अनुसूची – २ नेपाल राष्ट्र बैंक मौद्रिक व्यवस्थापन विभाग केन्द्रीय कार",
+      "expect_document_id": "0aac412cbd1041bb97b0e5150225790c",
+      "expect_section": null
+    },
+    {
+      "id": "q019",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: नोटकोष कारोबार संचालन गर्ने सम्बन्धमा] पत्र संख्या. : मु. नो.ले१०श०७०।७९ श्री डेभलपमेण्ट बैंकर्स एशोसियसन अनामनगर, काठमाडौं। महाशय, नेपाल राष्टर वैंक, नोटकोष संचालन निदेशिका २०६७ (दोशरो संशोधन २०७०) ",
+      "expect_document_id": "0cee726e8e59440c92a42678a69fb9f1",
+      "expect_section": null
+    },
+    {
+      "id": "q020",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: POS मसिन मार्फत गरिने कारोबार र Online Reporting सम्बन्धमा] पत्र संख्या: अ.प्रा. निरदेशन ८/०७६ भुक्तानी सम्बन्धी कार्य गर्ने सम्बन्धित सबै संस्थाहरु । विषय: POs मसिन मा्फत गरिने कारोबार र Online Reporting सम्बन्धमा महाशय",
+      "expect_document_id": "0d6c6441b93349b8941eee90ff6590a3",
+      "expect_section": null
+    },
+    {
+      "id": "q021",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: नेपाल राष्ट्र बैंक कागजात धुल्याउने बिनियमावली, २०६४] 11 ६. विभागीय समिति र उप–समितिका निण र्य । ८. तलव ,भ त्ता, सुविधा सम्बन्धी विवरण /फाराम । फाईल । ११. हवाइ र् टिकटको टिप्पणी तथा परमिट । १२. वीमा दावीका टिप्पणी ",
+      "expect_document_id": "0de7cee271ea497dbaf6187d43341d2d",
+      "expect_section": null
+    },
+    {
+      "id": "q022",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: सम्पत्ति शुद्धीकरण आतङ्ककारी क्रियाकलाप तथा आम विनाशका हातहतियार निर्माण तथा विस्तारमा वित्तीय लगानी (प्रोलिफरेसन फाइनान्सिङ्ग) निवारणसम्बन्धी निरीक्षण तथा सुपरिवेक्षण विनियमावली, २०८३] 6 मिति २०८३/०१/१७, बैठक संख्या २/२०८३ को निर्णय नं. १ सँग सम्बन्धित उक्त कागजातको विद्युतीय अभिलेख समेत राख्ने । साथै, उक्त कागजातको सक्कल प्रतिसहितको प्रतिवेदन",
+      "expect_document_id": "0f01071f7e4f4bf6bd515eb6e119a345",
+      "expect_section": null
+    },
+    {
+      "id": "q023",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: नेपाल राष्ट्र बैंक सूचना तथा सञ्चार नीति, २०७७ (पहिलो संशोधनसहित)] 2 सम्झनुपर्छ । सो शब्दले विद्युतीय माध्यमबाट गरिने विभिन्न श्रव्य दृश्य प्रकाशनसमेतलाई जनाउँछ । (छ) “प्रसारण” भन्नाले विद्युतीय वा अन्य माध्यममार्फत श्रव्य –दृश",
+      "expect_document_id": "0f7ba4b4461c45d9a284cc068dbb2dbc",
+      "expect_section": null
+    },
+    {
+      "id": "q024",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: नेपाल राष्ट्र बैंक निरीक्षण तथा सुपरिवेक्षण विनियमावली, २०७४ (प्रथम संशोधन २०७९)] िरीक्षणमा जानुपूर्व विभागले सामान्यतया सात दिन अघि निरीक्षण टोलीका प्रमुख तथा सदस्यहरुको नाम समावेश गरी निरीक्षण शुरु हुने दिन तोकेर सम्बन्धित बैंक वा वित्तीय स",
+      "expect_document_id": "0ff2a3d0ea6645bd8824138ab0349a58",
+      "expect_section": null
+    },
+    {
+      "id": "q025",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: २/२०८२-८३: विदेशी विनिमय सम्बन्धी एकीकृत परिपत्र–२०८१ मा संशोधन । २०८२/०४/२२] नेपाल राष्ट्र बैंक, विदेशी विनिमय व्यवस्थापन विभागबाट जारी भएको एकीकृत परिपत्र–२०८१ मा संशोधन/परिमार्जन/थप सम्बन्धमा क्र. ;+= एकीकृत इ.प्रा. परिपत्र v08÷ दफा/ ब",
+      "expect_document_id": "103667d2e4ad408d9a36928199b75093",
+      "expect_section": null
+    },
+    {
+      "id": "q026",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: Unified Directive, 2078] od ug{ ;Sg] u/L k'g/tflnsLs/0f÷k'g/;+/rgf ug{ ;lsg] 5 . o;/L k'g/tflnsLs/0f÷k'g/;+/rgf ul/Psf shf{x?nfO{ c;n shf{sf] ?kdf juL{s/0f ug{ ;lsg] 5 . -ª_ ;]o/sf] lwt",
+      "expect_document_id": "1095efc772a94b29b05af3fc48d76a9c",
+      "expect_section": null
+    },
+    {
+      "id": "q027",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: वित्तीय जानकारी इकाई सम्बन्धी विनियमावली, २०७७] नेपाल राष्ट्र बैंक संचालक समितिको मिति २०७७/०१/१२ गतेको बैठकबाट स्वीकृत । परिच्छेद – ६ इकाईको लेखा तथा लेखापरीक्षण १२. लेखा तथा लेखापरीक्षण : (१) इकाईले आफ्नो ख",
+      "expect_document_id": "10a46d1cfb0243d3826b83ff79246f29",
+      "expect_section": null
+    },
+    {
+      "id": "q028",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: सुरक्षित कारोवार ऐन, २०६३] (2) (ङ) “उपभोग्य वस्तु” भन्नाले व्यक्तिगत, पारिवारिक वा घरायसी k5{ . तर सो शब्दले क्रमसंख्या अङ्ढित सवारी साधनलाई जनाउने छैन । (च) “उपकरण” (इक्वीपमेन्ट) भन्नाले",
+      "expect_document_id": "112af3459b5e43dda006c55db5d0260e",
+      "expect_section": null
+    },
+    {
+      "id": "q029",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: सूचनाको हक सम्बन्धी ऐन, २०६४] (6) (२) उपदफा (१) बमोजिम दस्तुर तोक्दा सूचना उपलब्ध गराउ“दा लाग्ने वास्तविक लागतको आधारमा तोकिनेछ । (३) उपदफा (२) बमोजिम तोकिएको दस्तुर लागत भन्दा बढी भएको लागे",
+      "expect_document_id": "11b83b6842a2435b8a42a49129a0f2b7",
+      "expect_section": null
+    },
+    {
+      "id": "q030",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: सूचना नं. १६ /०८१ –८२ चेक अनादर गरेको व्यहोरा प्रमाणित गर्ने कार्यविधि जारी गरिएको सम्बन्धमा ।] घ) चेक धारकले अनादर भएको प्रमाणित गराउन चाहेमा उक्त चेक जारी गर्ने बैंक वा वित्तीय संस्था (माथिको उदाहरणमा “क” बैंक) को जुनसुकै शाखा/कार्यालयमा निवेदन दिन सक्ने",
+      "expect_document_id": "11c47aae05ac48de807c61e698ee081b",
+      "expect_section": null
+    },
+    {
+      "id": "q031",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: NRB, Strategic Plan 2017-2021] Third Strategic Plan 2017-21 financial stability and financial sector development, (iii) external sector stability, and (iv) sound and effective payment system.",
+      "expect_document_id": "133cf285719245a0b0b471ba8765dea4",
+      "expect_section": null
+    },
+    {
+      "id": "q032",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: नेपाली नोटमा लेख्न वा कोर्न नहुने सम्बन्धी इजाजतपत्र प्राप्त बैंक तथा वित्तीय संस्थाहरुलाई परिपत्र] पत्र संख्या : मुव्य.वि./सफा नोट/परिपत्र/१०७५ सिंहमहल, थापाथली, काठमाडौ ४२४२१२७, ४१०१७२९ फ्याक्स E-mail : ९७७ ९ ४२४९५४९ :nrbcmd@nrb.org.np Web Sites www.nrb.org.",
+      "expect_document_id": "13a4618fd22e4aa693a473f3e74d64cd",
+      "expect_section": null
+    },
+    {
+      "id": "q033",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: सूचना नं २२/२०८२/०८३ : राय/सुझाव उपलब्ध गराउने सम्बन्धमा ।] त्नीको गर्भ पतन भएको वा मृत शिशु जन्मेको रहेछ भने त्यस्तो कर्मचारीले सम्बन्धित अस्पताल वा स्वास्थ्यचौकीले दिएको सो व्यहोरा पुष्टि हुने प्रमाण/प्रतिवेदन (मेडिकल ",
+      "expect_document_id": "1442a724370948469e036e7f54e520ad",
+      "expect_section": null
+    },
+    {
+      "id": "q034",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: वाणिज्य बैंकहरुले भारतीय मुद्रामा ऋण लिन सक्ने संशोधित व्यवस्था सम्बन्धी सूचना २०७५/०९/१०] गर्नु पर्नेछ । - ऋणको साँवा ब्याज भुक्तानी ग्दा यस बैंकलाई अविलम्ब जानकारी गराई यस बैंकको अभिलेखमा अधावधिक गराउनु पन्छ। साथै, ऋणको बव्याज भुक्तानी गदा प्रचलित न",
+      "expect_document_id": "151164bae8b04e15a6bbe76d61340a1a",
+      "expect_section": null
+    },
+    {
+      "id": "q035",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: NRB, Strategic Plan 2022-2026] 34 Strategic Plan 2022-2026 Strategic Pillar 7: Cooperation and Coordination Th is pillar builds and strengthens harmonized relations among national and interna",
+      "expect_document_id": "1513420ee783401a982019dde3cb6678",
+      "expect_section": null
+    },
+    {
+      "id": "q036",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: सम्पत्ति शुद्धीकरण (मनी लाउण्डरिङ्ग) निवारण ऐन, २०६४ (संशोधन, २०८०)] (संवत् २०८० साल चैत मसान्तसम्म भएका संशोधन ममलाइएको) (75) (क) कुनै सरकारी मनकाय, मनयमनकारी मनकाय , सूचक संस्था वा सम्बत्तन्धत व्यत्तिसाँग रिेको सम्पत्ति शुद्धीक",
+      "expect_document_id": "162a7a0e238a4e50b1aabbcacbf9fa16",
+      "expect_section": null
+    },
+    {
+      "id": "q037",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: सूचना नं १५/२०८२-८३: नगद कारोबारको सीमा सम्बन्धमा ।] बैक तथा वित्तीय संस्था नियमन विभाग पत्र संख्या : वै.वि.निवि. / नीति/सूचना /१५/०८२/८३ इजाजतपत्प्राप्त \"क\", \"ख\", \"ग\" र \"घ\" वर्गका बैंक तथा वित्तीय संस्थाहरु महाशय",
+      "expect_document_id": "16f66cd114904bbe98793d25f69f0fe9",
+      "expect_section": null
+    },
+    {
+      "id": "q038",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: नेपाल राष्ट्र बैंक, नोटकोष व्यवस्थापन निर्देशिका, २०८२] ारहरुको सबै विवरण सोही System वाट अध्यावधिक गनुपर्नेछ । उक्त Systeा बाट प्राप्त विवरणको आधारमा प्रदेशस्थित कार्यालय र विभागले बैंकको Olympic System /GL System म",
+      "expect_document_id": "16f894c84de943bf9d17a07ee0c99643",
+      "expect_section": null
+    },
+    {
+      "id": "q039",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: विदेशी विनिमय (नियमित गर्ने) ऐन, २०१९ (संशोधन सहित)] तर कुनै स्वास्नीमानिसको खानतलासी लिंदा स्वास्नीमानिसद्वारा मात्र खानतलासी लिन लगाउनु पर्नेछ । (२) शङ्का लागेको व्यक्तिको खानतलासी लिंदा यस ऐन विपरीत कुनै विदेशी",
+      "expect_document_id": "180663be97704094b671330a4dd6c129",
+      "expect_section": null
+    },
+    {
+      "id": "q040",
+      "kind": "answerable",
+      "question": "[REVIEW — rewrite as a user question about: नेपाल राष्ट्र बैंक सञ्चालक समितिको बैठक तथा छाप सम्बन्धी विनियमावली, २०६३] 2 (६) “बै७क” भन्नाले समितिको बै७क सम्झनू पर्५ । (८) “लोगो” भन्नाले बैंकको लोगो सम्झनू पर्५ । समितिको बै७क सम्बन्धी कार्यविधि र काम कर्तव्य तथा अधिकार घ. समितिको",
+      "expect_document_id": "18880930db054b7b86309e67900aee32",
+      "expect_section": null
+    },
+    {
+      "id": "n001",
+      "kind": "unanswerable",
+      "question": "[REVIEW — write a question this department's corpus genuinely cannot answer]",
+      "why": "human-authored: no second populated department exists to borrow from"
+    },
+    {
+      "id": "n002",
+      "kind": "unanswerable",
+      "question": "[REVIEW — write a question this department's corpus genuinely cannot answer]",
+      "why": "human-authored: no second populated department exists to borrow from"
+    },
+    {
+      "id": "n003",
+      "kind": "unanswerable",
+      "question": "[REVIEW — write a question this department's corpus genuinely cannot answer]",
+      "why": "human-authored: no second populated department exists to borrow from"
+    },
+    {
+      "id": "n004",
+      "kind": "unanswerable",
+      "question": "[REVIEW — write a question this department's corpus genuinely cannot answer]",
+      "why": "human-authored: no second populated department exists to borrow from"
+    },
+    {
+      "id": "n005",
+      "kind": "unanswerable",
+      "question": "[REVIEW — write a question this department's corpus genuinely cannot answer]",
+      "why": "human-authored: no second populated department exists to borrow from"
+    },
+    {
+      "id": "n006",
+      "kind": "unanswerable",
+      "question": "[REVIEW — write a question this department's corpus genuinely cannot answer]",
+      "why": "human-authored: no second populated department exists to borrow from"
+    },
+    {
+      "id": "n007",
+      "kind": "unanswerable",
+      "question": "[REVIEW — write a question this department's corpus genuinely cannot answer]",
+      "why": "human-authored: no second populated department exists to borrow from"
+    },
+    {
+      "id": "n008",
+      "kind": "unanswerable",
+      "question": "[REVIEW — write a question this department's corpus genuinely cannot answer]",
+      "why": "human-authored: no second populated department exists to borrow from"
+    },
+    {
+      "id": "n009",
+      "kind": "unanswerable",
+      "question": "[REVIEW — write a question this department's corpus genuinely cannot answer]",
+      "why": "human-authored: no second populated department exists to borrow from"
+    },
+    {
+      "id": "n010",
+      "kind": "unanswerable",
+      "question": "[REVIEW — write a question this department's corpus genuinely cannot answer]",
+      "why": "human-authored: no second populated department exists to borrow from"
+    }
+  ]
+}
