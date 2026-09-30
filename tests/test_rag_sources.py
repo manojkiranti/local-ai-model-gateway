@@ -205,6 +205,15 @@ def test_with_download_urls_adds_the_field_without_mutating_input():
     assert "download_url" not in stored[0], "input must not be mutated"
 
 
+def test_a_pdf_source_also_gets_a_pages_url_and_nothing_else_does():
+    out = with_download_urls([
+        {"document_id": "a", "department_code": "nrb", "title": "T", "file_type": "pdf"},
+        {"document_id": "b", "department_code": "hr", "title": "T", "file_type": "csv"},
+    ])
+    assert out[0]["pages_url"] == "/v1/departments/nrb/documents/a/pages"
+    assert out[1]["pages_url"] is None
+
+
 def test_with_download_urls_passes_none_through():
     assert with_download_urls(None) is None
 
@@ -214,6 +223,7 @@ def test_resolved_sources_never_carry_a_download_url():
     change would leave stale URLs in the database."""
     sources = resolve_sources([record(chunk("docA"))], "[1]")
     assert "download_url" not in sources[0]
+    assert "pages_url" not in sources[0]
 
 
 @pytest.mark.parametrize("field", ["document_id", "title", "department_code",

@@ -276,10 +276,20 @@ def download_url_for(department_code: str, document_id: str) -> str:
     return f"/v1/departments/{department_code}/documents/{document_id}/download"
 
 
+def pages_url_for(department_code: str, document_id: str) -> str:
+    """The relative path of a PDF source's page-image viewer (`GET …/pages`).
+
+    Downloading is admin-only, so this is how everyone else reads a cited PDF.
+    Derived exactly like `download_url_for`, for the same reasons.
+    """
+    return f"/v1/departments/{department_code}/documents/{document_id}/pages"
+
+
 def with_download_urls(
     sources: Optional[list[dict[str, Any]]],
 ) -> Optional[list[dict[str, Any]]]:
-    """Add the derived `download_url` to stored sources on the way out.
+    """Add the derived `download_url` (and, for a PDF, `pages_url`) to stored
+    sources on the way out.
 
     Called on every read path (live turn and history replay) because the field
     is computed, never persisted.
@@ -293,6 +303,12 @@ def with_download_urls(
         enriched = dict(source)
         enriched["download_url"] = (
             download_url_for(code, document_id) if code and document_id else None
+        )
+        # Only a PDF can be rendered as page images (app/rag/pages.py).
+        enriched["pages_url"] = (
+            pages_url_for(code, document_id)
+            if code and document_id and source.get("file_type") == "pdf"
+            else None
         )
         out.append(enriched)
     return out

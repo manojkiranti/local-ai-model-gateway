@@ -41,6 +41,9 @@ class SourceOut(BaseModel):
     # Fetch it WITH the bearer header and make a blob URL — an <a href> cannot
     # send the token.
     download_url: Optional[str] = None
+    # PDF sources only, derived the same way: the page-image viewer, which is
+    # how a non-admin reads the document (the download itself is admin-only).
+    pages_url: Optional[str] = None
     # Where the document came from: "nrb" for a catalog document, else the
     # document's own source ("upload"/"manual").
     origin: Optional[str] = None
