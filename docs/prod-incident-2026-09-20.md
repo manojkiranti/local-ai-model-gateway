@@ -903,3 +903,72 @@ a chunk does not carry its document's title, so nothing in the index tells
 them apart. Letting the lexical channel also match `documents.title` would
 need no re-embedding; it is the obvious candidate fix, to be measured on a
 real question set.
+
+### 9.9 Delivered (2026-09-29), and why the bank saw only General (2026-09-30)
+
+**The release database went to the bank on 2026-09-29.** Built by
+`scripts/build_release_db.py --target ai_gateway` (NRB department only: 338
+documents, 26,058 chunks, the catalog and recovery cache; no users, chats,
+files or keys), then shipped from `/home/manoj/nrb-release/`:
+`ai_gateway.pg15.dump` (221 MB), `nrb_files.tar` (523 MB, the 338 PDFs),
+`RESTORE.md`, `SHA256SUMS`. Production runs PostgreSQL 15.18 and this laptop
+16.15 — and the system `pg_dump` wrapper picked **18.6**, whose plain dump
+carries `SET transaction_timeout` (PG17+). So the dump was restored into a
+`pgvector/pgvector:pg15` container (one harmless error: that SET), re-dumped
+there with PG15's own `pg_dump -Fc`, and that file `pg_restore`d into a fresh
+PG15 database with **zero errors**; counts, ownership (all 23 tables
+`gateway`), the HNSW and tsv indexes and both searches verified.
+
+**What went wrong on their side:** the database had no users, so every first
+AD login became a member with **no department grant**, and non-admins see only
+granted departments — hence only General. Swagger `POST /auth/register` then
+answered 401, because register is unauthenticated only while `users` is EMPTY.
+The fix sent (as copy-paste steps, their server has no AI agent): `UPDATE users
+SET role='admin'` for their admin, then the insert-if-absent grant of `nrb` to
+every active user. Code fix `721c6ea` (pushed): `DEFAULT_DEPARTMENTS=nrb`
+granted once at account creation, `scripts/grant_default_departments.py
+--apply` for older accounts — effective there only after they deploy our code,
+which first needs their `.pptx` preview feature merged in.
+
+### 9.10 Next: retrieval quality — measured, not yet built
+
+**The keyword channel is effectively OFF for natural questions.**
+`websearch_to_tsquery` ANDs every word, and Nepali function words (`के`, `छ`,
+`मा`, `ले`, `गरेको`, `अनुसार`) are not English stop-words, so a natural question
+matches no chunk: **8 of 9 real test questions had 0 lexical hits** on
+`ai_gateway`. Retrieval has been vector-only in practice, and vectors cannot
+tell `परिपत्र नं. २` from `नं. १` (their text differs only in a zero-padded
+`०२`). OR-semantics with function words removed helped only 3 of 9 alone.
+
+**Design A (awaiting approval): a title channel.** Rank documents by title
+match (OR terms, function words removed, Devanagari↔ASCII digit folding), add
+each matching document's best chunk by vector distance, fuse as a third RRF
+channel in `app/rag/retrieval.py`. Query-time only (338 titles): no migration,
+no re-ingest, the delivered database unchanged. Measured by title alone: Circular
+No. 2 → rank **1** (today: not in the top 12), corridor 1, forex bylaw 1,
+Unified Directive 2082 2, BAFIA 4 — Nepali questions; English questions do not
+match Nepali titles (a later title-embedding step). Test first: two documents
+with identical text titled "…No. 1"/"…No. 2", the "No. 2" question must rank
+No. 2 first.
+
+**The yardstick (C):** `docs/rag/nrb-retrieval-cohort.json` (50 candidates, all
+still `[REVIEW`) and a reviewer workbook `/home/manoj/nrb-cohort-review.xlsx`
+(full passages, 5 yellow known-weak-spot rows). A person writes every
+question; `rag_eval_build_cohort.py --freeze` refuses until then. The sweep
+script needs the reranker, so scoring RRF retrieval over the frozen cohort
+needs a small runner over `app/rag/eval_metrics.score` (not written).
+
+**B (feasible, not built): repair the 24 garbled PDFs from their fonts.** The
+garbling is one systematic Word-export bug in the Kalimati ToUnicode labels
+(gid 143 त labelled `ि`, gid 91 र् labelled `ध`, the same gids wrong in every
+Word-2013 file), and the embedded font keeps `cmap` + `GSUB`: **83/83 and
+80/80 glyphs recoverable** on two Word-2013 pages; a Word-365 export stripped
+`GSUB` (60/92 glyphs, 86% of uses). Build = glyph ids → font tables →
+visual-to-logical reordering (pre-base `ि`, reph `र्`), as `native-3`, on a NEW
+cohort with a Nepali reader. Probe: `/home/manoj/ab-rule/font_check.py`.
+
+**Also measured (2026-09-28):** the dated-document rule in `NO_SOURCE_PROMPT`
+(A/B, 5 people-questions × 3, laptop qwen2.5): **9/15 clean vs 6/15**, a person
+named in 5 runs vs 9. Still failing: officer lists from the strategic plans
+(0/3 either way) — the staff-list pages themselves are the source; a table
+misread (the Finance Secretary as governor) survives prompts.
