@@ -51,7 +51,7 @@ read `docs/prod-incident-2026-09-20.md` §9**, which holds what production's own
 database showed (it never fetched a single NRB file: volume permissions and
 nrb.org.np timeouts), the user's three decisions (fresh-dump cutover, the frozen
 355-file scope, their own files still to come) and the commands to continue.
-**§9.8 is the latest state (2026-09-27): the NRB corpus is BUILT** — 338/338
+**Latest state: §9.9 (delivered 2026-09-29; the bank's General-only tab and its fix) and §9.10 (measured next steps: the keyword channel matches nothing for natural questions, design A = a title channel awaiting approval, the review cohort, the font-repair feasibility).** §9.8 (2026-09-27): the NRB corpus is BUILT — 338/338
 documents `ready`, 26,058 chunks, verified by route split. **Production gets a
 BRAND-NEW database** (one admin + test users; §9.1 — the fresh-dump plan is
 dropped), built and dumped on a local **PostgreSQL 15** because production runs
