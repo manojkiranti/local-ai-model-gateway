@@ -326,6 +326,35 @@ def test_full_unicode_preserved():
     assert "नेपाल राष्ट्र बैंक" in texts and "smile 😀" in texts
 
 
+def test_every_typeface_in_the_deck_is_arial():
+    """Theme fonts, the template master/layout styles, explicit runs on the
+    cover, bullets, tables and stat cards, and chart text — nothing left in
+    Calibri. `+mj-lt`/`+mn-lt` are theme references and resolve to Arial."""
+    import re
+
+    result = _run(
+        {
+            "title": "Quarterly Review",
+            "subtitle": "Q3 2026",
+            "slides": [
+                {"title": "Highlights", "bullets": ["a", "b"]},
+                {"title": "Table", "table": {"headers": ["x", "y"], "rows": [["1", "2"]]}},
+                {"title": "Stats", "stats": [{"value": "12%", "label": "Growth", "note": "YoY"}]},
+                {"title": "Chart", "chart": {"chart_type": "bar", "labels": ["a"], "series": [{"data": [1]}]}},
+            ],
+        }
+    )
+    assert result.startswith("Created"), result
+    with zipfile.ZipFile(file_store.get(_link_id(result)).path) as z:
+        faces = {
+            face
+            for name in z.namelist()
+            if name.endswith(".xml")
+            for face in re.findall(rb'<a:latin typeface="([^"]*)"', z.read(name))
+        }
+    assert faces - {b"+mj-lt", b"+mn-lt"} == {pptx_tool.DECK_FONT.encode()}
+
+
 def test_saved_record_carries_the_structured_preview():
     """The frontend renders a per-slide preview from the exact validated args,
     not a re-extraction of the saved bytes — so the saved FileRecord's

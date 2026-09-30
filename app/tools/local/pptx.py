@@ -370,6 +370,11 @@ def _add_stats(slide, stats: list[dict], top_emu: int, height_emu: int, slide_wi
 
 _P14_SECTION_EXT_URI = "{521415D9-36F7-43E2-AB2F-B90AF26B5E84}"
 
+# Every deck is set in one typeface. Applied last, by `_apply_deck_font`, over
+# the finished deck rather than at each `run.font` call site, so a text shape
+# added later cannot forget it.
+DECK_FONT = "Arial"
+
 # Position/font of the title-slide cover's title+subtitle text, lifted directly
 # from the template's own slideLayout1.xml ctrTitle/subTitle placeholders (and
 # the master's titleStyle/bodyStyle for font) so plain text boxes land exactly
@@ -497,7 +502,7 @@ def _add_cover_title_text(slide, title: str, subtitle: str) -> None:
     run = p.add_run()
     run.text = title
     run.font.size = Pt(60)
-    run.font.name = "Calibri Light"
+    run.font.name = DECK_FONT
 
     if subtitle:
         sub_box = slide.shapes.add_textbox(*(Emu(v) for v in _COVER_SUBTITLE_XFRM))
@@ -508,7 +513,44 @@ def _add_cover_title_text(slide, title: str, subtitle: str) -> None:
         run2 = p2.add_run()
         run2.text = subtitle
         run2.font.size = Pt(24)
-        run2.font.name = "Calibri"
+        run2.font.name = DECK_FONT
+
+
+def _apply_deck_font(prs, typeface: str) -> None:
+    """Set the whole deck in `typeface`, across every part of the package.
+
+    Themes get their major/minor Latin font replaced — that is what
+    `+mj-lt`/`+mn-lt` references and un-styled runs resolve to. Every other
+    XML part (slides, layouts, masters, notes, charts) has each EXPLICIT Latin
+    typeface replaced: the branded template's master and layouts hard-code
+    Calibri in their list styles, so fixing the theme alone would leave text
+    inheriting from those styles in Calibri. Theme references (`+…`) are kept,
+    since they now resolve to `typeface` anyway. Charts also get it set on the
+    chart itself, as some viewers ignore the theme for chart text.
+
+    Only the LATIN slot is touched: Arial has no Devanagari, and leaving the
+    complex-script slot alone keeps Nepali text on the viewer's fallback font
+    instead of rendering boxes."""
+    from lxml import etree
+    from pptx.opc.constants import CONTENT_TYPE as CT
+    from pptx.oxml.ns import qn
+
+    latin_tag = qn("a:latin")
+    for part in prs.part.package.iter_parts():
+        if part.content_type == CT.OFC_THEME:
+            root = etree.fromstring(part.blob)
+            for latin in root.iterfind(f".//{qn('a:fontScheme')}/*/{latin_tag}"):
+                latin.set("typeface", typeface)
+            part._blob = etree.tostring(root, xml_declaration=True, encoding="UTF-8", standalone=True)
+        elif hasattr(part, "_element"):
+            for latin in part._element.iter(latin_tag):
+                if not latin.get("typeface", "").startswith("+"):
+                    latin.set("typeface", typeface)
+
+    for slide in prs.slides:
+        for shape in slide.shapes:
+            if shape.has_chart:
+                shape.chart.font.name = typeface
 
 
 def _build_pptx_bytes(
@@ -606,6 +648,7 @@ def _build_pptx_bytes(
                 table_top = int(prs.slide_height * (0.55 if bullets else 0.32))
             _add_table(slide, table, table_top, prs.slide_width)
 
+    _apply_deck_font(prs, DECK_FONT)
     buffer = BytesIO()
     prs.save(buffer)
     return buffer.getvalue()
