@@ -243,6 +243,27 @@ def test_bullets_and_table_on_one_slide():
     assert "point one" in texts and "a" in texts and "b" in texts
 
 
+def test_content_slide_title_sits_in_the_header_band_above_the_divider():
+    """On the branded template the title goes in the header band, left
+    aligned, above the red divider (~15% down) and clear of the logo (~86%
+    across) — and the bullets start below the divider, not under the old
+    title position."""
+    from pptx import Presentation
+    from pptx.enum.text import PP_ALIGN
+
+    result = _run({"slides": [{"title": "Hello", "bullets": ["point one"]}]})
+    prs = Presentation(file_store.get(_link_id(result)).path)
+    W, H = prs.slide_width, prs.slide_height
+    slide = prs.slides[0]
+    title = slide.shapes.title
+    assert title.top + title.height <= H * 0.155
+    assert title.left < W * 0.05
+    assert title.left + title.width <= W * 0.86
+    assert title.text_frame.paragraphs[0].alignment == PP_ALIGN.LEFT
+    body = slide.placeholders[1]
+    assert H * 0.155 < body.top <= H * 0.21
+
+
 def test_bullets_and_table_shrink_keeps_body_left_and_width():
     """Regression: shrinking the bullet box for a table must not zero its
     left/width. python-pptx placeholder position setters write a bare xfrm,

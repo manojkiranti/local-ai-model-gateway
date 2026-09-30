@@ -553,6 +553,39 @@ def _apply_deck_font(prs, typeface: str) -> None:
                 shape.chart.font.name = typeface
 
 
+# Content-slide title in the branded header band: left-aligned above the red
+# divider line (which sits at ~15% of slide height) and stopping short of the
+# logo (which starts at ~86% of slide width). Fractions of slide size.
+_HEADER_TITLE_BOX = (0.025, 0.02, 0.80, 0.13)  # left, top, width, height
+_HEADER_TITLE_PT = 24
+# Where content starts below the header. The branded layouts' own title sits
+# BELOW the divider (18-29%), with the body at 30%; once the title moves up
+# into the header, content moves up by the same margin. The stock python-pptx
+# fallback keeps its own title placement, so it keeps the old offset.
+_CONTENT_TOP_BRANDED = 0.20
+_CONTENT_TOP_DEFAULT = 0.30
+
+
+def _place_title_in_header(slide, slide_width: int, slide_height: int) -> None:
+    """Move a content slide's title placeholder into the header band, left
+    aligned and vertically centered, like the template's own examples."""
+    from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
+    from pptx.util import Emu, Pt
+
+    title = slide.shapes.title
+    left, top, width, height = _HEADER_TITLE_BOX
+    title.left = Emu(int(slide_width * left))
+    title.top = Emu(int(slide_height * top))
+    title.width = Emu(int(slide_width * width))
+    title.height = Emu(int(slide_height * height))
+    tf = title.text_frame
+    tf.word_wrap = True
+    tf.vertical_anchor = MSO_ANCHOR.MIDDLE
+    for paragraph in tf.paragraphs:
+        paragraph.alignment = PP_ALIGN.LEFT
+        paragraph.font.size = Pt(_HEADER_TITLE_PT)
+
+
 def _build_pptx_bytes(
     title: str, subtitle: str, slides: list[dict], image_paths: dict[str, str]
 ) -> bytes:
@@ -561,7 +594,8 @@ def _build_pptx_bytes(
     from pptx.util import Emu
 
     cover_slide = None
-    if _TEMPLATE_PATH.exists():
+    branded = _TEMPLATE_PATH.exists()
+    if branded:
         prs = Presentation(str(_TEMPLATE_PATH))
         cover_rid, cover_slide = _find_cover_slide(prs)
         # No deck title -> no title slide at all, matching the pre-template
@@ -590,36 +624,41 @@ def _build_pptx_bytes(
         slide = prs.slides.add_slide(prs.slide_layouts[layout])
         slide.shapes.title.text = str(spec.get("title") or "")
 
-        # Zone offsets (fractions of slide height) are calibrated against this
-        # template's own title placeholder, which the master pushes down to
-        # ~29% to clear the branded header artwork (logo + divider line) --
-        # not the stock Office default's ~5%-25%. A template swap would need
-        # these recalibrated the same way.
+        # Zone offsets are fractions of slide height, all relative to `top`:
+        # on the branded template the title sits in the header band above
+        # the divider line, so content starts just below it. A template swap
+        # would need _HEADER_TITLE_BOX and these recalibrated together.
+        if branded:
+            _place_title_in_header(slide, prs.slide_width, prs.slide_height)
+            top = _CONTENT_TOP_BRANDED
+        else:
+            top = _CONTENT_TOP_DEFAULT
+        shift = top - _CONTENT_TOP_DEFAULT  # 0 on the fallback, negative when branded
 
         # image/chart are full-slide content, mutually exclusive with
         # bullets/table/stats (enforced in _validate) — a simpler layout than
         # trying to stack a picture or a chart alongside the other zones.
         if image is not None:
             _add_image(
-                slide, image, image_paths, int(prs.slide_height * 0.30),
+                slide, image, image_paths, int(prs.slide_height * top),
                 int(prs.slide_height * 0.58), prs.slide_width,
             )
             continue
         if chart is not None:
             _add_chart(
-                slide, chart, int(prs.slide_height * 0.30),
+                slide, chart, int(prs.slide_height * top),
                 int(prs.slide_height * 0.58), prs.slide_width,
             )
             continue
 
         if stats:
             _add_stats(
-                slide, stats, int(prs.slide_height * 0.30), int(prs.slide_height * 0.22), prs.slide_width
+                slide, stats, int(prs.slide_height * top), int(prs.slide_height * 0.22), prs.slide_width
             )
 
         if bullets:
             _add_bullets(slide, bullets)
-            if stats or table is not None:
+            if stats or table is not None or shift:
                 # Shrink/reposition the bullet box so it doesn't collide with
                 # whatever else shares the slide. Capture the inherited
                 # left/width first: python-pptx placeholder position setters
@@ -631,11 +670,16 @@ def _build_pptx_bytes(
                 body = slide.placeholders[1]
                 left, width = body.left, body.width
                 if stats:
-                    body.top = Emu(int(prs.slide_height * 0.55))
+                    body.top = Emu(int(prs.slide_height * (0.55 + shift)))
                     body.height = Emu(int(prs.slide_height * 0.33))
-                else:
-                    body.top = Emu(int(prs.slide_height * 0.30))
+                elif table is not None:
+                    body.top = Emu(int(prs.slide_height * top))
                     body.height = Emu(int(prs.slide_height * 0.22))
+                else:
+                    # Bullets alone: the layout's body, lifted to just under
+                    # the header, stopping above the bottom-corner badge.
+                    body.top = Emu(int(prs.slide_height * top))
+                    body.height = Emu(int(prs.slide_height * 0.66))
                 body.left = left
                 body.width = width
         if table is not None:
@@ -643,9 +687,9 @@ def _build_pptx_bytes(
             # edge case visually -- it renders without error but cramped, and
             # is not a combination the tool's own description encourages.
             if stats:
-                table_top = int(prs.slide_height * (0.80 if bullets else 0.55))
+                table_top = int(prs.slide_height * ((0.80 if bullets else 0.55) + shift))
             else:
-                table_top = int(prs.slide_height * (0.55 if bullets else 0.32))
+                table_top = int(prs.slide_height * ((0.55 if bullets else 0.32) + shift))
             _add_table(slide, table, table_top, prs.slide_width)
 
     _apply_deck_font(prs, DECK_FONT)
