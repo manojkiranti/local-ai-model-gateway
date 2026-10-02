@@ -123,6 +123,8 @@ def build_pdf(
     base_font: str = "ABCDEE+TestDeva",
     in_form: bool = False,
     save_restore: bool = False,
+    nest: int = 0,
+    twice: bool = False,
 ) -> bytes:
     objs: list[bytes] = []
 
@@ -171,7 +173,26 @@ def build_pdf(
                 for i, line in enumerate(lines)
             )
         body = shown
-        if in_form:
+        if nest:
+            # The page's own text, plus a chain of `nest` forms (the last draws
+            # the first line): a form past the walker's depth limit.
+            inner = add(stream(
+                f"/Type /XObject /Subtype /Form /BBox [0 0 612 792] "
+                f"/Resources << /Font << /F1 {font} 0 R >> >>",
+                f"BT /F1 12 Tf 72 100 Td <{hexed(lines[0])}> Tj ET".encode()))
+            for _ in range(nest - 1):
+                inner = add(stream(
+                    f"/Type /XObject /Subtype /Form /BBox [0 0 612 792] "
+                    f"/Resources << /XObject << /Fm1 {inner} 0 R >> >>", b"q /Fm1 Do Q"))
+            contents = add(stream("", (body + " q /Fm1 Do Q").encode()))
+            resources = f"/Font << /F1 {font} 0 R >> /XObject << /Fm1 {inner} 0 R >>"
+        elif twice:
+            form = add(stream(
+                f"/Type /XObject /Subtype /Form /BBox [0 0 612 792] "
+                f"/Resources << /Font << /F1 {font} 0 R >> >>", body.encode()))
+            contents = add(stream("", b"q /Fm1 Do Q q /Fm1 Do Q"))
+            resources = f"/XObject << /Fm1 {form} 0 R >>"
+        elif in_form:
             form = add(stream(
                 f"/Type /XObject /Subtype /Form /BBox [0 0 612 792] "
                 f"/Resources << /Font << /F1 {font} 0 R >> >>", body.encode()))

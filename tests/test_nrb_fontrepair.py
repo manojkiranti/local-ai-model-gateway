@@ -213,3 +213,51 @@ def test_fonts_report_names_the_contradicting_font(tmp_path):
     report = fontrepair.fonts_report(W.word_pdf(tmp_path, LOHIT))
     assert report["contradicts"] is True
     assert report["fonts"][0]["identity"] == "Lohit Devanagari/711"
+
+
+def test_a_form_nested_past_the_depth_limit_fails_closed(tmp_path):
+    """A form the walker declines is text the gate never checked."""
+    path = W.word_pdf(tmp_path, LOHIT, nest=4)
+    out = _repair(path)
+    assert out.status == fontrepair.unrepaired(fontrepair.LAYOUT)
+    assert out.text == _native(path)
+    assert out.detail["declined_forms"] == 1
+
+
+def test_a_form_within_the_limit_is_still_repaired(tmp_path):
+    out = _repair(W.word_pdf(tmp_path, LOHIT, nest=3))
+    assert out.status == fontrepair.STATUS_REPAIRED, out.detail
+
+
+def test_a_form_drawn_twice_is_walked_twice(tmp_path):
+    out = _repair(W.word_pdf(tmp_path, LOHIT, twice=True))
+    assert out.status == fontrepair.STATUS_REPAIRED, out.detail
+    assert out.detail["runs"] == 2 * len(W.LINES) * W.REPEAT
+
+
+def test_a_shaper_that_raises_is_engine_error_not_an_exception(tmp_path, monkeypatch):
+    path = W.word_pdf(tmp_path, LOHIT)
+
+    def boom(program, text):
+        raise RuntimeError("hb")
+
+    monkeypatch.setattr(fontrepair.shaping, "shape", boom)
+    out = _repair(path)
+    assert out.status == fontrepair.unrepaired(fontrepair.ENGINE_ERROR)
+    assert out.text == _native(path)
+    assert out.detail["error"] == "RuntimeError"
+
+
+def test_an_extract_text_that_raises_is_engine_error(tmp_path, monkeypatch):
+    from pypdf import PageObject
+
+    path = W.word_pdf(tmp_path, LOHIT)
+    native = _native(path)
+
+    def boom(self, *a, **k):
+        raise ValueError("x")
+
+    monkeypatch.setattr(PageObject, "extract_text", boom)
+    out = fontrepair.FontRepairEngine().repair_page(path, 1, native)
+    assert out.status == fontrepair.unrepaired(fontrepair.ENGINE_ERROR)
+    assert out.text == native

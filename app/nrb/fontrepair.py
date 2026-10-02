@@ -28,7 +28,10 @@ THE GATE — all four, or the page keeps today's text (spec §4.3)
                inside one BT…ET — decoded, reordered and SHAPED with that
                font's own program reproduces the run's drawn gids, 100%
     layout     the served text contains every round-tripped run, whitespace
-               ignored, in content order: pypdf only ADDED whitespace
+               ignored, in content order: pypdf only ADDED whitespace — and
+               the walker declined no form (past MAX_XOBJECT_DEPTH, or one
+               drawing its own ancestor), because pypdf's extract_text has no
+               such limit and would serve glyphs no check ever saw
 
     Density is the DETECTOR (`detect`), never the acceptance: a misread rakar
     produced पर्कृति — wrong, and with zero illegal clusters (§1.1).
@@ -387,6 +390,7 @@ class _Document:
                 raise PermissionError("encrypted")
         self.reader = reader
         self._fonts: dict[Any, _Font] = {}
+        self.declined = 0  # forms the last `runs()` was asked to draw and did not walk
 
     def font(self, fonts: Any, key: Any) -> _Font | None:
         if fonts is None or not hasattr(fonts, "get"):
@@ -409,13 +413,14 @@ class _Document:
             resources = page.get("/Resources")
         out: list[_Run] = []
         unusable: set[str] = set()
+        self.declined = 0
         contents = page.get_contents()
         if contents is not None:
-            self._walk(contents, _resolve(resources), out, unusable, 0, set())
+            self._walk(contents, _resolve(resources), out, unusable, 0, ())
         return out, unusable
 
     def _walk(self, content: Any, resources: Any, out: list[_Run], unusable: set[str],
-              depth: int, seen: set[Any]) -> None:
+              depth: int, stack: tuple[Any, ...]) -> None:
         from pypdf.generic import ContentStream
 
         stream = content if hasattr(content, "operations") else ContentStream(content, self.reader)
@@ -456,18 +461,24 @@ class _Document:
                     run = _Run(current, [])
                 for raw in _strings(op, operands):
                     run.gids.extend(current.gid(c) for c in _codes(raw))
-            elif op == b"Do" and operands and xobjects is not None and depth < MAX_XOBJECT_DEPTH:
+            elif op == b"Do" and operands and xobjects is not None:
                 ref = xobjects.raw_get(operands[0]) if hasattr(xobjects, "raw_get") else xobjects.get(operands[0])
                 if ref is None:
                     continue
                 ident = (ref.idnum, ref.generation) if hasattr(ref, "idnum") else id(ref)
                 xobject = _resolve(ref)
-                if ident in seen or str(xobject.get("/Subtype", "")) != "/Form":
+                if str(xobject.get("/Subtype", "")) != "/Form":
                     continue
                 flush()
-                seen.add(ident)
+                # A form we decline to walk is text the gate never checked, yet
+                # pypdf's extract_text has no such limit: count it, fail closed.
+                # `stack` holds the ANCESTORS only, so a form drawn twice is
+                # walked twice (it may inherit different resources each time).
+                if depth >= MAX_XOBJECT_DEPTH or ident in stack:
+                    self.declined += 1
+                    continue
                 inner = _resolve(xobject.get("/Resources")) or resources
-                self._walk(xobject, inner, out, unusable, depth + 1, seen)
+                self._walk(xobject, inner, out, unusable, depth + 1, stack + (ident,))
         flush()
 
 
@@ -533,12 +544,21 @@ class FontRepairEngine:
             reason = UNSUPPORTED_FONT if unusable else NO_SUSPECT_FONT
             return RepairOutcome(unrepaired(reason), native_text,
                                  {"unusable_fonts": sorted(unusable)})
+        declined = doc.declined
+        try:
+            return self._attempt(page, native_text, runs, suspect, declined)
+        except Exception as exc:  # noqa: BLE001 - repair_page never raises
+            logger.warning("native-3: page %s engine error (%s)", page_number, type(exc).__name__)
+            return RepairOutcome(unrepaired(ENGINE_ERROR), native_text, {"error": type(exc).__name__})
+
+    def _attempt(self, page: Any, native_text: str, runs: list[_Run],
+                 suspect: dict[int, _Font], declined: int) -> RepairOutcome:
         for font in suspect.values():
             font.install_corrected()
 
         detail: dict[str, Any] = {
             "runs": 0, "runs_matched": 0, "glyph_uses": 0, "unresolved_uses": 0,
-            "orphans": 0, "layout_missing": 0,
+            "orphans": 0, "layout_missing": 0, "declined_forms": declined,
             "fonts": sorted({f.name for f in suspect.values()}),
             "font_identities": sorted({f.table.identity.label() for f in suspect.values() if f.table}),
             "examples": [],
@@ -583,7 +603,7 @@ class FontRepairEngine:
             failed = ORPHANS
         elif detail["runs_matched"] < detail["runs"]:
             failed = ROUNDTRIP
-        elif detail["layout_missing"]:
+        elif detail["layout_missing"] or declined:
             failed = LAYOUT
         if failed is not None:
             return RepairOutcome(unrepaired(failed), native_text, detail)
