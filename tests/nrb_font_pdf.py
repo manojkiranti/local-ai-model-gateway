@@ -126,6 +126,7 @@ def build_pdf(
     nest: int = 0,
     twice: bool = False,
     form_subtype: str = "Form",
+    isolate: frozenset[int] = frozenset(),
 ) -> bytes:
     objs: list[bytes] = []
 
@@ -159,6 +160,19 @@ def build_pdf(
         def hexed(line):
             return "".join(f"{g:04X}" for g in line)
 
+        def shown_line(line):
+            if not any(g in isolate for g in line):
+                return f"<{hexed(line)}> Tj"
+            # Word positions some glyphs (the reph) on their own inside a TJ;
+            # pypdf reads each large offset as a word gap and writes a space.
+            parts = []
+            for g in line:
+                if g in isolate:
+                    parts.append(f"900 <{g:04X}> -900")
+                else:
+                    parts.append(f"<{g:04X}>")
+            return f"[{' '.join(parts)}] TJ"
+
         if save_restore:
             # The font is set ONCE, in its own text object, and every line is
             # drawn inside q...Q without a Tf of its own: a walker that resets
@@ -170,7 +184,7 @@ def build_pdf(
             # One text object per line, as Word writes them: a run never spans
             # two lines, so a syllable is never split and lines never merge.
             shown = " ".join(
-                f"BT /F1 12 Tf 72 {740 - 18 * i} Td <{hexed(line)}> Tj ET"
+                f"BT /F1 12 Tf 72 {740 - 18 * i} Td {shown_line(line)} ET"
                 for i, line in enumerate(lines)
             )
         body = shown
@@ -252,6 +266,21 @@ def strip_gsub(program: bytes) -> bytes:
 
     font = TTFont(io.BytesIO(program))
     del font["GSUB"]
+    out = io.BytesIO()
+    font.save(out)
+    return out.getvalue()
+
+
+def without_codepoints(program: bytes, codepoints: Sequence[int]) -> bytes:
+    """The font with `codepoints` removed from every cmap subtable — Word's
+    subsets carry no glyph for ZWJ/ZWNJ, so a shaper draws a hidden joiner as
+    the SPACE glyph (measured on the production Kalimati subsets, 2026-10-02)."""
+    from fontTools.ttLib import TTFont
+
+    font = TTFont(io.BytesIO(program))
+    for sub in font["cmap"].tables:
+        for cp in codepoints:
+            sub.cmap.pop(cp, None)
     out = io.BytesIO()
     font.save(out)
     return out.getvalue()

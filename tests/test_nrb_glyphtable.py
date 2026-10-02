@@ -77,6 +77,20 @@ def test_an_old_spec_below_base_ra_reads_as_virama_ra():
     assert tokens[11] == "प्र"
 
 
+def test_an_old_spec_below_base_ra_after_a_half_form_is_ra_virama():
+    """भित्र्याउन, हेलचेक्र्याइँ, दुव्र्यवहार (CHECKPOINT A, 2026-10-02): in
+    क्र्य old-spec Kalimati forms the half क् from [क, ्] and the below-base
+    ra from [र, ्] — the virama AFTER र, because the one before it went into
+    the half form. Read as ्र, the pair became क््र (a double virama, which no
+    text contains) and every such word failed the round trip."""
+    rules = [_r({"half"}, (1, 2), 10), _r({"blwf"}, (3, 2), 11, lookup=1),
+             _r({"vatu"}, (10, 11), 12, lookup=2)]
+    tokens, ambiguous = GT.derive({1: "क", 2: "्", 3: "र"}, rules)
+    assert tokens[11] == "्र"
+    assert tokens[12] == "क्र्"
+    assert 12 not in ambiguous
+
+
 def test_a_new_spec_below_base_ra_is_already_logical():
     tokens, _ = GT.derive({1: "्", 2: "र"}, [_r({"blwf"}, (1, 2), 10)])
     assert tokens[10] == "्र"
@@ -130,6 +144,21 @@ def test_canonically_equal_derivations_are_one_token():
     assert 1 in tokens and 1 not in ambiguous
 
 
+def test_a_half_feature_ligature_is_a_half_form():
+    """Measured 2026-10-02 (CHECKPOINT A): Word draws a hidden ZWJ as the space
+    glyph after a half form (राख्‍न, सञ्‍च, गर्‍य). The half form is what
+    tells the repair that space glyph is a joiner, so the table must know it."""
+    rules = [_r({"half"}, (1, 2), 10), _r({"akhn"}, (1, 2, 3), 11, lookup=1)]
+    assert GT.half_forms(rules) == frozenset({10})
+
+
+def test_a_lookup_shared_with_haln_is_not_a_half_form():
+    """`haln` forms the WORD-FINAL halant form (पश्चात्), which a real space
+    follows; a glyph either feature may have formed is not evidence of a joiner."""
+    rules = [_r({"half", "haln"}, (1, 2), 10), _r({"haln"}, (3, 2), 11, lookup=1)]
+    assert GT.half_forms(rules) == frozenset()
+
+
 # --------------------------------------------------------------------------- #
 # A real font
 # --------------------------------------------------------------------------- #
@@ -161,6 +190,24 @@ def test_the_sample_round_trips_through_the_table(font):
         assert out.orphans == 0, text
         assert out.text == text
         assert shaping.shape(program, out.text) == gids
+
+
+@pytest.mark.skipif(not SYSTEM_KALIMATI.exists(), reason="fonts-deva-extra Kalimati not installed")
+@pytest.mark.parametrize("word", ["हेलचेक्र्याइँ", "भित्र्याउन", "दुव्र्यवहार", "पुख्र्यौली"])
+def test_kalimati_rakar_after_a_half_form_round_trips(word):
+    program, table = SYSTEM_KALIMATI.read_bytes(), _table(SYSTEM_KALIMATI)
+    gids = shaping.shape(program, word)
+    out = reorder("".join(table.token(g) for g in gids))
+    assert (out.text, out.orphans) == (word, 0)
+    assert shaping.shape(program, out.text) == gids
+
+
+def test_a_real_font_records_its_half_forms():
+    program = LOHIT.read_bytes()
+    table = _table()
+    half_kha = shaping.shape(program, "ख्\u200dन")[0]
+    assert half_kha in table.half_forms
+    assert table.token(half_kha) == "ख्"
 
 
 def test_identity_records_the_glyph_count_and_the_advance_widths():

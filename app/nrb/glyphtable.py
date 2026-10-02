@@ -23,6 +23,9 @@ THE RULES
       logical ्C. Old-spec (`deva`) fonts like Kalimati build the below-base ra
       from the pair [र, ्]; read literally it is र्, and प्रकृति becomes
       पर्कृति (measured 2026-10-02).
+    * ...except right after a half form. In क्र्य the half क् took the virama
+      BEFORE र, so the [र, ्] pair is the virama after it: [क्, ्र] is क्र्,
+      not the double virama क््र (CHECKPOINT A: भित्र्याउन, हेलचेक्र्याइँ).
     * Only lookups that default-on shaping features reach are followed.
       Optional alternates (`aalt`, `salt`, `ssNN`) are not applied by Word or by
       HarfBuzz, and following them would make glyphs ambiguous for nothing.
@@ -30,6 +33,11 @@ THE RULES
       AMBIGUOUS and resolves to None. Ambiguity propagates: a ligature built
       from an ambiguous glyph has several candidates too, and a refusal
       propagates the same way, even if another rule also yields the glyph.
+    * A glyph a `half` lookup forms is a HALF FORM (`half_forms`). A shaper
+      forms one only before a consonant or a ZWJ, so `fontrepair` reads the
+      space glyph drawn right after one as a hidden ZWJ. A lookup shared with
+      `haln` (the word-final halant form, which a real space follows) is not
+      evidence and is left out.
 
 The derivation (`derive`) is pure, over flattened `Rule`s, so every rule above
 is testable without a font. fontTools is imported only inside
@@ -56,6 +64,7 @@ __all__ = [
     "VATTU_FEATURES",
     "build_glyph_table",
     "derive",
+    "half_forms",
     "seed_tokens",
 ]
 
@@ -115,6 +124,7 @@ class GlyphTable:
     cmap_chars: Mapping[int, frozenset[str]]
     has_gsub: bool
     identity: FontIdentity
+    half_forms: frozenset[int] = frozenset()
 
     def token(self, gid: int) -> str | None:
         """What the glyph draws, or None when the font's own tables cannot say."""
@@ -131,9 +141,10 @@ def seed_tokens(cmap_chars: Mapping[int, frozenset[str]]) -> dict[int, str]:
     return seed
 
 
-def _token_for(rule: Rule, text: str) -> str | None:
-    """The token a rule's output draws, given its inputs' concatenated tokens.
+def _token_for(rule: Rule, parts: Sequence[str]) -> str | None:
+    """The token a rule's output draws, given its inputs' tokens.
     None means "refuse": the output is ambiguous by rule, not by evidence."""
+    text = "".join(parts)
     if "rphf" in rule.tags:
         if (rule.tags & DEFAULT_FEATURES) - {"rphf"}:
             return None
@@ -146,6 +157,16 @@ def _token_for(rule: Rule, text: str) -> str | None:
         and _is_consonant(text[0])
     ):
         return _VIRAMA + text[0]
+    if (
+        rule.tags & VATTU_FEATURES
+        and len(parts) == 2
+        and len(parts[0]) > 1
+        and parts[0].endswith(_VIRAMA)
+        and len(parts[1]) == 2
+        and parts[1][0] == _VIRAMA
+        and _is_consonant(parts[1][1])
+    ):
+        return parts[0] + parts[1][1] + _VIRAMA
     return text
 
 
@@ -172,7 +193,7 @@ def derive(
                 continue
             pools = [sorted(cands[g]) for g in rule.inputs]
             for combo in itertools.islice(itertools.product(*pools), MAX_CANDIDATES + 1):
-                token = _token_for(rule, "".join(combo))
+                token = _token_for(rule, combo)
                 if token is None:
                     if rule.output not in refused:
                         refused.add(rule.output)
@@ -188,6 +209,11 @@ def derive(
     tokens = {g: next(iter(s)) for g, s in cands.items() if len(s) == 1 and g not in refused}
     ambiguous = frozenset({g for g, s in cands.items() if len(s) > 1} | refused)
     return tokens, ambiguous
+
+
+def half_forms(rules: Sequence[Rule]) -> frozenset[int]:
+    """The glyphs a `half` lookup forms, never one `haln` may also have formed. Pure."""
+    return frozenset(r.output for r in rules if "half" in r.tags and "haln" not in r.tags)
 
 
 # --------------------------------------------------------------------------- #
@@ -318,4 +344,5 @@ def build_glyph_table(program: bytes) -> GlyphTable:
     has_gsub = "GSUB" in font
     rules = _rules(font["GSUB"].table, gid_of) if has_gsub else []
     tokens, ambiguous = derive(seed_tokens(chars), rules)
-    return GlyphTable(tokens, ambiguous, chars, has_gsub, _identity(font, order))
+    return GlyphTable(tokens, ambiguous, chars, has_gsub, _identity(font, order),
+                      half_forms(rules))

@@ -133,6 +133,131 @@ def test_save_restore_around_the_text_does_not_lose_the_font(tmp_path):
     assert out.detail["runs"] == len(W.LINES) * W.REPEAT
 
 
+# A Word subset has no glyph for ZWJ, so the shaper draws the hidden joiner
+# as the space glyph: राख्‍नु is drawn [र ा ख्(half) space न ु]. Read as a
+# space it is "राख् नु", which shapes to [र ा ख ् space न ु] and fails the
+# round trip on every page that has one (CHECKPOINT A, 2026-10-02).
+JOINED = ("राख्\u200dनु सञ्\u200dचालन क्\u200dया पश्चात् भएको",)
+NO_JOINERS = W.without_codepoints(LOHIT, (0x200C, 0x200D))
+
+
+def test_a_hidden_joiner_drawn_as_the_space_glyph_is_repaired(tmp_path):
+    lines = list(W.LINES) + list(JOINED)
+    path = W.word_pdf(tmp_path, NO_JOINERS, lines=lines)
+    out = _repair(path)
+    assert out.status == fontrepair.STATUS_REPAIRED, out.detail
+    assert _lines(out.text) == lines * W.REPEAT
+    assert out.detail["hidden_joiners"] == 3 * W.REPEAT
+
+
+def test_a_real_space_after_an_explicit_halant_stays_a_space(tmp_path):
+    """पश्चात् ends in a visible halant, not a half form: its space is a space."""
+    lines = list(W.LINES) + ["पश्चात् भएको अर्थात् यस्तो"]
+    out = _repair(W.word_pdf(tmp_path, NO_JOINERS, lines=lines))
+    assert out.status == fontrepair.STATUS_REPAIRED, out.detail
+    assert _lines(out.text) == lines * W.REPEAT
+    assert out.detail["hidden_joiners"] == 0
+
+
+def test_a_joiner_that_cannot_be_placed_fails_layout(tmp_path, monkeypatch):
+    lines = list(W.LINES) + list(JOINED)
+    path = W.word_pdf(tmp_path, NO_JOINERS, lines=lines)
+    monkeypatch.setattr(fontrepair, "rejoin", lambda raw, runs: None)
+    out = _repair(path)
+    assert out.status == fontrepair.unrepaired(fontrepair.LAYOUT)
+    assert out.detail["joiners_unplaced"] == 3 * W.REPEAT
+    assert out.text == _native(path)
+
+
+def test_relabelling_nothing_keeps_pypdfs_spacing(tmp_path):
+    """The ToUnicode still labels the space glyph " ": pypdf finds a font's
+    space width through that label, and without it wrote double spaces on every
+    repaired page (measured on production PDFs, 2026-10-02)."""
+    lines = list(W.LINES) + list(JOINED)
+    out = _repair(W.word_pdf(tmp_path, NO_JOINERS, lines=lines))
+    assert "  " not in out.text
+
+
+def _reph_gids(program: bytes) -> frozenset[int]:
+    from app.nrb import glyphtable
+    from app.nrb.reorder import REPH
+
+    table = glyphtable.build_glyph_table(program)
+    return frozenset(g for g, t in table.tokens.items() if REPH in t and g not in table.ambiguous)
+
+
+def test_a_separately_positioned_reph_is_rejoined_to_its_cluster(tmp_path):
+    """Word positions the reph glyph on its own inside a TJ, and pypdf writes a
+    space on each side of it: मार्फत served as "माफ <R> त" orphaned the reph
+    and split the word (CHECKPOINT A, 2026-10-02: 82 occurrences in 11
+    documents). The run itself drew no space there, so neither is kept."""
+    path = W.word_pdf(tmp_path, LOHIT, isolate=_reph_gids(LOHIT))
+    out = _repair(path)
+    assert out.status == fontrepair.STATUS_REPAIRED, out.detail
+    assert _lines(out.text) == list(W.LINES) * W.REPEAT
+    assert out.detail["gaps_closed"] > 0
+
+
+R = "\ue001"  # reorder.REPH
+
+
+def test_rejoin_closes_pypdfs_gaps_on_both_sides_of_a_reph():
+    assert fontrepair.rejoin(f"x मक {R} री y", [(f"मक{R}री", frozenset())]) == (f"x मक{R}री y", 2)
+
+
+def test_rejoin_closes_a_gap_before_a_dependent_sign():
+    assert fontrepair.rejoin(f"पाक े{R}", [(f"पाके{R}", frozenset())]) == (f"पाके{R}", 1)
+
+
+P = "\ue000"  # reorder.PREBASE
+
+
+def test_rejoin_closes_a_gap_after_a_dependent_sign():
+    """फैसला served as "फ ै सला": Word positions ै on its own, and pypdf
+    writes a space on both sides of it (219 + 1,675 occurrences measured)."""
+    assert fontrepair.rejoin("भएको फ ै सला", [("भएको फैसला", frozenset())]) == ("भएको फैसला", 2)
+
+
+def test_rejoin_closes_a_gap_beside_the_prebase_sign():
+    assert fontrepair.rejoin(f"प्रकृ {P}त", [(f"प्रकृ{P}त", frozenset())]) == (f"प्रकृ{P}त", 1)
+
+
+def test_rejoin_never_touches_a_gap_between_two_letters():
+    """Measured: pypdf never wrote whitespace between two letters of a run that
+    the run did not draw. If it ever does, it is not this rule's to judge."""
+    assert fontrepair.rejoin("कम ल", [("कमल", frozenset())]) == ("कम ल", 0)
+
+
+def test_rejoin_keeps_a_space_the_run_drew():
+    assert fontrepair.rejoin(f"पने{R} मना", [(f"पने{R} मना", frozenset())]) == (f"पने{R} मना", 0)
+
+
+def test_rejoin_never_removes_a_line_break():
+    assert fontrepair.rejoin(f"मक{R}\nरी", [(f"मक{R}री", frozenset())]) == (f"मक{R}\nरी", 0)
+
+
+def test_rejoin_normalises_pypdfs_spaces_beside_a_reph_to_the_runs_own():
+    runs = [(f"पने{R} मना", frozenset())]
+    assert fontrepair.rejoin(f"पने{R}   मना", runs) == (f"पने{R} मना", 1)
+    assert fontrepair.rejoin(f"पने{R}\nमना", runs) == (f"पने{R}\nमना", 0)
+
+
+def test_rejoin_takes_all_of_pypdfs_whitespace_at_a_hidden_joiner():
+    runs = [("राख् नु", frozenset({4}))]
+    assert fontrepair.rejoin("x राख् \nनु y", runs) == ("x राख्\u200dनु y", 0)
+
+
+def test_rejoin_follows_content_order():
+    """A genuinely spaced "राख् नु" earlier on the page keeps its space."""
+    runs = [("राख् नु", frozenset()), ("राख् नु", frozenset({4}))]
+    assert fontrepair.rejoin("राख् नु\nराख् नु", runs) == ("राख् नु\nराख्\u200dनु", 0)
+
+
+def test_rejoin_refuses_when_a_run_is_not_in_the_text():
+    runs = [("राख् नु", frozenset({4})), ("सञ् च", frozenset({3}))]
+    assert fontrepair.rejoin("राख् नु", runs) is None
+
+
 def test_a_roundtrip_mismatch_fails_the_page(tmp_path, monkeypatch):
     path = W.word_pdf(tmp_path, LOHIT)
     monkeypatch.setattr(fontrepair.shaping, "shape", lambda program, text: (0,))

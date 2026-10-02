@@ -21,6 +21,21 @@ THE REPAIR, PER PAGE
        layout (lines, spaces) is pypdf's, unchanged.
     4. `reorder` the result visual → logical.
 
+HIDDEN JOINERS (CHECKPOINT A, 2026-10-02)
+    Word's font subsets carry no glyph for ZWJ, so the shaper draws a typed
+    joiner as the SPACE glyph: राख्‍नु is drawn [र ा ख्(half) space न ु], and
+    read as a space it shapes back to [र ा ख ् space न ु] — every such run
+    failed the round trip. A half form (`GlyphTable.half_forms`) is formed only
+    before a consonant or a ZWJ, so the space glyph right after one IS a hidden
+    ZWJ; after anything else it is a space. One code cannot carry both labels,
+    and relabelling the space glyph is not an option: pypdf finds a font's
+    space width through the code labelled " ", and without one it adds spaces
+    of its own (measured: double spaces on every repaired page). So the
+    ToUnicode keeps " ", and `rejoin` finds each run — in content order,
+    pypdf's whitespace ignored, as the layout check does — in pypdf's text and
+    puts the ZWJ back at that run's own space glyph. A run it cannot find fails
+    the page `layout`.
+
 THE GATE — all four, or the page keeps today's text (spec §4.3)
     coverage   every glyph a suspect font draws resolves in its table
     orphans    reordering attaches every marker, per run and on the page
@@ -57,7 +72,7 @@ from pathlib import Path
 from typing import Any, Sequence
 
 from . import devanagari, glyphtable, shaping
-from .reorder import reorder
+from .reorder import PREBASE, REPH, reorder
 
 logger = logging.getLogger("app.nrb.fontrepair")
 
@@ -67,9 +82,10 @@ __all__ = [
     "NOT_APPLICABLE", "NO_SUSPECT_FONT", "ORPHANS", "READ_FAILED",
     "REPAIR_VERSION", "ROUNDTRIP", "RepairOutcome", "SHAPER_UNAVAILABLE",
     "STATUS_REPAIRED", "UNAVAILABLE", "UNREPAIRED_PREFIX", "UNSUPPORTED_FONT",
+    "ZWJ",
     "corrected_cmap", "detect", "document_evidence", "engine_available",
     "engine_version", "fonts_report", "missing_in_order", "parse_tounicode",
-    "unrepaired",
+    "rejoin", "unrepaired",
 ]
 
 # --- identity --------------------------------------------------------------- #
@@ -107,6 +123,14 @@ UNREPAIRED_REASONS = (
 )
 
 MAX_EXAMPLES = 3
+ZWJ = "\u200d"
+# The signs Word positions on their own glyph by glyph: the reph and pre-base
+# markers, the dependent vowel signs and the other marks, nukta and virama.
+# pypdf reads each such offset as a word gap. (`rejoin`.)
+_SIGNS = frozenset({REPH, PREBASE, "\u093c", "\u094d"}) | frozenset(
+    chr(c) for c in (0x0900, 0x0901, 0x0902, 0x0903, 0x093A, 0x093B,
+                     *range(0x093E, 0x094D), 0x094E, 0x094F,
+                     0x0955, 0x0956, 0x0957, 0x0962, 0x0963))
 MAX_XOBJECT_DEPTH = 3
 _SHOW_OPS = frozenset({b"Tj", b"TJ", b"'", b'"'})
 
@@ -223,6 +247,80 @@ def corrected_cmap(labels: dict[int, str]) -> bytes:
         out.append(b"endbfchar")
     out += [b"endcmap", b"CMapName currentdict /CMap defineresource pop", b"end", b"end"]
     return b"\n".join(out)
+
+
+def _hidden_joiners(
+    gids: Sequence[int], tokens: Sequence[str], half_forms: frozenset[int]
+) -> tuple[str, frozenset[int]]:
+    """A run as pypdf reads it, and the indexes in it of the space glyphs that
+    are hidden ZWJs: a space glyph right after a half form (module docstring)."""
+    read: list[str] = []
+    hidden: set[int] = set()
+    offset = 0
+    for i, token in enumerate(tokens):
+        if token == " " and i and gids[i - 1] in half_forms:
+            hidden.add(offset)
+        read.append(token)
+        offset += len(token)
+    return "".join(read), frozenset(hidden)
+
+
+def rejoin(raw: str, runs: Sequence[tuple[str, frozenset[int]]]) -> tuple[str, int] | None:
+    """`raw` with what pypdf's layout split inside a run put back together. Pure.
+
+    `runs` are (the run as pypdf reads it, the indexes of its hidden joiners),
+    in content order. Each run is found in `raw` after the previous one,
+    whitespace ignored exactly as `missing_in_order` ignores it. Inside a run:
+
+      * a hidden joiner takes ALL the whitespace pypdf wrote at its place;
+      * spaces pypdf wrote beside a sign Word positions on its own (`_SIGNS`:
+        reph, pre-base ि, the dependent signs) are removed WHERE THE RUN DREW
+        NO SPACE — pypdf reads each positioning offset as a word gap, so
+        मार्फत was served "माफ <R> त" and फैसला "फ ै सला" — and where the run
+        did draw one, pypdf's spaces there become the run's own. Measured
+        (CHECKPOINT A, 6 documents): 2,492 such spaces, every one beside a
+        sign, none between two letters and none a line break. A line break is
+        never removed, and a gap between two letters is never touched.
+
+    Returns the text and how many gaps it closed, or None when any run cannot
+    be found: nothing is ever moved anywhere but inside its own run.
+    """
+    edits: list[tuple[int, int, str]] = []
+    closed = 0
+    cursor = 0
+    for read, hidden in runs:
+        items = [(k, ch) for k, ch in enumerate(read) if k in hidden or not ch.isspace()]
+        if not items:
+            continue
+        pattern: list[str] = []
+        fills: list[str] = []
+        prev: tuple[int, str] | None = None
+        for k, ch in items:
+            if prev is not None and prev[0] not in hidden and k not in hidden:
+                drew = "".join(c for c in read[prev[0] + 1:k] if c in " \t")
+                if prev[1] in _SIGNS or ch in _SIGNS:
+                    pattern.append(r"([ \t]*)\s*")
+                    fills.append(drew)
+                else:
+                    pattern.append(r"\s*")
+            if k in hidden:
+                pattern.append(r"(\s*)")
+                fills.append(ZWJ)
+            else:
+                pattern.append(re.escape(ch))
+            prev = (k, ch)
+        found = re.compile("".join(pattern)).search(raw, cursor)
+        if found is None:
+            return None
+        for group, fill in enumerate(fills, start=1):
+            start, end = found.span(group)
+            if fill == ZWJ or (end > start and raw[start:end] != fill):
+                edits.append((start, end, fill))
+                closed += fill != ZWJ
+        cursor = found.end()
+    for start, end, fill in sorted(edits, reverse=True):
+        raw = raw[:start] + fill + raw[end:]
+    return raw, closed
 
 
 def missing_in_order(needles: Sequence[str], haystack: str) -> int:
@@ -565,11 +663,13 @@ class FontRepairEngine:
         detail: dict[str, Any] = {
             "runs": 0, "runs_matched": 0, "glyph_uses": 0, "unresolved_uses": 0,
             "orphans": 0, "layout_missing": 0, "declined_forms": declined,
+            "hidden_joiners": 0, "joiners_unplaced": 0, "gaps_closed": 0,
             "fonts": sorted({f.name for f in suspect.values()}),
             "font_identities": sorted({f.table.identity.label() for f in suspect.values() if f.table}),
             "examples": [],
         }
         logical_runs: list[str] = []
+        read_runs: list[tuple[str, frozenset[int]]] = []  # as pypdf reads them
         for run in runs:
             if not run.font.suspect:
                 continue
@@ -583,7 +683,10 @@ class FontRepairEngine:
                 detail["unresolved_uses"] += len(missing)
                 _example(detail, COVERAGE, gids=missing[:12])
                 continue
-            out = reorder("".join(tokens))  # type: ignore[arg-type]
+            read, hidden = _hidden_joiners(run.gids, tokens, table.half_forms)  # type: ignore[arg-type]
+            read_runs.append((read, hidden))
+            detail["hidden_joiners"] += len(hidden)
+            out = reorder("".join(ZWJ if k in hidden else c for k, c in enumerate(read)))
             if out.orphans:
                 detail["orphans"] += out.orphans
                 _example(detail, ORPHANS, text=out.text[:80])
@@ -596,7 +699,15 @@ class FontRepairEngine:
                          drawn=run.gids[:24], shaped=shaped[:24])
             logical_runs.append(out.text)
 
-        served = reorder(page.extract_text() or "")
+        raw = page.extract_text() or ""
+        rejoined = rejoin(raw, read_runs)
+        if rejoined is not None:
+            raw, detail["gaps_closed"] = rejoined
+        elif detail["hidden_joiners"]:
+            # Otherwise a run is missing from pypdf's text, which the layout
+            # check below refuses on its own.
+            detail["joiners_unplaced"] = detail["hidden_joiners"]
+        served = reorder(raw)
         detail["orphans"] += served.orphans
         detail["layout_missing"] = missing_in_order(logical_runs, served.text)
         detail["illegal_before"] = devanagari.illegal_cluster_count(native_text)
@@ -609,7 +720,7 @@ class FontRepairEngine:
             failed = ORPHANS
         elif detail["runs_matched"] < detail["runs"]:
             failed = ROUNDTRIP
-        elif detail["layout_missing"] or declined:
+        elif detail["layout_missing"] or declined or detail["joiners_unplaced"]:
             failed = LAYOUT
         if failed is not None:
             return RepairOutcome(unrepaired(failed), native_text, detail)
