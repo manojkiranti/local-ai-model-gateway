@@ -467,9 +467,15 @@ class _Document:
                     continue
                 ident = (ref.idnum, ref.generation) if hasattr(ref, "idnum") else id(ref)
                 xobject = _resolve(ref)
-                if str(xobject.get("/Subtype", "")) != "/Form":
+                subtype = str(xobject.get("/Subtype", ""))
+                if subtype == "/Image":
                     continue
                 flush()
+                if subtype != "/Form":
+                    # pypdf extracts ANY non-Image XObject as a form; we walk
+                    # only real forms, so an unknown subtype is declined.
+                    self.declined += 1
+                    continue
                 # A form we decline to walk is text the gate never checked, yet
                 # pypdf's extract_text has no such limit: count it, fail closed.
                 # `stack` holds the ANCESTORS only, so a form drawn twice is

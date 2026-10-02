@@ -125,6 +125,7 @@ def build_pdf(
     save_restore: bool = False,
     nest: int = 0,
     twice: bool = False,
+    form_subtype: str = "Form",
 ) -> bytes:
     objs: list[bytes] = []
 
@@ -177,7 +178,7 @@ def build_pdf(
             # The page's own text, plus a chain of `nest` forms (the last draws
             # the first line): a form past the walker's depth limit.
             inner = add(stream(
-                f"/Type /XObject /Subtype /Form /BBox [0 0 612 792] "
+                f"/Type /XObject /Subtype /{form_subtype} /BBox [0 0 612 792] "
                 f"/Resources << /Font << /F1 {font} 0 R >> >>",
                 f"BT /F1 12 Tf 72 100 Td <{hexed(lines[0])}> Tj ET".encode()))
             for _ in range(nest - 1):
@@ -194,7 +195,7 @@ def build_pdf(
             resources = f"/XObject << /Fm1 {form} 0 R >>"
         elif in_form:
             form = add(stream(
-                f"/Type /XObject /Subtype /Form /BBox [0 0 612 792] "
+                f"/Type /XObject /Subtype /{form_subtype} /BBox [0 0 612 792] "
                 f"/Resources << /Font << /F1 {font} 0 R >> >>", body.encode()))
             contents = add(stream("", b"q /Fm1 Do Q"))
             resources = f"/XObject << /Fm1 {form} 0 R >>"

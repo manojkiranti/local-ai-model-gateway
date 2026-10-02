@@ -261,3 +261,12 @@ def test_an_extract_text_that_raises_is_engine_error(tmp_path, monkeypatch):
     out = fontrepair.FontRepairEngine().repair_page(path, 1, native)
     assert out.status == fontrepair.unrepaired(fontrepair.ENGINE_ERROR)
     assert out.text == native
+
+
+@pytest.mark.parametrize("subtype", ["PS", "Weird"])
+def test_a_non_form_non_image_xobject_fails_closed(tmp_path, subtype):
+    """pypdf extracts any XObject that is not an Image; the walker must not skip one unseen."""
+    path = W.word_pdf(tmp_path, LOHIT, nest=1, form_subtype=subtype)
+    out = _repair(path)
+    assert out.status == fontrepair.unrepaired(fontrepair.LAYOUT)
+    assert out.detail["declined_forms"] == 1
