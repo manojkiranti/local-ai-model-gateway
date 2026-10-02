@@ -106,6 +106,16 @@ def test_a_lookup_shared_by_rphf_and_another_feature_is_refused():
     assert 10 in ambiguous and 10 not in tokens
 
 
+def test_a_refusal_propagates_even_when_another_rule_also_yields_the_glyph():
+    """Glyph 10 is refused (rphf shared with half) AND has one candidate from a
+    pres rule. A ligature built from it must not look unambiguous."""
+    rules = [_r({"rphf", "half"}, (1, 2), 10), _r({"pres"}, (3,), 10, lookup=1),
+             _r({"abvs"}, (5, 10), 12, lookup=2)]
+    tokens, ambiguous = GT.derive({1: "र", 2: "्", 3: "X", 5: "े"}, rules)
+    assert {10, 12} <= ambiguous
+    assert 10 not in tokens and 12 not in tokens
+
+
 def test_a_non_default_feature_is_ignored():
     """`aalt` is not applied by Word or HarfBuzz; following it would make the
     target ambiguous for no reason."""

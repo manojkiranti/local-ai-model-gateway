@@ -28,7 +28,8 @@ THE RULES
       HarfBuzz, and following them would make glyphs ambiguous for nothing.
     * A glyph reached by two derivations whose tokens differ (after NFC) is
       AMBIGUOUS and resolves to None. Ambiguity propagates: a ligature built
-      from an ambiguous glyph has several candidates too.
+      from an ambiguous glyph has several candidates too, and a refusal
+      propagates the same way, even if another rule also yields the glyph.
 
 The derivation (`derive`) is pure, over flattened `Rule`s, so every rule above
 is testable without a font. fontTools is imported only inside
@@ -162,6 +163,11 @@ def derive(
     for _ in range(MAX_PASSES):
         changed = False
         for rule in active:
+            if refused.intersection(rule.inputs):
+                if rule.output not in refused:
+                    refused.add(rule.output)
+                    changed = True
+                continue
             if not all(g in cands for g in rule.inputs):
                 continue
             pools = [sorted(cands[g]) for g in rule.inputs]
