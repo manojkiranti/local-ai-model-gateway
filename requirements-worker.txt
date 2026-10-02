@@ -28,3 +28,17 @@ docling>=2.0
 # directly so the resolved versions are the ones the A/B was run against.
 rapidocr>=3.9
 onnxruntime>=1.20
+
+# --- native-3: NRB text-layer repair through the embedded font ------------- #
+#
+# `app/nrb/glyphtable.py` is the only importer of fontTools and
+# `app/nrb/shaping.py` the only importer of uharfbuzz; both import inside a
+# function, and `Dockerfile` installs `requirements.txt` alone — so the API
+# image never loads either. fontTools was already here through docling; it is
+# named because the repair now depends on it directly.
+# Licences: fontTools MIT; uharfbuzz Apache-2.0, bundling HarfBuzz under the
+# "Old MIT" licence. Permissive — no distribution gate of the npttf2utf kind —
+# but keep uharfbuzz's LICENSE/NOTICE in the image.
+# docs/superpowers/specs/2026-10-02-native3-font-repair-design.md §3.4
+fonttools>=4.60,<5
+uharfbuzz>=0.56.2,<0.57
