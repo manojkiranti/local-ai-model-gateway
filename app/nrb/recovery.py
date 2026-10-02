@@ -109,6 +109,7 @@ __all__ = [
     "RecoveredDocument",
     "convert_unit",
     "ocr_unit",
+    "page_routes",
     "plan_document",
     "recover",
     "route_page",
@@ -404,6 +405,33 @@ def route_page(
     return ROUTE_NATIVE, "empty_page"
 
 
+def _routes(
+    prov: provenance.DocumentProvenance, plan_reason: str, pages: Sequence[str]
+) -> tuple[tuple[str, str], ...]:
+    """`route_page` for every page of a page-routed PDF, in page order."""
+    return tuple(
+        route_page(prov.page(index), plan_reason=plan_reason, text_chars=len(text.strip()))
+        for index, text in enumerate(pages, start=1)
+    )
+
+
+def page_routes(
+    path: Path, plan: DocumentPlan, pages: Sequence[str]
+) -> tuple[tuple[str, str], ...]:
+    """`(route, why)` per page, decided exactly as `recover` decides it.
+
+    Public because the native-3 evidence (scripts, `extraction`'s native-3
+    metrics) must ask "which pages are native" the same way recovery does —
+    the detector's input is the NATIVE pages, and a second derivation of that
+    set could disagree with the one that serves text.
+    """
+    if plan.plan == PLAN_NATIVE:
+        return tuple((ROUTE_NATIVE, plan.reason) for _ in pages)
+    if plan.plan != PLAN_PAGES:
+        return ()
+    return _routes(provenance.read_pdf_provenance(path), plan.reason, pages)
+
+
 # --------------------------------------------------------------------------- #
 # Execution.
 # --------------------------------------------------------------------------- #
@@ -567,10 +595,9 @@ def _recover_pdf(
         warnings.append(f"provenance_unavailable:{prov.error}")
 
     out: list[PageText] = []
-    for index, text in enumerate(pages, start=1):
-        route, why = route_page(
-            prov.page(index), plan_reason=plan.reason, text_chars=len(text.strip())
-        )
+    for index, (text, (route, why)) in enumerate(
+        zip(pages, _routes(prov, plan.reason, pages)), start=1
+    ):
         if route == ROUTE_LEGACY:
             out.append(
                 convert_unit(

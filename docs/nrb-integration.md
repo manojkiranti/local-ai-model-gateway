@@ -5432,3 +5432,167 @@ store. Worth adding when there is traffic: a count of out-of-range `[N]` markers
 expected route split on live NRB chunks), when the frontend first draws them (is the
 verify badge legible and honoured), and after §15's Nepali review — which may soften
 the caveat wording for conversions that are by then verified.
+
+## 31. native-3 — repairing Word text layers through their own fonts
+
+Design: `docs/superpowers/specs/2026-10-02-native3-font-repair-design.md`; plan:
+`docs/superpowers/plans/2026-10-02-native3-font-repair.md`. The engine is
+`app/nrb/{shaping,reorder,glyphtable,fontrepair}.py`; nothing is wired into
+recovery yet (`NRB_NATIVE_REPAIR` does not exist until Task 6, and defaults off).
+
+### 31.1 Development measurement (CHECKPOINT A)
+
+**Date:** 2026-10-02. **Database:** `local_ai_gateway_build` (the production
+scope, `nrb` department, 338 `ready` NRB PDFs, no blob missing). **Engine:**
+`native-3/repair-1/D=1/N=500/lang=ne/hb-14.5.0`. **Command:**
+`scripts/nrb_native3_detect.py --department nrb --out … --repair-report`, run as a
+`systemd-run --user` unit (read-only: it writes a JSON file, never the database).
+Routing comes from `recovery.page_routes` — the same answer `recover` serves
+from — and `plan_document`/`route_page` are pinned by AST hash in
+`tests/test_nrb_native_repair_recovery.py`.
+
+Development evidence — the production scope shaped this; it proves nothing (spec §6.1).
+
+**Counts.** "Attempted" is a native page of a detected document that holds
+Devanagari (every status but `not_applicable`). Round 1 is the engine as built in
+Tasks 1–4; round 2 is after the three fixes below. `REPAIR_VERSION` stayed
+`repair-1`, the detector constants and the four gate checks are unchanged.
+
+| | round 1 | round 2 |
+|---|---:|---:|
+| documents examined | 338 | 338 |
+| detected (D ≥ 1/1k, N ≥ 500) | 30 | 30 |
+| pages attempted | 1,834 | 1,834 |
+| repaired (`font_tables`) | 1,053 (57.4%) | **1,364 (74.4%)** |
+| unrepaired: `orphans` | 247 | 152 |
+| unrepaired: `roundtrip` | 220 | 4 |
+| unrepaired: `coverage` | 276 | 276 |
+| unrepaired: `no_suspect_font` | 38 | 38 |
+| unrepaired: `layout` / `engine_error` / `read_failed` | 0 / 0 / 0 | 0 / 0 / 0 |
+| pages without Devanagari (`not_applicable`) | 1,362 | 1,362 |
+| **Word 2007–2013: pages repaired / attempted** | 1,024 / 1,515 (67.6%) | **1,335 / 1,515 (88.1%)** |
+
+**Run agreement** (runs whose rebuilt text shapes back to the drawn glyphs ÷ all
+suspect-font runs; a run that fails `coverage` counts as a disagreement, which is
+what drags the GSUB-less producers down):
+
+| producer | docs | attempted | repaired r1 → r2 | run agreement r1 → r2 |
+|---|---:|---:|---:|---:|
+| Microsoft® Word 2013 | 14 | 797 | 556 → **725 (91.0%)** | 0.9950 → **0.9982** |
+| Microsoft® Office Word 2007 | 8 | 625 | 393 → **523 (83.7%)** | 0.9805 → 0.9836 |
+| Microsoft® Word 2010 | 2 | 93 | 75 → **87 (93.5%)** | 0.9994 → 0.9997 |
+| Microsoft® Word 2019 | 2 | 119 | 0 → 0 | 0.5570 |
+| Microsoft® Word for Microsoft 365 | 1 | 141 | 28 → 28 | 0.4980 |
+| Microsoft® Word 2016 | 1 | 9 | 1 → 1 | 0.5304 |
+| Microsoft® Word LTSC | 1 | 12 | 0 → 0 | 0.4852 |
+| Online2PDF.com | 1 | 38 | 0 → 0 | — (no suspect font) |
+| **all detected** | 30 | 1,834 | 1,053 → 1,364 | 0.9063 → 0.9086 |
+| **Word 2007–2013** | 24 | 1,515 | 1,024 → 1,335 | 0.9903 → **0.9930** |
+
+**Bugs found and fixed (ours — our text was wrong, HarfBuzz was right):**
+
+1. **A hidden ZWJ is drawn as the SPACE glyph.** Word's font subsets carry no
+   glyph for U+200D, so a typed joiner is drawn with the space glyph: राख्‍नु is
+   [र ा ख्(half) space न ु], read as "राख् नु" and shaped back to
+   [र ा ख ् space न ु]. With fix 2 it accounts for 216 of round 1's 220
+   `roundtrip` pages (राख्‍नु ×71 runs in one Act, सञ्‍चालन, उल्लङ्‍घन,
+   गर्‍यो/पुर्‍याउने, क्‍य, and
+   `2b11bf653aa2` p.21 परिषद्‍मा — the plan's own example of a "genuine"
+   difference, glyph00217 vs glyph00622, was this bug). A half form is formed only
+   before a consonant or a ZWJ, so the space glyph right after a `half`-feature
+   glyph (`GlyphTable.half_forms`; a lookup shared with `haln` excluded) is the
+   joiner. The ToUnicode keeps " " for the space glyph — relabelling it was tried
+   first and made pypdf, which finds a font's space width through the code
+   labelled " ", write double spaces on every repaired page — and
+   `fontrepair.rejoin` finds each run in pypdf's text, in content order, and puts
+   the ZWJ back at that run's own space glyph; a run it cannot find fails
+   `layout`. Tests: `test_a_half_feature_ligature_is_a_half_form`,
+   `test_a_lookup_shared_with_haln_is_not_a_half_form`,
+   `test_a_real_font_records_its_half_forms`,
+   `test_a_hidden_joiner_drawn_as_the_space_glyph_is_repaired`,
+   `test_a_real_space_after_an_explicit_halant_stays_a_space`,
+   `test_a_joiner_that_cannot_be_placed_fails_layout`,
+   `test_relabelling_nothing_keeps_pypdfs_spacing`,
+   `test_rejoin_takes_all_of_pypdfs_whitespace_at_a_hidden_joiner`,
+   `test_rejoin_follows_content_order`, `test_rejoin_refuses_when_a_run_is_not_in_the_text`.
+2. **Old-spec below-base ra after a half form.** In क्र्य old-spec Kalimati forms
+   the half क् from [क, ्] and the below-base ra from [र, ्] — the virama AFTER र,
+   because the one before it went into the half form — so `vatu`[क्, ्र] is क्र्,
+   not the double virama क््र. Probe case `5acd61c8e9a8` p.27 भित्र्याउन, plus
+   हेलचेक्र्याइँ (×16), दुव्र्यवहार, पुख्र्यौली. Tests:
+   `test_an_old_spec_below_base_ra_after_a_half_form_is_ra_virama`,
+   `test_kalimati_rakar_after_a_half_form_round_trips` (4 words, system Kalimati).
+3. **pypdf writes a space beside every sign Word positions on its own.** Word
+   places the reph, the pre-base ि and many dependent signs glyph by glyph, and
+   pypdf reads each positioning offset as a word gap: मार्फत served "माफ <R> त"
+   (an orphaned reph — 95 round-1 `orphans` pages had no orphan in any run, only in
+   pypdf's text), फैसला "फ ै सला", केही "के ही", प्रकृति "प्रकृ <P>त". Measured over
+   6 documents: 2,492 such pypdf-only spaces inside runs, **every one beside a
+   sign, none between two letters, none a line break**. `rejoin` removes them where
+   the run itself drew no space glyph and, where it did, makes pypdf's spaces the
+   run's own; it never touches a gap between two letters or a line break. Tests:
+   `test_a_separately_positioned_reph_is_rejoined_to_its_cluster` (fixture option
+   `isolate`, which reproduces pypdf's spacing), `test_rejoin_closes_pypdfs_gaps_on_both_sides_of_a_reph`,
+   `test_rejoin_closes_a_gap_before_a_dependent_sign`, `test_rejoin_closes_a_gap_after_a_dependent_sign`,
+   `test_rejoin_closes_a_gap_beside_the_prebase_sign`, `test_rejoin_keeps_a_space_the_run_drew`,
+   `test_rejoin_normalises_pypdfs_spaces_beside_a_reph_to_the_runs_own`,
+   `test_rejoin_never_removes_a_line_break`, `test_rejoin_never_touches_a_gap_between_two_letters`.
+
+**What fix 3 says about the gate.** The `layout` check ignores whitespace by
+design, so round 1 already served pages as "repaired" whose text carried these
+in-word spaces. An A/B over 12 documents: of the 689 pages repaired in both rounds,
+**604 changed text, and every change is whitespace removed and nothing else**
+(no non-whitespace character differs on any of them) — के ही → केही, क ै द → कैद,
+स्वीकृ ति → स्वीकृति, जुनसुकै␣␣कुरा → जुनसुकै कुरा. A whitespace-blind check cannot see an
+in-word space; the run-aligned `rejoin` is what can. The four checks were not
+changed.
+
+**Classified residue — every remaining failure on a Word 2007–2013 page:**
+
+* **Reph on an independent vowel — 152 `orphans` pages, 268 occurrences in 17
+  documents (genuine Word-vs-HarfBuzz; not repairable by this gate).** Drawn
+  [इ uni0907, reph glyph00091] for ई — नभइ+reph (`adb6ffd9c6e4` p.5),
+  व्यक्तिलाइ+reph, भराई+reph. Most likely the Preeti-era spelling of ई (ई drawn
+  as इ plus the reph-shaped hook, converted to र्इ). Uniscribe forms a
+  reph in a vowel-based syllable; HarfBuzz calls र्इ a broken cluster
+  (`र्इ` → [.notdef (dotted circle), glyph00091, uni0907]), so even attaching the
+  reph would fail the round trip — and the "repaired" text would be र्इ, itself a
+  misspelling. `reorder` counts it an orphan, by design.
+* **Malformed input, Word and HarfBuzz disagree — 4 `roundtrip` pages.**
+  गर्र्ने (a doubled र्; `3238eb5aa13d` p.48 and its copy `ac444447b308` p.48) and
+  पर्र्नेछ (`35445ee37706` p.19): Word drew the half/eyelash ra glyph00226,
+  HarfBuzz the reph glyph00089. ◌्रचलित (`b3a471010e33` p.130, a word starting
+  with a bare virama): Word drew [uni094D, uni0930], HarfBuzz the below-base
+  glyph00089. One glyph choice on a page that also orphans: रयिल
+  (`2f1c574967ac`), Word uni093F vs HarfBuzz glyph00466.
+* **Coverage the font's own tables cannot give — 24 pages.** Word 2007 Mangal
+  subsets: `b649effba591` and `8ce14b898063` (Mangal/885, 7 pages each) omit U+094D
+  from the subset's cmap, so the virama glyph glyph00081 has no seed;
+  `442b3529089a` (Mangal/675, 9 pages) draws glyph ids past the subset's 675 glyphs
+  (gid 871). On the same pages Word's shaper also skipped `pres` conjuncts HarfBuzz
+  forms (प्त [glyph00220, uni0924] vs glyph00431; राष्ट्रिय, पश्चिम, महोत्तरी) and
+  chose other ी forms — genuine differences, moot behind coverage.
+  `075bf12eb087` p.1 (Nirmala UI/4923): glyph00700 derives from a glyph reached only
+  through lookup types `glyphtable` does not read (GSUB type 2 multiple
+  substitutions); 2 glyph uses.
+
+**Outside Word 2007–2013 (not a defect of this repair).** Word 2016/2019/365/LTSC
+subsets carry **no GSUB** (Kalimati/696 and /699, Kokila/725, Arial Unicode MS),
+so every conjunct glyph is uncovered: 252 `coverage` pages in 5 documents — the
+donor-font case (spec §7). `54a26570ed07` (Online2PDF.com, Arial Unicode MS): its
+ToUnicode agrees with the font's cmap, so the garbling is not a label problem and
+`no_suspect_font` is the correct answer (38 pages).
+
+**Against the suggested go criterion** (≥ 90% of attempted Word 2007–2013 pages
+repaired, every remaining failure classified): **88.1%**, and every remaining
+failure is classified. The shortfall is the reph-on-an-independent-vowel class
+alone (10.0% of attempted pages); without it the share is 1,335 / 1,363 = 97.9%.
+
+**Evaluation & Improvement (development stage).** *Success metric:* the share of
+attempted Word 2007–2013 pages served repaired with zero gate failures — the proxy
+for retrieval recall on the ~6% of the corpus whose text layer is garbled (no SQL
+tie: this is corpus text quality). *Eval:* this table is development evidence
+only; the held-out measurement is the frozen cohort of Tasks 10–13. *Feedback
+capture:* the detect report's per-page statuses and examples
+(`--repair-report`), kept as the JSON beside each run. *Review loop:* re-run the
+report at every engine change (each must carry its tests), and at the cohort run.
