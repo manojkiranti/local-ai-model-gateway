@@ -5455,39 +5455,42 @@ Development evidence — the production scope shaped this; it proves nothing (sp
 
 **Counts.** "Attempted" is a native page of a detected document that holds
 Devanagari (every status but `not_applicable`). Round 1 is the engine as built in
-Tasks 1–4; round 2 is after the three fixes below. `REPAIR_VERSION` stayed
-`repair-1`, the detector constants and the four gate checks are unchanged.
+Tasks 1–4; round 2 is after the three fixes below; round 3 adds the review's two
+`rejoin` corrections (linear-time matching, and the word-gap check enforced —
+see fix 3). `REPAIR_VERSION` stayed `repair-1`, the detector constants and the
+four gate checks are unchanged.
 
-| | round 1 | round 2 |
-|---|---:|---:|
-| documents examined | 338 | 338 |
-| detected (D ≥ 1/1k, N ≥ 500) | 30 | 30 |
-| pages attempted | 1,834 | 1,834 |
-| repaired (`font_tables`) | 1,053 (57.4%) | **1,364 (74.4%)** |
-| unrepaired: `orphans` | 247 | 152 |
-| unrepaired: `roundtrip` | 220 | 4 |
-| unrepaired: `coverage` | 276 | 276 |
-| unrepaired: `no_suspect_font` | 38 | 38 |
-| unrepaired: `layout` / `engine_error` / `read_failed` | 0 / 0 / 0 | 0 / 0 / 0 |
-| pages without Devanagari (`not_applicable`) | 1,362 | 1,362 |
-| **Word 2007–2013: pages repaired / attempted** | 1,024 / 1,515 (67.6%) | **1,335 / 1,515 (88.1%)** |
+| | round 1 | round 2 | round 3 (final) |
+|---|---:|---:|---:|
+| documents examined | 338 | 338 | 338 |
+| detected (D ≥ 1/1k, N ≥ 500) | 30 | 30 | 30 |
+| pages attempted | 1,834 | 1,834 | 1,834 |
+| repaired (`font_tables`) | 1,053 (57.4%) | 1,364 (74.4%) | **1,363 (74.3%)** |
+| unrepaired: `orphans` | 247 | 152 | 152 |
+| unrepaired: `roundtrip` | 220 | 4 | 4 |
+| unrepaired: `coverage` | 276 | 276 | 276 |
+| unrepaired: `no_suspect_font` | 38 | 38 | 38 |
+| unrepaired: `layout` | 0 | 0 | 1 |
+| unrepaired: `engine_error` / `read_failed` | 0 / 0 | 0 / 0 | 0 / 0 |
+| pages without Devanagari (`not_applicable`) | 1,362 | 1,362 | 1,362 |
+| **Word 2007–2013: pages repaired / attempted** | 1,024 / 1,515 (67.6%) | 1,335 / 1,515 (88.1%) | **1,334 / 1,515 (88.1%)** |
 
 **Run agreement** (runs whose rebuilt text shapes back to the drawn glyphs ÷ all
 suspect-font runs; a run that fails `coverage` counts as a disagreement, which is
 what drags the GSUB-less producers down):
 
-| producer | docs | attempted | repaired r1 → r2 | run agreement r1 → r2 |
+| producer | docs | attempted | repaired r1 → r2 → r3 | run agreement r1 → r3 |
 |---|---:|---:|---:|---:|
-| Microsoft® Word 2013 | 14 | 797 | 556 → **725 (91.0%)** | 0.9950 → **0.9982** |
-| Microsoft® Office Word 2007 | 8 | 625 | 393 → **523 (83.7%)** | 0.9805 → 0.9836 |
-| Microsoft® Word 2010 | 2 | 93 | 75 → **87 (93.5%)** | 0.9994 → 0.9997 |
-| Microsoft® Word 2019 | 2 | 119 | 0 → 0 | 0.5570 |
-| Microsoft® Word for Microsoft 365 | 1 | 141 | 28 → 28 | 0.4980 |
-| Microsoft® Word 2016 | 1 | 9 | 1 → 1 | 0.5304 |
-| Microsoft® Word LTSC | 1 | 12 | 0 → 0 | 0.4852 |
-| Online2PDF.com | 1 | 38 | 0 → 0 | — (no suspect font) |
-| **all detected** | 30 | 1,834 | 1,053 → 1,364 | 0.9063 → 0.9086 |
-| **Word 2007–2013** | 24 | 1,515 | 1,024 → 1,335 | 0.9903 → **0.9930** |
+| Microsoft® Word 2013 | 14 | 797 | 556 → 725 → **724 (90.8%)** | 0.9950 → **0.9982** |
+| Microsoft® Office Word 2007 | 8 | 625 | 393 → 523 → **523 (83.7%)** | 0.9805 → 0.9836 |
+| Microsoft® Word 2010 | 2 | 93 | 75 → 87 → **87 (93.5%)** | 0.9994 → 0.9997 |
+| Microsoft® Word 2019 | 2 | 119 | 0 → 0 → 0 | 0.5570 |
+| Microsoft® Word for Microsoft 365 | 1 | 141 | 28 → 28 → 28 | 0.4980 |
+| Microsoft® Word 2016 | 1 | 9 | 1 → 1 → 1 | 0.5304 |
+| Microsoft® Word LTSC | 1 | 12 | 0 → 0 → 0 | 0.4852 |
+| Online2PDF.com | 1 | 38 | 0 → 0 → 0 | — (no suspect font) |
+| **all detected** | 30 | 1,834 | 1,053 → 1,364 → 1,363 | 0.9063 → 0.9086 |
+| **Word 2007–2013** | 24 | 1,515 | 1,024 → 1,335 → 1,334 | 0.9903 → **0.9930** |
 
 **Bugs found and fixed (ours — our text was wrong, HarfBuzz was right):**
 
@@ -5530,13 +5533,31 @@ what drags the GSUB-less producers down):
    6 documents: 2,492 such pypdf-only spaces inside runs, **every one beside a
    sign, none between two letters, none a line break**. `rejoin` removes them where
    the run itself drew no space glyph and, where it did, makes pypdf's spaces the
-   run's own; it never touches a gap between two letters or a line break. Tests:
+   run's own; it never removes a line break. **The assumption is enforced, not
+   trusted (review, round 3):** a space pypdf wrote between two non-sign
+   characters that the run did not draw means the producer may encode word gaps
+   by positioning, so a gap beside a sign may be a real word gap; `rejoin` then
+   returns None and the page fails `layout` (detail `unaligned`). Round 3: it
+   failed closed on **1 page** — `075bf12eb087` p.2 (Word 2013, Nirmala UI),
+   where pypdf wrote "ष्ट्र य" inside अन्तराष्ट्रिय: an in-word positioning gap
+   where the pre-base sign lands, so a false positive of the strict rule, given up
+   on purpose. Also from the review: every gap is now ONE `(\s*)` between two
+   literal characters; the first version's `([ \t]*)\s*` backtracked
+   exponentially when a run was absent (14 signs: 14.6 s; now 40 signs 0.001 s).
+   On the 12-document A/B, round 3's served text is byte-identical to round 2's.
+   Tests:
    `test_a_separately_positioned_reph_is_rejoined_to_its_cluster` (fixture option
    `isolate`, which reproduces pypdf's spacing), `test_rejoin_closes_pypdfs_gaps_on_both_sides_of_a_reph`,
    `test_rejoin_closes_a_gap_before_a_dependent_sign`, `test_rejoin_closes_a_gap_after_a_dependent_sign`,
    `test_rejoin_closes_a_gap_beside_the_prebase_sign`, `test_rejoin_keeps_a_space_the_run_drew`,
    `test_rejoin_normalises_pypdfs_spaces_beside_a_reph_to_the_runs_own`,
-   `test_rejoin_never_removes_a_line_break`, `test_rejoin_never_touches_a_gap_between_two_letters`.
+   `test_rejoin_never_removes_a_line_break`,
+   `test_rejoin_refuses_a_gap_between_two_letters_the_run_did_not_draw`,
+   `test_rejoin_refuses_a_run_mixing_a_sign_gap_and_a_positioned_word_gap`,
+   `test_rejoin_keeps_a_letter_gap_the_run_drew`, `test_rejoin_keeps_a_line_break_between_letters`,
+   `test_rejoin_closes_a_gap_before_a_line_break_but_keeps_the_break`,
+   `test_rejoin_refuses_an_absent_long_run_in_linear_time`,
+   `test_a_word_gap_drawn_by_positioning_fails_layout`.
 
 **What fix 3 says about the gate.** The `layout` check ignores whitespace by
 design, so round 1 already served pages as "repaired" whose text carried these
@@ -5549,15 +5570,24 @@ changed.
 
 **Classified residue — every remaining failure on a Word 2007–2013 page:**
 
-* **Reph on an independent vowel — 152 `orphans` pages, 268 occurrences in 17
-  documents (genuine Word-vs-HarfBuzz; not repairable by this gate).** Drawn
-  [इ uni0907, reph glyph00091] for ई — नभइ+reph (`adb6ffd9c6e4` p.5),
-  व्यक्तिलाइ+reph, भराई+reph. Most likely the Preeti-era spelling of ई (ई drawn
-  as इ plus the reph-shaped hook, converted to र्इ). Uniscribe forms a
-  reph in a vowel-based syllable; HarfBuzz calls र्इ a broken cluster
-  (`र्इ` → [.notdef (dotted circle), glyph00091, uni0907]), so even attaching the
-  reph would fail the round trip — and the "repaired" text would be र्इ, itself a
-  misspelling. `reorder` counts it an orphan, by design.
+* **Reph on an independent vowel (र्इ typed for ई) — 152 `orphans` pages, 268
+  occurrences in 17 documents. Reproducible, deliberately refused, an open
+  decision.** Word drew [इ uni0907, reph glyph00091] where a reader sees ई —
+  नभइ+reph (`adb6ffd9c6e4` p.5), व्यक्तिलाइ+reph, भराई+reph. The author's text is
+  र्इ (0930 094D 0907), a deprecated but common way of typing ई (the review cites
+  the Unicode Standard's "do not use" table for it; not re-checked here). This is
+  NOT an irreproducible shaping difference. Probed with HarfBuzz 14.5.0 on system
+  Kalimati and on `adb6ffd9c6e4`'s own embedded subset: `र्ई` → [ई, reph], so
+  HarfBuzz does form a reph on a vowel-based syllable; `र्इ` → [dotted circle,
+  reph, इ] by default, by design for that sequence; with
+  `BufferFlags.DO_NOT_INSERT_DOTTED_CIRCLE`, `नभर्इ` → [uni0928, uni092D, uni0907,
+  glyph00091], exactly what Word drew. Today two things refuse it on purpose:
+  `reorder` attaches no reph after an independent vowel (an orphan), and the round
+  trip shapes with HarfBuzz's defaults. **Possible recovery path, not taken (the
+  user's decision):** `reorder` attaches REPH after इ; the round trip uses
+  `DO_NOT_INSERT_DOTTED_CIRCLE` for exactly that sequence; the served text
+  normalises र्इ → ई. The ceiling would be about 97.9% of attempted Word 2007–2013
+  pages (the share without this class).
 * **Malformed input, Word and HarfBuzz disagree — 4 `roundtrip` pages.**
   गर्र्ने (a doubled र्; `3238eb5aa13d` p.48 and its copy `ac444447b308` p.48) and
   पर्र्नेछ (`35445ee37706` p.19): Word drew the half/eyelash ra glyph00226,
@@ -5584,9 +5614,10 @@ ToUnicode agrees with the font's cmap, so the garbling is not a label problem an
 `no_suspect_font` is the correct answer (38 pages).
 
 **Against the suggested go criterion** (≥ 90% of attempted Word 2007–2013 pages
-repaired, every remaining failure classified): **88.1%**, and every remaining
-failure is classified. The shortfall is the reph-on-an-independent-vowel class
-alone (10.0% of attempted pages); without it the share is 1,335 / 1,363 = 97.9%.
+repaired, every remaining failure classified): **88.1%** (1,334 / 1,515), and
+every remaining failure is classified. The shortfall is the र्इ class (10.0% of
+attempted pages) plus the one page the word-gap check failed closed; without the
+र्इ class the share is 1,334 / 1,363 = 97.9%.
 
 **Evaluation & Improvement (development stage).** *Success metric:* the share of
 attempted Word 2007–2013 pages served repaired with zero gate failures — the proxy

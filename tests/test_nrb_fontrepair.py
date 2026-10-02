@@ -198,6 +198,22 @@ def test_a_separately_positioned_reph_is_rejoined_to_its_cluster(tmp_path):
     assert out.detail["gaps_closed"] > 0
 
 
+def test_a_word_gap_drawn_by_positioning_fails_layout(tmp_path):
+    """क drawn on its own inside a TJ (both sides offset): in बैंकको pypdf writes
+    a space between क and क, two letters, which no sign explains. The page is
+    a producer that may encode word gaps by positioning: it keeps its native
+    text rather than have real words merged beside signs."""
+    from app.nrb import glyphtable
+
+    ka = glyphtable.build_glyph_table(LOHIT)
+    gid = next(g for g in W.shaped_lines(LOHIT, ["क"])[0] if ka.token(g) == "क")
+    path = W.word_pdf(tmp_path, LOHIT, isolate=frozenset({gid}))
+    out = _repair(path)
+    assert out.status == fontrepair.unrepaired(fontrepair.LAYOUT), out.detail
+    assert out.detail["unaligned"] == 1
+    assert out.text == _native(path)
+
+
 R = "\ue001"  # reorder.REPH
 
 
@@ -222,10 +238,41 @@ def test_rejoin_closes_a_gap_beside_the_prebase_sign():
     assert fontrepair.rejoin(f"प्रकृ {P}त", [(f"प्रकृ{P}त", frozenset())]) == (f"प्रकृ{P}त", 1)
 
 
-def test_rejoin_never_touches_a_gap_between_two_letters():
+def test_rejoin_refuses_a_gap_between_two_letters_the_run_did_not_draw():
     """Measured: pypdf never wrote whitespace between two letters of a run that
-    the run did not draw. If it ever does, it is not this rule's to judge."""
-    assert fontrepair.rejoin("कम ल", [("कमल", frozenset())]) == ("कम ल", 0)
+    the run did not draw. If it does, the producer encodes word gaps by
+    positioning, and closing gaps beside signs would merge real words (most
+    Nepali words end in a sign). So the page fails closed."""
+    assert fontrepair.rejoin("कम ल", [("कमल", frozenset())]) is None
+
+
+def test_rejoin_refuses_a_run_mixing_a_sign_gap_and_a_positioned_word_gap():
+    """One sign gap (फ ै) that would be closed, one letter gap (ल क) the run
+    drew no space for: the second proves the first may be a real word gap."""
+    assert fontrepair.rejoin("फ ैसल कमल", [("फैसलकमल", frozenset())]) is None
+
+
+def test_rejoin_keeps_a_letter_gap_the_run_drew():
+    assert fontrepair.rejoin("कमल  नयन", [("कमल नयन", frozenset())]) == ("कमल  नयन", 0)
+
+
+def test_rejoin_keeps_a_line_break_between_letters():
+    assert fontrepair.rejoin("कम\nल", [("कमल", frozenset())]) == ("कम\nल", 0)
+
+
+def test_rejoin_refuses_an_absent_long_run_in_linear_time():
+    """Review, 2026-10-02: `([ \t]*)\s*` per gap backtracked exponentially when
+    a run was absent (14 signs: 14.6 s). A Word line has 20+ signs."""
+    import time
+
+    read, raw = "कै" * 40 + "X", "क ै " * 40
+    started = time.perf_counter()
+    assert fontrepair.rejoin(raw, [(read, frozenset())]) is None
+    assert time.perf_counter() - started < 1.0
+
+
+def test_rejoin_closes_a_gap_before_a_line_break_but_keeps_the_break():
+    assert fontrepair.rejoin(f"मक {R}  \nरी", [(f"मक{R}री", frozenset())]) == (f"मक{R}\nरी", 2)
 
 
 def test_rejoin_keeps_a_space_the_run_drew():

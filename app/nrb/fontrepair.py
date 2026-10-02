@@ -265,6 +265,9 @@ def _hidden_joiners(
     return "".join(read), frozenset(hidden)
 
 
+_LINE_BREAK = re.compile(r"[^ \t]")  # the first non-horizontal whitespace
+
+
 def rejoin(raw: str, runs: Sequence[tuple[str, frozenset[int]]]) -> tuple[str, int] | None:
     """`raw` with what pypdf's layout split inside a run put back together. Pure.
 
@@ -280,10 +283,17 @@ def rejoin(raw: str, runs: Sequence[tuple[str, frozenset[int]]]) -> tuple[str, i
         did draw one, pypdf's spaces there become the run's own. Measured
         (CHECKPOINT A, 6 documents): 2,492 such spaces, every one beside a
         sign, none between two letters and none a line break. A line break is
-        never removed, and a gap between two letters is never touched.
+        never removed.
+      * that measurement is ENFORCED, not assumed: a space pypdf wrote between
+        two non-sign characters that the run did not draw means this producer
+        encodes word gaps by positioning, so a gap beside a sign may be a real
+        word gap too (most Nepali words end in a sign). Then nothing is closed:
+        None, and the page fails `layout`.
 
-    Returns the text and how many gaps it closed, or None when any run cannot
-    be found: nothing is ever moved anywhere but inside its own run.
+    Every gap is ONE `(\s*)` between two literal characters, so a run that is
+    not in `raw` fails in linear time (two adjacent quantifiers backtracked
+    exponentially: 14 signs took 14.6 s). Returns the text and how many gaps it
+    closed, or None when a run cannot be found or a word gap was positioned.
     """
     edits: list[tuple[int, int, str]] = []
     closed = 0
@@ -293,30 +303,38 @@ def rejoin(raw: str, runs: Sequence[tuple[str, frozenset[int]]]) -> tuple[str, i
         if not items:
             continue
         pattern: list[str] = []
-        fills: list[str] = []
+        gaps: list[tuple[str, str | None]] = []  # (kind, what the run drew)
         prev: tuple[int, str] | None = None
         for k, ch in items:
             if prev is not None and prev[0] not in hidden and k not in hidden:
                 drew = "".join(c for c in read[prev[0] + 1:k] if c in " \t")
-                if prev[1] in _SIGNS or ch in _SIGNS:
-                    pattern.append(r"([ \t]*)\s*")
-                    fills.append(drew)
-                else:
-                    pattern.append(r"\s*")
+                pattern.append(r"(\s*)")
+                gaps.append(("sign" if prev[1] in _SIGNS or ch in _SIGNS else "letter", drew))
             if k in hidden:
                 pattern.append(r"(\s*)")
-                fills.append(ZWJ)
+                gaps.append(("joiner", None))
             else:
                 pattern.append(re.escape(ch))
             prev = (k, ch)
         found = re.compile("".join(pattern)).search(raw, cursor)
         if found is None:
             return None
-        for group, fill in enumerate(fills, start=1):
+        for group, (kind, drew) in enumerate(gaps, start=1):
             start, end = found.span(group)
-            if fill == ZWJ or (end > start and raw[start:end] != fill):
-                edits.append((start, end, fill))
-                closed += fill != ZWJ
+            if kind == "joiner":
+                edits.append((start, end, ZWJ))
+                continue
+            text = raw[start:end]
+            brk = _LINE_BREAK.search(text)
+            lead_end = start + (brk.start() if brk else len(text))  # horizontal lead only
+            lead = raw[start:lead_end]
+            if kind == "letter":
+                if lead and not drew:
+                    return None
+                continue
+            if lead and lead != drew:
+                edits.append((start, lead_end, drew or ""))
+                closed += 1
         cursor = found.end()
     for start, end, fill in sorted(edits, reverse=True):
         raw = raw[:start] + fill + raw[end:]
@@ -663,7 +681,7 @@ class FontRepairEngine:
         detail: dict[str, Any] = {
             "runs": 0, "runs_matched": 0, "glyph_uses": 0, "unresolved_uses": 0,
             "orphans": 0, "layout_missing": 0, "declined_forms": declined,
-            "hidden_joiners": 0, "joiners_unplaced": 0, "gaps_closed": 0,
+            "hidden_joiners": 0, "joiners_unplaced": 0, "gaps_closed": 0, "unaligned": 0,
             "fonts": sorted({f.name for f in suspect.values()}),
             "font_identities": sorted({f.table.identity.label() for f in suspect.values() if f.table}),
             "examples": [],
@@ -703,12 +721,16 @@ class FontRepairEngine:
         rejoined = rejoin(raw, read_runs)
         if rejoined is not None:
             raw, detail["gaps_closed"] = rejoined
-        elif detail["hidden_joiners"]:
-            # Otherwise a run is missing from pypdf's text, which the layout
-            # check below refuses on its own.
+        else:
+            # A run missing from pypdf's text, or a word gap drawn by
+            # positioning: either way the page's text cannot be trusted.
+            detail["unaligned"] = 1
             detail["joiners_unplaced"] = detail["hidden_joiners"]
         served = reorder(raw)
-        detail["orphans"] += served.orphans
+        if not detail["unaligned"]:
+            # Unaligned text is never served; its orphans would only hide the
+            # real reason (layout) behind a symptom of it.
+            detail["orphans"] += served.orphans
         detail["layout_missing"] = missing_in_order(logical_runs, served.text)
         detail["illegal_before"] = devanagari.illegal_cluster_count(native_text)
         detail["illegal_after"] = devanagari.illegal_cluster_count(served.text)
@@ -720,7 +742,7 @@ class FontRepairEngine:
             failed = ORPHANS
         elif detail["runs_matched"] < detail["runs"]:
             failed = ROUNDTRIP
-        elif detail["layout_missing"] or declined or detail["joiners_unplaced"]:
+        elif detail["layout_missing"] or declined or detail["unaligned"]:
             failed = LAYOUT
         if failed is not None:
             return RepairOutcome(unrepaired(failed), native_text, detail)
