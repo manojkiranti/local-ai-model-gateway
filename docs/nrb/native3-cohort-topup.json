@@ -1,0 +1,2833 @@
+{
+  "algorithm_version": "nrb-native3-v1",
+  "catalog_counts": {
+    "active_sources": 18577,
+    "blocked_files": 1094,
+    "duplicate_comparison_keys": 0,
+    "duplicate_source_identities": 0,
+    "files": 18266,
+    "inactive_sources": 0,
+    "relationships": 18308,
+    "rest_sources": 18380,
+    "sitemap_only_sources": 197,
+    "sources": 18577,
+    "untyped_sources": 5418
+  },
+  "diagnostics": {},
+  "drawn_at": "2026-10-03T11:20:58+05:45",
+  "entries": [
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2069_70_Notice-01-AGM-Clearance-Dividend-Approval-Working-Procedure-2069.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2071_72_For_A__B__C_Class-Circular_31-Non-MICR-Related-new.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2068_69-Circular_29-Withdrawal-of-Action-against-a-Willful-Defaulter.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2071_72_Notice-07-Attachment-Consultative-Guideline-for-Reconstruction-Refinance-DRAFT.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2069_70-Circular_23-Attachment-Unified-Directives-2070.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/03/Notice-no-14-Foreign-Bank-Branch-Policy-2022-1.pdf",
+      "document_type": "guideline_manual",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/06/FXMD-Circular-18_Remittance-Transaction.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/06/Circular-9-1.pdf",
+      "document_type": "circular",
+      "owner": "psd",
+      "owners": [
+        "psd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2067_68_Guidelines-01-Attachement-Banking-Service-Fee.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2070_71_For_D_Class-Circular_07-Unified-Directives-for-D-Class.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/04/ML-TF-Risk-Assessment-Guidelines-for-Banks-and-Financial-Institution-2022.pdf",
+      "document_type": "guideline_manual",
+      "owner": "mlpsd",
+      "owners": [
+        "mlpsd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2074_75_Notice-07_Bank_Open_at_Public_Holidays.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2073_74_Notice-08_Request_for_Participation_in_IFC_Programme_Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/06/Circular-Upload.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2073_74_For_A__B__C_Class-Circular_04-Deprived-Sector-Agriculture-Project-Loan-Branch-Displaced-in-Insurgency-related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2074_75_Notice-04-Legal_Documents_Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2063_64-Circular_20-Loans-Against-Guarantee-and-Counter-Gtee.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2067_68-Circular_02-CRR-Capital-Plan-for-Special-1-District-Exemption-in-SLR-Penalty-Cheque-NBA.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2072_73_For_D_Class-Circular_05-Client-Protection-Fund.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2063_64-Circular_24-Compulsory-Lending-to-Deprived-Sector.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2065_66-Circular_39-Technical-Service-to-Foreign-BanksDeferred-Tax.pdf.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/12/NIFRA-Circular-no-1.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Guidelines-Banking_Service_Fee_Guidelines_2067.pdf",
+      "document_type": "guideline_manual",
+      "owner": "bfr",
+      "owners": [
+        "bfr",
+        "itd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/06/दैनिक-तरलता-सुविधासम्बन्धी-कार्यविधि-तेस्रो-संशोधन-२०८०-२०७६.pdf",
+      "document_type": "guideline_manual",
+      "owner": "psd",
+      "owners": [
+        "psd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/List_of_Circular-657.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2016
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2068_69-Circular_03-FD-Account-of-Foreign-Investor-Amendment-in-Directive-2-and-3-AMLPrority-Sector-Lending.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/07/2_2081.04.16_FEMD-Circular_MP-2081-82.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/01/Notice-No.-11-hirepurchase-with-manual.pdf",
+      "document_type": "guideline_manual",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/09/Circular-3-ABC-Working-Capital-Loan-guidelines-related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2067_68-Circular_03-Risk-Management-Guidelines-1.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/04/10_2080-81_2081.01.04_FEMD-Circular_Peace-Mission-LC-1.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2075_76_For_A__B__C_Class-Circular_01-Monetary_Policy_Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2074_75_For_A__B__C_Class-Circular_15-Deposit__IPS_Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/fxm_circular_220190120.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2067_68-Circular_07-Plan-for-Productive-Sector-Loan.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/07/Bittya-Grahak-Samrakshan-tatha-Gunaso-Byawaspathan-Karyabidhi-2077-second-amendment-2082.pdf",
+      "document_type": "guideline_manual",
+      "owner": "bfr",
+      "owners": [
+        "bfr",
+        "ficpd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/07/Circular-2-MFIs-Final-Upload.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2069_70-Circular_20-Amendment-in-CA-Reporting-Format.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2067_68-Circular_01-Attachment-of-21.8-3-13.3-14.1.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/08/Circular-ABC-Assets-Quality-and-WCG.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2064_65-Circular_07-attachment.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2072_73_For_A__B__C_Class-Circular_07-Relaxation-in-Credit-Regulation-and-CRR.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/List_of_Circular-640.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2015
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/08/FXMD-Circular-062079-80.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/09/FXMD_Circular-03.2080.81.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2076_77_For_A__B__C_Class-Circular_07-Amendment_in_Interest_Subsidy-new.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2071_72_For_D_Class-Circular_05-Equity-Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2071_72_For_A__B__C_Class-Circular_24-Prime-Minister-Disaster-Relief-Fund-Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/08/WC-Guidelines-2nd-Amendment.pdf",
+      "document_type": "guideline_manual",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/04/HP-Manual-2082.pdf",
+      "document_type": "guideline_manual",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2065_66-Circular_28-Annex-of-Circular-no.-28.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2072_73_For_A__B__C_Class-Circular_04-Capital-Plan-Disclosure.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2069_70-Circular_12-Mutual-Fund-Good-For-Payment-Cheque.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2069_70-Circular_07-CRR.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2073_74_Notice-03_Call_-for-_Submitting_-information_-on-_CSR-_HR_Development_-Expenses.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2069_70_Notice-06-Information-for-CA-Reporting-Format.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/03/09_2080-81_Unified-Circular_QR-Code.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2076_77_Notice-03-Time_Extension_Related-new.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2069_70_Notice-05-Notice-for-Suggestions-on-Sample-Byrules.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2068_69-Circular_19-Housing-Real-Estate-Loan.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2073_74_For_A__B__C_Class-Circular_23-New_Directive_no._19_related-new.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/06/Circular-no-27-AML-CFT.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2066_67-Circular_24-Prohibition-on-IPO-Organised-Sector-Defined.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2073_74_For_D_Class-Circular_05-Interest_Rate_Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2071_72_For_D_Class-Circular_09-Post-Earthquke-Facilities.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2071_72_Notice-01-Nepal-National-Payment-System-Development-Strategy.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2070_71_For_A__B__C_Class-Circular_05-Redemption-Reserve-Deprived-Sector-Limit-for-held-for-trading-investment.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/09/09-2079-80-Circular.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2074_75_For_A__B__C_Class-Circular_16-Amendment_in_Krishi_Karja_Karybidhi.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2067_68-Circular_04-Bills-Purchase-Investment-Privileges-for-Share-Investment-on-CIB-Nepal-Clearing-House-NBTI.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2073_74_For_A__B__C_Class-Circular_13-Productive_Sector_Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/List_of_Circular-651.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2016
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/List_of_Circular-635.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2015
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/02/Circular-No-10-ABC-MP-for-half-yearly-review-2.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2065_66-Circular_07-Attachment-Capital-Adeuqacy-Framework-2007-Update-2008.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2068_69-Circular_12-Withdrawal-of-Action-against-a-Willful-Defaulter.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2065_66-Circular_23-Attach.Self-Declaration-Anusuchi-12.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2069_70-Circular_05-No-approval-to-treat-Tier-2-Capital-for-Debt-Intstr.-Loan-by-Non-national-level-finacial-institutions.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2068_69-Circular_33-Unified-Directives-2069.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/01/MFI-Manual-final_upload.pdf",
+      "document_type": "guideline_manual",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/12/FXMD-Circular-13_2078-79.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/05/Circular.No-11-ABC.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2069_70_Notice-01-Attachment-AGM-Clearance-Dividend-Approval-Working-Procedure-2069.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2074_75_Notice-08-BOD_CEO_Qualification_Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2065_66-Circular_45-Insurance-of-AcNo-Extra-BenefitCallable-FDRCrossholding.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2074_75_Notice-15_Earthquake_Victim_Refinance_Loan_Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2069_70-Circular_19-Amendment-related-to-Directors-qualification.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2072_73_For_A__B__C_Class-Circular_01-Attachment-Unified-Directives-2072.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2066_67-Circular_23-Rivision-in-Clause-6.2-of-Licensing-Policy-2063.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2076_77_For_D_Class-Circular_02-Attachment_Amendment_to_Directive_to_Microfinance-FIs_2075-new.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2073_74_For_D_Class-Circular_06-Directors_Education_Employees_Training__CSR_Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2069_70-Circular_01-Refinance-Facilities-CCD-Ratio.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/05/भुक्तानी-प्रणाली-सम्बन्धी-एकीकृत-निर्देशन-२०७८-मा-संशोधन-तथा-थप-गरिएको-सम्बन्धमा-।.pdf",
+      "document_type": "circular",
+      "owner": "psd",
+      "owners": [
+        "psd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/List_of_Circular-644.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2015
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/UC-2076-Letter-1.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2075_76_For_A__B__C_Class-Circular_24-Fixed_Deposit_Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/FXMCircular20170710.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2017
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/02/circular-Infra-01-1.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/11/नेपाल-राष्ट्र-बैंक-मनिचेञ्जर-इजाजतपत्र-तथा-निरीक्षण-विनियमावली-२०७७.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2073_74_Notice-10_Cash_Transaction_Limit__e-Government_Procurement_Related-new.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2067_68_Notice-4-Attachment-Merger-Bylaws-2068.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/Roster_Notice.pdf",
+      "document_type": "guideline_manual",
+      "owner": "pbrd",
+      "owners": [
+        "pbrd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2074_75_For_A__B__C_Class-Circular_10-NFRS_Compliant_FS_Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/11/आगलागी-एवम्-वाढी-तथा-डुवानबाट-पीडित-घरपरिवारलाई-२०७४.pdf",
+      "document_type": "guideline_manual",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/02/Hirepurchase-AML_CFT-publish.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2067_68-Circular_26-Attachment-Cheque-Standards-and-Specifications.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/02/Nepal-Rastra-Bank-Punarkarja-Karyabidhi-2077-Fifth-Amendment.pdf",
+      "document_type": "guideline_manual",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/03/FXMD_Circular21_207879.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/08/FXMD-Circular-01-207879_Import-From-India.pdf.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2067_68-Circular_17-Promoter-Share-Pledged-Quarterly-Reporting-via-Form-9.6.1.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2063_64-Circular_19-Reopening-Branches-and-Counters.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2066_67-Circular_20-Limit-on-Real-State-Amd-9.3-ka-4.a-CD-Ratio-Interest-Bearing-Ac-Merchant-Bank-IC-Purchase-for-D.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/List_of_Circular-663.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2016
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2066_67-Circular_47-Addition-in-point-no.-11-of-Unified-Directives-2-2066-and-point-no.-2-of-6-2066.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2069_70-Circular_23-Unified-Directives-2070.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2075_76_Notice-12-opening_branch_office_for-revenue_collection-new.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2070_71_For_A__B__C_Class-Circular_15-Directive-No.19-Revised.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2069_70-Circular_10-SOL-waiver.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2068_69-Circular_21-Attachment-Stress-Testing-Guidelines.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2074_75_Notice-12-BFIs_Opening_During_Public_Holidays.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/12/FXMD-11-2079-80-Cash-Margin.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2072_73_For_A__B__C_Class-Circular_02-Bank-Rate-Capital-Deprived-Sector.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/08/FXMD_Circular-4_Monetary-Policy.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/10/Circular-5-ABCFinal-V1-publish.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/FXM_CIRCULAR20190106.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/12/Notice-No-7-ML-TF-Risk-Assessment-Guidelines-for-Banks-and-Financial-Institution-2022.pdf",
+      "document_type": "guideline_manual",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/02/ABC-circular-8_merged.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/10/Circular3-2077-78.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2071_72_For_A__B__C_Class-Circular_29-CRR-Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/08/Threshold-Transaction-Reporting-Guidelines-Updated-July-2025.pdf",
+      "document_type": "guideline_manual",
+      "owner": "fiu",
+      "owners": [
+        "fiu"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/10/Unified-directives-circular-no-3.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2070_71_For_A__B__C_Class-Circular_23-Sick-industriesCorporate-governanceAML-CFTBranch-policy.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/03/Circular-9.2077.78.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2067_68-Circular_18-Deposits-upto-Rs-2-lakhs-to-be-insured-by-B-C.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2065_66-Circular_32-Attach.-Name-List-of-Defaulters.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/08/D-Circular-no-1.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2065_66-Circular_11-Clarification-about-PPA-on-Circular-no.15-064_65.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2068_69-Circular_11-Attachment-ECC-Revised-Provisions.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2071_72_For_A__B__C_Class-Circular_30-Post-Earthquake-Facilities.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2074_75_Notice-06_Rural_Area_for_Subsidized_Interest_Agriculture_Loan_Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2076_77_For_A__B__C_Class-Circular_04-Attachement_Amendment_to_Unified_Directive_2075-new.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/02/FXM_Unified_Circular-2074.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2017
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2071_72_For_A__B__C_Class-Circular_22-Regarding_Uninterrupted_Services.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2073_74_For_A__B__C_Class-Circular_22-Bank_Opening_on_Asar_End_2074_related-new.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2074_75_For_A__B__C_Class-Circular_21-Uniform_Chart_of_Accounts_Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2065_66-Circular_10-Application-for-Merger-upgrade.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2067_68-Circular_21-Attachment-Anusuchi-9.3-ka-9.14-and-4.a.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2064_65-Circular_13-Margin-Lending-upto-50-of-Last-90-days.doc.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2069_70-Circular_16-Revision-in-KYC-Provision-Provision-to-open-Represent.-Office-Provision-to-appoint-Directors.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/03/Final-to-Publish-1.pdf",
+      "document_type": "circular",
+      "owner": "psd",
+      "owners": [
+        "psd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/10/2081.06.30_FEMD-Circular-Teen-Mahale.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/07/Targeted-Financial-Sanctions-related-guidelines.pdf",
+      "document_type": "guideline_manual",
+      "owner": "mlpsd",
+      "owners": [
+        "mlpsd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2066_67-Circular_12-Margin-type-Lending-Underwriting-Non-executive-Directors.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2073_74_Notice-11_Oath_Taking_Related-new.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Circular3.2076-77.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2067_68-Circular_27-Refinance-for-Liquidity-Management-Interbank-Transactions.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/08/Notice_1_Hire_Purchase_Amendmend.pdf",
+      "document_type": "guideline_manual",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2026
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/12/ABC-Circular-no-8.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/10/18-2081-Final-Khata-Rokka-Fukuwa-1st-Ammendment-Publish.pdf",
+      "document_type": "guideline_manual",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/02/circular-no-5-D.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2074_75_Notice-02-Infrastructure_Development_Bank_Licensing_Policy_Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2072_73_For_A__B__C_Class-Circular_15-Earthquake-Refinance-Procedure-Revision-SLR-Account-Opening-new.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/03/Quantitative-Restriction.-Circular.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2066_67-Circular_20-Attachment-of-9.3-ka-4.a.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/04/Circular-25-2078-79.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2075_76_For_D_Class-Circular_03-Attachment_to_Directive_to_Microfinance-FIs_2075.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2067_68-Circular_10-Attachment-Chief-Executives-Remuneration.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/12/FXMD-Circular-17_2078.79.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/12/Circular-6-ABC-Final-Upload.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2071_72_For_A__B__C_Class-Circular_14-regarding-Blacklisting-Branch-Expansion.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/10/FXMD-Circular-10-2078.79.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/05/Circular_5_2078_01_19.pdf",
+      "document_type": "circular",
+      "owner": "psd",
+      "owners": [
+        "psd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2069_70-Circular_04-Amd.-in-Loan-to-risk-taker-Loan-thr.-pvt.-company-Insurance-agent-by-D-Audit-Restriction-to-shareholder.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/10/FXMD-Circular-05-207879_Quantitative-Restriction_Import.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Guidelines-Banking_Service_Fee_Guidelines_2067-2.pdf",
+      "document_type": "guideline_manual",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/07/laghubitta-monetary-policy-1.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2075_76_For_A__B__C_Class-Circular_18-CSR_and_Refinance_Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2065_66-Circular_35-Amendment-in-Point-2-of-Circular-32_065_66.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/List_of_Circular-634.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2015
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/01/ABC-Circular-no-9.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2065_66-Circular_17-Deprived-Sector-Hospital.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/fxm_circular20_20190211.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2069_70-Circular_20-Attachment-CA-Reporting-Form-No.-1-2-3.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2066_67-Circular_13-Mobile-Banking-Service.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2073_74_For_D_Class-Circular_03-Branch-Opening-Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/paripatra20181128.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2018
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/04/FXMD-Circular-19_2079-80.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2065_66-Circular_29-Prohibition-in-own-BFIs-s-Share-Transaction.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2070_71_For_D_Class-Circular_04-Public-Holiday.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2066_67-Circular_03-Monetary-Policy-Consortium-SOLSLRSubsidiaryDeprive-SectorCheque-Transaction-over-50-Laks.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/01/D-Circular-no-4.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Circular-28-2075-76.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2073_74_Notice-07_District_Police_Office_Crime_Investigation_Branch_Kaski_Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2067_68-Circular_05-Attachment-of-Cicular-No-5-067-68.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2076_77_For_A__B__C_Class-Circular_03-Changes_Unified_Directive_2075-new.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2067_68_Notice-3-Account-Block-Release-Circular-through-Website.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2070_71_For_D_Class-Circular_07-Attachment-Unified-Directives-for-D-Class.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2070_71_For_A__B__C_Class-Circular_09-Attachment-Form-No.-15.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2073_74_For_A__B__C_Class-Circular_09-Amendment-_in_Arthik_Punaruddar_Kosh.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2071_72_Notice-05-Bagmati-Safai-Program.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Guidelines-ICAAP-Guidelines-2012-updated-July-2013.pdf",
+      "document_type": "guideline_manual",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2071_72_Notice-02-Amendment-in-AGM-Clearance-Dividend-Approval-Working-Procedure-2069.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2069_70-Circular_13-Representative-Office-Opening-Doc-on-Nepali-Language.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2071_72_For_A__B__C_Class-Circular_30-Post-Earthquake-Facilities-new.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2065_66-Circular_24-Productwise-Credit-Information.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/08/Circular.FCY-Bylaw.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/03/Risk-Management.pdf",
+      "document_type": "circular",
+      "owner": "psd",
+      "owners": [
+        "psd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2071_72_For_D_Class-Circular_06-Regarding-managerial-recruitment.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2072_73_Notice-3-Regular-Session-of-Friday-new.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2067_68-Circular_14-Attachment-Zero-Interest-Loan-Anusuchi.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/10/Nifra-AML-CFT-Circular-03-Final-2081.06.15-2.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/07/Circular-1-For-MFIs-Final.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2076_77_For_D_Class-Circular_03-Directive_to_Microfinance-FIs_2076-new.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2071_72_Notice-06-Earthquake-2015-Impact-Assessment-Notice.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/08/Circular-3-for-ABC-final-merged.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/FXM_PDF_Circular_4_20180819.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2018
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/01/Notice-No.-8-financial-literacy-guidelines.pdf",
+      "document_type": "guideline_manual",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2069_70-Circular_11-Mobile-Banking-Services-1.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/03/Final-Publish_.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2076_77_For_A__B__C_Class-Circular_08-Interest_Subsidy-new.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2072_73_For_A__B__C_Class-Circular_12-Extension-of-Relaxation-in-Credit-Regulation-new.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2071_72_For_A__B__C_Class-Circular_02-Ammendments-on-ECC.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2065_66-Circular_47-Unaudited-and-Audited-Financial-Result.pdf.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/List_of_Circular-639.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2015
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/01/WC-Guidelines-1st-Amendment-upload.pdf",
+      "document_type": "guideline_manual",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2072_73_For_A__B__C_Class-Circular_13-Arthik-Punarudhar-Kosh.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2075_76_For_A__B__C_Class-Circular_11-Margin_Lending_Stock_Broker_Base_Rate_Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/12/FXMD_Circular-13_2079.80.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Policies-Payment_and_Settlement_Bylaw_2072.pdf",
+      "document_type": "guideline_manual",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2071_72_For_D_Class-Circular_08-CRR-Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/07/FXMD_Circular-29_7879.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/11/OMR-Circular-1.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/10/DB-Summary_time-series-data_-2.pdf",
+      "document_type": "circular",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2066_67-Circular_41-Attachment-of-Annex-4a-Addition-in-Unified-12-066-4-CRR.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2070_71_For_A__B__C_Class-Circular_12-Treatment-of-surplus-fund-after-merger.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/10/Unified-Directives-Infrastructure-Development-Bank-2080-1.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2066_67-Notice-Urgent-Notice-of-NRB-to-Non-issuer-of-IPOs.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/11/ABC-circular-6-1.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/12/D-class-final-monetary-policy-first-quarter-review.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2069_70_Notice-02-Amendment-in-NRB-Credit-Information-Bylaw-2059.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/04/NSAP-2.pdf",
+      "document_type": "guideline_manual",
+      "owner": "mlpsd",
+      "owners": [
+        "mlpsd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/circular667.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2017
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/03/Subsidy-loan-template-3.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/09/FXMD-Circular-04-207879_Monetary-Policy.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2072_73_For_D_Class-Circular_03-Cross-Holding-CEO-Appointment-Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2065_66-Circular_28-Report-of-Prom.-Share-Investment-above-Rs.2-m.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2074_75_For_A__B__C_Class-Circular_20-Tourism_Sector_Redefined_Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2064_65-Circular_33-Ownership-Transfer-of-1-or-less-Promoters-Share-without-Prior-Permission-of-NRB.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2066_67-Circular_36-SOL-SLR-Export-Refinance-Licence-Open-for-B-and-D.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2071_72_Notice-04-Provision-related-to-FINGO-Conversion.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    }
+  ],
+  "notes": [
+    "native-3 cohort; population claims from the random stratum only (spec §6.2)",
+    "enriched = circular/guideline_manual ≥2015: the spec's act/rule_bylaw/directive ≥2015 lies wholly inside the withheld production scope (user amendment 2026-10-03, before any network access)"
+  ],
+  "provenance": {
+    "excluded_manifests": [
+      "docs/nrb/phase6a-manifest.json",
+      "docs/nrb/phase6b-routing-holdout.json",
+      "docs/nrb/phase7-validation-cohort.json",
+      "docs/nrb/prod-corpus-scope.json"
+    ]
+  },
+  "requested": 250,
+  "sampler": {
+    "algorithm_version": "nrb-native3-v1",
+    "detector": {
+      "density": 0.001,
+      "min_devanagari": 500
+    },
+    "enriched_sections": [
+      "circular",
+      "guideline_manual"
+    ],
+    "enriched_since": 2015,
+    "exclude_keys_sha256": "1ac32df70f50d7c9352094a3da95c0923838a6801d37e53df2635ccee6c87240",
+    "excluded_sets": [
+      "docs/nrb/phase6a-manifest.json",
+      "docs/nrb/phase6b-routing-holdout.json",
+      "docs/nrb/phase7-validation-cohort.json",
+      "docs/nrb/prod-corpus-scope.json"
+    ],
+    "frame": "nrb_files.resource_type = 'pdf' (the REST claim)",
+    "offset": 250,
+    "seed": "native3-2026-10-02",
+    "sizes": {
+      "enriched": 250,
+      "random": 0
+    },
+    "top_up_rule": {
+      "size": 250,
+      "stratum": "enriched",
+      "threshold_detected": 20
+    }
+  },
+  "seed": "native3-2026-10-02",
+  "selected": 250,
+  "selection_sha256": "00d24c2b3bf3fc8833ca1d018e626ee7b4e098333bf741c496f77f47669ecff8",
+  "shortfall": 0,
+  "strata": [
+    {
+      "requested": 250,
+      "selected": 250,
+      "stratum": "enriched"
+    },
+    {
+      "requested": 0,
+      "selected": 0,
+      "stratum": "random"
+    }
+  ],
+  "version": "manifest-2"
+}
