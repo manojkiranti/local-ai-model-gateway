@@ -109,7 +109,7 @@ def main() -> int:
             records.append({"document_id": row["id"], "sha": sha[:12], "missing": True})
             continue
         record = examine(path, engine, repair=args.repair_report)
-        record |= {"document_id": row["id"], "sha": sha[:12], "title": row["title"],
+        record |= {"document_id": row["id"], "sha": sha[:12], "sha_full": sha, "title": row["title"],
                    "producer": _producer(path)}
         records.append(record)
         if record.get("detection", {}).get("suspect"):
