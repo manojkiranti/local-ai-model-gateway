@@ -71,9 +71,18 @@ def window(lines, index: int) -> tuple[int, int]:
     return start, min(len(lines), start + 8)
 
 
+_PAGES: dict = {}  # path -> native pages; each PDF is parsed once, not once per candidate page
+
+
+def _native_pages(path: Path):
+    if path not in _PAGES:
+        _PAGES[path] = file_documents.read_pdf_pages(path).pages
+    return _PAGES[path]
+
+
 def _texts(engine, sha: str, page: int):
     path = filestore.resolve_path(filestore.storage_key_for(sha, "pdf"))
-    native = file_documents.read_pdf_pages(path).pages[page - 1]
+    native = _native_pages(path)[page - 1]
     out = engine.repair_page(path, page, native)
     return path, native, out
 
@@ -83,6 +92,27 @@ def _render(path: Path, page: int, target: Path) -> Path:
     subprocess.run(["pdftoppm", "-r", "90", "-f", str(page), "-l", str(page), "-png",
                     "-singlefile", str(path), str(target.with_suffix(""))], check=True)
     return target
+
+
+def highlight(text: str, klass: str, bold):
+    """The repaired text with the row's risky letters in bold (CellRichText), or the plain str."""
+    from openpyxl.cell.rich_text import CellRichText, TextBlock
+
+    pattern = {"reph": _REPH, "rakar": _RAKAR, "conjunct": _CONJUNCT}.get(klass)
+    if pattern is None and klass != "prebase":
+        return text
+    extra = 1 if klass == "reph" else 0  # the reph's lookahead consonant is bolded too
+    hits = list(re.finditer("ि", text) if klass == "prebase" else pattern.finditer(text))
+    if not hits:
+        return text
+    blocks, cursor = [], 0
+    for m in hits:
+        blocks.append(text[cursor:m.start()])
+        blocks.append(TextBlock(bold, text[m.start():m.end() + extra]))
+        cursor = m.end() + extra
+    blocks.append(text[cursor:])
+    # never `b != ""`: TextBlock.__eq__ assumes its operand is a TextBlock
+    return CellRichText([b for b in blocks if not (isinstance(b, str) and b == "")])
 
 
 def _candidates(pages, source):
@@ -150,7 +180,6 @@ def main() -> int:
     args = ap.parse_args()
 
     from openpyxl import load_workbook
-    from openpyxl.cell.rich_text import CellRichText, TextBlock
     from openpyxl.cell.text import InlineFont
     from openpyxl.drawing.image import Image
     from openpyxl.styles import Alignment
@@ -200,19 +229,8 @@ def main() -> int:
         ws.cell(r, 8, row["cluster"])
         ws.cell(r, 10, row["native"])
         klass = row["cluster"]
-        pattern = {"reph": _REPH, "rakar": _RAKAR, "conjunct": _CONJUNCT}.get(klass)
         text = row["repaired"]
-        if pattern is not None or klass == "prebase":
-            blocks, cursor = [], 0
-            hits = (re.finditer("ि", text) if klass == "prebase" else pattern.finditer(text))
-            for m in hits:
-                blocks.append(text[cursor:m.start()])
-                blocks.append(TextBlock(bold, text[m.start():m.end() + (1 if klass == "reph" else 0)]))
-                cursor = m.end() + (1 if klass == "reph" else 0)
-            blocks.append(text[cursor:])
-            ws.cell(r, 11).value = CellRichText([b for b in blocks if b != ""])
-        else:
-            ws.cell(r, 11, text)
+        ws.cell(r, 11).value = highlight(text, klass, bold)
         for col in (10, 11):
             ws.cell(r, col).alignment = Alignment(wrap_text=True, vertical="top")
         verdicts.add(ws.cell(r, 12))

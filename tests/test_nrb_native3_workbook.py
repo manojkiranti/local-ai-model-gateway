@@ -61,3 +61,23 @@ def test_a_wrong_words_verdict_with_no_words_is_unanswered_never_correct():
              "repaired": "क " * 400}]
     out = I.score(rows)
     assert out["unanswered"] == 1 and out["passed"] is False
+
+
+def _plain(value):
+    return value if isinstance(value, str) else "".join(
+        b if isinstance(b, str) else b.text for b in value)
+
+
+def test_highlight_builds_rich_text_without_comparing_a_textblock_to_a_str():
+    from openpyxl.cell.rich_text import CellRichText
+    from openpyxl.cell.text import InlineFont
+
+    bold = InlineFont(b=True)
+    for text, klass in (("गर्दा छ", "reph"), ("किताब पढ्छ", "prebase"),
+                        ("प्रकृति", "rakar"), ("क्षेत्र", "conjunct"),
+                        ("िक", "prebase"), ("र्कक", "reph")):  # hit at 0: leading empty string
+        out = WB.highlight(text, klass, bold)
+        assert isinstance(out, CellRichText), (text, klass)
+        assert _plain(out) == text
+    assert WB.highlight("नेपाल", "plain", bold) == "नेपाल"
+    assert WB.highlight("नेपाल", "reph", bold) == "नेपाल"  # class named, no hit
