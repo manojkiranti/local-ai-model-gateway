@@ -58,6 +58,19 @@ a page is **not** re-routed to OCR either — PP-OCRv5 measured worse than
 deterministic conversion on embedded-font pages (§16.6), so that substitution
 would trade a recorded gap for unvalidated text.
 
+**6. A native page the font repair could not fix keeps its native text — a
+deliberate exception to rule 5.** Rule 5 withholds the input of a failed
+CONVERSION because that input is glyph-mapped ASCII: unreadable, noise to
+search. The input here is Unicode Devanagari that is mostly right, and the
+only other source of an Act's text — OCR — loses 28-53% of it. So a page whose
+`native-3` repair did not pass its gate is served exactly as before, now marked
+non-authoritative (`rag._chunk_meta`) so every reader shows the VERIFY caveat.
+Withholding stays the rule everywhere else (spec §5).
+
+`ROUTE_NATIVE` therefore means "the PDF's own text layer — read through its
+embedded font program when its ToUnicode is proven wrong" (spec §2, D1): the
+route never changes, only what the native engine produces.
+
 WHAT THIS MODULE DOES NOT DO
 ----------------------------
 It does not classify (that is `routing.py`), does not persist (`recovery_cache.py`
@@ -85,7 +98,7 @@ from typing import Any, Sequence
 
 from ..files import documents as file_documents
 from ..files import readers
-from . import extraction, legacy_convert, provenance, quality
+from . import extraction, fontrepair, legacy_convert, provenance, quality
 from .legacy_font import LegacyFontConverter
 from .lexicon import Lexicon
 from .ocr import OcrUnavailable, PageOcrEngine
@@ -108,6 +121,7 @@ __all__ = [
     "ROUTE_OCR",
     "RecoveredDocument",
     "convert_unit",
+    "native_unit",
     "ocr_unit",
     "page_routes",
     "plan_document",
@@ -579,6 +593,43 @@ def ocr_unit(
     )
 
 
+def native_unit(
+    number: int,
+    text: str,
+    *,
+    reason: str,
+    path: Path,
+    suspect: bool,
+    repair: Any | None,
+) -> PageText:
+    """One native page: passthrough, or read through its embedded font (native-3).
+
+    `suspect` is the DOCUMENT's detection over its native pages
+    (`fontrepair.detect`), passed in exactly as `document_legacy_ratio` reaches
+    `convert_unit`: the cold path and `recovery_cache`'s refresh compute it
+    from the same pages, so they cannot disagree.
+
+    Never raises. A repair that did not pass its gate — or that raised — keeps
+    the native text (rule 6) and says why in `detail["repair"]`.
+    """
+    if repair is None or not suspect:
+        return PageText(number, ROUTE_NATIVE, reason, text)
+    try:
+        outcome = repair.repair_page(path, number, text)
+    except Exception as exc:  # noqa: BLE001 - a repair bug must not lose the page
+        logger.warning("NRB recovery: native repair of page %d raised (%s)", number, type(exc).__name__)
+        outcome = fontrepair.RepairOutcome(
+            fontrepair.unrepaired(fontrepair.ENGINE_ERROR), text, {"error": type(exc).__name__}
+        )
+    served = outcome.text if outcome.status == fontrepair.STATUS_REPAIRED else text
+    detail = {
+        "repair": outcome.status,
+        "repair_engine": getattr(repair, "version", "unknown"),
+        **outcome.detail,
+    }
+    return PageText(number, ROUTE_NATIVE, reason, served, detail=detail)
+
+
 def _recover_pdf(
     path: Path,
     plan: DocumentPlan,
@@ -587,6 +638,7 @@ def _recover_pdf(
     converter: LegacyFontConverter | None,
     lexicon: Lexicon | None,
     ocr: PageOcrEngine | None,
+    repair: Any | None = None,
 ) -> tuple[tuple[PageText, ...], tuple[str, ...]]:
     """Route a PDF page by page and keep the pages in source order."""
     prov = provenance.read_pdf_provenance(path)
@@ -594,10 +646,15 @@ def _recover_pdf(
     if prov.error:
         warnings.append(f"provenance_unavailable:{prov.error}")
 
+    routes = _routes(prov, plan.reason, pages)
+    detection = fontrepair.detect(
+        [text for text, (route, _) in zip(pages, routes) if route == ROUTE_NATIVE]
+    )
+    if repair is not None and detection.suspect:
+        warnings.append(f"tounicode_suspected:{detection.density:g}")
+
     out: list[PageText] = []
-    for index, (text, (route, why)) in enumerate(
-        zip(pages, _routes(prov, plan.reason, pages)), start=1
-    ):
+    for index, (text, (route, why)) in enumerate(zip(pages, routes), start=1):
         if route == ROUTE_LEGACY:
             out.append(
                 convert_unit(
@@ -608,7 +665,8 @@ def _recover_pdf(
         elif route == ROUTE_OCR:
             out.append(ocr_unit(index, path, reason=why, engine=ocr))
         else:
-            out.append(PageText(index, ROUTE_NATIVE, why, text))
+            out.append(native_unit(index, text, reason=why, path=path,
+                                   suspect=detection.suspect, repair=repair))
     return tuple(out), tuple(warnings)
 
 
@@ -704,6 +762,7 @@ def recover(
     converter: LegacyFontConverter | None = None,
     lexicon: Lexicon | None = None,
     ocr: PageOcrEngine | None = None,
+    repair: Any | None = None,
     pages: Sequence[str] | None = None,
 ) -> RecoveredDocument:
     """Route one classified blob and return its recovered text. NEVER raises.
@@ -722,6 +781,8 @@ def recover(
     Every dependency is injected. The converter is GPL-3 and the OCR engine pulls
     a model stack; passing `None` for either is a supported state that degrades
     to a recorded failure on the affected pages, never to a wrong answer.
+    `repair` (native-3) may be None too — then native pages are passthrough,
+    byte-identical to before.
     """
     path = Path(path)
     plan = plan_document(
@@ -749,7 +810,8 @@ def recover(
                 plan.warnings,
             )
         routed, warnings = _recover_pdf(
-            path, plan, page_texts, converter=converter, lexicon=lexicon, ocr=ocr
+            path, plan, page_texts, converter=converter, lexicon=lexicon, ocr=ocr,
+            repair=repair,
         )
         return RecoveredDocument(
             result.family, plan.plan, plan.reason, plan.gate_ratio, routed, warnings
@@ -792,13 +854,18 @@ def recover(
             except Exception:  # noqa: BLE001 - fall back to the flat text
                 page_texts = None
         if page_texts is not None:
+            detection = fontrepair.detect(page_texts)
+            warnings = plan.warnings
+            if repair is not None and detection.suspect:
+                warnings = (*plan.warnings, f"tounicode_suspected:{detection.density:g}")
             return RecoveredDocument(
                 result.family, plan.plan, plan.reason, plan.gate_ratio,
                 tuple(
-                    PageText(i, ROUTE_NATIVE, plan.reason, text)
+                    native_unit(i, text, reason=plan.reason, path=path,
+                                suspect=detection.suspect, repair=repair)
                     for i, text in enumerate(page_texts, start=1)
                 ),
-                plan.warnings,
+                warnings,
             )
     return RecoveredDocument(
         result.family, plan.plan, plan.reason, plan.gate_ratio,

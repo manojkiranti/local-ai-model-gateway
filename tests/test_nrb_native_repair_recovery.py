@@ -52,3 +52,95 @@ def test_page_routes_agree_with_what_recover_routes(tmp_path):
     pages = ["g]kfn /fi6« a}+s " * 5, "", "g]kfn /fi6« a}+s " * 5]
     routes = recovery.page_routes(path, plan, pages)
     assert [r for r, _ in routes] == [recovery.ROUTE_LEGACY, recovery.ROUTE_OCR, recovery.ROUTE_LEGACY]
+
+
+from pathlib import Path  # noqa: E402
+
+from app.files import documents as file_documents  # noqa: E402
+from app.nrb import fontrepair  # noqa: E402
+
+uharfbuzz = pytest.importorskip("uharfbuzz")
+from tests import nrb_font_pdf as W  # noqa: E402
+
+LOHIT = W.LOHIT.read_bytes()
+
+
+class StubRepair:
+    """A repair engine that records calls and answers what it is told to."""
+
+    def __init__(self, status=fontrepair.STATUS_REPAIRED, text="REPAIRED", raises=None):
+        self.version = "native-3/stub"
+        self.status, self.text, self.raises = status, text, raises
+        self.calls: list[int] = []
+
+    def repair_page(self, path, page_number, native_text):
+        self.calls.append(page_number)
+        if self.raises:
+            raise self.raises
+        return fontrepair.RepairOutcome(self.status, self.text, {"runs": 1, "runs_matched": 1})
+
+
+def _classified(path: Path):
+    return extraction.extract_file(path, family="pdf", extension="pdf", extractor_version="native-2")
+
+
+def test_without_a_repair_engine_recovery_is_byte_identical(tmp_path):
+    path = W.word_pdf(tmp_path, LOHIT)
+    doc = recovery.recover(path, _classified(path))
+    assert [p.text for p in doc.pages] == list(file_documents.read_pdf_pages(path).pages)
+    assert all(p.detail == {} for p in doc.pages)
+    assert not any(w.startswith("tounicode_suspected") for w in doc.warnings)
+
+
+def test_a_detected_document_is_repaired_with_the_real_engine(tmp_path):
+    path = W.word_pdf(tmp_path, LOHIT)
+    doc = recovery.recover(path, _classified(path), repair=fontrepair.FontRepairEngine())
+    page = doc.pages[0]
+    assert page.route == recovery.ROUTE_NATIVE and page.ok and page.indexable
+    assert page.detail["repair"] == fontrepair.STATUS_REPAIRED
+    assert [l.strip() for l in page.text.splitlines() if l.strip()] == list(W.LINES) * W.REPEAT
+    assert any(w.startswith("tounicode_suspected:") for w in doc.warnings)
+
+
+def test_an_undetected_document_never_calls_the_engine(tmp_path):
+    """Too little Devanagari to judge (N=500): the engine is not consulted."""
+    path = W.word_pdf(tmp_path, LOHIT, repeat=1)
+    stub = StubRepair()
+    doc = recovery.recover(path, _classified(path), repair=stub)
+    assert stub.calls == []
+    assert doc.pages[0].text == file_documents.read_pdf_pages(path).pages[0]
+
+
+def test_an_unrepaired_page_keeps_its_native_text_and_stays_indexable(tmp_path):
+    """Rule 6 — the deliberate exception to rule 5 (spec §5.1)."""
+    path = W.word_pdf(tmp_path, LOHIT)
+    stub = StubRepair(status=fontrepair.unrepaired(fontrepair.COVERAGE), text="MUST NOT APPEAR")
+    page = recovery.recover(path, _classified(path), repair=stub).pages[0]
+    assert page.text == file_documents.read_pdf_pages(path).pages[0]
+    assert page.indexable
+    assert page.detail["repair"] == "unrepaired:coverage"
+    assert page.detail["repair_engine"] == "native-3/stub"
+
+
+def test_a_failed_legacy_conversion_still_withholds():
+    """Rule 6's other half: rule 5 is unchanged for the converter."""
+    page = recovery.convert_unit(1, "g]kfn /fi6« a}+s", reason="embedded_font",
+                                 converter=None, lexicon=None, document_legacy_ratio=1.0)
+    assert page.ok is False and page.text == ""
+
+
+def test_a_repair_engine_that_raises_keeps_the_native_text(tmp_path):
+    """Review Focus 3."""
+    path = W.word_pdf(tmp_path, LOHIT)
+    stub = StubRepair(raises=RuntimeError("boom"))
+    page = recovery.recover(path, _classified(path), repair=stub).pages[0]
+    assert page.text == file_documents.read_pdf_pages(path).pages[0]
+    assert page.detail["repair"] == fontrepair.unrepaired(fontrepair.ENGINE_ERROR)
+
+
+def test_native_unit_without_suspicion_is_plain_passthrough(tmp_path):
+    stub = StubRepair()
+    page = recovery.native_unit(3, "पाठ", reason="clean", path=tmp_path / "x.pdf",
+                                suspect=False, repair=stub)
+    assert (page.route, page.reason, page.text, page.detail) == (recovery.ROUTE_NATIVE, "clean", "पाठ", {})
+    assert stub.calls == []
