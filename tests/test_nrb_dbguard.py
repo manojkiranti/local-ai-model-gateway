@@ -172,6 +172,7 @@ EVIDENCE = [
     "nrb_build_lexicon.py", "nrb_holdout_evidence.py", "nrb_holdout_validate.py",
     "nrb_legacy_eval.py", "nrb_native2_compare.py", "nrb_p7_cohort.py",
     "nrb_rag_ingest.py", "nrb_supersession_exercise.py", "nrb_native3_cohort.py",
+    "nrb_native3_evidence.py",
 ]
 
 
