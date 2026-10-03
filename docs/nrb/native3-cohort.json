@@ -1,0 +1,5582 @@
+{
+  "algorithm_version": "nrb-native3-v1",
+  "catalog_counts": {
+    "active_sources": 18577,
+    "blocked_files": 600,
+    "duplicate_comparison_keys": 0,
+    "duplicate_source_identities": 0,
+    "files": 18266,
+    "inactive_sources": 0,
+    "relationships": 18308,
+    "rest_sources": 18380,
+    "sitemap_only_sources": 197,
+    "sources": 18577,
+    "untyped_sources": 5418
+  },
+  "diagnostics": {},
+  "drawn_at": "2026-10-03T10:38:45+05:45",
+  "entries": [
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2073_74_For_A__B__C_Class-Circular_16-CCD_Ratio_Monitoring__Penalty_Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2072_73_For_D_Class-Circular_01-Attachment-to-Directives-to-Microfinance-FIs-2072.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2074_75_For_A__B__C_Class-Circular_22-Guideline_on_Environmental__Social_Risk_Management_for_Banks_and_Financial_Institutions_Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2068_69-Circular_33-Attachment-Unified-Directives-2069.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2066_67-Circular_04-Withdrawal-of-Action-against-2-Willful-Defaulters.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2066_67-Circular_28-Withdrawal-of-Action-against-6-Willful-Defaulters.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2068_69-Circular_22-Agri-Hydro-lending-Form-No.-3-9.3-Zero-interest-Loan-Agri-Refinance.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/fxm_circulars_2075_02_15.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2018
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2068_69-Circular_05-Attachment-Form-No.-9.1-9.2-9.3ka-9.12-9.16-9.17-9.18-9.19-9.20-2.1.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2070_71_For_D_Class-Circular_05-Foreign-Shareholding-related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2074_75_Notice-05-Cheque_Clearing_during_Dashain_Festival_Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2063_64-Circular_02-Implementation-of-Monetary-Policy.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2065_66-Circular_22-Amendment-in-Cir.35-64-65-Interbank.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/01/mfi-UD-18-Upload.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2071_72_For_D_Class-Circular_09-Post-Earthquke-Facilities-new.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2074_75_For_D_Class-Circular_03-Investment_Adjustment_Reserve_Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2071_72_For_A__B__C_Class-Circular_17-Loan-classification-amendment-to-consumer-protection-and-other.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2063_64-Circular_03_to_7.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/04/IMG_20210419_0001.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2065_66-Circular_13-Excess-Shareholding-Bank-Guarantee-Low-Cost-Housing-Microcredit.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/05/circular-No-9-1.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/List_of_Circular-664.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2016
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2075_76_For_A__B__C_Class-Circular_20-Dormant_Account_-and_-Deprived_Sector_Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2068_69-Circular_10-Withdrawal-of-Action-against-a-Willful-Defaulter.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/07/Circular-1-2080-2081.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Guidelines-Nepal_ECC_Rules_Book_2015.pdf",
+      "document_type": "guideline_manual",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2065_66-Circular_50-D-51-pc-Prom.-Right-Sh-B-and-C-ATM.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/07/Circular-1-ABC-Final-Upload.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2063_64-Circular_23-Lending-for-IPO-Application.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2075_76_Notice-13-Bank_Branch__Counter_Opening_Related-new.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/FXM_Circular20181225.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2018
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/fxm_circular20190515.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2074_75_For_D_Class-Circular_5-Receipt_of_Gifts__International_Visit_Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2066_67-Circular_08-Subsidiary-Company-for-Deprived-Sector-Lending.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/1_75-76_2075-4-4_Edible_Gold.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2018
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2070_71_For_A__B__C_Class-Circular_18-Stress-Testing-Call-Account-for-B-C.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/07/Circular-1-NIFRA-Upload.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2063_64-Circular_26-Prize-based-Deposit-Scheme.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/02/Circular-no-8-ABC.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2071_72_For_A__B__C_Class-Circular_21-Non-MICR-Cheque-Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2063_64-Circular_08-No-RightBonus-Cash-to-Blacklisted.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2067_68-Circular_16-Correspondence-by-Non-executive-chairman.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2068_69-Circular_25-CCD-Ratio-LCY-Loan-Grant-FCY-transaction-Loan-purchase-Sick-Ind-desk-Fees-for-Operating-Account.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/11/FXMD-Circular-12_2078-79.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2075_76_Notice-01-One_Employee_One_Fruit_Plantation_Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/03/FXMD-Circular-17-2079.80-1.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2064_65-Circular_39-CRR-due-to-Republic-Declaration-.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/2076_77_For_A__B__C_Class-Circular_10-Attachment_To_NRB_Refinance_Procedure_related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2074_75_Notice-11_Rural_Area_for_Subsidized_Interest_Agriculture_Loan_Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2076_77_For_A__B__C_Class-Circular_01-Attachement_Guideline_on_Recognition_of_Interest_Income_2019-new.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/10/NIFRA-4-Published.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2072_73_For_A__B__C_Class-Circular_11-Attachment-New-Capital-Adequacy-Framework-2015-new.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2072_73_For_D_Class-Circular_8-Extension-of-Relaxation-in-Credit-Regulation-new.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2063_64-Circular_28-Business-Capital-Plan.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2071_72_Notice-03-NFRS-Migration-Guidelines-to-BFIs.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2076_77_For_A__B__C_Class-Circular_01-Interest_Income_Recognition_Related-new.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2069_70_Notice-07-Suggestions-for-Sick-Industry-Refinance-Procedures-2070.pdf.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/12/Circular-No-4ABC-Directive-no-19-related-1.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2073_74_For_A__B__C_Class-Circular_05-CRR_Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Ammedment-of-directive-5_075.pdf",
+      "document_type": "circular",
+      "owner": "psd",
+      "owners": [
+        "psd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2070_71_For_A__B__C_Class-Circular_25-Regulations-related-to-FATCA.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2070_71_For_A__B__C_Class-Circular_03-FCY-Derivatives.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/07/Financial-Literacy-Guideline-2022.pdf",
+      "document_type": "guideline_manual",
+      "owner": "ficpd",
+      "owners": [
+        "ficpd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2076_77_For_A__B__C_Class-Circular_03-Attachment_Amendment_to_Unified_Directive_2075-new.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2067_68-Circular_03-Attachment-Risk-Management-Guidelines.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2067_68-Circular_26-ECC-Rule-Book-ECC-Operating-Rule-Cheque-Standard-Specifications.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2071_72_For_D_Class-Circular_01-Zero-interest-rate-and-lending-limit.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2072_73_For_D_Class-Circular_9-Earthquake-Refinance-Procedure-Revision-new.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2074_75_Notice-18-BOD_CEO_Qualification_Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2069_70-Circular_09-Credit-information-working-area-exp.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2069_70-Circular_23-Attachment-Amendments-in-Unified-Directives-2070.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2065_66-Circular_26-Record-of-Home-Loan-above-Rs-1-million.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/02/Circular-No-4-NIFRA.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2068_69-Circular_08-Promoter-Share-Balance-Certificate-Ads-Inv.-Equilisation-Reserve-CCTV-Deprive-Sector-Lending.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2067_68-Circular_15-Blacklisting-Interest-Rate-Disclosure-Deposit-Insurance-Data.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/List_of_Circular-641.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2015
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2071_72_For_A__B__C_Class-Circular_26-Earthquake-Relief-Refinance-Procedure-2072.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2065_66-Circular_15-CRR.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2075_76_Notice-10-Bank_Branch__Counter_Opening_Related-new.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/fxm_cricular_120190120.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2071_72_For_A__B__C_Class-Circular_16-Tenure-Credit-to-Managerial-Level-Equity-Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2066_67-Circular_50-Attachment-of-Unified_Directives_-2067.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2066_67-Circular_45-Addition-in-Merchant-Banking-BOD-of-Subsidiary-Credit-to-Organized-Promoter-of-Class-D.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/List_of_Circular-654.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2016
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/UC-Ammendments-Details.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2074_75_For_A__B__C_Class-Circular_18-Branch_Expansion_at_every_Local_Body_Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2075_76_For_D_Class-Circular_03-Directive_to_Microfinance_FIs_2075.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2075_76_For_A__B__C_Class-Circular_19-Interim_Financial_Report.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2073_74_For_A__B__C_Class-Circular_20-Interest_Rate_LTV_Deprived_Sector__Account_Payee_Cheque__Related-new.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2076_77_Notice-09-Supervisory_Information_System_Related-new.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2071_72_For_A__B__C_Class-Circular_08-Cash-Dividend-for-tax-purpose-CRR-for-Dashain-Holiday.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2075_76_For_A__B__C_Class-Circular_05-Earthquake_Loan_Interest_Subsidy_Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2067_68-Circular_32-Attachment-2-Unified-Directives-2068.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2072_73_For_D_Class-Circular_9-Earthquake-Refinance-Procedure-Revision.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2072_73_For_A__B__C_Class-Circular_10-CRR-Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/11/सहुलियतपूर्ण-कर्जाका-लागि-ब्याज-अनुदान-सम्बन्धी.pdf",
+      "document_type": "guideline_manual",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2068_69-Circular_18-Credit-Purchase-against-interbank-lending-Permission-to-be-obtained-for-Branch-of-D-Class.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Circular-30-Harmonic-Code-Change-Correction.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2066_67-Circular_34-Opening-of-Foreign-Branch-by-Commercial-Bank.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2073_74_For_A__B__C_Class-Circular_21-Consortium_of_Loan_to_MFIs_related-new.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/07/FXMD-CIRCULAR-20-2079-80..pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/08/TFS-Guidelines-for-Payment-Service-Providers.pdf",
+      "document_type": "guideline_manual",
+      "owner": "mlpsd",
+      "owners": [
+        "mlpsd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2069_70-Circular_11-Attachment-Cheque-Standards-and-Specifications.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2073_74_For_A__B__C_Class-Circular_07-Unified_Directives_2073.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2068_69-Circular_20-Time-Extension-for-Interest-bearing-Account-Bank-CEO-Salary.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2076_77_For_Non_Bank_FI-Circular_01-new.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2063_64-Circular_11-At-Least-10-pc-of-Paidup-Capital-in-CAF.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2068_69-Circular_23-Withdrawal-of-Action-against-a-Willful-Defaulter.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2069_70-Circular_18-Capital-Charge-RWA-for-Operational-Risk.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/09/Unified-directives-2077-with-cover.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2074_75_Notice-10-Hire_Purchase_Loan_Providing_Company_Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2067_68-Circular_32-Unified-Directives-2068.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2071_72_For_A__B__C_Class-Circular_10-Attachement-Yuva-Krishi-Karja-Karyabidhi.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2068_69-Circular_04-Restructuring-and-Provisioning-CRR-penalty-Prohibiting-Opening-Deposit-Account-Reporitng-NGOs.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2075_76_For_A__B__C_Class-Circular_07-Increment_in_Deposit_Gurantee_Limit.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/05/Financial-Inclusion-Policy-2081.pdf",
+      "document_type": "guideline_manual",
+      "owner": "ficpd",
+      "owners": [
+        "ficpd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2074_75_For_D_Class-Circular_02-Directive_to_Microfinance_FIs_2074.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2074_75_Notice-22_Payment_from_Nepal_Government_Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/03/Financial-Literacy-Guideline-2022.pdf",
+      "document_type": "guideline_manual",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2073_74_Notice-02_Postponement_of_new_licencing_for_D_class_financial_institution.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2068_69_Notice-Attachment-Appilication-Form-for-Listing-of-Management-Team.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2067_68-Circular_12-Promoter-Share-CRRWithhelding-Point-8-of-Circular-no.-6.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/07/Circular01-2077-78.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/03/IMG_20210303_0001.pdf",
+      "document_type": "circular",
+      "owner": "psd",
+      "owners": [
+        "psd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2068_69_Notice-01-Attachment.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2065_66-Circular_51-Withdrawal-of-Action-against-3-Willful-Defaulters.pdf.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/02/ABC-circular-no-10.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2069_70-Circular_22-Attachment-Directives-to-Microfinance-FIs-2070-Main-Provisions.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Licensing_Policy_in_English-2016.pdf",
+      "document_type": "guideline_manual",
+      "owner": "ofg",
+      "owners": [
+        "ofg",
+        "psd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2068_69-Circular_33-Attachment-Amendments-in-Unified-Directives-2068.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/Circular.pdf",
+      "document_type": "circular",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2073_74_For_D_Class-Circular_04-Attachment_to_Directives_to_Microfinance_FIs_2073.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2069_70-Circular_22-Attachment-Amendments-of-Directives-to-Microfinance-FIs.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2072_73_For_A__B__C_Class-Circular_09-Contingency-Management-Framework-Multiple-Banking-and-Deprived-sector-Related-new.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/List_of_Circular-655.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2016
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2068_69-Circular_05-Attachment-Amended-Directive-No.-9.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2074_75_For_A__B__C_Class-Circular_11-Minimum_Capital_of_One_District_FIs.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2076_77_For_A__B__C_Class-Circular_04-Amendment_to_Unified_Directive_2075-new.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2065_66-Circular_09-Electronic-Payment.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/03/Customer-Right-Protection.pdf",
+      "document_type": "circular",
+      "owner": "psd",
+      "owners": [
+        "psd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2073_74_Notice-17-Delisting_of_List_of_Approved_Auditors-new.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2071_72_For_D_Class-Circular_03-CRR-for-Dashain-Holiday.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2070_71_For_A__B__C_Class-Circular_10-ECC-Revised.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2066_67-Circular_02-Attachment-Amd-in-Annex-4.30.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2071_72_For_A__B__C_Class-Circular_11-Addition-in-Promoters-Share-Foreign-Investment.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2067_68-Circular_24-Promoter-Share.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2075_76_For_A__B__C_Class-Circular_02-Extension_of_time_for_Interim_Financial_Reporting.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/Problem_Bank_Resolution_Framework.pdf",
+      "document_type": "guideline_manual",
+      "owner": "pbrd",
+      "owners": [
+        "pbrd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/05/ECL_finalReport.pdf",
+      "document_type": "guideline_manual",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2074_75_For_A__B__C_Class-Circular_22-Attachment_to_Guideline_on_Environmental__Social_Risk_Management_for_Banks_and_Financial_Institutions_Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2065_66-Circular_38-CIAA-Governance.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2072_73_Notice-3-Regular-Session-of-Friday.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/List_of_Circular-658.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2016
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2063_64-Circular_14-Attachment-Tables.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2073_74_For_A__B__C_Class-Circular_06-Branch_Opening_Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/06/Nirdeshan20801.pdf",
+      "document_type": "circular",
+      "owner": "psd",
+      "owners": [
+        "psd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2075_76_For_D_Class-Circular_10-Relaxation_For_Flood_Related-new.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2075_76_For_A__B__C_Class-Circular_19-Attachment_to_Interim_Financial_Report.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Policies-Licensing_Policy_for_Foreign_Banks_Branch.pdf",
+      "document_type": "guideline_manual",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2072_73_Notice-1-Non-inclusion-of-Preference-Share-in-Paid-up-Capital-new.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/02/New_Capital_Adequacy_Framework_NCAF-FAQ_on_NRB_New_Capital_Adequacy_Framework_NCAF.pdf",
+      "document_type": "guideline_manual",
+      "owner": "dbs",
+      "owners": [
+        "dbs"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2072_73_For_A__B__C_Class-Circular_15-Earthquake-Refinance-Procedure-Revision-SLR-Account-Opening.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2068_69-Circular_32-Attachment-E-banking-Services.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Policy-Micro-Finance-Policy-2064.pdf",
+      "document_type": "guideline_manual",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2070_71_For_A__B__C_Class-Circular_23-Attachment-on-Sick-industries.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/08/FXMD-Circular-03-207879_Monetary-Policy.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2073_74_For_A__B__C_Class-Circular_01-Attachment_Addition-Amendments_to_Unified_Directives_2072__Guidelines.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/07/FXMD-Circular-02-2079-80.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2070_71_For_A__B__C_Class-Circular_05-Cheque-Clearing-Payment-Subsidiary-Company-Governance-related-CRR-SLR.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/fxm_circular20190122.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/08/D-Circular-no-2-1.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/10/FXMD-Circular-06-207879-Standby-LC-and-FCY-Loan-Abroad.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/08/Cyber-Resilience-Guidelines-2023.pdf",
+      "document_type": "circular",
+      "owner": "psd",
+      "owners": [
+        "psd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2066_67-Circular_14-Work-Permit-for-foreign-Nationals.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2073_74_For_A__B__C_Class-Circular_14-Technical_Service_-Agreement.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2063_64-Circular_25-Minimum-Paid-Up-Capital.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2067_68-Circular_05-Attachment-of-Cicular-No-5-067-68-NRB-Form-No.9.9.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2073_74_Notice-06_Consultative_Docoment_on_Interest_Rate.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Manuals-RSRF-Credit-Manual-Nepali-2069.pdf",
+      "document_type": "guideline_manual",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2075_76_Notice-06-Information_of_Interest_Subsidized_Loan.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/04/NSAP-1.pdf",
+      "document_type": "guideline_manual",
+      "owner": "mlpsd",
+      "owners": [
+        "mlpsd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2071_72_For_A__B__C_Class-Circular_01-Cash-Reserve-Ratio.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2075_76_For_A__B__C_Class-Circular_15-Credit_Information_Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2068_69-Circular_11-Attachment-Nepal-ECC-Operating-Rules.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2075_76_For_A__B__C_Class-Circular_17-Pre_Approval_Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/10/Notice-5-Merger-and-acquisition-bylaws-2073-Fifth-Amendment-2079.pdf",
+      "document_type": "guideline_manual",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/10/Circular-No-1-081-82.pdf",
+      "document_type": "circular",
+      "owner": "psd",
+      "owners": [
+        "psd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/List_of_Circular-643.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2015
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2075_76_For_Infrastructure_Development_Bank-Circular_01-Directive_to_Infrastructure_Development_Bank-new.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/04/NSAP-3.pdf",
+      "document_type": "guideline_manual",
+      "owner": "mlpsd",
+      "owners": [
+        "mlpsd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2072_73_For_D_Class-Circular_8-Extension-of-Relaxation-in-Credit-Regulation.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/08/ABC-Circular-no-2.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/08/NIFRA-Circular-WCG-1.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/09/ABC-Circular-no-3.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2066_67-Circular_46-Revision-in-Directive-no.-34569101516-and-20-of-Unified-Directives-2066.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/FXMD_03_20740323.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2017
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/FXM-Circular-11-20181006.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2018
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/07/Nepal-Rastra-Bank-Refinance-Procedure-2077.pdf",
+      "document_type": "guideline_manual",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/List_of_Circular-645.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2015
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2071_72_Notice-07-Consultative-Guideline-for-Reconstruction-Refinance-DRAFT.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/Circular9-2076-77.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2076_77_For_A__B__C_Class-Circular_05-Unified_Directive_2076-new.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/07/FXMD-Circular-03-2079-80.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2065_66-Circular_30-pp-seizure_2nd-list.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/03/Circular_20781118.pdf",
+      "document_type": "circular",
+      "owner": "psd",
+      "owners": [
+        "psd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2068_69-Circular_11-Attachment-Nepal-ECC-Rules-Book.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2072_73_For_A__B__C_Class-Circular_03-Branch-SLR-Refinance-Productive-Sector-Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/07/भुक्तानीसम्बन्धी-कार्य-गर्ने-संस्थालाई-प्रदान-गरिने-अनुमति-नीति-प्रथम-संशोधन-२०८०-२०७९.pdf",
+      "document_type": "guideline_manual",
+      "owner": "psd",
+      "owners": [
+        "psd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2068_69-Circular_14-Repeal-of-Liquidity-Management-Refinance.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/11/PSOPSP-Paripatra.pdf",
+      "document_type": "circular",
+      "owner": "psd",
+      "owners": [
+        "psd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/fxm_circular20190510.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2067_68-Circular_23-Attachment-Upgradation-Directives.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2070_71_For_D_Class-Circular_02-Branch-Provision-Zero-Interest-Loan.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2075_76_For_D_Class-Circular_04-Increment_in_Deposit_Gurantee_Limit.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2073_74_For_A__B__C_Class-Circular_12-Supreme_Court_Direction.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2070_71_For_A__B__C_Class-Circular_28-Attachment-Unified-Directives-2071-NEW.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2068_69-Circular_28-Share-Investment-in-D-Class-Inst..pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/01/Nifra.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/psd_circular20190524.pdf",
+      "document_type": "circular",
+      "owner": "psd",
+      "owners": [
+        "psd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/09/FXMD-08-2079-80-Circular.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/07/Circular.pdf",
+      "document_type": "circular",
+      "owner": "psd",
+      "owners": [
+        "psd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/01/FXMD-Circular-18-Unified-Circular-2078-1.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2073_74_Notice-01_Payment_System_Department_Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2070_71_Notice-04-Refinance-Grievances.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/08/FXMD-Circular-02-207879_Education-tax.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/08/नेपाल-राष्ट्र-बैंक-विदेशी-विनिमय-कारोवार-इजाजतपत्र-तथा-निरीक्षण-विनियमावली-२०७७.pdf.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/ofg_other_policies20190121.pdf",
+      "document_type": "guideline_manual",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2068_69-Circular_17-Attachment-TOR-for-Sub-committee.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/List_of_Circular-662.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2016
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2075_76_For_D_Class-Circular_06-Expansion_of_Work_Area.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/01/FXMD-Circular-14_2079.80.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2076_77_For_D_Class-Circular_05-Amendment_in_Interest_Subsidy-new.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/10/Stress-Testing-2023.pdf",
+      "document_type": "guideline_manual",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2069_70-Circular_08-Attachment-Base-Rate-Anusuchi.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2070_71_For_A__B__C_Class-Circular_20-Limited-Banking-Outlets-Local-Remitance.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2069_70_Notice-03-Amendment-in-Merger-Bylaw-2068.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2072_73_For_A__B__C_Class-Circular_08-Branch_Counter-Opening-during-Dipawali-Chhatha-Festival-Holiday.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2067_68-Circular_31-Revision-on-Real-Estate-Loan-and-Margin-Type-Lending.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2067_68-Circular_26-Attachment-Nepal-ECC-Operating-Rules.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2069_70-Circular_22-Attachment-Directives-to-Microfinance-FIs-2070-Annex.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/01/सूचना-नं-०५-२०७८-७९-कोभिडसँग-सम्बन्धित-सूचना-1.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2066_67-Circular_46-Attachment-of-Cicular-46-066-67.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/psd_circular20190201.pdf",
+      "document_type": "circular",
+      "owner": "psd",
+      "owners": [
+        "psd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/09/FXMD-07-2079-80.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/10/FXMD-Circular-10-2079-80.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/List_of_Circular-666.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2017
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/06/Final-Book-Upload-2083-02-26.pdf",
+      "document_type": "guideline_manual",
+      "owner": "psd",
+      "owners": [
+        "psd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2026
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/04/Circular-7-D-Unified-Directives.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/06/Guidelines-on-the-Regulatory-Sandbox-1.pdf",
+      "document_type": "guideline_manual",
+      "owner": "psd",
+      "owners": [
+        "psd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2026
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2074_75_Notice-01-Qualification_of_Directors__CEO_Bylaws_Related.pdf",
+      "document_type": "circular",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "enriched",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/05/Monetary-Operation-Report-FY-2080-81_2081-02-16.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/01/Lilam-Suchana.pdf",
+      "document_type": "notice",
+      "owner": "dhn",
+      "owners": [
+        "dhn"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/09/Standing-Deposit-facility-upto2082.05.31.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/02/Current_Macroeconomic_Situation_English-2010-09_Text_Based-on-First-Months-data-of-2010-11.pdf",
+      "document_type": "statistics",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2010
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2071_72_Account-Block-l-Release-l-Information-124-CWE-Global-Capital-J.V..pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2072_73_Account-Block-l-Release-l-Information-120-Chaina-Town-Restaurant.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2075_76_Account-Block-l-Release-l-Information-286-Matthu-Rawan-and-Others-Jilla-Prahari-Karyalaya-Pokhara.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2070_71_Account-Block-l-Release-l-Information-125-Shiv-Kumar-Agrawal-Related.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2075_76_Account-Block-l-Release-l-Information-689-Dhital-Builders-Others-IRO-Nepalgunj-Others.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2074_75_Account-Block-l-Release-l-Information-685-Ram-Prasad-Adhikari-SametDPO-Surkhet.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Current_Macroeconomic_Situation_English-2071-11_Text_Based_on_Six_Months_Data_of_2071-72-2.pdf",
+      "document_type": "statistics",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/11/Press_Release_2077_07_16_Interaction-1.pdf",
+      "document_type": "media",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2074_75_Account-Block-l-Release-l-Information-503-Diked-International-Pvt-Ltd-TSO-Maharajganj.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/06/Deposit-Collection-Result-Update-FY-2082-83-upto-2083-03-12.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2026
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/03/Auction_Notices-2080-11-21.pdf",
+      "document_type": "notice",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/CMEs-Two-Months-English-2076-77-final-compilation.pdf",
+      "document_type": "statistics",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Ownership_Structure_of_Government_Securities-2070-04Shaun.pdf",
+      "document_type": "report",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/07/IES-7879Q4_Final-4.pdf",
+      "document_type": "notice",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/NRB_News_in_Nepali-Year_32_Issue-09.pdf",
+      "document_type": "publication",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/01/FIU-Nepal-Annual-Report-2022.23-1.pdf",
+      "document_type": "notice",
+      "owner": "fiu",
+      "owners": [
+        "fiu"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2_Summary_Results-Reverse_Repo_-FY-072-73-upto-073-01-15-New.pdf",
+      "document_type": "untyped",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/04/Overnight-Repo-Update-FY-2078-79-upto-2079-01-05.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/06/4_Auction_Notices-2077-03-01.pdf",
+      "document_type": "notice",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/in_English-2007-08.pdf",
+      "document_type": "untyped",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2074_75_Account-Block-l-Release-l-Information-554-Sanjaya-Bdr-Raut-Others-DPO-Morang.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2072_73_Account-Block-l-Release-l-Information-118-Dakshinkali-Enterprises.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Nepal_Rastra_Bank_Chaitra_Ank-2072.pdf",
+      "document_type": "publication",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2072_73_Account-Block-l-Release-l-Information-215-Rabin-Kumar-Sharma.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/06/2017-Development-of-a-Macroeconomic-Model-for-Economic-Forecasting.pdf",
+      "document_type": "report",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2075_76_Account-Block-l-Release-l-Information-293-Saroj-Koirala-and-Others-CIAA.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/lists_of_suppliers_206904231.pdf",
+      "document_type": "notice",
+      "owner": "gsd",
+      "owners": [
+        "gsd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/RFP_response_cancellation_notice_20720520.pdf",
+      "document_type": "procurement",
+      "owner": "gsd",
+      "owners": [
+        "gsd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/02/Exam_schedule_NRB_Final1.pdf",
+      "document_type": "notice",
+      "owner": "hrm",
+      "owners": [
+        "hrm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2026
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/12/1.-DC_Issue-Notice-2080.09.08.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2068_69_Account-Block-l-Release-l-Information-265-Thum-Bahadur-Chand.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/08/2080.03-monthly-finall-1.pdf",
+      "document_type": "report",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/09/10.DC_-NOtice2081.05.26.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/06/bid-notice.pdf",
+      "document_type": "notice",
+      "owner": "fmd",
+      "owners": [
+        "fmd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/11/Monetary-Operation-Report-FY-2080-81_2080-08-14.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2069_70_Account-Block-l-Release-l-Information-213-Everest-Ice-cream-Pvt.-Ltd..pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Current_Macroeconomic_Situation_Nepali-2060-09-Poush.pdf",
+      "document_type": "statistics",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/02/Auction_Notices-2080-10-29-1.pdf",
+      "document_type": "notice",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/notice20721201.pdf",
+      "document_type": "procurement",
+      "owner": "gsd",
+      "owners": [
+        "gsd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/10/Overnight-Repo-Update-FY-2079-80-upto-2079-07-14.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/11/Notice.pdf",
+      "document_type": "notice",
+      "owner": "fmd",
+      "owners": [
+        "fmd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Press_Release-Governor_Research_Advisers_meet.pdf",
+      "document_type": "media",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2076_77_Account-Block-l-Release-l-Information-103-Dinesh-Rai-Others-Rokka-Fukuwa-MPP-IRO-Tripureshwor.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2070_71_Account-Block-l-Release-l-Information-224-Niraj-Kumar-Surana.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Press_Release-Governor_Dr_Khatiwada_visited_MEDEP_Projects_in_Western_Nepal-1.pdf",
+      "document_type": "media",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Sources_And_Uses_Of_Funds_of_Commercial_Banks-2007-08_Mid_Aug.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/nrbdhn_20760727.pdf",
+      "document_type": "procurement",
+      "owner": "gsd",
+      "owners": [
+        "gsd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2075_76_Account-Block-l-Release-l-Information-271-Gita-Nepal-and-others-Mahanagariya-Prahari-Parisar-and-others.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/10/Notice-Mirmire2082-06-27.pdf",
+      "document_type": "notice",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/08/FY-2078-079-upto78.04.26.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2074_75_Account-Block-l-Release-l-Information-435-Ram-Bdr-Moktan-MPP-Teku.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2076_77_Account-Block-l-Release-l-Information-007-Chitwan-Supply-Center-Others-Various-IROs.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/4_Issue_Notices-2073-04-10-New.pdf",
+      "document_type": "untyped",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Sources_And_Uses_Of_Funds_of_Commercial_Banks-2065-10-Mid-February-2009.pdf",
+      "document_type": "statistics",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/07/2081.04.13_Notice-with-Swap-Bylaw.pdf",
+      "document_type": "notice",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/07/Monetary-Operation-Report-FY-2081-82_2081-04-02.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/4_Auction-Notice_IRC-2074-07-29-1500-Crore.pdf",
+      "document_type": "untyped",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2070_71_Account-Block-l-Release-l-Information-195-Bhim-Prakash-Rokka-Magar.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Current_Macroeconomic_Situation_Nepali-2068-02_Text_Based_on_First_Nine_months_data_of_2067-68-2.pdf",
+      "document_type": "statistics",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/CMEs_Seven-_Months_-Nepali-2072.73-1.pdf",
+      "document_type": "statistics",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/05/KFI_B_-2079-chaitra.pdf",
+      "document_type": "statistics",
+      "owner": "fisd",
+      "owners": [
+        "fisd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2075_76_Account-Block-l-Release-l-Information-353-Bundes-intl-counselling-and-OthersMahanagariya-Prahari-Parisar-KTM.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/09/RTGS_Regular_Timing_notice_20200920.pdf",
+      "document_type": "notice",
+      "owner": "psd",
+      "owners": [
+        "psd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2075_76_Account-Block-l-Release-l-Information-472-Madan-Pd.-Gupta-Others-CIAA.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/05/Chaitra-2078.pdf",
+      "document_type": "statistics",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Media_Release-Governor_Addresses_to_BFIs_Chairpersons_Meeting.pdf",
+      "document_type": "media",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2076_77_Account-Block-l-Release-l-Information-067-Sundar-Pd.-Pandey-Others-Rokk-Fukuwa-MPP-IRO-Simara.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Study_Reports-An_Assessment_of_Export_Barriers_of_Nepalese_Products_to_India-new.pdf",
+      "document_type": "research",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2076_77_Account-Block-l-Release-l-Information-203-Subhash-Kumar-Niraula-Others-CIAA.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Media_Release-Governor_Dr._Nepal_Addresses_the_National_Agriculture_Policy_and_Special_Credit_Program_organized_by_Media_International-2.pdf",
+      "document_type": "media",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/06/1.-DC_Issue-Notice-2081.03.05.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2070_71_Account-Block-l-Release-l-Information-138-Aditya-International-Others.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/03/KFI-Poush-20791.pdf",
+      "document_type": "statistics",
+      "owner": "bsd",
+      "owners": [
+        "bsd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/04/KFI-Poush-2077.pdf",
+      "document_type": "statistics",
+      "owner": "bsd",
+      "owners": [
+        "bsd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/security-interview-schedule-new-1.pdf",
+      "document_type": "notice",
+      "owner": "hrm",
+      "owners": [
+        "hrm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/01/Monetary-Operation-Report-FY-2080-81_2080-10-03-1.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Media_Release-Governors_Visit_to_Dhading.pdf",
+      "document_type": "media",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2074_75_Account-Block-l-Release-l-Information-576-Subodh-Kmr-Pokhrel-OtherslMPP-Teku.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2075_76_Account-Block-l-Release-l-Information-063-Digo-Udham-IRO-Dhangadhi.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2068_69_Account-Block-l-Release-l-Information-103-Gyabiyan-Wire-Industry-related.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/4_Auction_Notices-2076-07-07-1.pdf",
+      "document_type": "untyped",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/04/2083.01.17_LoI-Notice.pdf",
+      "document_type": "notice",
+      "owner": "gsd",
+      "owners": [
+        "gsd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2026
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2074_75_Account-Block-l-Release-l-Information-474-Janak-Raut-MPP-Lalitpur.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2075_76_Account-Block-l-Release-l-Information-242-Ashok-Goyal-and-OthersMahanagariya-Prahari-Parisar-KTM.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2075_76_Account-Block-l-Release-l-Information-437-Nabin-Kumar-Gauli-CIAA.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/04/Investment-Notice-2080.01.13.pdf",
+      "document_type": "notice",
+      "owner": "fmd",
+      "owners": [
+        "fmd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/CMEs_3rd-Month_-English-2073-74-final-1.pdf",
+      "document_type": "statistics",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2072_73_Account-Block-l-Release-l-Information-129-Alankaran-Electronics.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2069_70_Account-Block-l-Release-l-Information-405-Sudhir-Basnet-related.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/06/2082.09.30-Badmintion-SQ-Cancelled-NRB-Website-Notice.pdf",
+      "document_type": "notice",
+      "owner": "brg",
+      "owners": [
+        "brg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2026
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/02/Monetary-Operation-Summary-Data-upto-2082.10.28.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2026
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Media_Release-Dr._Min_Bahadur_Shrestha_Appointed_NRB_Spokesman.pdf",
+      "document_type": "media",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Current_Macroeconomic_Situation_Nepali-2071-11_Text_Based_on_Six_Months_Data_of_2071-72.pdf",
+      "document_type": "statistics",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2015
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Press_Release-Press-Release-on-INR-Exchange-Rate.pdf",
+      "document_type": "media",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2074_75_Account-Block-l-Release-l-Information-442-Puskar-Nath-Upreti-Others-CIAA-Tangal.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/02/NRB-Samachar_Fagun_2080-1.pdf",
+      "document_type": "publication",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/10/Auction_Notices-2078-07-07.pdf",
+      "document_type": "notice",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Ownership_Structure_of_Government_Securities-2064-11Fagun.pdf",
+      "document_type": "report",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Current_Macroeconomic_Situation_English-2069-09_Text_Based_on_Four-Months_Data_of_2069-70.pdf",
+      "document_type": "statistics",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2012
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/05/Monetary-Policy-2080-81-3rd-Quarter-Review.pdf",
+      "document_type": "monetary_policy",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/4_Auction_Notices-2074-05-05.pdf",
+      "document_type": "untyped",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/03/Monetary-Operation-Summary-Data-upto-2082.11.26.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2026
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/06/Current-Macroeconomic-and-Financial-Situation-Nepali-Based-on-Ten-Months-data-of-2080.81.pdf",
+      "document_type": "statistics",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/03/18.2080-pdf-1.pdf",
+      "document_type": "notice",
+      "owner": "hrm",
+      "owners": [
+        "hrm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Current_Macroeconomic_Situation_Nepali-2062-05-Bhadra-1.pdf",
+      "document_type": "statistics",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2070_71_Account-Block-l-Release-l-Information-236-Kanchha-Ram-Yakthunga.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/12/1.-DC_Issue-Notice-2080.08.15.pdf",
+      "document_type": "notice",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2070_71_Account-Block-l-Release-l-Information-573-Rajesh-Kumar-Khadgi-Others.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/06/List-of-BFIs-Baisakh-2083-English.pdf",
+      "document_type": "license_registry",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2026
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2068_69_Account-Block-l-Release-l-Information-035-Bimal-Kumar-Sawarthiya-related.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2072_73_Account-Block-l-Release-l-Information-277-Capital-Remittance.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/02/Monetary-Operation-Report-FY-2080-81_2080-10-28.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Interest_Rate_Structure_of_Commercial_Banks-2066-04_Mid-August_2009.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/CICTAB-Speech.pdf",
+      "document_type": "media",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Notice_for_Articles-Annual_Issue_of_NRB_Samachar_2068-1.pdf",
+      "document_type": "untyped",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2_Issue-Notice-2071-06-01.pdf",
+      "document_type": "untyped",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/Study_Reports-नेपालमा_साना_तथा_मझौला_उद्यममा_वित्तीय_साधन_परिचालन_2076.pdf",
+      "document_type": "research",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/07/4_Auction_Notices-2078-04-11.pdf",
+      "document_type": "notice",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Current_Macroeconomic_Situation_Nepali-2062-01-Baishakh.pdf",
+      "document_type": "statistics",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/08/Issue-Auction-Calender-2080-81.pdf",
+      "document_type": "notice",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Macroeconomic_Indicators_of_Nepal-2015-11_November_2015-New.pdf",
+      "document_type": "publication",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/01/Monetary-Operation-Summary-Data-upto-2082.10.04.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2026
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2_Time_Series_Data-FY_2073-74-upto-2073-04-11-New.pdf",
+      "document_type": "untyped",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2069_70_Account-Block-l-Release-l-Information-083-Bishnu-Bdr-Chhetri-related.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2070_71_Account-Block-l-Release-l-Information-359-Binod-Kumar-Agrawal.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/NRB-Samachar_Saun-20760518.pdf",
+      "document_type": "publication",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/4_Issuance_Notices-DB2081A7_years-New.pdf",
+      "document_type": "untyped",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2068_69_Account-Block-l-Release-l-Information-059-Aroma-Intl-Education-related.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/07/DB_2083_Nga.pdf",
+      "document_type": "notice",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Monetary_Policy_in_English-2006-07_Mid-Term_Review_Tables.pdf",
+      "document_type": "monetary_policy",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/11/painting-final-result.pdf",
+      "document_type": "notice",
+      "owner": "hrm",
+      "owners": [
+        "hrm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/01/NRB_Takeover_GDB_Nepal_Ltd.pdf",
+      "document_type": "notice",
+      "owner": "dbs",
+      "owners": [
+        "dbs"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/08/deposit-collection-auction-notice-2078.04.21.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/09/overnight-repo-update-FY-2078-79-upto-2078-06-04.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/NRB_Assistant_II_General_Exam_Center_2074-75-1.pdf",
+      "document_type": "notice",
+      "owner": "hrm",
+      "owners": [
+        "hrm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/CMEs-Five-Months-Nepali-2075-76.pdf",
+      "document_type": "statistics",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2071_72_Account-Block-l-Release-l-Information-087-R.K.-Supreme.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/09/Deposit-Collection-Result-2081.05.31-1.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Office_of_the_Governor-NRB-Press-Meet-2068-2-4-1.pdf",
+      "document_type": "untyped",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/07/Standing-Deposit-facility-upto-2083.04.08-1.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2026
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/10/DB-Summary_time-series-data_.pdf",
+      "document_type": "notice",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/06/Monetary-Operation-Summary-Data-upto-2082.03.05.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Media_Release-Governor_Dr._Nepal_Inaugurates_NRB_BFIRDs_Merger_and_Acquisition_Interaction_Program_Chitwan-new.pdf",
+      "document_type": "media",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2073_74_Account-Block-l-Release-l-Information-073-Energy-Prabardhan-Pra.Li_.-TSO-Tangal.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Governors_Meeting-Governors-Meeting-with-Nepalese-Association-of-Financial-Journalist-NAFIJ.pdf",
+      "document_type": "media",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Monthly-Balance-Sheet-7507.pdf",
+      "document_type": "report",
+      "owner": "fmd",
+      "owners": [
+        "fmd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2073_74_Account-Block-l-Release-l-Information-342-Sapana-Merina-Construction-IRO-Hetauda.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Office_of_the_Governor-Mr-Gyanwali-New-Spokes-Person-of-NRB-1.pdf",
+      "document_type": "untyped",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/02/Standing-Deposit-facility-upto2081.10.22.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Current_Macroeconomic_Situation_English-2008-05-Table-Based-on-first-eight-month-data-of-2007-08-1.pdf",
+      "document_type": "statistics",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/07/Monetary-Operation-Summary-Data-upto-2083.03.31.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2026
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Investment_Notice_20720618.pdf",
+      "document_type": "notice",
+      "owner": "fmd",
+      "owners": [
+        "fmd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/12/FY-2078-079-upto78-9-05.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2075_76_Account-Block-l-Release-l-Information-545-C-M-Jaibaba-J-V-IRO-Kalanki.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/02/RTGS-Notice_80.02.06.pdf",
+      "document_type": "notice",
+      "owner": "psd",
+      "owners": [
+        "psd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Factors-Affecting-Reserve-Money-Mid-March_08.pdf",
+      "document_type": "untyped",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/CMEs-Eleven-Months-English-2075-76-Final.pdf",
+      "document_type": "statistics",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2073_74_Account-Block-l-Release-l-Information-211-Dinesh-Kshetri-DPO-Parbat.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/4_Auction-Notice_IRC-2075-03-19-500-Crore.pdf",
+      "document_type": "untyped",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/nrbdhn_20760603.pdf",
+      "document_type": "procurement",
+      "owner": "gsd",
+      "owners": [
+        "gsd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/03/27.-Notice-for-website-Rebid-1.pdf",
+      "document_type": "notice",
+      "owner": "gsd",
+      "owners": [
+        "gsd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2026
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/11/NRB-Samachar_Kattik_2080-1.pdf",
+      "document_type": "publication",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/10/Letter-of-Intent-Rs.-100_IFB_CMD_G-03_080_81.pdf",
+      "document_type": "notice",
+      "owner": "cmd",
+      "owners": [
+        "cmd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/01/Monetary-Operation-Report-FY-2080-81_2080-09-19-1.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/List_of_Circular-392.pdf",
+      "document_type": "circular",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2007
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Notice-of-Intent_Electrification.pdf",
+      "document_type": "notice",
+      "owner": "gsd",
+      "owners": [
+        "gsd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/04/Monetary-Operation-Summary-Data-upto-2081.12.28.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/11/Letter-of-Intent.pdf",
+      "document_type": "notice",
+      "owner": "nep",
+      "owners": [
+        "nep"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Current_Macroeconomic_Situation_Nepali-2070-04_Text_Based_on_Eleven_Months_Data_of_2069-70-1.pdf",
+      "document_type": "statistics",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/04/Financial-Institutions-Supervision-Annual-Report-2024-1.pdf",
+      "document_type": "report",
+      "owner": "fisd",
+      "owners": [
+        "fisd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/06/Intent-AC.pdf",
+      "document_type": "notice",
+      "owner": "dhn",
+      "owners": [
+        "dhn"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2070_71_Account-Block-l-Release-l-Information-635-Star-Saving-B.M.-Bag.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2072_73_Account-Block-l-Release-l-Information-494-Sajan-Chandeswari-Birat-Nepal-Silk-T.S.O.-Balaju.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/07/4_Auction_Notices-2078-03-28.pdf",
+      "document_type": "notice",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/07/Monetary-Operation-Summary-Data-upto-2082.03.31.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Assistant_2070_DHN-1.pdf",
+      "document_type": "notice",
+      "owner": "hrm",
+      "owners": [
+        "hrm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/01/Monetary-Operation-Report-FY-2081-82_2081-09-24.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/06/suchi-darta-Form-FY-2081.82.pdf",
+      "document_type": "notice",
+      "owner": "skt",
+      "owners": [
+        "skt"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/09/MOnthly-Balance-Sheet-Bhadra-End-82.pdf",
+      "document_type": "report",
+      "owner": "fmd",
+      "owners": [
+        "fmd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/amendmentnotice_03062017.pdf",
+      "document_type": "procurement",
+      "owner": "gsd",
+      "owners": [
+        "gsd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Press_Release-Deputy_Governor_Adhikari_at_FATF_-Plenary_Meeting_2014_20701104-1.pdf",
+      "document_type": "media",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/08/FXMD-Notice-02-207879-Liscence-Renewal.pdf",
+      "document_type": "notice",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Current_Macroeconomic_Situation_Nepali-2060-05-Bhadra-1.pdf",
+      "document_type": "statistics",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/12/Situation-of-Microfinace-Institutions-Asoj-2078.pdf",
+      "document_type": "statistics",
+      "owner": "mfd",
+      "owners": [
+        "mfd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/04/Monthly-Balance-Sheet-78.12-pdf.pdf",
+      "document_type": "report",
+      "owner": "fmd",
+      "owners": [
+        "fmd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/06/FY-2078-079-upto79-03-07.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/09/RTGS-Notice_80.05.23.pdf",
+      "document_type": "notice",
+      "owner": "psd",
+      "owners": [
+        "psd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2075_76_Account-Block-l-Release-l-Information-236-Balram-Rijal-and-OthersCIAA.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Nepal_Rastra_Bank_Baisakh_Ank-2073.pdf",
+      "document_type": "publication",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2076_77_Account-Block-l-Release-l-Information-248-Shiva-Nirman-Sewa-Others-Rokka-IRO-Ba.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/03/Overnight-Repo-Update-FY-2078-79-upto-2078-12-09.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2074_75_Account-Block-l-Release-l-Information-678-Cha.No_.7308CIB2-Maharajgunj.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2072_73_Account-Block-l-Release-l-Information-285-Deepak-Kumar-Shah-Madesh-Initiative.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/fxm_notice20190520.pdf",
+      "document_type": "notice",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/3_Reverse_Repo_Auction-2073.09.06.pdf",
+      "document_type": "untyped",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Monetary_Policy_in_Nepali-2074-75_Summary.pdf",
+      "document_type": "monetary_policy",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2068_69_Account-Block-l-Release-l-Information-162-National-Development-J.V.-Related.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Current_Macroeconomic_Situation_Nepali-2068-12_Text_Based_on_Seven_Months_Data_of_2068-69.pdf",
+      "document_type": "statistics",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2012
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/11/Press-Release-on-Annual-Report_2081-82.pdf",
+      "document_type": "media",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Monetary_Policy_in_Nepali-2070-71_Full-Text.pdf",
+      "document_type": "monetary_policy",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2076-Asar.pdf",
+      "document_type": "statistics",
+      "owner": "dbs",
+      "owners": [
+        "dbs"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/05/1.-DC_Issue-Notice-2081.02.01.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/07/Final_Syllabus_Driver.pdf",
+      "document_type": "notice",
+      "owner": "hrm",
+      "owners": [
+        "hrm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Keynote_Speech-NRB_Presentaion_on_Financial_Sector_Development_Strategy.pdf",
+      "document_type": "media",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2026/07/Interest-subsidized-loan-Jestha-2083-Publish.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2026
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Media_Release-NRB_unveils_monetary_policy_for_fiscal_year_2070-71.pdf",
+      "document_type": "media",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Annual_Reports-Annual_Bank_Supervision_Report_2015-new.pdf",
+      "document_type": "report",
+      "owner": "bsd",
+      "owners": [
+        "bsd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2074_75_Account-Block-l-Release-l-Information-073-Gajadhar-SapkotaIRO-Butwal.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/08/विज्ञापन-एजेन्सीहरुलाई-दरभाऊपत्र-पेश-गर्ने-सूचना-।.pdf",
+      "document_type": "notice",
+      "owner": "gsd",
+      "owners": [
+        "gsd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/01/Auction_Notices-2078-09-19.pdf",
+      "document_type": "notice",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/05/officer-center.pdf",
+      "document_type": "notice",
+      "owner": "hrm",
+      "owners": [
+        "hrm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/11/Notice-19.pdf",
+      "document_type": "notice",
+      "owner": "dhn",
+      "owners": [
+        "dhn"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2070_71_Account-Block-l-Release-l-Information-373-Marigold-Foods-Pvt-Ltd.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/08/Overnight-Repo-Update-FY-2079-80-upto-2079-04-17.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/04/United_Bikas_Bank_Declared_Problematic.pdf",
+      "document_type": "enforcement_action",
+      "owner": "dbs",
+      "owners": [
+        "dbs"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2015
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/07/Press-Release-on-APG-Annual-Meeting-FINAL.pdf",
+      "document_type": "media",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2023
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Current_Macroeconomic_Situation_English-2009-06_Text_Based-on-first-nine-month-data-of-2008-09-2.pdf",
+      "document_type": "statistics",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/09/Standing-Deposit-facility-upto2081.05.23-1.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2075_76_Account-Block-l-Release-l-Information-586-Gopal-Pd.-Ghimire-Others-CIAA.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/07/NRB-News-Vol.35-20770331.pdf",
+      "document_type": "publication",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2067_68_Account-Information-091-Rudra-Rakesh-Giri.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2074_75_Account-Block-l-Release-l-Information-091-Commercial-Banks-Home-Ministry-Sinhadarwar.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/07/Current-Macroeconomic-and-Financial-Situation-Nepali-Based-on-Eleven-Months-data-of-2081.82-1.pdf",
+      "document_type": "statistics",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Current_Macroeconomic_Situation_Nepali-2068-02_Text_Based_on_First_Nine_months_data_of_2067-68.pdf",
+      "document_type": "statistics",
+      "owner": "red",
+      "owners": [
+        "red"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2011
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Financial_Statement_207374.pdf",
+      "document_type": "report",
+      "owner": "fmd",
+      "owners": [
+        "fmd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Current_Macroeconomic_Situation_Nepali-2071-05_Text_Based_on_Annual_Data_of_2070-71-2.pdf",
+      "document_type": "statistics",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/12/Monthly-Statistics-_-2077_07-Nov-2020.pdf",
+      "document_type": "statistics",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/03/Deposit-Collection-Result-Update-FY-2080-81-upto-2080-12.08.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2_Summary_Result_Time_Series_Data-FY-2072-73-upto-08-22.pdf",
+      "document_type": "untyped",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/03/directives_about_port.pdf",
+      "document_type": "notice",
+      "owner": "fxm",
+      "owners": [
+        "fxm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2015
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Press_Release-Governor_Dr._Khatiwada_participated_in_various_programs_in_Biratnagar_20691212-1.pdf",
+      "document_type": "media",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Current_Macroeconomic_Situation_Nepali-2063-01_Based-on-first-seven-months-data-of-2062-63-2.pdf",
+      "document_type": "statistics",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/08/overnight-repo-update-F.Y-2078-79-upto-2078-05-02.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/06/Monthly-Balance-Sheet-2081-Jestha.pdf",
+      "document_type": "report",
+      "owner": "fmd",
+      "owners": [
+        "fmd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/12/Standing-Deposit-facility-upto2081.09.01.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2024/06/Standing-Deposit-facility-upto2081.02.23.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2024
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/3_Reverse_Repo_Auction-2074.04.08.pdf",
+      "document_type": "untyped",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/Press_Release-IFC_Regional_Director_meets_Governor.pdf",
+      "document_type": "media",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2021/12/NRB-Spokesperson_Press-News-1.pdf",
+      "document_type": "media",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2021
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2022/03/FY-2078-079-upto78-12-08.pdf",
+      "document_type": "monetary_operations",
+      "owner": "pdm",
+      "owners": [
+        "pdm"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2022
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2070_71_Account-Block-l-Release-l-Information-377-Medicare-Enterprises.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2020/02/62Shikhar.pdf",
+      "document_type": "license_registry",
+      "owner": "fis",
+      "owners": [
+        "fis"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2020
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/09/15A.-Notice-for-website.pdf",
+      "document_type": "notice",
+      "owner": "gsd",
+      "owners": [
+        "gsd"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2019/12/2074_75_Account-Block-l-Release-l-Information-059-Hulas-Eng.-Constr.-Pvt.LtdIRO-Babarmahal.pdf",
+      "document_type": "untyped",
+      "owner": "bfr",
+      "owners": [
+        "bfr"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2019
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2025/08/Cancellation-of-SQ.pdf",
+      "document_type": "notice",
+      "owner": "nep",
+      "owners": [
+        "nep"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2025
+    },
+    {
+      "comparison_key": "https://www.nrb.org.np/contents/uploads/2023/11/RTI_NRB-Report_2080_Asoj.pdf",
+      "document_type": "untyped",
+      "owner": "ofg",
+      "owners": [
+        "ofg"
+      ],
+      "resource_type": "pdf",
+      "sampling_stratum": "random",
+      "year": 2023
+    }
+  ],
+  "notes": [
+    "native-3 cohort; population claims from the random stratum only (spec §6.2)",
+    "enriched = circular/guideline_manual ≥2015: the spec's act/rule_bylaw/directive ≥2015 lies wholly inside the withheld production scope (user amendment 2026-10-03, before any network access)"
+  ],
+  "provenance": {
+    "excluded_manifests": [
+      "docs/nrb/phase6a-manifest.json",
+      "docs/nrb/phase6b-routing-holdout.json",
+      "docs/nrb/phase7-validation-cohort.json",
+      "docs/nrb/prod-corpus-scope.json"
+    ]
+  },
+  "requested": 500,
+  "sampler": {
+    "algorithm_version": "nrb-native3-v1",
+    "detector": {
+      "density": 0.001,
+      "min_devanagari": 500
+    },
+    "enriched_sections": [
+      "circular",
+      "guideline_manual"
+    ],
+    "enriched_since": 2015,
+    "exclude_keys_sha256": "1ac32df70f50d7c9352094a3da95c0923838a6801d37e53df2635ccee6c87240",
+    "excluded_sets": [
+      "docs/nrb/phase6a-manifest.json",
+      "docs/nrb/phase6b-routing-holdout.json",
+      "docs/nrb/phase7-validation-cohort.json",
+      "docs/nrb/prod-corpus-scope.json"
+    ],
+    "frame": "nrb_files.resource_type = 'pdf' (the REST claim)",
+    "offset": 0,
+    "seed": "native3-2026-10-02",
+    "sizes": {
+      "enriched": 250,
+      "random": 250
+    },
+    "top_up_rule": {
+      "size": 250,
+      "stratum": "enriched",
+      "threshold_detected": 20
+    }
+  },
+  "seed": "native3-2026-10-02",
+  "selected": 500,
+  "selection_sha256": "3e5378a6150426f4f4a293ad3b046e6e9ec7bf5cc63461eb7f4f846fc057989d",
+  "shortfall": 0,
+  "strata": [
+    {
+      "requested": 250,
+      "selected": 250,
+      "stratum": "enriched"
+    },
+    {
+      "requested": 250,
+      "selected": 250,
+      "stratum": "random"
+    }
+  ],
+  "version": "manifest-2"
+}
