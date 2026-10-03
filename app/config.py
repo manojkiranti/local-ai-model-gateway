@@ -241,6 +241,12 @@ class Settings(BaseSettings):
     # Byte caps and timeouts stay module constants in `app/nrb/fetch.py` because
     # they follow from the corpus's measured shape (largest file observed: 46 MB).
     nrb_files_dir: str = "nrb_files"
+    # native-3: read garbled Word text layers through their embedded font
+    # (docs/superpowers/specs/2026-10-02-native3-font-repair-design.md). OFF
+    # until the Nepali reader's gate passes: off, the native engine string stays
+    # `passthrough/native-2` and no cached recovery goes stale. On needs
+    # uharfbuzz in the worker (requirements-worker.txt).
+    nrb_native_repair: bool = False
 
     # --- RAG: department corpus ingestion ---
     # Corpus documents are org knowledge, NOT per-user files — separate tree.

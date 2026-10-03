@@ -66,7 +66,7 @@ from pathlib import Path
 from typing import Any
 
 from ..rag.chunking import Chunk, chunk_text, renumber
-from . import extraction, recovery, sniff
+from . import extraction, fontrepair, recovery, sniff
 
 logger = logging.getLogger("app.nrb.rag")
 
@@ -142,8 +142,8 @@ def default_lexicon():
 
 
 @functools.lru_cache(maxsize=1)
-def nrb_dependencies() -> tuple[Any, Any, Any]:
-    """`(converter, lexicon, ocr_engine)`, built once per PROCESS.
+def nrb_dependencies() -> tuple[Any, Any, Any, Any]:
+    """`(converter, lexicon, ocr_engine, repair)`, built once per PROCESS.
 
     Cached because both ends are expensive and the worker parses documents in a
     loop: `FontMapper` re-reads a 34 KB rule file per construction, and the OCR
@@ -185,7 +185,25 @@ def nrb_dependencies() -> tuple[Any, Any, Any]:
     except Exception as exc:  # noqa: BLE001
         logger.warning("NRB rag: OCR unavailable (%s)", type(exc).__name__)
 
-    return converter, lexicon, ocr_engine
+    from ..config import get_settings
+
+    return converter, lexicon, ocr_engine, _repair_dependency(get_settings())
+
+
+def _repair_dependency(settings):
+    """The native-3 repair engine, or None while `NRB_NATIVE_REPAIR` is off.
+
+    Off means the native engine string stays `passthrough/native-2` and no
+    cached unit goes stale — the code can ship before the reader's gate passes
+    (plan Task 18 flips the default). On without uharfbuzz is NOT None: the
+    engine reports `native-3/repair-unavailable` and detected pages are
+    recorded unrepaired, so installing it later invalidates exactly those.
+    """
+    if not getattr(settings, "nrb_native_repair", False):
+        return None
+    from .fontrepair import FontRepairEngine
+
+    return FontRepairEngine()
 
 
 def reset_dependencies() -> None:
@@ -205,9 +223,10 @@ def resolve_dependencies(injected: dict[str, Any]) -> dict[str, Any]:
             "converter": injected.get("converter"),
             "lexicon": injected.get("lexicon"),
             "ocr": injected.get("ocr"),
+            "repair": injected.get("repair"),
         }
-    converter, lexicon, ocr = nrb_dependencies()
-    return {"converter": converter, "lexicon": lexicon, "ocr": ocr}
+    converter, lexicon, ocr, repair = nrb_dependencies()
+    return {"converter": converter, "lexicon": lexicon, "ocr": ocr, "repair": repair}
 
 
 def recover_blob(
@@ -260,6 +279,14 @@ def _chunk_meta(page: recovery.PageText, extractor_version: str) -> dict[str, An
         # Carried to the chunk, not just to the log: OCR text is retrieval
         # material and must never be quoted as an authoritative figure, date or
         # contact detail on a degraded scan (§16.6).
+        meta["authoritative"] = False
+    repair = detail.get("repair")
+    if page.route == recovery.ROUTE_NATIVE and repair and repair != fontrepair.NOT_APPLICABLE:
+        # Detected as garbled by native-3 (spec §5.1). Repaired text is
+        # machine-recovered and unreviewed; unrepaired text is known garbled.
+        # Either way every reader shows the VERIFY caveat, keyed on this flag.
+        meta["text_repair"] = "font_tables" if repair == fontrepair.STATUS_REPAIRED else "unrepaired"
+        meta["repair_engine"] = detail.get("repair_engine")
         meta["authoritative"] = False
     return {k: v for k, v in meta.items() if v is not None}
 

@@ -152,7 +152,7 @@ async def do_reuse_check(Session, prefixes: list[str], settings) -> int:
     Both passes use the SAME wrapped dependencies, so the counters measure this
     process's invocations rather than two different engines' behaviour.
     """
-    converter, lexicon, ocr = nrb_rag.nrb_dependencies()
+    converter, lexicon, ocr, repair = nrb_rag.nrb_dependencies()
     print("\ndependencies:")
     print(f"  converter  {getattr(converter, 'name', None)} "
           f"{getattr(converter, 'version', '')} / "
@@ -161,12 +161,14 @@ async def do_reuse_check(Session, prefixes: list[str], settings) -> int:
     print(f"  lexicon    {lexicon.fingerprint[:12] if lexicon else 'MISSING'}")
     print(f"  ocr        {getattr(ocr, 'model', 'MISSING')} "
           f"{getattr(ocr, 'version', '')}")
+    print(f"  repair     {getattr(repair, 'version', 'off')}")
     print(f"  base       {recovery_cache.base_version()}")
 
     counted_converter = _CountingConverter(converter) if converter else None
     counted_ocr = _CountingOcr(ocr) if ocr else None
     injected = {
         "converter": counted_converter, "lexicon": lexicon, "ocr": counted_ocr,
+        "repair": repair,
     }
 
     targets: list[tuple[str, str, Path]] = []

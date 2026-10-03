@@ -39,11 +39,13 @@ may now differ, so no unit's cached answer is still about the right question.
 **`engine_version`** (on `nrb_recovery_units`, per unit) is the identity of
 whatever produced that unit's text, and it depends on the unit's route:
 
-    native              the extractor identity. Parser changes are what
-                        `extraction.EXTRACTOR_VERSION` is documented to be
-                        bumped for, so it is reused rather than tracking pypdf,
-                        python-docx and openpyxl versions separately — which
-                        would make an openpyxl release invalidate every PDF.
+    native              `passthrough/<classifier>` while the native-3 repair is
+                        off (today's string, so nothing goes stale), or the
+                        repair engine's identity (`fontrepair.engine_version`:
+                        `native-3/repair-N/D=…/N=…/lang=ne/hb-…`) when it is on.
+                        The classifier version stays in the BASE: the repair
+                        changes what the native route produces, never which
+                        route a page takes (spec §2, D1).
     legacy_conversion   npttf2utf version + mapping + lexicon fingerprint. The
                         lexicon belongs HERE, not in the base version: it is a
                         conversion guard, so it changes what conversion
@@ -98,7 +100,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..files import documents as file_documents
-from . import legacy_convert, provenance, recovery
+from . import fontrepair, legacy_convert, provenance, recovery
 from .legacy_font import LegacyFontConverter
 from .lexicon import Lexicon
 from .models import NRBRecovery, NRBRecoveryUnit
@@ -175,6 +177,7 @@ def engine_versions(
     lexicon: Lexicon | None,
     ocr: PageOcrEngine | None,
     extractor_version: str = "native-2",
+    repair: Any | None = None,
 ) -> EngineVersions:
     """Per-route engine identities for the dependencies actually in hand.
 
@@ -209,8 +212,10 @@ def engine_versions(
             f"/{getattr(ocr, 'version', '') or 'unknown'}"
         )
 
+    # Off (repair is None): today's string exactly, so nothing goes stale.
+    native = f"passthrough/{extractor_version}" if repair is None else str(repair.version)
     return EngineVersions(
-        native=f"passthrough/{extractor_version}",
+        native=native,
         legacy_conversion=legacy,
         ocr=ocr_version,
     )
@@ -297,6 +302,8 @@ class CacheReport:
     ocr_units: int = 0
     reparsed: bool = False         # did the blob have to be opened again?
     reason: str = ""               # why it was not a warm hit
+    repaired_units: int = 0
+    unrepaired_units: int = 0
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -309,7 +316,20 @@ class CacheReport:
             "ocr_units": self.ocr_units,
             "reparsed": self.reparsed,
             "reason": self.reason,
+            "repaired_units": self.repaired_units,
+            "unrepaired_units": self.unrepaired_units,
         }
+
+
+def _repair_counts(document: recovery.RecoveredDocument) -> tuple[int, int]:
+    repaired = unrepaired = 0
+    for page in document.pages:
+        status = (page.detail or {}).get("repair")
+        if status == fontrepair.STATUS_REPAIRED:
+            repaired += 1
+        elif isinstance(status, str) and status.startswith(fontrepair.UNREPAIRED_PREFIX):
+            unrepaired += 1
+    return repaired, unrepaired
 
 
 # --------------------------------------------------------------------------- #
@@ -324,6 +344,7 @@ def resolve(
     converter: LegacyFontConverter | None = None,
     lexicon: Lexicon | None = None,
     ocr: PageOcrEngine | None = None,
+    repair: Any | None = None,
     extractor_version: str = "native-2",
     cold: Callable[[], recovery.RecoveredDocument] | None = None,
 ) -> tuple[recovery.RecoveredDocument, CacheReport]:
@@ -352,7 +373,7 @@ def resolve(
     """
     engines = engine_versions(
         converter=converter, lexicon=lexicon, ocr=ocr,
-        extractor_version=extractor_version,
+        extractor_version=extractor_version, repair=repair,
     )
     base = base_version(extractor_version)
     report = CacheReport(base_version=base)
@@ -369,6 +390,7 @@ def resolve(
         counts = recovered.route_counts
         report.converter_units = counts.get(recovery.ROUTE_LEGACY, 0)
         report.ocr_units = counts.get(recovery.ROUTE_OCR, 0)
+        report.repaired_units, report.unrepaired_units = _repair_counts(recovered)
         return recovered, report
 
     if cached is None:
@@ -384,7 +406,9 @@ def resolve(
         report.outcome = "warm"
         report.units_reused = len(cached.units)
         report.reason = "all_units_current"
-        return cached.as_document(), report
+        doc = cached.as_document()
+        report.repaired_units, report.unrepaired_units = _repair_counts(doc)
+        return doc, report
 
     if cached.family != "pdf":
         # One route per document, so a stale unit means the whole thing is
@@ -399,6 +423,11 @@ def resolve(
             "falling back to a cold recovery", type(exc).__name__,
         )
         return run_cold("reread_failed")
+
+    native_numbers = [u.unit_number for u in cached.units if u.route == recovery.ROUTE_NATIVE]
+    suspect = fontrepair.detect(
+        [page_texts[n - 1] for n in native_numbers if 0 <= n - 1 < len(page_texts)]
+    ).suspect
 
     pages: list[recovery.PageText] = []
     for unit in cached.units:
@@ -422,6 +451,8 @@ def resolve(
                 lexicon=lexicon,
                 ocr=ocr,
                 report=report,
+                repair=repair,
+                suspect=suspect,
             )
         )
         report.units_recovered += 1
@@ -429,17 +460,16 @@ def resolve(
     report.outcome = "partial"
     report.reparsed = True
     report.reason = f"{len(stale)} of {len(cached.units)} units stale"
-    return (
-        recovery.RecoveredDocument(
-            family=cached.family,
-            plan=cached.plan,
-            plan_reason=cached.plan_reason,
-            gate_ratio=cached.gate_ratio,
-            pages=tuple(pages),
-            warnings=cached.warnings,
-        ),
-        report,
+    document = recovery.RecoveredDocument(
+        family=cached.family,
+        plan=cached.plan,
+        plan_reason=cached.plan_reason,
+        gate_ratio=cached.gate_ratio,
+        pages=tuple(pages),
+        warnings=cached.warnings,
     )
+    report.repaired_units, report.unrepaired_units = _repair_counts(document)
+    return document, report
 
 
 def _refresh_unit(
@@ -452,6 +482,8 @@ def _refresh_unit(
     lexicon: Lexicon | None,
     ocr: PageOcrEngine | None,
     report: CacheReport,
+    repair: Any | None = None,
+    suspect: bool = False,
 ) -> recovery.PageText:
     """Re-execute ONE stale unit on its cached route.
 
@@ -476,8 +508,9 @@ def _refresh_unit(
         return recovery.ocr_unit(
             unit.unit_number, path, reason=unit.reason, engine=ocr
         )
-    return recovery.PageText(
-        unit.unit_number, recovery.ROUTE_NATIVE, unit.reason, native_text
+    return recovery.native_unit(
+        unit.unit_number, native_text, reason=unit.reason, path=path,
+        suspect=suspect, repair=repair,
     )
 
 
@@ -679,6 +712,16 @@ async def stats(session: AsyncSession) -> dict[str, Any]:
             )
         )
     ).all()
+    repairs = (
+        await session.execute(
+            select(
+                NRBRecoveryUnit.detail["repair"].astext.label("repair"),
+                func.count().label("units"),
+            )
+            .where(NRBRecoveryUnit.route == recovery.ROUTE_NATIVE)
+            .group_by(NRBRecoveryUnit.detail["repair"].astext)
+        )
+    ).all()
     return {
         "versions": [
             {"base_version": v, "documents": d, "units": int(u or 0)}
@@ -688,6 +731,7 @@ async def stats(session: AsyncSession) -> dict[str, Any]:
             {"route": r, "engine_version": e, "ok": ok, "units": n}
             for r, e, ok, n in routes
         ],
+        "native_repair": [{"repair": r or "passthrough", "units": n} for r, n in repairs],
     }
 
 

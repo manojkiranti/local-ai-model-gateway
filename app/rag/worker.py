@@ -223,9 +223,10 @@ async def _load_chunks(Session, snap: DocSnapshot, settings: Settings):
         # is judged by its route split and its reuse, never by job success.
         log.info(
             "nrb recovery %s for %s: %d units (%d reused, %d recovered; "
-            "converter %d, ocr %d)",
+            "converter %d, ocr %d; repaired %d, unrepaired %d)",
             report.outcome, snap.id, report.units_total, report.units_reused,
             report.units_recovered, report.converter_units, report.ocr_units,
+            report.repaired_units, report.unrepaired_units,
         )
     return chunks
 
