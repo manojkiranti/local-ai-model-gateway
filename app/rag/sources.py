@@ -47,6 +47,19 @@ NRB_ORIGIN = "nrb"
 RECOVERED_ROUTES = frozenset({"ocr", "legacy_conversion"})
 VERIFY_NOTE = "machine-recovered — VERIFY figures, dates and names against the source"
 
+
+def is_machine_recovered(route: str | None, authoritative: bool | None) -> bool:
+    """Does this chunk's text need the VERIFY caveat? THE one predicate.
+
+    Three readers ask it — the model's context (`search_department_docs`), the
+    citation (`verify_note`, below) and the whole-document read
+    (`read_department_doc`) — and they must never answer differently, or the
+    reader sees a badge that contradicts the answer. A recovered route, or a
+    chunk explicitly marked non-authoritative (OCR; native-3's detected pages).
+    """
+    return route in RECOVERED_ROUTES or authoritative is False
+
+
 # ``[12]`` — the marker the retrieval tool tells the model to cite with. Bounded
 # to three digits so a stray "[2024]" in document text is not read as a citation
 # into a passage list that never has thousands of entries.
@@ -199,7 +212,7 @@ def _document_sources(
             # page a reader has to verify.
             if chunk.route and chunk.route not in entry["routes"]:
                 entry["routes"].append(chunk.route)
-            if chunk.route in RECOVERED_ROUTES or chunk.authoritative is False:
+            if is_machine_recovered(chunk.route, chunk.authoritative):
                 entry["machine_recovered"] = True
 
     for entry in by_document.values():

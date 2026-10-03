@@ -21,7 +21,7 @@ from typing import Any
 
 from ...rag.context import current_department
 from ...rag.reassemble import ChunkText, to_lines
-from ...rag.sources import RECOVERED_ROUTES, VERIFY_NOTE
+from ...rag.sources import VERIFY_NOTE, is_machine_recovered
 from ._paging import HEADER_BUDGET, MODEL_RESULT_CAP, window
 from .base import LocalToolSpec
 
@@ -72,7 +72,7 @@ def _header(doc, lines: list[str], start: int, last: int, truncated: bool,
 
 
 async def _fetch_document(document_id: str, department_id: int):
-    """(document, chunks, routes) for a READY document in this department.
+    """(document, chunks, trust) for a READY document in this department.
 
     Its own session, like `retrieval.search_chunks`: a tool is called from the
     agent loop and has no request-scoped session to borrow. Returns None when
@@ -122,14 +122,17 @@ async def _fetch_document(document_id: str, department_id: int):
         )
         for r in rows
     ]
-    routes = [str((r.meta or {}).get("route") or "") for r in rows]
+    trust = [
+        (str((r.meta or {}).get("route") or ""), (r.meta or {}).get("authoritative"))
+        for r in rows
+    ]
     meta = doc.meta or {}
     info = _DocInfo(
         title=doc.title,
         pages=meta.get("pages"),
         origin=meta.get("origin"),
     )
-    return info, chunks, routes
+    return info, chunks, trust
 
 
 class _DocInfo:
@@ -169,7 +172,7 @@ async def _read_department_doc(args: dict[str, Any]) -> str:
     found = await _fetch_document(document_id.strip(), department.id)
     if found is None:
         return NOT_FOUND
-    doc, chunks, routes = found
+    doc, chunks, trust = found
 
     if not chunks:
         return (
@@ -190,7 +193,7 @@ async def _read_department_doc(args: dict[str, Any]) -> str:
             f"{len(lines)} line(s)."
         )
 
-    recovered = any(r in RECOVERED_ROUTES for r in routes)
+    recovered = any(is_machine_recovered(r, a) for r, a in trust)
     header = _header(doc, lines, max(1, start_line), last, truncated, hard_cut, recovered)
     return "\n".join(header + [""] + shown)
 

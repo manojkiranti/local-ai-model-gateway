@@ -247,15 +247,28 @@ def test_output_tells_the_model_to_answer_only_from_these_passages(faked):
     assert "cite" in out.lower()
 
 
-def test_the_caveat_is_one_constant_with_two_readers():
-    """The model's context and the API's `verify_note` must never drift apart.
-
-    Two copies of this sentence is the failure mode: a UI badge that disagreed
-    with the answer text would be worse than neither, because the reader cannot
-    tell which one to believe.
+def test_the_caveat_is_one_constant_with_three_readers():
+    """The model's context, the citation, and the whole-document read all use
+    the same predicate for deciding the caveat. A second copy would drift, and
+    a UI badge disagreeing with the answer text is worse than neither, because
+    the reader cannot tell which one to believe.
     """
     from app.rag import sources as rag_sources
     from app.tools.local import search_department_docs as tool
 
     assert tool._VERIFY is rag_sources.VERIFY_NOTE
-    assert tool._RECOVERED_ROUTES is rag_sources.RECOVERED_ROUTES
+    assert tool._is_machine_recovered is rag_sources.is_machine_recovered
+
+
+def test_all_three_readers_share_one_caveat_predicate():
+    """The model's context, the citation and the whole-document read must decide
+    the caveat the same way (spec §5.2): read_department_doc used to check the
+    route only, and would have handed the model a garbled Act uncaveated."""
+    from app.rag import sources as rag_sources
+    from app.tools.local import read_department_doc, search_department_docs as tool
+
+    assert tool._is_machine_recovered is rag_sources.is_machine_recovered
+    assert read_department_doc.is_machine_recovered is rag_sources.is_machine_recovered
+    assert rag_sources.is_machine_recovered("native", False) is True
+    assert rag_sources.is_machine_recovered("ocr", None) is True
+    assert rag_sources.is_machine_recovered("native", None) is False

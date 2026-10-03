@@ -24,7 +24,7 @@ from ...rag.embedding import EmbeddingError, embed_texts
 from ...rag import ranking
 from ...rag.retrieval import RetrievedChunk, search_chunks
 from ...rag.sources import (
-    RECOVERED_ROUTES as _RECOVERED_ROUTES,
+    is_machine_recovered as _is_machine_recovered,
     VERIFY_NOTE as _VERIFY,
     SourceChunk,
     record_search,
@@ -85,7 +85,7 @@ def _nrb_provenance(chunk: RetrievedChunk) -> str:
     lines: list[str] = []
     route = cm.get("route")
     if route:
-        recovered = route in _RECOVERED_ROUTES or cm.get("authoritative") is False
+        recovered = _is_machine_recovered(route, cm.get("authoritative"))
         lines.append(f"route: {route}" + (f" — {_VERIFY}" if recovered else ""))
     dm = chunk.doc_metadata or {}
     source = dm.get("page_url") or dm.get("source_url")

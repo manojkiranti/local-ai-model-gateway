@@ -28,7 +28,8 @@ def _call(args, *, department="hr", doc=_Doc(), chunks=None, routes=None, monkey
     async def _fetch(document_id, department_id):
         if doc is None:
             return None
-        return doc, (chunks if chunks is not None else []), (routes or [])
+        trust = [r if isinstance(r, tuple) else (r, None) for r in (routes or [])]
+        return doc, (chunks if chunks is not None else []), trust
 
     monkeypatch.setattr(tool, "_fetch_document", _fetch)
     ctx = DepartmentContext(id=1, code=department) if department else None
@@ -175,3 +176,17 @@ def test_the_search_tool_points_at_this_one():
 
 def test_this_tool_names_the_search_tool_as_where_ids_come_from():
     assert "search_department_docs" in tool.SPEC.description
+
+
+def test_a_repaired_or_garbled_native_page_carries_the_caveat(monkeypatch):
+    """native-3 marks detected native pages `authoritative: false` (spec §5.1)."""
+    from app.rag.sources import VERIFY_NOTE
+
+    out = _call(
+        {"document_id": "d1"},
+        doc=_Doc(origin="nrb"),
+        chunks=_chunks("उपभोक्ता संरक्षण ऐन"),
+        routes=[("native", False)],
+        monkeypatch=monkeypatch,
+    )
+    assert VERIFY_NOTE in out
