@@ -5627,3 +5627,136 @@ only; the held-out measurement is the frozen cohort of Tasks 10–13. *Feedback
 capture:* the detect report's per-page statuses and examples
 (`--repair-report`), kept as the JSON beside each run. *Review loop:* re-run the
 report at every engine change (each must carry its tests), and at the cohort run.
+
+### 31.2 The cohort
+
+**Date:** 2026-10-03. **Database:** `local_ai_gateway_p4`. **Engine:**
+`native-3/repair-1/D=1/N=500/lang=ne/hb-14.5.0`. **Evidence:**
+`docs/nrb/native3-cohort-evidence.{txt,json}` (summary; per-document and per-page
+rows), produced by `scripts/nrb_native3_evidence.py` over both manifests below.
+
+Cohort evidence — unlike §31.1 this was frozen before it was fetched and shaped
+nothing (spec §6.1). It proves what it measures and no more.
+
+**Manifests (both frozen before any network access).**
+
+| manifest | commit | entries | `selection_sha256` |
+|---|---|---:|---|
+| `docs/nrb/native3-cohort.json` | `8fbec07` | 500 | `3e5378a6150426f4f4a293ad3b046e6e9ec7bf5cc63461eb7f4f846fc057989d` |
+| `docs/nrb/native3-cohort-topup.json` (the single pre-registered top-up) | `7c3268f` | 250 | `00d24c2b3bf3fc8833ca1d018e626ee7b4e098333bf741c496f77f47669ecff8` |
+
+Drawn from the p4 catalog's metadata alone, no network access, 859 spent keys
+excluded, 0 shortfall. **The enriched stratum was redefined once, before any
+cohort existed.** Spec §6.2's original definition (act / rule_bylaw / directive,
+published ≥ 2015) selected **0** documents: all 251 such PDFs sit in the withheld
+`prod-corpus-scope.json`. That draw was never committed and was deleted. The user
+amended enriched to **circular / guideline_manual, published ≥ 2015** (spec §6.2
+amendment, `f6bb5ef`) and the cohort was redrawn and frozen in `8fbec07`. Enriched
+means "enriched for likely regulatory documents"; it is not a claim that those
+files are Word exports. The first pass over the cohort alone found enriched
+detected **3 < 20**, so the top-up (the next 250 enriched ranks) was frozen BEFORE
+it was fetched. After it enriched detected is **4**: a reported **shortfall**,
+not padded, per §6.2 ("A shortfall after that is reported, never padded").
+
+**Entries and fetch.** 750 entries = 500 enriched + 250 random.
+
+| | entries | fetched | honest HTTP 404 (kept in the denominator, §15's convention) |
+|---|---:|---:|---:|
+| cohort | 500 | 425 | 75 |
+| top-up | 250 | 239 | 11 |
+| **total** | **750** | **664** | **86** |
+
+By stratum: enriched 477 fetched / 23 failed, random 187 / 63. Extraction at
+`native-2` and `native-3` covers 422 distinct cohort blobs and 233 top-up blobs,
+with identical status counts per version. 661 of the 664 fetched PDFs are parsed
+and measured (enriched 474, random 187). Three
+(`1fa83967352a`, `2d18be6998c1`, `d225f79de8ca`) failed `native-2` extraction
+(one is the corrupt top-up PDF that crashed pass 2) and are recorded
+`extraction_failed`, outside the 661. The evidence run failed on any measurement
+error (`measure_errors` and `fonts_report_errors` are both empty); **RESULT
+PASS, exit 0.**
+
+**Non-regression and classifier invariance.** 654 undetected documents: served
+text identical at `native-3` and `native-2`, **0 regressions**. Classifier
+invariance (`native-3` status/ratios equal `native-2`'s on every blob): 661
+checked, 0 missing `native-3` rows, **0 failures**.
+
+**Detector (D ≥ 1/1k, N ≥ 500) against the producers' own ToUnicode
+contradiction signal.** 661 documents:
+
+| | documents |
+|---|---:|
+| detected and contradicted (`both`) | 6 |
+| detected only | 1 |
+| contradiction only | 12 |
+| neither | 642 |
+
+Detected 7 (enriched 4, random 3). **False-positive candidate (1):**
+`2573d7cb8592` (enriched, iLovePDF; detected, no contradiction, 64 pages
+`no_suspect_font`, 0 runs). **False-negative candidates (12):** `151313050583`,
+`17d8d5aada9a`, `181b1809a205`, `1aeef891fd0b`, `271d6c30c150`, `2769d6cf88f4`,
+`76fd016577ba`, `79b525ba6a52`, `839de4721da2`, `9d4c5a2a103c`, `ade79e5c3103`,
+`e483b798de59` — by producer 6 Office Word 2007, 2 iLovePDF, 1 each Word 2010,
+Word 2016 (random) and 3-Heights PDF Security Shell. These are candidates only:
+the contradiction signal is not ground truth and none has been reviewed.
+
+**Prevalence — random stratum only (the only population claim this cohort
+supports).** 3 detected of 187 parsed = **1.6%**, Wilson 95% **[0.55%, 4.61%]**.
+Enriched is not a sample of the corpus and contributes no rate.
+
+**The gate on unseen pages.** The 7 detected documents hold 608 page rows: 463
+`not_applicable` (no Devanagari; 460 are one Nitro Pro 7 document) and **145
+attempted** (every status but `not_applicable`, as §31.1 counts). Totals are
+summed over the `pages` list, not the per-font table below, which groups pages by
+font and producer:
+
+| status | pages | of attempted |
+|---|---:|---:|
+| repaired (`font_tables`) | **11** | **7.6%** |
+| unrepaired: `coverage` | 69 | 47.6% |
+| unrepaired: `no_suspect_font` | 64 | 44.1% |
+| unrepaired: `orphans` | 1 | 0.7% |
+| unrepaired: `roundtrip` / `layout` / `engine_error` / `read_failed` | 0 | 0 |
+| **attempted** | **145** | |
+
+**Against §31.1's development figure of 74.3% of attempted pages repaired
+(1,363 / 1,834), the cohort repairs 11 of 145 (7.6%).** The 11 come from two
+documents (9 from `8a6b67ef3ee6`, enriched, Word 2007; 2 from `6d6f616314e8`,
+random, Excel 2007); the 64 `no_suspect_font` pages are one iLovePDF document;
+by stratum, enriched attempts 126 pages (9 repaired) and random 19 (2 repaired).
+
+| font identity \| producer | repaired | `coverage` | other |
+|---|---:|---:|---|
+| Mangal/675 \| Microsoft® Office Word 2007 | 9 | 3 | |
+| Kalimati/696 \| Microsoft® Office Excel® 2007 | 2 | 9 | |
+| Kalimati/696 \| Microsoft® Word 2019 | 0 | 42 | |
+| Kalimati/696 \| Microsoft® Word 2016 | 0 | 6 | |
+| Mangal/885+Preeti/142 \| Nitro Pro 7 | 0 | 7 | 1 `orphans` |
+| Kokila/725+Nirmala UI/5025 \| Microsoft® Excel® LTSC | 0 | 2 | |
+| – \| iLovePDF | 0 | 0 | 64 `no_suspect_font` (+3 `not_applicable`) |
+| – \| Nitro Pro 7 | 0 | 0 | 460 `not_applicable` |
+
+The `coverage` failures are concentrated in Kalimati/696 under Word 2019 (42
+pages, one enriched document, whose Kalimati subset has no GSUB, as §31.1
+recorded for Word 2019) and the Excel 2007 / Word 2016 / Excel LTSC documents.
+Not every cell matches §31.1's producer grouping: the one Word 2016 document
+(random, `2d6339693ecc`) and the Excel 2007 Kalimati subset here report GSUB
+present, yet still fail `coverage` (6 and 9 pages); the data do not say why, and
+no cause is claimed.
+
+**Run agreement** (runs whose rebuilt text shapes back to the drawn glyphs ÷ all
+suspect-font runs, §31.1's definition): over the 7 detected documents **10,097 /
+12,759 = 0.7914**. Per document: Word 2019 `970233e1bd2f` 3,268 / 5,759 (0.5674);
+Word 2007 `8a6b67ef3ee6` 1,076 / 1,079 (0.9972); Excel LTSC `55be699ef205` 341 /
+446 (0.7646); Word 2016 `2d6339693ecc` 1,786 / 1,807 (0.9884); Excel 2007
+`6d6f616314e8` 2,187 / 2,213 (0.9883); Nitro Pro 7 `d09cbe1c267f` 1,439 / 1,455
+(0.9890); iLovePDF `2573d7cb8592` 0 / 0. §31.1's comparable figure was 0.9086
+over its 30 documents.
+
+**Evaluation & Improvement (cohort stage).** *Success metric:* unchanged from
+§31.1 (attempted pages served repaired with zero gate failures), now on unseen
+pages: 11 / 145. *Eval:* the two frozen manifests above; non-regression 0 of 654,
+invariance 0 of 661; prevalence is from the random stratum alone. *Feedback
+capture:* the evidence JSON (per-document, per-page) beside this section; the 12
+false-negative and 1 false-positive candidates are unreviewed. *Review loop:*
+re-run the evidence script at each engine change; no go/no-go is recorded here.

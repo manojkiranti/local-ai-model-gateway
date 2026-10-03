@@ -1,0 +1,16 @@
+native-3 cohort evidence — local_ai_gateway_p4, engine native-3/repair-1/D=1/N=500/lang=ne/hb-14.5.0
+
+entries: 750
+fetched_pdfs_parsed: 661
+detected: 7
+enriched_detected: 4
+top_up_required: true
+prevalence_random: {"detected": 3, "parsed": 187, "wilson95": [0.0055, 0.0461]}
+non_regression: {"undetected": 654, "regressions": []}
+classifier_invariance: {"checked": 661, "missing_native3": [], "failures": []}
+extraction_failed: ["1fa83967352a", "2d18be6998c1", "d225f79de8ca"]
+measure_errors: []
+fonts_report_errors: []
+crosstab: {"both": 6, "neither": 642, "detected_only": 1, "contradiction_only": 12, "false_negative_candidates": ["151313050583", "17d8d5aada9a", "181b1809a205", "1aeef891fd0b", "271d6c30c150", "2769d6cf88f4", "76fd016577ba", "79b525ba6a52", "839de4721da2", "9d4c5a2a103c", "ade79e5c3103", "e483b798de59"], "false_positive_candidates": ["2573d7cb8592"]}
+run_agreement: {"runs": 12759, "matched": 10097, "rate": 0.7914}
+gate_by_font_and_producer: {"- | Nitro Pro 7": {"not_applicable": 460}, "- | iLovePDF": {"not_applicable": 3, "unrepaired:no_suspect_font": 64}, "Kalimati/696 | Microsoft® Office Excel® 2007": {"unrepaired:coverage": 9, "font_tables": 2}, "Kalimati/696 | Microsoft® Word 2016": {"unrepaired:coverage": 6}, "Kalimati/696 | Microsoft® Word 2019": {"unrepaired:coverage": 42}, "Kokila/725+Nirmala UI/5025 | Microsoft® Excel® LTSC": {"unrepaired:coverage": 2}, "Mangal/675 | Microsoft® Office Word 2007": {"unrepaired:coverage": 3, "font_tables": 9}, "Mangal/885+Preeti/142 | Nitro Pro 7": {"unrepaired:coverage": 7, "unrepaired:orphans": 1}}
