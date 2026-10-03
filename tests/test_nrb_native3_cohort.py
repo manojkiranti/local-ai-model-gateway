@@ -13,7 +13,7 @@ import nrb_native3_cohort as C  # noqa: E402
 from app.nrb import manifest, sampling  # noqa: E402
 
 
-def _cand(key, doc_type="act", year=2020, resource="pdf"):
+def _cand(key, doc_type="circular", year=2020, resource="pdf"):
     return sampling.Candidate(key, year, sampling.year_cohort(year), doc_type, resource,
                               "lgd", ("lgd",), 1)
 
@@ -26,15 +26,15 @@ def test_every_spent_set_is_withheld():
 
 
 def test_the_strata_are_metadata_only():
-    assert C.stratum_of(_cand("a", "act", 2015)) == "enriched"
-    assert C.stratum_of(_cand("a", "directive", 2023)) == "enriched"
-    assert C.stratum_of(_cand("a", "act", 2014)) == "random"
-    assert C.stratum_of(_cand("a", "circular", 2023)) == "random"
-    assert C.stratum_of(_cand("a", "act", None)) == "random"
+    assert C.stratum_of(_cand("a", "circular", 2015)) == "enriched"
+    assert C.stratum_of(_cand("a", "guideline_manual", 2023)) == "enriched"
+    assert C.stratum_of(_cand("a", "circular", 2014)) == "random"
+    assert C.stratum_of(_cand("a", "act", 2023)) == "random"
+    assert C.stratum_of(_cand("a", "circular", None)) == "random"
 
 
 def test_the_draw_is_pdf_only_excludes_spent_keys_and_is_deterministic():
-    pool = [_cand(f"k{i}", "act" if i % 2 else "circular") for i in range(40)]
+    pool = [_cand(f"k{i}", "circular" if i % 2 else "act") for i in range(40)]
     pool.append(_cand("xls", resource="spreadsheet"))
     first = C.draw(pool, excluded=frozenset({"k1"}), seed="s", sizes={"enriched": 5, "random": 5})
     again = C.draw(list(reversed(pool)), excluded=frozenset({"k1"}), seed="s",
@@ -58,6 +58,7 @@ def test_the_manifest_binds_the_detector_and_verifies(tmp_path):
                     sizes={"enriched": 4, "random": 4}, offset=0, drawn_at="2026-10-02T00:00:00+05:45",
                     catalog_counts={}, excluded_sets=list(C.SPENT_SETS))
     assert built.sampler["detector"] == {"density": 0.001, "min_devanagari": 500}
+    assert any("user amendment 2026-10-03" in n for n in built.notes)
     assert manifest.verify_manifest(built).ok
     out = tmp_path / "m.json"
     manifest.write_new_manifest(built, out)

@@ -407,8 +407,15 @@ Frozen and **committed before any network access**.
   population the repair can touch.
 - **Two strata, defined on catalog metadata alone**, so nothing native-3
   computes can shape them:
-  - **Enriched, 250:** primary section ∈ {`act`, `rule_bylaw`, `directive`},
+  - **Enriched, 250:** primary section ∈ {`circular`, `guideline_manual`},
     published 2015 or later. That is where the Word exports appeared.
+    **Amendment (2026-10-03, user decision, before any network access):** the
+    original definition was primary section ∈ {`act`, `rule_bylaw`, `directive`},
+    published 2015 or later. All 251 of its PDFs are in the withheld
+    `prod-corpus-scope.json`, so the stratum and its top-up drew 0 in a dry draw
+    that was never frozen. The unspent counts for the same window are circular
+    975 and guideline_manual 102 (published 2015 or later). The redefinition uses
+    catalog metadata only.
   - **Random, 250:** the rest of the PDF frame, untyped documents included.
     **Population claims (prevalence, false-positive rate) come only from this
     stratum.**

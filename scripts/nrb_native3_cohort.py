@@ -30,7 +30,11 @@ from app.nrb import dbguard, fontrepair, manifest, sampling  # noqa: E402
 
 ALGORITHM = "nrb-native3-v1"
 SEED = "native3-2026-10-02"
-ENRICHED_SECTIONS = frozenset({"act", "rule_bylaw", "directive"})
+# The spec's original {act, rule_bylaw, directive} >= 2015 lies wholly inside the
+# withheld production scope (251 of 251), so the enriched stratum takes NRB's
+# remaining regulatory, Word-authored sections. Metadata-only; decided by the
+# user on 2026-10-03, before any network access.
+ENRICHED_SECTIONS = frozenset({"circular", "guideline_manual"})
 ENRICHED_SINCE = 2015
 SIZES = {"enriched": 250, "random": 250}
 TOP_UP = {"threshold_detected": 20, "size": 250, "stratum": "enriched"}
@@ -99,7 +103,12 @@ def build(candidates, *, excluded, seed, sizes, offset, drawn_at, catalog_counts
         sampler=parameters,
         catalog_counts=dict(catalog_counts),
         strata=strata,
-        notes=("native-3 cohort; population claims from the random stratum only (spec §6.2)",),
+        notes=(
+            "native-3 cohort; population claims from the random stratum only (spec §6.2)",
+            "enriched = circular/guideline_manual ≥2015: the spec's act/rule_bylaw/directive ≥2015 "
+            "lies wholly inside the withheld production scope (user amendment 2026-10-03, "
+            "before any network access)",
+        ),
         entries=entries,
         algorithm_version=ALGORITHM,
         seed=seed,
