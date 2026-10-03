@@ -309,15 +309,21 @@ def _extract_pdf(
     )
     if extractor_version != "native-3":
         return result
-    # Imported here, not at module scope: recovery imports extraction, and the
-    # evidence is the only reason extraction ever looks the other way.
-    from . import fontrepair, recovery
+    # Only the EVIDENCE step is guarded: a failure there must not turn native-2's
+    # verdict into `failed` (spec §2: a native-3 row equals native-2's).
+    try:
+        # Imported here, not at module scope: recovery imports extraction, and the
+        # evidence is the only reason extraction ever looks the other way.
+        from . import fontrepair, recovery
 
-    plan = recovery.plan_document(family=result.family, status=result.status,
-                                  reason=result.reason, metrics=result.metrics)
-    routes = recovery.page_routes(path, plan, read.pages)
-    native = [n for n, (route, _) in enumerate(routes, start=1) if route == recovery.ROUTE_NATIVE]
-    evidence = fontrepair.document_evidence(fontrepair.FontRepairEngine(), path, read.pages, native)
+        plan = recovery.plan_document(family=result.family, status=result.status,
+                                      reason=result.reason, metrics=result.metrics)
+        routes = recovery.page_routes(path, plan, read.pages)
+        native = [n for n, (route, _) in enumerate(routes, start=1) if route == recovery.ROUTE_NATIVE]
+        evidence = fontrepair.document_evidence(fontrepair.FontRepairEngine(), path, read.pages, native)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("NRB extract: native-3 evidence failed (%s)", type(exc).__name__)
+        evidence = {"error": type(exc).__name__}
     return replace(result, metrics={**result.metrics, "native3": evidence})
 
 

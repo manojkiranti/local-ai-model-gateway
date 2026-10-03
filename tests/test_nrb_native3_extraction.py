@@ -25,3 +25,20 @@ def test_native3_classifies_exactly_as_native2_and_adds_only_evidence(tmp_path):
 
 def test_native3_is_a_supported_version():
     assert "native-3" in extraction.SUPPORTED_EXTRACTOR_VERSIONS
+
+
+def test_an_evidence_failure_keeps_native2_verdict(tmp_path, monkeypatch):
+    from app.nrb import fontrepair
+
+    def boom(*args, **kwargs):
+        raise ValueError("secret detail")
+
+    monkeypatch.setattr(fontrepair, "document_evidence", boom)
+    path = W.word_pdf(tmp_path, W.LOHIT.read_bytes())
+    v2 = extraction.extract_file(path, family="pdf", extension="pdf", extractor_version="native-2")
+    v3 = extraction.extract_file(path, family="pdf", extension="pdf", extractor_version="native-3")
+    assert (v3.status, v3.reason, v3.text) == (v2.status, v2.reason, v2.text)
+    for key, value in v2.metrics.items():
+        if key != "duration_ms":
+            assert v3.metrics[key] == value, key
+    assert v3.metrics["native3"] == {"error": "ValueError"}
