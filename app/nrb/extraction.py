@@ -35,7 +35,7 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -75,7 +75,12 @@ EXTRACTOR_VERSION = "native-1"
 # The dispatch is by version rather than by a flag so a row can never be ambiguous
 # about which rules produced it: identity is (content_sha256, extractor_version),
 # and both versions' rows sit side by side for comparison.
-SUPPORTED_EXTRACTOR_VERSIONS = (EXTRACTOR_VERSION, "native-2")
+# native-3 is native-2's CLASSIFIER, unchanged, plus EVIDENCE of what the
+# native route's font repair would do (`metrics["native3"]`). The verdict is
+# computed on the UNREPAIRED text, so a native-3 row's status/reason/metrics
+# equal native-2's (spec §2's condition); the repair itself lives in the native
+# ENGINE (`recovery.native_unit`), never in extraction.
+SUPPORTED_EXTRACTOR_VERSIONS = (EXTRACTOR_VERSION, "native-2", "native-3")
 
 # A sanity-check window for a human reading the report, not a cached artefact.
 # NO extracted text is persisted beyond this: Phase 7 re-parses with Docling for
@@ -294,7 +299,7 @@ def _extract_pdf(
     extractor_version: str = EXTRACTOR_VERSION,
 ) -> ExtractionResult:
     read = file_documents.read_pdf_pages(path)
-    return result_from_pages(
+    result = result_from_pages(
         read.pages,
         parser="pypdf",
         family=family,
@@ -302,6 +307,18 @@ def _extract_pdf(
         extra_metrics={"pages_skipped": read.skipped},
         extractor_version=extractor_version,
     )
+    if extractor_version != "native-3":
+        return result
+    # Imported here, not at module scope: recovery imports extraction, and the
+    # evidence is the only reason extraction ever looks the other way.
+    from . import fontrepair, recovery
+
+    plan = recovery.plan_document(family=result.family, status=result.status,
+                                  reason=result.reason, metrics=result.metrics)
+    routes = recovery.page_routes(path, plan, read.pages)
+    native = [n for n, (route, _) in enumerate(routes, start=1) if route == recovery.ROUTE_NATIVE]
+    evidence = fontrepair.document_evidence(fontrepair.FontRepairEngine(), path, read.pages, native)
+    return replace(result, metrics={**result.metrics, "native3": evidence})
 
 
 def _extract_document(
