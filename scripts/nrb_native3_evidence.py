@@ -13,7 +13,8 @@ Measures, over every fetched PDF in the frozen cohort:
     row on status, reason and every native-2 metric (required: 100%);
   * the detector against font contradiction, as two independent signals;
   * the gate: page statuses and run agreement by font identity x producer.
-Exits 1 when either required property fails. Recovery runs with no converter
+Exits 1 when either required property fails, or when any parsed PDF lacks a
+native-2 or native-3 extraction row (a missing row cannot be compared). Recovery runs with no converter
 and no OCR: only native pages are compared, and both arms fail the other routes
 identically.
 """
@@ -52,6 +53,17 @@ def classification_equal(v2: dict, v3: dict) -> bool:
         return False
     m2, m3 = v2["metrics"] or {}, v3["metrics"] or {}
     return all(m3.get(k) == v for k, v in m2.items() if k != "duration_ms")
+
+
+def invariance_verdict(row: dict) -> str:
+    """"missing" when either extraction row is absent (it cannot be compared and
+    must FAIL the run, not be skipped), else "checked" or "failed"."""
+    if row["s2"] is None or row["s3"] is None:
+        return "missing"
+    same = classification_equal(
+        {"status": row["s2"], "reason": row["r2"], "metrics": row["m2"]},
+        {"status": row["s3"], "reason": row["r3"], "metrics": row["m3"]})
+    return "checked" if same else "failed"
 
 
 def crosstab(records: list[dict]) -> dict:
@@ -135,6 +147,8 @@ def main() -> int:
     rows = asyncio.run(_rows(url, list(stratum)))
     engine = fontrepair.FontRepairEngine()
     records, pages_out, invariance_failures = [], [], []
+    invariance_missing_native3: list[str] = []
+    invariance_checked = 0
     for row in rows:
         sha = row["content_sha256"]
         base = {"key": row["comparison_key"], "stratum": stratum[row["comparison_key"]],
@@ -153,10 +167,13 @@ def main() -> int:
         if family != "pdf":
             records.append({**base, "sha": sha[:12], "parsed": False, "family": family})
             continue
-        if row["s3"] is not None and not classification_equal(
-                {"status": row["s2"], "reason": row["r2"], "metrics": row["m2"]},
-                {"status": row["s3"], "reason": row["r3"], "metrics": row["m3"]}):
-            invariance_failures.append(sha[:12])
+        verdict = invariance_verdict(row)
+        if verdict == "missing":
+            invariance_missing_native3.append(sha[:12])
+        else:
+            invariance_checked += 1
+            if verdict == "failed":
+                invariance_failures.append(sha[:12])
         measured = _measure(path, engine)
         report = fontrepair.fonts_report(path)
         producer = _producer(path)
@@ -187,7 +204,9 @@ def main() -> int:
                               "wilson95": wilson(random_detected, len(random_parsed))},
         "non_regression": {"undetected": sum(1 for r in parsed if not r["detected"]),
                            "regressions": regressions},
-        "classifier_invariance_failures": invariance_failures,
+        "classifier_invariance": {"checked": invariance_checked,
+                                  "missing_native3": invariance_missing_native3,
+                                  "failures": invariance_failures},
         "crosstab": crosstab(parsed),
         "run_agreement": {"runs": runs, "matched": matched,
                           "rate": round(matched / runs, 4) if runs else None},
@@ -200,7 +219,7 @@ def main() -> int:
               if k not in ("database", "engine")]
     Path(args.out_txt).write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
-    ok = not regressions and not invariance_failures
+    ok = not regressions and not invariance_failures and not invariance_missing_native3
     print("RESULT:", "PASS" if ok else "FAIL")
     return 0 if ok else 1
 

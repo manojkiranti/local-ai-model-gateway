@@ -34,3 +34,12 @@ def test_wilson_interval_brackets_the_rate():
     lo, hi = E.wilson(5, 100)
     assert 0 < lo < 0.05 < hi < 0.15
     assert E.wilson(0, 0) == (0.0, 0.0)
+
+
+def test_invariance_verdict_never_skips_a_missing_row():
+    ok = {"s2": "extracted", "r2": "clean", "m2": {"a": 1},
+          "s3": "extracted", "r3": "clean", "m3": {"a": 1}}
+    assert E.invariance_verdict(ok) == "checked"
+    assert E.invariance_verdict({**ok, "s3": None}) == "missing"
+    assert E.invariance_verdict({**ok, "s2": None}) == "missing"
+    assert E.invariance_verdict({**ok, "r3": "legacy_font_suspected"}) == "failed"
