@@ -51,3 +51,13 @@ def test_the_pass_criterion_is_wer_and_no_class_wrong_twice():
     rows.append({"source": "cohort", "cluster": "reph", "verdict": "wrong words (list them)",
                  "wrong": "पनेर्छ", "repaired": "क"})
     assert I.score(rows)["passed"] is False
+
+
+def test_a_wrong_words_verdict_with_no_words_is_unanswered_never_correct():
+    assert I.count_wrong("wrong words (list them)", "") is None
+    assert I.count_wrong("wrong words (list them)", " , ") is None
+    rows = [{"source": "cohort", "cluster": "reph", "verdict": "correct", "wrong": "", "repaired": "क " * 400},
+            {"source": "cohort", "cluster": "rakar", "verdict": "wrong words (list them)", "wrong": "",
+             "repaired": "क " * 400}]
+    out = I.score(rows)
+    assert out["unanswered"] == 1 and out["passed"] is False

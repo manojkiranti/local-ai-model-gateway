@@ -26,7 +26,8 @@ def count_wrong(verdict: str, words: str) -> int | None:
     if verdict == "correct":
         return 0
     if verdict == "wrong words (list them)":
-        return len([w for w in re.split(r"[,\s]+", words or "") if w])
+        n = len([w for w in re.split(r"[,\s]+", words or "") if w])
+        return n or None  # a verdict with no words listed is unanswered, never clean
     return None
 
 
