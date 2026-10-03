@@ -171,7 +171,7 @@ def test_an_operational_script_refuses_the_dev_database_before_connecting(script
 EVIDENCE = [
     "nrb_build_lexicon.py", "nrb_holdout_evidence.py", "nrb_holdout_validate.py",
     "nrb_legacy_eval.py", "nrb_native2_compare.py", "nrb_p7_cohort.py",
-    "nrb_rag_ingest.py", "nrb_supersession_exercise.py",
+    "nrb_rag_ingest.py", "nrb_supersession_exercise.py", "nrb_native3_cohort.py",
 ]
 
 
