@@ -5673,8 +5673,10 @@ and measured (enriched 474, random 187). Three
 (`1fa83967352a`, `2d18be6998c1`, `d225f79de8ca`) failed `native-2` extraction
 (one is the corrupt top-up PDF that crashed pass 2) and are recorded
 `extraction_failed`, outside the 661. The evidence run failed on any measurement
-error (`measure_errors` and `fonts_report_errors` are both empty); **RESULT
-PASS, exit 0.**
+error (`measure_errors` and `fonts_report_errors` are both empty). Pass 2
+crashed on that corrupt top-up PDF (`fonts_report` guarded only the open); fixed
+in `42e8a5c`, after which pass 3 is the result recorded here: **RESULT PASS,
+exit 0.**
 
 **Non-regression and classifier invariance.** 654 undetected documents: served
 text identical at `native-3` and `native-2`, **0 regressions**. Classifier
@@ -5696,8 +5698,8 @@ Detected 7 (enriched 4, random 3). **False-positive candidate (1):**
 `no_suspect_font`, 0 runs). **False-negative candidates (12):** `151313050583`,
 `17d8d5aada9a`, `181b1809a205`, `1aeef891fd0b`, `271d6c30c150`, `2769d6cf88f4`,
 `76fd016577ba`, `79b525ba6a52`, `839de4721da2`, `9d4c5a2a103c`, `ade79e5c3103`,
-`e483b798de59` — by producer 6 Office Word 2007, 2 iLovePDF, 1 each Word 2010,
-Word 2016 (random) and 3-Heights PDF Security Shell. These are candidates only:
+`e483b798de59` — by producer 7 Office Word 2007, 2 iLovePDF, 1 Word 2016 (random,
+`2769d6cf88f4`), 1 Word 2010 and 1 3-Heights PDF Security Shell (12 in all). These are candidates only:
 the contradiction signal is not ground truth and none has been reviewed.
 
 **Prevalence — random stratum only (the only population claim this cohort
@@ -5741,7 +5743,7 @@ pages, one enriched document, whose Kalimati subset has no GSUB, as §31.1
 recorded for Word 2019) and the Excel 2007 / Word 2016 / Excel LTSC documents.
 Not every cell matches §31.1's producer grouping: the one Word 2016 document
 (random, `2d6339693ecc`) and the Excel 2007 Kalimati subset here report GSUB
-present, yet still fail `coverage` (6 and 9 pages); the data do not say why, and
+present, yet still fail `coverage` (all 6 of the Word 2016 pages, 9 of the Excel 2007 document's 11); the data do not say why, and
 no cause is claimed.
 
 **Run agreement** (runs whose rebuilt text shapes back to the drawn glyphs ÷ all
