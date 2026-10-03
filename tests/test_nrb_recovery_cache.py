@@ -903,3 +903,14 @@ def test_a_document_with_no_recoverable_units_is_still_cached():
         assert report.outcome == "warm" and report.units_total == 0
 
     _run(body)
+
+
+def test_stats_executes_and_reports_native_repair():
+    """`stats()` must actually run on Postgres: its GROUP BY expression has to be
+    the same bound expression as the SELECT's, or Postgres raises GroupingError."""
+    async def body(session, Session):
+        return await recovery_cache.stats(session)
+
+    result = _run(body)
+    assert "native_repair" in result
+    assert isinstance(result["native_repair"], list)

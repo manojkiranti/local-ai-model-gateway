@@ -712,14 +712,14 @@ async def stats(session: AsyncSession) -> dict[str, Any]:
             )
         )
     ).all()
+    # ONE expression object: two separately built `detail["repair"]` bind two
+    # different parameters and Postgres rejects the GROUP BY (GroupingError).
+    repair_expr = NRBRecoveryUnit.detail["repair"].astext
     repairs = (
         await session.execute(
-            select(
-                NRBRecoveryUnit.detail["repair"].astext.label("repair"),
-                func.count().label("units"),
-            )
+            select(repair_expr.label("repair"), func.count().label("units"))
             .where(NRBRecoveryUnit.route == recovery.ROUTE_NATIVE)
-            .group_by(NRBRecoveryUnit.detail["repair"].astext)
+            .group_by(repair_expr)
         )
     ).all()
     return {
