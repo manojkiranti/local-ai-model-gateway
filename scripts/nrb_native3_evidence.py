@@ -13,8 +13,11 @@ Measures, over every fetched PDF in the frozen cohort:
     row on status, reason and every native-2 metric (required: 100%);
   * the detector against font contradiction, as two independent signals;
   * the gate: page statuses and run agreement by font identity x producer.
-Exits 1 when either required property fails, or when any parsed PDF lacks a
-native-2 or native-3 extraction row (a missing row cannot be compared). Recovery runs with no converter
+Exits 1 when either required property fails, when any parsed PDF lacks a
+native-2 or native-3 extraction row (a missing row cannot be compared), or when
+a PDF could not be measured at all (`measure_errors`: unverified, never a pass).
+A PDF native-2 itself could not parse (`extraction_failed`) has no native pages
+to regress and is recorded, not counted. Recovery runs with no converter
 and no OCR: only native pages are compared, and both arms fail the other routes
 identically.
 """
@@ -64,6 +67,12 @@ def invariance_verdict(row: dict) -> str:
         {"status": row["s2"], "reason": row["r2"], "metrics": row["m2"]},
         {"status": row["s3"], "reason": row["r3"], "metrics": row["m3"]})
     return "checked" if same else "failed"
+
+
+def row_route(row: dict) -> str:
+    """"extraction_failed" when native-2 could not parse the PDF (nothing to
+    measure, never measured), else "measure"."""
+    return "extraction_failed" if row["s2"] == "failed" else "measure"
 
 
 def crosstab(records: list[dict]) -> dict:
@@ -148,6 +157,9 @@ def main() -> int:
     engine = fontrepair.FontRepairEngine()
     records, pages_out, invariance_failures = [], [], []
     invariance_missing_native3: list[str] = []
+    extraction_failed: list[str] = []
+    measure_errors: list[str] = []
+    fonts_report_errors: list[str] = []
     invariance_checked = 0
     for row in rows:
         sha = row["content_sha256"]
@@ -167,6 +179,10 @@ def main() -> int:
         if family != "pdf":
             records.append({**base, "sha": sha[:12], "parsed": False, "family": family})
             continue
+        if row_route(row) == "extraction_failed":
+            extraction_failed.append(sha[:12])
+            records.append({**base, "sha": sha[:12], "parsed": False, "extraction_failed": True})
+            continue
         verdict = invariance_verdict(row)
         if verdict == "missing":
             invariance_missing_native3.append(sha[:12])
@@ -174,9 +190,16 @@ def main() -> int:
             invariance_checked += 1
             if verdict == "failed":
                 invariance_failures.append(sha[:12])
-        measured = _measure(path, engine)
-        report = fontrepair.fonts_report(path)
-        producer = _producer(path)
+        try:
+            measured = _measure(path, engine)
+            report = fontrepair.fonts_report(path)
+            producer = _producer(path)
+        except Exception as exc:  # noqa: BLE001 - an unmeasurable document fails the run
+            measure_errors.append(sha[:12])
+            records.append({**base, "sha": sha[:12], "parsed": False, "measure_error": type(exc).__name__})
+            continue
+        if "error" in report:
+            fonts_report_errors.append(sha[:12])
         # `contradicts` is present on both the success and the error shape.
         records.append({**base, "sha": sha[:12], "sha_full": sha, "parsed": True, "producer": producer,
                         "contradicts": report["contradicts"], "fonts": report.get("fonts"), **measured})
@@ -207,6 +230,9 @@ def main() -> int:
         "classifier_invariance": {"checked": invariance_checked,
                                   "missing_native3": invariance_missing_native3,
                                   "failures": invariance_failures},
+        "extraction_failed": extraction_failed,
+        "measure_errors": measure_errors,
+        "fonts_report_errors": fonts_report_errors,
         "crosstab": crosstab(parsed),
         "run_agreement": {"runs": runs, "matched": matched,
                           "rate": round(matched / runs, 4) if runs else None},
@@ -219,7 +245,7 @@ def main() -> int:
               if k not in ("database", "engine")]
     Path(args.out_txt).write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
-    ok = not regressions and not invariance_failures and not invariance_missing_native3
+    ok = not regressions and not invariance_failures and not invariance_missing_native3 and not measure_errors
     print("RESULT:", "PASS" if ok else "FAIL")
     return 0 if ok else 1
 

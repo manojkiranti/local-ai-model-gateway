@@ -442,3 +442,39 @@ def test_a_non_form_non_image_xobject_fails_closed(tmp_path, subtype):
     out = _repair(path)
     assert out.status == fontrepair.unrepaired(fontrepair.LAYOUT)
     assert out.detail["declined_forms"] == 1
+
+
+# --------------------------------------------------------------------------- #
+# A PDF whose /Pages tree is invalid: the evidence helpers keep their contract
+# --------------------------------------------------------------------------- #
+def _broken_pages_pdf(tmp_path: Path) -> Path:
+    """Opens fine; pypdf flattens /Pages lazily, so iterating the pages raises."""
+    objs = [b"<< /Type /Catalog /Pages 2 0 R >>",
+            b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+            b"42"]  # a /Kids entry that is not a page dictionary
+    out, offsets = b"%PDF-1.4\n", []
+    for i, obj in enumerate(objs, 1):
+        offsets.append(len(out))
+        out += b"%d 0 obj\n" % i + obj + b"\nendobj\n"
+    xref = len(out)
+    out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objs) + 1)
+    out += b"".join(b"%010d 00000 n \n" % o for o in offsets)
+    out += b"trailer\n<< /Root 1 0 R /Size %d >>\nstartxref\n%d\n%%%%EOF\n" % (len(objs) + 1, xref)
+    body = out
+    path = tmp_path / "bad-pages.pdf"
+    path.write_bytes(body)
+    return path
+
+
+def test_fonts_report_returns_the_error_shape_for_an_invalid_pages_tree(tmp_path):
+    out = fontrepair.fonts_report(_broken_pages_pdf(tmp_path))
+    assert out["fonts"] == [] and out["contradicts"] is False
+    assert isinstance(out["error"], str) and out["error"]
+
+
+def test_document_evidence_does_not_raise_for_an_invalid_pages_tree(tmp_path):
+    path = _broken_pages_pdf(tmp_path)
+    devanagari_text = "कार्यालय " * 120
+    out = fontrepair.document_evidence(fontrepair.FontRepairEngine(), path, [devanagari_text], [1])
+    assert out["native_pages"] == 1
+    assert sum(out["statuses"].values()) == len(out["pages"])

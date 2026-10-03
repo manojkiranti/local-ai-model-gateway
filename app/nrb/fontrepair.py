@@ -759,13 +759,17 @@ def fonts_report(path: Path) -> dict[str, Any]:
     except Exception as exc:  # noqa: BLE001
         return {"error": type(exc).__name__, "fonts": [], "contradicts": False}
     fonts: dict[int, _Font] = {}
-    for page in doc.reader.pages:
-        try:
-            runs, _ = doc.runs(page)
-        except Exception:  # noqa: BLE001
-            continue
-        for run in runs:
-            fonts[id(run.font)] = run.font
+    try:
+        # pypdf flattens /Pages lazily, so the iteration itself can raise.
+        for page in doc.reader.pages:
+            try:
+                runs, _ = doc.runs(page)
+            except Exception:  # noqa: BLE001
+                continue
+            for run in runs:
+                fonts[id(run.font)] = run.font
+    except Exception as exc:  # noqa: BLE001 - the error shape is the contract
+        return {"error": type(exc).__name__, "fonts": [], "contradicts": False}
     rows = [
         {
             "name": f.name,

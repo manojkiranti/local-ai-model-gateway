@@ -43,3 +43,10 @@ def test_invariance_verdict_never_skips_a_missing_row():
     assert E.invariance_verdict({**ok, "s3": None}) == "missing"
     assert E.invariance_verdict({**ok, "s2": None}) == "missing"
     assert E.invariance_verdict({**ok, "r3": "legacy_font_suspected"}) == "failed"
+
+
+def test_a_failed_native2_row_is_extraction_failed_and_never_measured():
+    row = {"s2": "failed", "r2": "parse_error", "m2": None, "s3": "failed", "r3": None, "m3": None}
+    assert E.row_route(row) == "extraction_failed"
+    assert E.row_route({**row, "s2": "extracted"}) == "measure"
+    assert E.row_route({**row, "s2": None}) == "measure"  # missing row is invariance's to fail
