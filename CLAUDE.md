@@ -512,12 +512,12 @@ retained). Runbook: `docs/external-api.md`.
   is_active alone); (5) `sources` is **never** gated by `EXPOSE_TRACE` — the trace
   is diagnostics, a citation is the product — and `null` (no corpus searched) is a
   different fact from `[]`.
-- **The "machine-recovered — VERIFY …" sentence is ONE constant with TWO readers.**
+- **The "machine-recovered — VERIFY …" sentence is ONE constant with THREE readers.**
   `sources.VERIFY_NOTE`/`RECOVERED_ROUTES` are rendered into the model's context by
-  `search_department_docs._nrb_provenance` **and** published as a source's
-  `verify_note`; a second copy would drift, and a UI badge contradicting the answer
+  `search_department_docs._nrb_provenance`, published as a source's
+  `verify_note`, **and** rendered by `read_department_doc`; a second copy would drift, and a UI badge contradicting the answer
   text leaves the reader unable to tell which to believe
-  (`test_the_caveat_is_one_constant_with_two_readers`). A source's `routes` is the
+  (`test_the_caveat_is_one_constant_with_three_readers`). A source's `routes` is the
   **union** over the pages the model saw, because an NRB PDF is routed per PAGE
   (§16) — reporting only the first route would hide the recovered page, which is
   exactly the page a reader must check. `authoritative: false` alone is enough to

@@ -1,9 +1,14 @@
 # native-3: repairing NRB text layers through their own fonts
 
 **Date:** 2026-10-02
-**Status:** design approved section by section in conversation (2026-10-01/02);
-this written spec awaits review. No code exists yet. Phase 1 (§3–§6, §8, §9)
-is one implementation plan; Phase 2 (§7) gets its own plan after Phase 1 ships.
+**Status:** design approved section by section in conversation (2026-10-01/02).
+**Phase 1 is BUILT (2026-10-04):** the engine, its wiring into recovery, the
+recovery cache, RAG chunk metadata and the three caveat readers, all behind
+`NRB_NATIVE_REPAIR` (default **off**); CHECKPOINT A measured, the cohort frozen
+and evaluated (`docs/nrb-integration.md` §31). The production repair run and
+turning the flag on wait for the Nepali reader's verdicts (CHECKPOINT B, §6.4).
+Phase 1 (§3–§6, §8, §9) is one implementation plan; Phase 2 (§7) gets its own
+plan after Phase 1 ships.
 **Scope:** `app/nrb/` (four new modules, small edits to `recovery`,
 `recovery_cache`, `rag`, `extraction`), `app/rag/sources.py` and the two
 retrieval tools, `app/config.py`, `requirements-worker.txt`, new scripts, a new
@@ -161,7 +166,7 @@ that importing `app.main` loads neither, in the shape of
 | `app/nrb/glyphtable.py` | One embedded TrueType program → `GlyphTable`: gid → (text, class), with class ∈ `plain`/`prebase`/`reph`. See §3.3. Also the font-identity fingerprint (family without subset prefix, glyph count, sha256 of the full advance-width vector) that Phase 2 needs. | fontTools |
 | `app/nrb/reorder.py` | Visual token stream → logical Unicode. A marker with no legal attachment is an **orphan**: counted and never guessed. Output NFC. | nothing (pure) |
 | `app/nrb/shaping.py` | `available()`, `version()`, `shape(font_program, text, *, script="deva", lang="ne") → tuple[gid, …]` | uharfbuzz |
-| `app/nrb/fontrepair.py` | One PDF page → `RepairOutcome(status, text, detail)` where status ∈ `repaired` / `unrepaired:<why>` / `not_applicable`. Finds suspect fonts (§4.2), installs a corrected ToUnicode with markers on an **in-memory** reader, extracts with **the same `extract_text` call** `documents.read_pdf_pages` makes, reorders, runs the gate (§4.3). Glyph tables are memoized by font-program digest within a process. | the three above, pypdf |
+| `app/nrb/fontrepair.py` | One PDF page → `RepairOutcome(status, text, detail)` where status ∈ `repaired` / `unrepaired:<why>` / `not_applicable`. Finds suspect fonts (§4.2), installs a corrected ToUnicode with markers on an **in-memory** reader, extracts with **the same `extract_text` call** `documents.read_pdf_pages` makes, reorders, runs the gate (§4.3). Glyph tables are memoized per DOCUMENT (each font object analysed once while that PDF is open), not by font-program digest across a process — amended 2026-10-04 to match the code. | the three above, pypdf |
 
 ### 3.2 Edits to existing files
 
@@ -233,7 +238,10 @@ that importing `app.main` loads neither, in the shape of
 - Obligations: keep uharfbuzz's Apache licence and NOTICE in the worker image,
   and read the wheel's bundled per-directory COPYING files when the dependency
   is added. Recorded beside §12's npttf2utf licence note.
-- No font bytes or font tables enter the repository in either phase (§7).
+- No NRB or proprietary font bytes or font tables enter the repository in
+  either phase (§7). The one exception is the test fixture
+  `tests/fixtures/fonts/Lohit-Devanagari.ttf` (OFL-1.1, its licence committed
+  beside it as `Lohit-Devanagari.LICENSE`), which the tests shape with.
 
 ### 3.5 Data flow
 
@@ -277,12 +285,15 @@ Neither can stand in for the other (§1.1).
 Inside a suspect document, a font is **SUSPECT** when all of these hold:
 - it is Type0 over CIDFontType2 with an embedded `FontFile2`;
 - it is encoded Identity-H, with an Identity or stream CIDToGIDMap (any other
-  encoding is `not_applicable` in Phase 1);
+  encoding is `unrepaired:unsupported_font` in Phase 1 — see §5.1's note on
+  `not_applicable`);
 - it carries a ToUnicode;
-- that ToUnicode **contradicts the font's own cmap** on at least one glyph the
-  page draws. "Contradicts" means the label is not among the codepoints the
-  cmap maps to that gid. Ligature glyphs, which have no cmap entry, cannot
-  contradict.
+- that ToUnicode **contradicts the font's own cmap** on at least one code.
+  "Contradicts" means the label is not among the codepoints the cmap maps to
+  that gid. Ligature glyphs, which have no cmap entry, cannot contradict.
+  **As built (amended 2026-10-04):** contradiction is judged per FONT across
+  its whole ToUnicode, not only over the glyphs one page draws — Word decides a
+  glyph's label once per file, so a font that lies anywhere lies everywhere.
 
 A page is attempted only if it draws text in a suspect font. Only suspect fonts
 get the corrected map; Calibri, Times and a healthy Mangal on the same page pass
@@ -306,10 +317,13 @@ never widens.
    A development-set mismatch is a finding to fix in `glyphtable`/`reorder`,
    with a new repair version. It is **never** a percentage quietly accepted.
 4. **Layout agreement.** The served text is pypdf's extraction through the
-   corrected map, then reordered. With all whitespace removed, it must equal
-   the round-tripped runs together with the other fonts' text, in content
-   order, also with whitespace removed. This proves pypdf's layout only *added
-   whitespace*: it never split a syllable or reordered runs. The intra-word
+   corrected map, then reordered. With all whitespace removed, it must
+   **contain** every round-tripped run, in content order, also with whitespace
+   removed. This proves pypdf's layout only *added whitespace* around them: it
+   never split a syllable or reordered runs. **As built (amended 2026-10-04):**
+   the check is containment in order (`fontrepair.missing_in_order`), not
+   equality with every font's text; the other fonts' text is pypdf's own,
+   unchanged. A form XObject the walker declined to visit also fails `layout`. The intra-word
    spaces pypdf already inserts today (`आफू ले`) are unchanged and out of
    scope.
 
@@ -332,8 +346,13 @@ A page in a detected document that is not served repaired keeps **today's
 native text**. That covers four cases:
 - a gate failure;
 - no suspect font on the page;
-- `not_applicable` (an unsupported encoding);
+- an unsupported font or encoding (`unrepaired:unsupported_font`);
 - a missing shaper.
+
+**`not_applicable`, as built (amended 2026-10-04),** is a page with no
+Devanagari at all — an English annex inside a detected Act. It keeps its native
+text and, **deliberately, carries no caveat**: nothing on it was a candidate for
+the defect, and over-warning trains a reader to ignore the warning (`docs/nrb-integration.md` §29.2).
 
 Its unit records `detail.repair = "unrepaired:<why>"`, and its chunks carry
 `text_repair: "unrepaired"` and `authoritative: false`. Repaired pages carry
@@ -374,7 +393,7 @@ caution while the citation badge says VERIFY. That is the contradiction the
 one-constant rule exists to prevent. The fix: **one shared predicate**,
 `sources.is_machine_recovered(route, authoritative)`, used by all three. The
 existing `test_the_caveat_is_one_constant_with_two_readers` is extended to
-cover it.
+cover it (it is now `test_the_caveat_is_one_constant_with_three_readers`).
 
 **The wording stays the single `VERIFY_NOTE`** ("machine-recovered — VERIFY
 figures, dates and names against the source"). It is accurate for repaired
@@ -408,7 +427,8 @@ Frozen and **committed before any network access**.
 - **Two strata, defined on catalog metadata alone**, so nothing native-3
   computes can shape them:
   - **Enriched, 250:** primary section ∈ {`circular`, `guideline_manual`},
-    published 2015 or later. That is where the Word exports appeared.
+    published 2015 or later — enriched for likely Word-authored regulatory
+    documents (not established).
     **Amendment (2026-10-03, user decision, before any network access):** the
     original definition was primary section ∈ {`act`, `rule_bylaw`, `directive`},
     published 2015 or later. All 251 of its PDFs are in the withheld
@@ -693,9 +713,15 @@ A repaired chunk counts only while the reader's sample says the repair is right.
   | 7 | an English native page | `not_applicable` |
   | 8 | a Preeti page | never reaches `native_unit` |
 
-- **Current pass rate: unmeasured.** Nothing is built. The throwaway probe got
-  case 1's direction right, but its output kept 4 illegal clusters and about 6
-  legal-but-wrong words, which the gate would have rejected.
+- **Current pass rate: unmeasured against reader-confirmed lines.** The engine
+  is built and gated (flag off); the labelled file above was not created, and
+  its role is taken by CHECKPOINT A (`docs/nrb-integration.md` §31.1: 30
+  detected documents, 1,363 pages `font_tables` on the development set) and the
+  frozen cohort (§31.2: 11 of 145 attempted pages repaired on unseen data).
+  Reference lines come from the reader's sheet (§6.4, CHECKPOINT B), which is
+  still unanswered. The throwaway probe got case 1's direction right, but its
+  output kept 4 illegal clusters and about 6 legal-but-wrong words, which the
+  gate would have rejected.
 - **`reorder.py`** gets exhaustive hand-built cases: `ि` before a cluster,
   `ि` before a conjunct, reph after a matra, `ि` with reph (`र्ति`), rakar
   (`प्र`, the probe's bug), a half-form conjunct (`क्ष`), and orphans of each

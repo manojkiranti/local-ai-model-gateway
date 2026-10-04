@@ -33,11 +33,12 @@ from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import Any, Iterator, Optional
 
-# The vocabulary of a machine-recovered citation, defined ONCE and read twice:
-# `search_department_docs` renders it into the model's context, and the chat API
-# publishes it as `verify_note`. Two copies of this sentence would drift, and a UI
-# badge disagreeing with the answer text is worse than neither — the reader cannot
-# tell which to believe. `test_the_caveat_is_one_constant_with_two_readers` locks it.
+# The vocabulary of a machine-recovered citation, defined ONCE and read three
+# times: `search_department_docs` renders it into the model's context, the chat
+# API publishes it as `verify_note`, and `read_department_doc` renders it over a
+# whole document. Copies of this sentence would drift, and a UI badge disagreeing
+# with the answer text is worse than neither — the reader cannot tell which to
+# believe. `test_the_caveat_is_one_constant_with_three_readers` locks it.
 #
 # Why the caveat exists at all: OCR output is explicitly `authoritative: false`
 # (§16.6), a legacy-font conversion is still `awaiting_nepali_review` (§15), and

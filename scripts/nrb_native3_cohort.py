@@ -32,8 +32,9 @@ ALGORITHM = "nrb-native3-v1"
 SEED = "native3-2026-10-02"
 # The spec's original {act, rule_bylaw, directive} >= 2015 lies wholly inside the
 # withheld production scope (251 of 251), so the enriched stratum takes NRB's
-# remaining regulatory, Word-authored sections. Metadata-only; decided by the
-# user on 2026-10-03, before any network access.
+# remaining regulatory sections — enriched for likely Word-authored regulatory
+# documents (not established). Metadata-only; decided by the user on
+# 2026-10-03, before any network access.
 ENRICHED_SECTIONS = frozenset({"circular", "guideline_manual"})
 ENRICHED_SINCE = 2015
 SIZES = {"enriched": 250, "random": 250}

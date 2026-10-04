@@ -5437,8 +5437,29 @@ the caveat wording for conversions that are by then verified.
 
 Design: `docs/superpowers/specs/2026-10-02-native3-font-repair-design.md`; plan:
 `docs/superpowers/plans/2026-10-02-native3-font-repair.md`. The engine is
-`app/nrb/{shaping,reorder,glyphtable,fontrepair}.py`; nothing is wired into
-recovery yet (`NRB_NATIVE_REPAIR` does not exist until Task 6, and defaults off).
+`app/nrb/{shaping,reorder,glyphtable,fontrepair}.py`, and it IS wired in: into
+recovery (`recovery.native_unit`, rule 6), the recovery cache (the native
+route's engine version), RAG chunk metadata (`text_repair`, `authoritative`)
+and the three caveat readers (`sources.is_machine_recovered`) — all behind
+`NRB_NATIVE_REPAIR`, which defaults **off**. With it off the native engine
+string is `passthrough/native-2`, the detector does not run and output is
+byte-identical. The production repair run and turning the flag on wait for the
+Nepali reader's CHECKPOINT B (the `native3-repair` sheet of the review workbook).
+
+**Version discipline.** The reader's sheet was built by `native-3/repair-1` at
+commit `34ae1cd`. Any engine change that alters repaired output — glyphtable's
+rules, `reorder`, the gate, `rejoin` — must bump `fontrepair.REPAIR_VERSION`;
+under the spec's §6.4 the reviewed excerpts of every class it affects then
+become development evidence, and validating the new version needs fresh
+excerpts. The final review's resource bounds (2026-10-04: ToUnicode codes and
+labels clamped to the two-byte window and capped at 65,536, the CIDToGIDMap
+truncated at 65,536, font programs over 16 MB / 65,535 glyphs / 4,096 GSUB
+lookups and unsettled derivations refused as `unsupported_font`) are
+output-neutral on real Identity-H files and kept `repair-1`. Checked, not
+assumed: `scripts/nrb_native3_detect.py --repair-report` over
+`local_ai_gateway_build` before and after the change gave the same summary
+(338 documents, 30 detected, 1,363 `font_tables`, run agreement 0.9086) and
+zero per-document differences across all 3,196 per-page statuses.
 
 ### 31.1 Development measurement (CHECKPOINT A)
 
