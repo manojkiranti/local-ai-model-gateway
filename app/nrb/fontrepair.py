@@ -79,6 +79,7 @@ logger = logging.getLogger("app.nrb.fontrepair")
 __all__ = [
     "COVERAGE", "DETECT_DENSITY", "DETECT_MIN_DEVANAGARI", "Detection",
     "ENGINE_ERROR", "ENGINE_PREFIX", "FontRepairEngine", "LAYOUT",
+    "MAX_CID_TO_GID", "MAX_CODE", "MAX_LABEL_CHARS", "MAX_TOUNICODE_LABELS",
     "NOT_APPLICABLE", "NO_SUSPECT_FONT", "ORPHANS", "READ_FAILED",
     "REPAIR_VERSION", "ROUNDTRIP", "RepairOutcome", "SHAPER_UNAVAILABLE",
     "STATUS_REPAIRED", "UNAVAILABLE", "UNREPAIRED_PREFIX", "UNSUPPORTED_FONT",
@@ -132,6 +133,19 @@ _SIGNS = frozenset({REPH, PREBASE, "\u093c", "\u094d"}) | frozenset(
                      *range(0x093E, 0x094D), 0x094E, 0x094F,
                      0x0955, 0x0956, 0x0957, 0x0962, 0x0963))
 MAX_XOBJECT_DEPTH = 3
+
+# --- resource bounds on untrusted maps (final review I1) --------------------- #
+# Output-neutral on real files: Identity-H codes are two bytes, so nothing a
+# page can draw lies outside these windows (REPAIR_VERSION stays repair-1).
+# A drawn Identity-H code is two bytes; a label for a larger one is never read.
+MAX_CODE = 0xFFFF
+# One label per two-byte code; ~1 KB of ranges used to expand to 2.6M labels.
+MAX_TOUNICODE_LABELS = 65_536
+# A real label is a cluster of a few characters; a megabyte one, copied per
+# code of a 65,536-code range, is a memory bomb.
+MAX_LABEL_CHARS = 64
+# A CIDToGIDMap entry per two-byte CID; anything past it is never looked up.
+MAX_CID_TO_GID = 65_536
 _SHOW_OPS = frozenset({b"Tj", b"TJ", b"'", b'"'})
 
 
@@ -211,26 +225,58 @@ def _utf16(hexstr: bytes) -> str:
 
 
 def parse_tounicode(data: bytes) -> dict[int, str]:
+    """A ToUnicode CMap's labels, code → text, bounded (module constants).
+
+    Codes outside 0..MAX_CODE are skipped (a range is clamped to that window;
+    one wholly outside it, or reversed, is skipped), a destination longer than
+    MAX_LABEL_CHARS is skipped, and parsing stops after MAX_TOUNICODE_LABELS
+    labels are written. None of these can fire on a real Identity-H map.
+    """
     labels: dict[int, str] = {}
+    budget = MAX_TOUNICODE_LABELS
+
+    def put(code: int, text: str) -> bool:
+        nonlocal budget
+        if budget <= 0:
+            return False
+        labels[code] = text
+        budget -= 1
+        return True
+
+    def label(hexstr: bytes) -> str | None:
+        if len(hexstr) > 4 * MAX_LABEL_CHARS:  # four hex digits per UTF-16 unit
+            return None
+        return _utf16(hexstr)
+
     for block in _BFCHAR.findall(data):
         for src, dst in _PAIR.findall(block):
-            labels[int(src, 16)] = _utf16(dst)
+            code, text = int(src, 16), label(dst)
+            if code > MAX_CODE or text is None:
+                continue
+            if not put(code, text):
+                return labels
     for block in _BFRANGE.findall(data):
         for lo_hex, hi_hex, dst in _RANGE.findall(block):
-            lo, hi = int(lo_hex, 16), int(hi_hex, 16)
-            if hi < lo or hi - lo > 0xFFFF:
+            lo, hi = int(lo_hex, 16), min(int(hi_hex, 16), MAX_CODE)
+            if lo > MAX_CODE or hi < lo:
                 continue
             if dst.startswith(b"["):
                 for k, item in enumerate(_HEX.findall(dst)):
-                    labels[lo + k] = _utf16(item)
+                    text = label(item)
+                    if lo + k > MAX_CODE:
+                        break
+                    if text is None:
+                        continue
+                    if not put(lo + k, text):
+                        return labels
                 continue
-            base = _utf16(dst[1:-1])
+            base = label(dst[1:-1])
             if not base:
                 continue
             for k in range(hi - lo + 1):
                 last = ord(base[-1]) + k
-                if last <= 0x10FFFF:
-                    labels[lo + k] = base[:-1] + chr(last)
+                if last <= 0x10FFFF and not put(lo + k, base[:-1] + chr(last)):
+                    return labels
     return labels
 
 
@@ -381,6 +427,7 @@ class _Font:
     labels: dict[int, str] = field(default_factory=dict)
     contradictions: int = 0
     corrected: bool = False
+    _codes_by_gid: dict[int, list[int]] | None = field(default=None, repr=False)
 
     @property
     def suspect(self) -> bool:
@@ -390,9 +437,16 @@ class _Font:
         return code if self.cid_to_gid is None else self.cid_to_gid.get(code, 0)
 
     def codes_for(self, gid: int) -> list[int]:
+        """Every code that draws `gid`, ascending. The CIDToGIDMap is inverted
+        ONCE per font, not scanned per glyph (up to 65,536 x glyphs)."""
         if self.cid_to_gid is None:
             return [gid]
-        return [code for code, g in self.cid_to_gid.items() if g == gid]
+        if self._codes_by_gid is None:
+            inverse: dict[int, list[int]] = {}
+            for code, g in self.cid_to_gid.items():
+                inverse.setdefault(g, []).append(code)
+            self._codes_by_gid = inverse
+        return list(self._codes_by_gid.get(gid, ()))
 
     def install_corrected(self) -> None:
         """Replace this font's ToUnicode, in memory, with the table's tokens."""
@@ -417,7 +471,8 @@ def _cid_to_gid(obj: Any) -> dict[int, int] | None:
     if resolved is None or str(resolved) == "/Identity":
         return None
     data = resolved.get_data()
-    return {i: int.from_bytes(data[2 * i:2 * i + 2], "big") for i in range(len(data) // 2)}
+    count = min(len(data) // 2, MAX_CID_TO_GID)
+    return {i: int.from_bytes(data[2 * i:2 * i + 2], "big") for i in range(count)}
 
 
 def _contradictions(font: _Font) -> int:

@@ -255,3 +255,67 @@ def test_a_font_with_no_unicode_cmap_says_nothing():
     table = GT.build_glyph_table(_symbol_cmap_only(LOHIT.read_bytes()))
     assert table.cmap_chars == {}
     assert table.tokens == {}
+
+
+# --------------------------------------------------------------------------- #
+# Resource bounds on an untrusted font program (final review I1)
+# --------------------------------------------------------------------------- #
+def test_an_oversized_font_program_is_unsupported_before_it_is_parsed():
+    with pytest.raises(GT.UnsupportedFont):
+        GT.build_glyph_table(b"\x00" * (GT.MAX_PROGRAM_BYTES + 1))
+
+
+def test_a_font_with_more_glyphs_than_the_cap_is_unsupported(monkeypatch):
+    monkeypatch.setattr(GT, "MAX_GLYPHS", 700)  # Lohit has 711
+    with pytest.raises(GT.UnsupportedFont):
+        _table()
+
+
+def test_a_gsub_with_more_lookups_than_the_cap_is_unsupported(monkeypatch):
+    monkeypatch.setattr(GT, "MAX_GSUB_LOOKUPS", 35)  # Lohit has 36
+    with pytest.raises(GT.UnsupportedFont):
+        _table()
+
+
+def test_the_real_fonts_sit_inside_every_cap():
+    for font in _fonts():
+        assert GT.build_glyph_table(font.read_bytes()).tokens
+
+
+def _fake_gsub(chain: int):
+    """`chain` contextual lookups, each applying the PREVIOUS one, with the only
+    feature on the LAST: tags flow back one lookup per pass of `_lookup_tags`."""
+    from types import SimpleNamespace as NS
+
+    def contextual(target):
+        return NS(LookupType=6, SubTable=[NS(SubstLookupRecord=[NS(LookupListIndex=target)])])
+
+    lookups = [NS(LookupType=1, SubTable=[])] + [contextual(i - 1) for i in range(1, chain)]
+    feature = NS(FeatureTag="half", Feature=NS(LookupListIndex=[chain - 1]))
+    return NS(LookupList=NS(Lookup=lookups), FeatureList=NS(FeatureRecord=[feature]))
+
+
+def test_lookup_tags_inherit_through_a_short_chain():
+    tags = GT._lookup_tags(_fake_gsub(5))
+    assert all(tags[i] == frozenset({"half"}) for i in range(5))
+
+
+def test_lookup_tags_that_do_not_settle_within_the_bound_make_the_font_unsupported():
+    with pytest.raises(GT.UnsupportedFont):
+        GT._lookup_tags(_fake_gsub(GT.MAX_TAG_PASSES + 2))
+
+
+def test_a_derivation_that_does_not_converge_is_unsupported_not_partial():
+    """MAX_PASSES used to truncate silently and serve a possibly incomplete table.
+    Single substitutions listed last-first advance one glyph per pass."""
+    n = GT.MAX_PASSES + 3
+    rules = [_r({"ccmp"}, [i], i + 1) for i in reversed(range(n))]
+    with pytest.raises(GT.UnsupportedFont):
+        GT.derive({0: "क"}, rules)
+
+
+def test_a_derivation_that_converges_within_the_bound_is_kept():
+    n = GT.MAX_PASSES - 3
+    rules = [_r({"ccmp"}, [i], i + 1) for i in reversed(range(n))]
+    tokens, ambiguous = GT.derive({0: "क"}, rules)
+    assert tokens[n] == "क" and not ambiguous

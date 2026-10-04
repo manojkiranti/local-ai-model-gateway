@@ -60,7 +60,12 @@ __all__ = [
     "DEFAULT_FEATURES",
     "FontIdentity",
     "GlyphTable",
+    "MAX_GLYPHS",
+    "MAX_GSUB_LOOKUPS",
+    "MAX_PROGRAM_BYTES",
+    "MAX_TAG_PASSES",
     "Rule",
+    "UnsupportedFont",
     "VATTU_FEATURES",
     "build_glyph_table",
     "derive",
@@ -77,9 +82,29 @@ VATTU_FEATURES = frozenset({"blwf", "pstf", "vatu"})
 MAX_CANDIDATES = 8
 MAX_PASSES = 16
 
+# --- resource bounds on an UNTRUSTED program (final review I1) --------------- #
+# Each one refuses the font — `UnsupportedFont`, which `fontrepair` records as
+# `unrepaired:unsupported_font` — rather than trusting a partial answer. Real
+# embedded Devanagari subsets sit far inside all four (Lohit: 155 KB, 711
+# glyphs, 36 lookups; Kalimati: 155 KB, 751 glyphs, 21 lookups).
+# Font programs Word embeds are subsets of KBs; 16 MB is past any real one.
+MAX_PROGRAM_BYTES = 16 * 1024 * 1024
+# A glyph id is a uint16 in TrueType, so more glyphs cannot be a real font.
+MAX_GLYPHS = 65_535
+# Real Devanagari fonts carry tens of lookups; thousands is a crafted GSUB.
+MAX_GSUB_LOOKUPS = 4_096
+# `_lookup_tags` settles in (longest contextual chain + 1) passes; real fonts
+# need a handful, so a table still changing after 64 is not trusted.
+MAX_TAG_PASSES = 64
+
 _VIRAMA = "्"
 _I_SIGN = "ि"
 _REPH_TEXT = "र्"
+
+
+class UnsupportedFont(ValueError):
+    """A program this module refuses to read: over a resource bound, or one
+    whose derivation did not settle. Never a partial table."""
 
 
 def _nfc(text: str) -> str:
@@ -177,6 +202,9 @@ def derive(
 
     Candidates only ever grow, so this terminates; `MAX_CANDIDATES` caps a set
     that is ambiguous anyway, and `MAX_PASSES` caps chains of substitutions.
+    A derivation still changing after `MAX_PASSES` raises `UnsupportedFont`:
+    its candidate sets may be incomplete, and a glyph with one candidate found
+    so far would read as unambiguous when it is not.
     """
     cands: dict[int, set[str]] = {g: {_nfc(t)} for g, t in seed.items()}
     refused: set[int] = set()
@@ -206,6 +234,8 @@ def derive(
                     changed = True
         if not changed:
             break
+    else:
+        raise UnsupportedFont(f"GSUB derivation did not converge in {MAX_PASSES} passes")
     tokens = {g: next(iter(s)) for g, s in cands.items() if len(s) == 1 and g not in refused}
     ambiguous = frozenset({g for g, s in cands.items() if len(s) > 1} | refused)
     return tokens, ambiguous
@@ -262,14 +292,18 @@ def _lookup_tags(table: Any) -> dict[int, frozenset[str]]:
         for typ, st in _subtables(lookup):
             if typ in (5, 6):
                 refs[li].update(_referenced(st))
-    changed = True
-    while changed:
+    for _ in range(MAX_TAG_PASSES):
         changed = False
         for li, targets in refs.items():
             for target in targets:
                 before = len(tags[target])
                 tags[target] |= tags[li]
                 changed |= len(tags[target]) != before
+        if not changed:
+            break
+    else:
+        # Partial tags could leave a lookup without the feature that gates it.
+        raise UnsupportedFont(f"GSUB lookup tags did not settle in {MAX_TAG_PASSES} passes")
     return {li: frozenset(tags[li]) for li in range(len(lookups))}
 
 
@@ -334,11 +368,20 @@ def _identity(font: Any, order: Sequence[str]) -> FontIdentity:
 
 def build_glyph_table(program: bytes) -> GlyphTable:
     """One embedded TrueType program → its glyph table. Raises on an unreadable
-    program; `fontrepair` records that as `unsupported_font`."""
+    program, or one over a resource bound (`UnsupportedFont`); `fontrepair`
+    records either as `unsupported_font`."""
+    if len(program) > MAX_PROGRAM_BYTES:
+        raise UnsupportedFont(f"font program of {len(program)} bytes")
     from fontTools.ttLib import TTFont
 
     font = TTFont(io.BytesIO(program))
     order = font.getGlyphOrder()
+    if len(order) > MAX_GLYPHS:
+        raise UnsupportedFont(f"{len(order)} glyphs")
+    if "GSUB" in font:
+        lookup_list = font["GSUB"].table.LookupList
+        if lookup_list is not None and len(lookup_list.Lookup) > MAX_GSUB_LOOKUPS:
+            raise UnsupportedFont(f"{len(lookup_list.Lookup)} GSUB lookups")
     gid_of = {name: i for i, name in enumerate(order)}
     chars = _cmap_chars(font, gid_of)
     has_gsub = "GSUB" in font

@@ -478,3 +478,83 @@ def test_document_evidence_does_not_raise_for_an_invalid_pages_tree(tmp_path):
     out = fontrepair.document_evidence(fontrepair.FontRepairEngine(), path, [devanagari_text], [1])
     assert out["native_pages"] == 1
     assert sum(out["statuses"].values()) == len(out["pages"])
+
+
+# --------------------------------------------------------------------------- #
+# Resource bounds on untrusted ToUnicode / CIDToGIDMap / font input (final review I1)
+# --------------------------------------------------------------------------- #
+def test_a_crafted_tounicode_cannot_expand_past_the_label_cap_and_is_fast():
+    """The reviewer's measurement: ~1 KB expanded to 2,621,440 labels."""
+    import time
+
+    wide = b"".join(b"<%08X> <%08X> <0041>\n" % (k << 16, (k << 16) | 0xFFFF) for k in range(10))
+    full = b"<0000> <FFFF> <0041>\n" * 10
+    data = b"20 beginbfrange\n" + wide + full + b"endbfrange\n"
+    assert len(data) < 600
+    started = time.perf_counter()
+    labels = fontrepair.parse_tounicode(data)
+    assert len(labels) <= fontrepair.MAX_TOUNICODE_LABELS == 65_536
+    assert time.perf_counter() - started < 1.0
+    assert all(0 <= code <= 0xFFFF for code in labels)
+
+
+def test_codes_outside_the_two_byte_window_are_skipped_not_errors():
+    """A range is clamped to the window; one wholly outside it, or reversed, is
+    skipped; a single code outside it is skipped."""
+    data = (b"2 beginbfchar\n<00010000> <0915>\n<0001> <0915>\nendbfchar\n"
+            b"3 beginbfrange\n<FFFE> <00010001> <0905>\n<0020> <0010> <0905>\n"
+            b"<00020000> <00020002> [<0924> <093F> <0915>]\nendbfrange\n")
+    assert fontrepair.parse_tounicode(data) == {1: "क", 0xFFFE: "अ", 0xFFFF: "आ"}
+
+
+def test_a_bfrange_array_never_writes_past_the_window():
+    data = b"1 beginbfrange\n<FFFF> <FFFF> [<0924> <093F>]\nendbfrange\n"
+    assert fontrepair.parse_tounicode(data) == {0xFFFF: "त"}
+
+
+def test_an_oversized_destination_string_is_skipped():
+    huge = b"0915" * (fontrepair.MAX_LABEL_CHARS + 1)
+    data = (b"1 beginbfrange\n<0000> <FFFF> <" + huge + b">\nendbfrange\n"
+            b"1 beginbfchar\n<0002> <" + huge + b">\nendbfchar\n")
+    assert fontrepair.parse_tounicode(data) == {}
+
+
+def test_the_cid_to_gid_map_is_truncated_at_the_two_byte_window():
+    class Stream:
+        def get_data(self):
+            return b"\x00\x01" * (fontrepair.MAX_CID_TO_GID + 10)
+
+    mapping = fontrepair._cid_to_gid(Stream())
+    assert len(mapping) == fontrepair.MAX_CID_TO_GID == 65_536
+
+
+def test_codes_for_inverts_the_cid_to_gid_map_once_per_font():
+    class Counting(dict):
+        calls = 0
+
+        def items(self):
+            Counting.calls += 1
+            return super().items()
+
+    mapping = Counting({0: 0, 1: 5, 2: 7, 3: 5, 4: 9})
+    font = fontrepair._Font(name="F", font_obj=None, cid_to_gid=mapping)
+    assert font.codes_for(5) == [1, 3]
+    assert font.codes_for(7) == [2]
+    assert font.codes_for(42) == []
+    assert Counting.calls == 1
+    assert fontrepair._Font(name="I", font_obj=None).codes_for(5) == [5]
+
+
+@pytest.mark.parametrize("cap, value", [
+    ("MAX_PROGRAM_BYTES", 1000),
+    ("MAX_GLYPHS", 700),
+    ("MAX_GSUB_LOOKUPS", 35),
+])
+def test_a_font_over_a_cap_is_unsupported_font_and_keeps_the_native_text(tmp_path, monkeypatch, cap, value):
+    from app.nrb import glyphtable
+
+    path = W.word_pdf(tmp_path, LOHIT)
+    monkeypatch.setattr(glyphtable, cap, value)
+    out = _repair(path)
+    assert out.status == fontrepair.unrepaired(fontrepair.UNSUPPORTED_FONT)
+    assert out.text == _native(path)
