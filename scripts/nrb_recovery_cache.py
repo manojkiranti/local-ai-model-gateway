@@ -116,6 +116,14 @@ async def do_stats(Session) -> None:
               f"{state:<9} {row['units']:>7}")
     if not payload["versions"]:
         print("   (empty)")
+    # native-3: what the repair did to each cached native unit. `passthrough`
+    # is a unit no repair engine touched (flag off, or the document undetected).
+    print("\n--- native units by repair status ---")
+    repairs = sorted(payload.get("native_repair", []), key=lambda r: r["repair"])
+    for row in repairs:
+        print(f"   {row['repair']:<40} {row['units']:>7}")
+    if not repairs:
+        print("   (none)")
 
 
 async def do_purge(Session, *, sha: str | None, stale_only: bool) -> None:

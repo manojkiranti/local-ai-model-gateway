@@ -270,3 +270,52 @@ def test_archived_documents_are_not_requeued():
 
     stats = _run(go)
     assert stats["total"] == 0
+
+
+def test_document_ids_and_with_the_department_filter():
+    """`document_ids` NARROWS the department scope, never widens it: an id that
+    belongs to another department is not queued (native-3 Task 14 re-ingests
+    named documents, and a stray id must not reach a different corpus)."""
+
+    async def go(session):
+        code_a, dept_a = _seed(session)
+        _code_b, dept_b = _seed(session)
+        await session.flush()
+        named_a, unnamed_a = _make_doc(dept_a.id), _make_doc(dept_a.id)
+        foreign = _make_doc(dept_b.id)
+        session.add_all([named_a, unnamed_a, foreign])
+        await session.commit()
+        stats = await reingest(session, department_code=code_a, dry_run=False,
+                               document_ids=[named_a.id, foreign.id])
+        queued = (
+            await session.execute(
+                select(IngestJob.document_id).where(
+                    IngestJob.document_id.in_([named_a.id, unnamed_a.id, foreign.id])
+                )
+            )
+        ).scalars().all()
+        return stats, set(queued), named_a.id
+
+    stats, queued, named = _run(go)
+    assert stats == {"queued": 1, "skipped": 0, "total": 1}
+    assert queued == {named}
+
+
+def test_an_empty_document_id_list_queues_nothing():
+    """`[]` means "these documents: none" — never "no filter"."""
+
+    async def go(session):
+        code, dept = _seed(session)
+        await session.flush()
+        doc = _make_doc(dept.id)
+        session.add(doc)
+        await session.commit()
+        stats = await reingest(session, department_code=code, dry_run=False, document_ids=[])
+        jobs = (
+            await session.execute(select(IngestJob).where(IngestJob.document_id == doc.id))
+        ).scalars().all()
+        return stats, len(jobs)
+
+    stats, job_count = _run(go)
+    assert stats == {"queued": 0, "skipped": 0, "total": 0}
+    assert job_count == 0
