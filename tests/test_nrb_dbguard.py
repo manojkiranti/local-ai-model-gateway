@@ -141,6 +141,7 @@ OPERATIONAL = {
     # --out is required; the guard fires (or admits) before anything is written.
     "nrb_prod_scope.py": ["--out", "/dev/null"],
     "nrb_native3_detect.py": ["--department", "nrb", "--out", "/dev/null"],
+    "nrb_corpus_fingerprint.py": ["--department", "nrb", "--out", "/dev/null"],
 }
 
 

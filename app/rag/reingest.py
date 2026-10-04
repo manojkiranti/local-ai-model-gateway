@@ -22,6 +22,7 @@ audit (same reasoning as departments never being deleted).
     .venv/bin/python -m app.rag.reingest [--department CODE] [--dry-run]
 
 `--dry-run` reports what would be queued without enqueuing anything at all.
+`--ids-file FILE` limits the run to the listed document ids (native-3 re-ingests only the detected documents).
 """
 
 from __future__ import annotations
@@ -29,6 +30,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+from typing import Sequence
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -41,7 +43,11 @@ log = logging.getLogger("rag.reingest")
 
 
 async def reingest(
-    session: AsyncSession, *, department_code: str | None, dry_run: bool
+    session: AsyncSession,
+    *,
+    department_code: str | None,
+    dry_run: bool,
+    document_ids: Sequence[str] | None = None,
 ) -> dict[str, int]:
     """Queue an ingest job for every non-archived document. Returns a summary.
 
@@ -69,6 +75,8 @@ async def reingest(
         stmt = stmt.join(Department, Department.id == Document.department_id).where(
             Department.code == department_code
         )
+    if document_ids is not None:
+        stmt = stmt.where(Document.id.in_(list(document_ids)))
     documents = list((await session.execute(stmt.order_by(Document.id))).all())
 
     queued = skipped = 0
@@ -89,10 +97,18 @@ async def reingest(
     return {"queued": queued, "skipped": skipped, "total": len(documents)}
 
 
+def read_ids_file(path) -> list[str]:
+    """One document id per line; blank lines ignored."""
+    from pathlib import Path
+
+    return [line.strip() for line in Path(path).read_text().splitlines() if line.strip()]
+
+
 async def _main() -> None:  # pragma: no cover - process entrypoint
     parser = argparse.ArgumentParser(description="Re-queue documents for ingestion.")
     parser.add_argument("--department", default=None, help="Department code to limit to.")
     parser.add_argument("--dry-run", action="store_true", help="Show, don't queue.")
+    parser.add_argument("--ids-file", default=None, help="Only these document ids, one per line.")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
@@ -102,7 +118,10 @@ async def _main() -> None:  # pragma: no cover - process entrypoint
     try:
         async with factory() as session:
             stats = await reingest(
-                session, department_code=args.department, dry_run=args.dry_run
+                session,
+                department_code=args.department,
+                dry_run=args.dry_run,
+                document_ids=read_ids_file(args.ids_file) if args.ids_file else None,
             )
     finally:
         await engine.dispose()
