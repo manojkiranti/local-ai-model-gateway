@@ -121,6 +121,7 @@ __all__ = [
     "ROUTE_OCR",
     "RecoveredDocument",
     "convert_unit",
+    "detect_for_repair",
     "native_unit",
     "ocr_unit",
     "page_routes",
@@ -593,6 +594,19 @@ def ocr_unit(
     )
 
 
+def detect_for_repair(repair: Any | None, native_texts: Sequence[str]) -> tuple[bool, str | None]:
+    """`(document suspect, its warning or None)` — and with no repair engine
+    (`NRB_NATIVE_REPAIR` off) the detector does not run at all: flag off
+    executes nothing native-3 added. `recovery_cache`'s partial refresh calls
+    this too, so the cold and refresh paths cannot disagree."""
+    if repair is None:
+        return False, None
+    detection = fontrepair.detect(native_texts)
+    if not detection.suspect:
+        return False, None
+    return True, f"tounicode_suspected:{detection.density:g}"
+
+
 def native_unit(
     number: int,
     text: str,
@@ -647,11 +661,11 @@ def _recover_pdf(
         warnings.append(f"provenance_unavailable:{prov.error}")
 
     routes = _routes(prov, plan.reason, pages)
-    detection = fontrepair.detect(
-        [text for text, (route, _) in zip(pages, routes) if route == ROUTE_NATIVE]
+    suspect, warning = detect_for_repair(
+        repair, [text for text, (route, _) in zip(pages, routes) if route == ROUTE_NATIVE]
     )
-    if repair is not None and detection.suspect:
-        warnings.append(f"tounicode_suspected:{detection.density:g}")
+    if warning:
+        warnings.append(warning)
 
     out: list[PageText] = []
     for index, (text, (route, why)) in enumerate(zip(pages, routes), start=1):
@@ -666,7 +680,7 @@ def _recover_pdf(
             out.append(ocr_unit(index, path, reason=why, engine=ocr))
         else:
             out.append(native_unit(index, text, reason=why, path=path,
-                                   suspect=detection.suspect, repair=repair))
+                                   suspect=suspect, repair=repair))
     return tuple(out), tuple(warnings)
 
 
@@ -854,15 +868,13 @@ def recover(
             except Exception:  # noqa: BLE001 - fall back to the flat text
                 page_texts = None
         if page_texts is not None:
-            detection = fontrepair.detect(page_texts)
-            warnings = plan.warnings
-            if repair is not None and detection.suspect:
-                warnings = (*plan.warnings, f"tounicode_suspected:{detection.density:g}")
+            suspect, warning = detect_for_repair(repair, page_texts)
+            warnings = (*plan.warnings, warning) if warning else plan.warnings
             return RecoveredDocument(
                 result.family, plan.plan, plan.reason, plan.gate_ratio,
                 tuple(
                     native_unit(i, text, reason=plan.reason, path=path,
-                                suspect=detection.suspect, repair=repair)
+                                suspect=suspect, repair=repair)
                     for i, text in enumerate(page_texts, start=1)
                 ),
                 warnings,

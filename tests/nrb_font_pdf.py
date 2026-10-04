@@ -16,9 +16,28 @@ committed.
 
 from __future__ import annotations
 
+import importlib
 import io
 from pathlib import Path
 from typing import Sequence
+
+import pytest
+
+def _installed(name: str) -> bool:
+    try:
+        importlib.import_module(name)
+    except ImportError:
+        return False
+    return True
+
+
+# Building a Word PDF shapes with HarfBuzz, and the real engine reads fonts with
+# fontTools: a test that does either needs both (requirements-worker.txt). Mark
+# THOSE tests, never the module, so a flag-off test without them still runs.
+NEEDS_SHAPER = pytest.mark.skipif(
+    not (_installed("uharfbuzz") and _installed("fontTools")),
+    reason="uharfbuzz/fontTools (requirements-worker.txt) not installed",
+)
 
 FIXTURES = Path(__file__).parent / "fixtures" / "fonts"
 LOHIT = FIXTURES / "Lohit-Devanagari.ttf"

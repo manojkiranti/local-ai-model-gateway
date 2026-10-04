@@ -7,9 +7,14 @@ import hashlib
 import inspect
 import textwrap
 
-import pytest
+from pathlib import Path
 
-from app.nrb import extraction, recovery
+from app.files import documents as file_documents
+from app.nrb import extraction, fontrepair, recovery
+from tests import nrb_font_pdf as W
+from tests.nrb_font_pdf import NEEDS_SHAPER
+
+LOHIT = W.LOHIT.read_bytes()
 
 # Recorded by Task 5 Step 1, BEFORE recovery.py was edited. If either changes,
 # the routing changed: bump RECOVERY_ROUTING_VERSION (the base version) and
@@ -54,17 +59,6 @@ def test_page_routes_agree_with_what_recover_routes(tmp_path):
     assert [r for r, _ in routes] == [recovery.ROUTE_LEGACY, recovery.ROUTE_OCR, recovery.ROUTE_LEGACY]
 
 
-from pathlib import Path  # noqa: E402
-
-from app.files import documents as file_documents  # noqa: E402
-from app.nrb import fontrepair  # noqa: E402
-
-uharfbuzz = pytest.importorskip("uharfbuzz")
-from tests import nrb_font_pdf as W  # noqa: E402
-
-LOHIT = W.LOHIT.read_bytes()
-
-
 class StubRepair:
     """A repair engine that records calls and answers what it is told to."""
 
@@ -84,6 +78,7 @@ def _classified(path: Path):
     return extraction.extract_file(path, family="pdf", extension="pdf", extractor_version="native-2")
 
 
+@NEEDS_SHAPER
 def test_without_a_repair_engine_recovery_is_byte_identical(tmp_path):
     path = W.word_pdf(tmp_path, LOHIT)
     doc = recovery.recover(path, _classified(path))
@@ -92,6 +87,7 @@ def test_without_a_repair_engine_recovery_is_byte_identical(tmp_path):
     assert not any(w.startswith("tounicode_suspected") for w in doc.warnings)
 
 
+@NEEDS_SHAPER
 def test_a_detected_document_is_repaired_with_the_real_engine(tmp_path):
     path = W.word_pdf(tmp_path, LOHIT)
     doc = recovery.recover(path, _classified(path), repair=fontrepair.FontRepairEngine())
@@ -102,6 +98,7 @@ def test_a_detected_document_is_repaired_with_the_real_engine(tmp_path):
     assert any(w.startswith("tounicode_suspected:") for w in doc.warnings)
 
 
+@NEEDS_SHAPER
 def test_an_undetected_document_never_calls_the_engine(tmp_path):
     """Too little Devanagari to judge (N=500): the engine is not consulted."""
     path = W.word_pdf(tmp_path, LOHIT, repeat=1)
@@ -111,6 +108,7 @@ def test_an_undetected_document_never_calls_the_engine(tmp_path):
     assert doc.pages[0].text == file_documents.read_pdf_pages(path).pages[0]
 
 
+@NEEDS_SHAPER
 def test_an_unrepaired_page_keeps_its_native_text_and_stays_indexable(tmp_path):
     """Rule 6 — the deliberate exception to rule 5 (spec §5.1)."""
     path = W.word_pdf(tmp_path, LOHIT)
@@ -129,6 +127,7 @@ def test_a_failed_legacy_conversion_still_withholds():
     assert page.ok is False and page.text == ""
 
 
+@NEEDS_SHAPER
 def test_a_repair_engine_that_raises_keeps_the_native_text(tmp_path):
     """Review Focus 3."""
     path = W.word_pdf(tmp_path, LOHIT)
@@ -144,3 +143,39 @@ def test_native_unit_without_suspicion_is_plain_passthrough(tmp_path):
                                 suspect=False, repair=stub)
     assert (page.route, page.reason, page.text, page.detail) == (recovery.ROUTE_NATIVE, "clean", "पाठ", {})
     assert stub.calls == []
+
+
+# --------------------------------------------------------------------------- #
+# Flag off executes nothing new (final review minor): no detector, no warning.
+# --------------------------------------------------------------------------- #
+def _detector_must_not_run(*_args, **_kwargs):
+    raise AssertionError("fontrepair.detect ran with no repair engine")
+
+
+def test_flag_off_never_runs_the_detector_on_a_native_pdf(tmp_path, monkeypatch):
+    from app.nrb import quality
+    from tests.test_nrb_recovery import UNICODE_NEPALI, _result, _write_pdf
+
+    path = _write_pdf(tmp_path, "native.pdf", [{"font": "Arial", "embedded": True}])
+    monkeypatch.setattr(fontrepair, "detect", _detector_must_not_run)
+    doc = recovery.recover(
+        path, _result(status=quality.STATUS_EXTRACTED, reason="clean", text=UNICODE_NEPALI, ratio=0.0),
+        pages=[UNICODE_NEPALI],
+    )
+    assert doc.plan == recovery.PLAN_NATIVE
+    assert [(p.text, p.detail) for p in doc.pages] == [(UNICODE_NEPALI, {})]
+    assert doc.warnings == ()
+
+
+def test_flag_off_never_runs_the_detector_on_a_per_page_pdf(tmp_path, monkeypatch):
+    from tests.test_nrb_recovery import PREETI, UNICODE_NEPALI, _result, _write_pdf
+
+    path = _write_pdf(tmp_path, "pages.pdf", [
+        {"font": "ABCDEE+Preeti", "embedded": True}, {"font": "Arial"},  # p2: no_font_provenance
+    ])
+    monkeypatch.setattr(fontrepair, "detect", _detector_must_not_run)
+    doc = recovery.recover(path, _result(text=PREETI), pages=[PREETI, UNICODE_NEPALI])
+    assert doc.plan == recovery.PLAN_PAGES
+    assert doc.pages[1].route == recovery.ROUTE_NATIVE
+    assert (doc.pages[1].text, doc.pages[1].detail) == (UNICODE_NEPALI, {})
+    assert not any(w.startswith("tounicode_suspected") for w in doc.warnings)

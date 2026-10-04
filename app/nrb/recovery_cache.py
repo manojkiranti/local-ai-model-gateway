@@ -425,9 +425,12 @@ def resolve(
         return run_cold("reread_failed")
 
     native_numbers = [u.unit_number for u in cached.units if u.route == recovery.ROUTE_NATIVE]
-    suspect = fontrepair.detect(
-        [page_texts[n - 1] for n in native_numbers if 0 <= n - 1 < len(page_texts)]
-    ).suspect
+    suspect, warning = recovery.detect_for_repair(
+        repair, [page_texts[n - 1] for n in native_numbers if 0 <= n - 1 < len(page_texts)]
+    )
+    warnings = cached.warnings
+    if warning and warning not in warnings:
+        warnings = (*warnings, warning)  # the cold path's warning, at the cold path's place
 
     pages: list[recovery.PageText] = []
     for unit in cached.units:
@@ -466,7 +469,7 @@ def resolve(
         plan_reason=cached.plan_reason,
         gate_ratio=cached.gate_ratio,
         pages=tuple(pages),
-        warnings=cached.warnings,
+        warnings=warnings,
     )
     report.repaired_units, report.unrepaired_units = _repair_counts(document)
     return document, report
