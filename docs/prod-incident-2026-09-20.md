@@ -1057,3 +1057,94 @@ expected document is in the top 12 the model sees (today 6/9 on the smoke set).
 bad answer is attributable to a channel from the stored ranks. *Review loop:*
 re-run the measurement after every retrieval change and after each corpus
 addition, and read the ignored-terms list with a Nepali reader.
+
+### 9.12 Code delivered to `main` (2026-10-04): native-3 dormant, and a local QA run
+
+**Pushed:** `origin/main` = `69f4d45` (`cbdec10..69f4d45`, a fast-forward of
+`feat/native3-font-repair`). It carries everything since the 2026-09-29 database
+delivery that the bank does not yet run:
+
+- the title channel (`cbdec10`, §9.11);
+- `DEFAULT_DEPARTMENTS=nrb` granted once at account creation (`721c6ea`, §9.9's fix);
+- a 200-with-HTML/empty stream reported as an error, not a blank answer (`a09e78c`);
+- **native-3** (`docs/nrb-integration.md` §31), installed **behind
+  `NRB_NATIVE_REPAIR`, default `false`**. Off, every native page is byte-identical
+  to today (654/654 undetected cohort documents), the engine string stays
+  `passthrough/native-2`, nothing goes stale, and the API never loads
+  fontTools/uharfbuzz (subprocess-tested).
+
+Verified before the push: final whole-branch review (Opus), one fix wave
+re-reviewed clean, full suite **2,990 passed / 115 skipped** on the merged tree,
+`alembic heads` = `e1a4c6f9b2d7` (**no migration** — production is already there).
+
+**What to tell the production team**
+
+- Keep the current database; no migration, no data change.
+- Leave `NRB_NATIVE_REPAIR` unset (or `false`). It is NOT to be switched on yet.
+- A rebuilt worker image now installs `fonttools` + `uharfbuzz`
+  (`requirements-worker.txt`); harmless and unused while the flag is off.
+- Their fork still needs its `.pptx` preview feature merged with our code first (§9.9).
+- Smoke test in the NRB tab:
+  1. "ब्याजदर करिडोर भनेको के हो?" → cites *ब्याजदर करिडोरसम्बन्धी कार्यविधि*;
+     the citation's Download opens the PDF.
+  2. "परिपत्र नं. २ (क, ख, ग) २०८३/८४ मा के व्यवस्था गरिएको छ?" → the answer should
+     be drawn from **Circular No. 2**. The title channel brings No. 2 into the passages
+     the model sees, but does **not** rank it first: locally No. 1 still ranked 1st
+     and No. 2 4th. So an answer citing No. 1 is the known weak spot, not a broken
+     deploy.
+  3. "Who is the current Governor of Nepal Rastra Bank?" → says it has no source and
+     names nobody (`NO_SOURCE_PROMPT`; production's `qwen3.5:35b-a3b` is the model
+     that used to invent one, so this is the check that matters).
+  4. A citation from an OCR'd page shows the "machine-recovered — VERIFY" note.
+  5. A first-time AD login sees the NRB tab without an admin grant.
+
+**native-3 status — what is still NOT done.** The repair is proven *safe* but not
+*correct*: CHECKPOINT B, the Nepali reader's sheet `native3-repair` in
+`/home/manoj/nrb-cohort-review.xlsx` (60 rows; 20 cohort rows score; page images
+in `/home/manoj/native3-review-pages`), has **0/60 verdicts**. Until it passes, the
+production repair run, the new release dump, the bank's update steps and the
+flag's default (plan Tasks 13.8 → 18) wait. The ledger that resumes them is
+`.superpowers/sdd/2026-10-02-native3-font-repair/progress.md`. On unseen
+documents the repair passed its gate on only 11 of 145 attempted pages (§31.2),
+against 74.3% on the production scope (§31.1).
+
+**Local QA run (2026-10-04) — the shipped release dump, asked questions on the laptop.**
+
+- Restored `/home/manoj/nrb-release/ai_gateway.pg15.dump` into a throwaway local
+  database `nrb_qa` (338 docs / 26,058 chunks / `e1a4c6f9b2d7`, one admin).
+  **Trap:** Ubuntu's `pg_restore` wrapper picks the newest client, which emits
+  `SET transaction_timeout` and fails on the PG16 server at the first statement;
+  use `/usr/lib/postgresql/16/bin/pg_restore` (the server's own major).
+- **Full chat answers cannot be tested on this laptop.** `qwen2.5:latest` (7B) at
+  Ollama's 32,768-token context needs 6.8 GB against a 6 GB GPU (30% on CPU): a
+  31-token prompt took 32 s, and no real turn (~5k prompt tokens: 21 tool schemas)
+  finished its first step in 15 min. `qwen2.5:3b` fits and searched correctly, then
+  looped while writing the Nepali answer. The chat model is `AGENT_MODEL`, not
+  `DEFAULT_CHAT_MODEL`. Answer quality needs the production model.
+- **Retrieval, tested directly** (the `search_department_docs` code path, no LLM),
+  18 questions drawn from the workbook's `questions` sheet:
+  - expected document ranked **1st for 9 of 14** answerable questions; 2nd–6th for 4;
+    Unified Directives 2068 only 11th (crowded out by its 2069/2070/2075/2076 editions);
+  - Circular No. 2 query: **No. 1 still ranks 1st, No. 2 is 4th** — measured WITH
+    the title channel's code (`cbdec10` is in this tree), so the channel lifts No. 2
+    into the top 12 (§9.11: from outside the pool to rank 7) without fixing the order;
+  - an English question about the forex licensing bylaw did not find it;
+  - the 3 unanswerable questions still get 12 passages (abstention is off by design),
+    so only the prompt rules stand between them and an invented answer.
+- **The finding for native-3:** both garbled native documents were retrieved
+  (बैंकिङ्ग कसूर ऐन rank 1, मनी लाउण्डरिङ्ग ऐन rank 3), but the passage a model reads
+  is the broken text (`ममलाइएको`, `कायधमा हविीय`) with `authoritative` empty — so **no
+  VERIFY caveat** today, unlike OCR pages (`false`). The production repair run is
+  what changes that: repaired text, or the caveat.
+- Throwaway artifacts: database `nrb_qa` and the scripts in the session scratchpad.
+  Drop the database when no longer needed (`DROP DATABASE nrb_qa;`).
+
+**Next: other departments.** The user has the bank's files for other departments.
+`local_ai_gateway_build` (production's ids) holds departments `nrb` (338 ready),
+`policy` (18), `guideline` (9), `hrdept` (0) and `it` (0); the shipped release
+database `ai_gateway` carries `nrb` only, and production's live database now has
+users and chats of its own (deliveries are data-only). **Decide the delivery path
+first:** upload through the API on production (`POST
+/v1/departments/{code}/documents`, the worker ingests there) versus build locally
+and ship a data-only update — the second repeats §9.9's dump/restore work and must
+not overwrite their users, chats or grants.

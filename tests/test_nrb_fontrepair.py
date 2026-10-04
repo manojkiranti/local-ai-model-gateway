@@ -261,7 +261,7 @@ def test_rejoin_keeps_a_line_break_between_letters():
 
 
 def test_rejoin_refuses_an_absent_long_run_in_linear_time():
-    """Review, 2026-10-02: `([ \t]*)\s*` per gap backtracked exponentially when
+    r"""Review, 2026-10-02: `([ \t]*)\s*` per gap backtracked exponentially when
     a run was absent (14 signs: 14.6 s). A Word line has 20+ signs."""
     import time
 

@@ -46,17 +46,17 @@ table nrb_recoveries` on the first query), fixed by moving the 23 tables to
 Any future restore needs the same step before the pipeline, worker or runner
 can touch it.
 
-**The PRODUCTION corpus build is IN PROGRESS in `local_ai_gateway_build` —
-read `docs/prod-incident-2026-09-20.md` §9**, which holds what production's own
+**The PRODUCTION NRB corpus was built in `local_ai_gateway_build` and DELIVERED
+(2026-09-29) — read `docs/prod-incident-2026-09-20.md` §9**, which holds what production's own
 database showed (it never fetched a single NRB file: volume permissions and
 nrb.org.np timeouts), the user's three decisions (fresh-dump cutover, the frozen
 355-file scope, their own files still to come) and the commands to continue.
-**Latest state: §9.9 (delivered 2026-09-29; the bank's General-only tab and its fix), §9.10 (measured next steps: the keyword channel matches nothing for natural questions, the review cohort, the font-repair feasibility) and §9.11 (design A, the title channel, BUILT 2026-09-30: Circular No. 2 not in the pool → rank 7, 5/9 → 6/9 in the top 12, latency median 4 → 37 ms; not deployed).** §9.8 (2026-09-27): the NRB corpus is BUILT — 338/338
+**Latest state: §9.12 (2026-10-04): `main` = `69f4d45` is PUSHED — title channel, `DEFAULT_DEPARTMENTS`, the HTML-200 guard and native-3 (§31) installed behind `NRB_NATIVE_REPAIR` = **false** (byte-identical while off, no migration); what to tell the production team and their smoke test; native-3's flag-on still waits for the Nepali reader's CHECKPOINT B (0/60 verdicts in `/home/manoj/nrb-cohort-review.xlsx`, resume from `.superpowers/sdd/2026-10-02-native3-font-repair/progress.md`); a local QA run of the shipped dump (the laptop cannot run the chat model usefully; retrieval ranks the right document 1st for 9/14); and the NEXT job — the bank's other-department files, whose delivery path (upload on production vs. a local build + data-only update) must be decided first.** Before that: §9.9 (delivered 2026-09-29; the bank's General-only tab and its fix), §9.10 (the keyword channel matches nothing for natural questions) and §9.11 (the title channel: Circular No. 2 from outside the pool to rank 7 — it does not rank first). §9.8 (2026-09-27): the NRB corpus is BUILT — 338/338
 documents `ready`, 26,058 chunks, verified by route split. **Production gets a
 BRAND-NEW database** (one admin + test users; §9.1 — the fresh-dump plan is
 dropped), built and dumped on a local **PostgreSQL 15** because production runs
-15.18. Still open before it ships: §17.6's broken-ToUnicode text in **24 of 73
-native documents** (the PDFs' own maps are wrong — poppler agrees with pypdf —
+15.18. Shipped with two known gaps: §17.6's broken-ToUnicode text in **24 of 73
+native documents** (native-3 is the fix, dormant until CHECKPOINT B) (the PDFs' own maps are wrong — poppler agrees with pypdf —
 and OCR loses 28–53% of the text, so it cannot simply replace it), and
 near-identical titles (Circular No. 2 retrieving No. 1). Run the worker as a
 `systemd-run --user` unit (§9.7), never from a Claude shell.

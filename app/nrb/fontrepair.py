@@ -315,7 +315,7 @@ _LINE_BREAK = re.compile(r"[^ \t]")  # the first non-horizontal whitespace
 
 
 def rejoin(raw: str, runs: Sequence[tuple[str, frozenset[int]]]) -> tuple[str, int] | None:
-    """`raw` with what pypdf's layout split inside a run put back together. Pure.
+    r"""`raw` with what pypdf's layout split inside a run put back together. Pure.
 
     `runs` are (the run as pypdf reads it, the indexes of its hidden joiners),
     in content order. Each run is found in `raw` after the previous one,
