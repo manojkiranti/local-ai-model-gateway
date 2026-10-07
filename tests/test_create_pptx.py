@@ -208,7 +208,8 @@ def test_no_deck_title_means_no_title_slide():
 
     result = _run({"slides": [{"title": "Only"}]})
     record = file_store.get(_link_id(result))
-    assert len(Presentation(record.path).slides) == 1
+    # The content slide, then the closing slide — no cover ahead of them.
+    assert len(Presentation(record.path).slides) == 2
 
 
 def test_table_slide_present():
@@ -393,6 +394,7 @@ def test_saved_record_carries_the_structured_preview():
         "title": "Quarterly Review",
         "subtitle": "Q3 2026",
         "slides": [{"title": "Highlights", "bullets": ["a", "b"]}],
+        "closing": True,
     }
 
 
@@ -403,33 +405,27 @@ def test_filename_suffix_is_forced():
     assert "'presentation.pptx'" in result
 
 
-def test_image_and_chart_cannot_combine_with_bullets_table_or_stats():
-    for field, value in [
-        ("bullets", ["a"]),
-        ("table", {"rows": [["a"]]}),
-        ("stats", [{"value": "1", "label": "l"}]),
-    ]:
-        for media_field, media_value in [
-            ("image", {"file_id": "whatever"}),
-            ("chart", {"chart_type": "bar", "labels": ["a"], "series": [{"data": [1]}]}),
-        ]:
-            result = _run({"slides": [{"title": "x", field: value, media_field: media_value}]})
-            assert result.startswith("ERROR:") and "combines" in result, result
+_CHART = {"chart_type": "bar", "labels": ["a"], "series": [{"data": [1]}]}
 
 
-def test_image_and_chart_together_is_refused():
-    result = _run(
-        {
-            "slides": [
-                {
-                    "title": "x",
-                    "image": {"file_id": "whatever"},
-                    "chart": {"chart_type": "bar", "labels": ["a"], "series": [{"data": [1]}]},
-                }
-            ]
-        }
-    )
-    assert result.startswith("ERROR:") and "both 'image' and 'chart'" in result
+def _preview_keys(result: str) -> list[list[str]]:
+    record = file_store.get(_link_id(result))
+    keys = ("chart", "image", "table", "bullets", "stats")
+    return [[k for k in keys if s.get(k) is not None] for s in record.preview["slides"]]
+
+
+def test_a_table_beside_a_chart_moves_to_its_own_slide():
+    # A table needs the full width, so a chart/image slide carrying one is
+    # split rather than refused (pptx._split_overpacked: refusing made the
+    # model loop to max_iterations with no deck).
+    result = _run({"slides": [{"title": "x", "table": {"rows": [["a"]]}, "chart": _CHART}]})
+    assert _preview_keys(result) == [["chart"], ["table"]]
+
+
+def test_image_and_chart_together_become_two_slides():
+    image_id = _save_image()
+    result = _run({"slides": [{"title": "x", "image": {"file_id": image_id}, "chart": _CHART}]})
+    assert _preview_keys(result) == [["chart"], ["image"]]
 
 
 def test_bad_image_is_error():
@@ -605,7 +601,7 @@ def test_content_slides_use_a_20pt_bold_title_and_16pt_body_but_the_cover_does_n
         }
     )
     prs = Presentation(file_store.get(_link_id(result)).path)
-    cover, bullets_slide, table_slide = prs.slides
+    cover, bullets_slide, table_slide, _closing = prs.slides
 
     for slide in (bullets_slide, table_slide):
         runs = [r for p in slide.shapes.title.text_frame.paragraphs for r in p.runs]
@@ -638,3 +634,72 @@ def test_every_stat_card_run_has_an_explicit_colour():
     for run in runs:
         assert run.font.color.type is not None, f"{run.text!r} inherits the shape colour"
         assert run.font.color.rgb != (0xFF, 0xFF, 0xFF)
+
+
+# ---- closing slide ----------------------------------------------------------
+
+
+def _closing_slide(result):
+    from pptx import Presentation
+
+    return Presentation(file_store.get(_link_id(result)).path).slides[-1]
+
+
+@pytest.mark.parametrize("title", ["Quarterly Review", ""])
+def test_every_deck_ends_on_a_thank_you_slide(title):
+    from pptx.util import Pt
+
+    result = _run({"title": title, "slides": [{"title": "Highlights", "bullets": ["a"]}]})
+    assert "1 slide(s)" in result  # still counts CONTENT slides only
+    slide = _closing_slide(result)
+    runs = [r for s in slide.shapes if s.has_text_frame for p in s.text_frame.paragraphs for r in p.runs]
+    words = [r for r in runs if r.text]
+    assert [r.text for r in words] == [pptx_tool.CLOSING_TEXT]
+    assert words[0].font.size == Pt(pptx_tool.CLOSING_TITLE_PT) and words[0].font.bold
+
+
+@pytest.mark.parametrize("title", ["Quarterly Review", ""])
+def test_closing_slide_shares_the_cover_artwork_without_embedding_it_twice(title):
+    """Even with no deck title (the cover slide is dropped), the closing slide
+    shows the cover art — the same image part, so the file does not grow."""
+    import zipfile
+
+    from pptx.oxml.ns import qn
+
+    result = _run({"title": title, "slides": [{"title": "Only", "bullets": ["a"]}]})
+    slide = _closing_slide(result)
+    blip = slide._element.find(qn("p:cSld")).find(f'{qn("p:bg")}/{qn("p:bgPr")}/{qn("a:blipFill")}/{qn("a:blip")}')
+    assert blip is not None
+    art = slide.part.rels[blip.get(qn("r:embed"))].target_part.blob
+    assert art == pptx_tool.cover_background_bytes()
+    with zipfile.ZipFile(file_store.get(_link_id(result)).path) as zf:
+        same = [n for n in zf.namelist() if n.startswith("ppt/media/") and zf.read(n) == art]
+    assert len(same) == 1
+
+
+def test_closing_slide_has_an_icon_a_transition_and_entrance_animations():
+    from pptx.enum.shapes import MSO_SHAPE, MSO_SHAPE_TYPE
+    from pptx.oxml.ns import qn
+
+    slide = _closing_slide(_run({"title": "T", "slides": [{"title": "One", "bullets": ["a"]}]}))
+    icon = next(s for s in slide.shapes if s.shape_type == MSO_SHAPE_TYPE.GROUP)
+    assert {s.auto_shape_type for s in icon.shapes} == {MSO_SHAPE.OVAL, MSO_SHAPE.HEART}
+
+    sld = slide._element
+    children = [c.tag for c in sld]
+    # Schema order: cSld, clrMapOvr, transition, timing.
+    assert children.index(qn("p:transition")) < children.index(qn("p:timing"))
+    assert sld.find(qn("p:transition")).find(qn("p:fade")) is not None
+
+    timing = sld.find(qn("p:timing"))
+    effects = [
+        (el.get("presetID"), el.find(f'.//{qn("p:spTgt")}').get("spid"))
+        for el in timing.iter(qn("p:cTn"))
+        if el.get("presetClass") == "entr"
+    ]
+    words = next(s for s in slide.shapes if s.has_text_frame and s.text_frame.text == pptx_tool.CLOSING_TEXT)
+    assert effects[0] == ("53", str(icon.shape_id))  # first, the icon zooms in
+    assert ("10", str(words.shape_id)) in effects[1:]  # then the words fade in
+    # Every cTn id in the timing tree is unique, or PowerPoint repairs the file.
+    ids = [el.get("id") for el in timing.iter(qn("p:cTn"))]
+    assert len(ids) == len(set(ids))

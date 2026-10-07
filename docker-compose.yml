@@ -109,6 +109,10 @@ services:
         # two never diverge into an OCR-mismatched pair of the same build.
         INSTALL_OCR: ${INSTALL_OCR:-true}
     command: ["python", "-m", "app.nrb.runner"]
+    # The shared image's HEALTHCHECK polls :8000/health, which only the gateway
+    # serves — inherited here it reports a healthy poll loop as "unhealthy".
+    healthcheck:
+      disable: true
     env_file: .env.docker
     depends_on:
       migrate:

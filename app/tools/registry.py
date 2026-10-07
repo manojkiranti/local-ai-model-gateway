@@ -67,8 +67,13 @@ class ToolRegistry:
         self._mcp: Optional[MCPClient] = None
         self._session: Any = None
 
-    def register_local_tools(self) -> None:
+    def register_local_tools(self, allowed: frozenset[str] | None = None) -> None:
+        """Register the local tools — only those in `allowed` when given (the
+        caller's per-user access, `app/toolaccess`). A tool left out is neither
+        offered to the model nor dispatchable."""
         for spec in LOCAL_TOOLS:
+            if allowed is not None and spec.name not in allowed:
+                continue
             self._tools[spec.name] = RegisteredTool(
                 name=spec.name,
                 ollama_schema=_ollama_schema(spec.name, spec.description, spec.parameters),
@@ -76,11 +81,17 @@ class ToolRegistry:
                 func=spec.func,
             )
 
-    async def load_mcp_tools(self, mcp: MCPClient, session: Any) -> None:
+    async def load_mcp_tools(self, mcp: MCPClient, session: Any, access: Any = None) -> None:
+        """Register the MCP tools the server-wide filter exposed — and, when
+        `access` is given (the caller's `toolaccess.mcp_policy.McpAccess`), only
+        those this user's level/overrides allow. A tool left out is neither
+        offered to the model nor dispatchable."""
         self._mcp = mcp
         self._session = session
         toolset = await mcp.load_toolset(session)
         for tool in toolset.exposed:
+            if access is not None and not access.allows(tool.name):
+                continue
             self._tools[tool.name] = RegisteredTool(
                 name=tool.name, ollama_schema=tool.ollama_schema, backend="mcp"
             )

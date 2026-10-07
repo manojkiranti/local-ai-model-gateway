@@ -1166,6 +1166,24 @@ retained). Runbook: `docs/external-api.md`.
   — the two sides deploy independently and version skew must cost access, not
   produce a 500. `McpIdentity` is a frozen dataclass and NOT a contextvar, so
   unlike `turn_files`/`rag_context` it needs no set-inside-the-generator care.
+- **Per-user MCP tool VISIBILITY is separate from the grants above, and does not
+  contradict "no tool→grant map".** `app/toolaccess/mcp_policy.py` (tables
+  `user_mcp_levels` + `user_mcp_tool_access`, migration `c7e3a9d15b20`, admin
+  routes `/v1/users/{id}/mcp-access`, frontend `McpAccessPanel` on the user page)
+  gives each user a `none`/`read`/`full` level per MCP system — HRMS/iZone/EMS/
+  other, derived from the tool NAME's tokens (never substrings: `list_izone_list_
+  items` contains "ems") — plus per-tool allow/block overrides that beat the
+  level. It decides what the gateway OFFERS the model (`ToolRegistry.load_mcp_tools`
+  drops the rest, so they are not dispatchable either, and `GET /v1/tools` agrees);
+  the grants still decide what the MCP SERVER will run. Three things a rewrite must
+  not lose: (1) the default level is `read`, which is exactly what every user saw
+  before the feature, so shipping it changed nobody's tools; (2) the server-wide
+  `MCP_TOOL_MODE` filter runs FIRST and is a ceiling — `full` only reaches write
+  tools on a deployment running `MCP_TOOL_MODE=all`, and the admin screen shows such
+  tools as "Off server-wide" rather than hiding them; (3) "write" is the read_only
+  classifier INVERTED, so a tool with no read-like token needs `full` — erring
+  toward the stricter level. A per-tool override PUT is refused with 503 while the
+  MCP server is down, rather than storing an unchecked name.
 - **`x-user-roles` is only as trustworthy as the MCP token, and that is the
   documented deployment contract.** `local-llm-mcp` binds `127.0.0.1` and its
   README already states that possession of the shared token grants every tool.

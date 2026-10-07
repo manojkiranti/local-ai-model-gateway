@@ -40,6 +40,8 @@ from ..rag.sources import (
     with_download_urls,
 )
 from ..ollama.client import OllamaClient
+from ..toolaccess.dependencies import get_allowed_local_tools, get_mcp_access
+from ..toolaccess.mcp_policy import McpAccess
 from ..users.models import User
 from .schemas import ChatTurnRequest, ChatTurnResponse, TurnMessage
 
@@ -101,6 +103,8 @@ async def chat(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
     identity: McpIdentity = Depends(get_mcp_identity),
+    local_tools: frozenset[str] = Depends(get_allowed_local_tools),
+    mcp_access: McpAccess = Depends(get_mcp_access),
 ):
     ollama: OllamaClient = request.app.state.ollama
     mcp: MCPClient = request.app.state.mcp
@@ -150,6 +154,7 @@ async def chat(
                     async for event in stream_turn(
                         messages=context, ollama=ollama, mcp=mcp,
                         settings=run_settings, identity=identity,
+                        local_tools=local_tools, mcp_access=mcp_access,
                     ):
                         if event.get("type") == "done":
                             stop_reason = event.get("stop_reason")
@@ -213,6 +218,7 @@ async def chat(
             result = await run_turn(
                 messages=context, ollama=ollama, mcp=mcp,
                 settings=run_settings, identity=identity,
+                local_tools=local_tools, mcp_access=mcp_access,
             )
     except MCPUnavailableError as exc:
         raise HTTPException(status_code=502, detail=exc.message) from exc

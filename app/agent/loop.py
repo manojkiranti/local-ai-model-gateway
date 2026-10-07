@@ -469,6 +469,8 @@ async def stream_turn(
     mcp: MCPClient,
     settings: Settings,
     identity: McpIdentity | None = None,
+    local_tools: frozenset[str] | None = None,
+    mcp_access: Any = None,
 ) -> AsyncIterator[dict[str, Any]]:
     """Build the tool registry (local + MCP) and stream the loop's events.
 
@@ -477,13 +479,15 @@ async def stream_turn(
     scope to the authenticated caller and gate which tools are even visible.
     A connect-time failure raises MCPUnavailableError (streaming callers pre-flight
     reachability); a mid-run failure surfaces as a `done` event, stop_reason=error.
+    `local_tools` limits the local tools to the caller's allowed set (None = all);
+    `mcp_access` does the same for MCP tools (`toolaccess.mcp_policy.McpAccess`).
     """
     registry = ToolRegistry()
-    registry.register_local_tools()
+    registry.register_local_tools(allowed=local_tools)
 
     if mcp.configured:
         async with mcp.session(identity=identity) as session:
-            await registry.load_mcp_tools(mcp, session)
+            await registry.load_mcp_tools(mcp, session, access=mcp_access)
             logger.info(
                 "agent run: %s -> %d tool(s) available %s",
                 describe_identity(identity),
@@ -512,6 +516,8 @@ async def run_turn(
     mcp: MCPClient,
     settings: Settings,
     identity: McpIdentity | None = None,
+    local_tools: frozenset[str] | None = None,
+    mcp_access: Any = None,
 ) -> dict[str, Any]:
     """Collect stream_turn's events into the result dict (non-streaming callers).
 
@@ -521,7 +527,8 @@ async def run_turn(
     """
     done: dict[str, Any] | None = None
     async for event in stream_turn(
-        messages=messages, ollama=ollama, mcp=mcp, settings=settings, identity=identity
+        messages=messages, ollama=ollama, mcp=mcp, settings=settings, identity=identity,
+        local_tools=local_tools, mcp_access=mcp_access,
     ):
         if event.get("type") == "done":
             done = event

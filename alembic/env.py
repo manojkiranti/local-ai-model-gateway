@@ -22,6 +22,7 @@ from app.rag import models as _rag_models  # noqa: F401
 from app.nrb import models as _nrb_models  # noqa: F401
 from app.apikeys import models as _apikeys_models  # noqa: F401
 from app.mcp import models as _mcp_models  # noqa: F401
+from app.toolaccess import models as _toolaccess_models  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:
